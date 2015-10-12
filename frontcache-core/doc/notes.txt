@@ -1,0 +1,15 @@
+<fc:include url="/4/b.jsp" />
+
+url="/4/b.jsp" - local call
+
+url="http://frontcache.org/4/b.jsp" - global call
+
+----
+
+<fc:component cache-max-age="-1" />
+
+cache-max-age="-1" - forever
+
+cache-max-age="0" - never
+
+cache-max-age="60" - 60 sec
