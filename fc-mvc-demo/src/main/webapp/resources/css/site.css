@@ -1,0 +1,23 @@
+
+.l {
+    border-left: 1px solid #99bbe8;
+}
+.r {
+    border-right: 1px solid #99bbe8;
+}
+.b {
+    border-bottom: 1px solid #99bbe8;
+}
+.t {
+    border-top: 1px solid #99bbe8;
+}
+
+.not-cacheable {
+    color: #fff;
+    background-color: #f0ad4e;
+}
+
+.cacheable {
+    color: #fff;
+    background-color: #5cb85c;
+}
