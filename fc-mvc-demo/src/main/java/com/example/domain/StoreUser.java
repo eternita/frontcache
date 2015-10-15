@@ -13,7 +13,12 @@ import org.springframework.security.core.SpringSecurityCoreVersion;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.util.Assert;
 
-public class HRUser implements UserDetails {
+/**
+ * 
+ * Basic user implementation for Spring Security
+ *
+ */
+public class StoreUser implements UserDetails {
 
 
 	private static final long serialVersionUID = SpringSecurityCoreVersion.SERIAL_VERSION_UID;
@@ -27,38 +32,18 @@ public class HRUser implements UserDetails {
 	private  boolean accountNonLocked;
 	private  boolean credentialsNonExpired;
 	private  boolean enabled;
+	
+	private int newMessagesAmount;
 
 	// ~ Constructors
 	// ===================================================================================================
 
-	/**
-	 * Calls the more complex constructor with all boolean arguments set to {@code true}.
-	 */
-	public HRUser(String username, String password,
+	public StoreUser(String username, String password,
 			Collection<? extends GrantedAuthority> authorities) {
 		this(username, password, true, true, true, true, authorities);
 	}
 
-	/**
-	 * Construct the <code>User</code> with the details required by
-	 * {@link org.springframework.security.authentication.dao.DaoAuthenticationProvider}.
-	 *
-	 * @param username the username presented to the
-	 * <code>DaoAuthenticationProvider</code>
-	 * @param password the password that should be presented to the
-	 * <code>DaoAuthenticationProvider</code>
-	 * @param enabled set to <code>true</code> if the user is enabled
-	 * @param accountNonExpired set to <code>true</code> if the account has not expired
-	 * @param credentialsNonExpired set to <code>true</code> if the credentials have not
-	 * expired
-	 * @param accountNonLocked set to <code>true</code> if the account is not locked
-	 * @param authorities the authorities that should be granted to the caller if they
-	 * presented the correct username and password and the user is enabled. Not null.
-	 *
-	 * @throws IllegalArgumentException if a <code>null</code> value was passed either as
-	 * a parameter or as an element in the <code>GrantedAuthority</code> collection
-	 */
-	public HRUser(String username, String password, boolean enabled,
+	public StoreUser(String username, String password, boolean enabled,
 			boolean accountNonExpired, boolean credentialsNonExpired,
 			boolean accountNonLocked, Collection<? extends GrantedAuthority> authorities) {
 
@@ -177,70 +162,48 @@ public class HRUser implements UserDetails {
 		this.enabled = enabled;
 	}
 
-	public HRUser() {
+	public StoreUser() {
 		super();
-		// TODO Auto-generated constructor stub
+	}
+
+	
+	
+	public int getNewMessagesAmount() {
+		return newMessagesAmount;
+	}
+
+	public void setNewMessagesAmount(int newMessagesAmount) {
+		this.newMessagesAmount = newMessagesAmount;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((username == null) ? 0 : username.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		StoreUser other = (StoreUser) obj;
+		if (username == null) {
+			if (other.username != null)
+				return false;
+		} else if (!username.equals(other.username))
+			return false;
+		return true;
 	}
 
 	@Override
 	public String toString() {
-		return "HRUser [username=" + username + ", authorities=" + authorities + ", enabled=" + enabled + "]";
+		return "StoreUser [username=" + username + ", new messages=" + newMessagesAmount + "]";
 	}
 
-	/**
-	 * Returns {@code true} if the supplied object is a {@code User} instance with the
-	 * same {@code username} value.
-	 * <p>
-	 * In other words, the objects are equal if they have the same username, representing
-	 * the same principal.
-	 */
-//	@Override
-//	public boolean equals(Object rhs) {
-//		if (rhs instanceof User) {
-//			return username.equals(((HRUser) rhs).username);
-//		}
-//		return false;
-//	}
-//
-//	/**
-//	 * Returns the hashcode of the {@code username}.
-//	 */
-//	@Override
-//	public int hashCode() {
-//		return username.hashCode();
-//	}
-
-//	@Override
-//	public String toString() {
-//		StringBuilder sb = new StringBuilder();
-//		sb.append(super.toString()).append(": ");
-//		sb.append("Username: ").append(this.username).append("; ");
-//		sb.append("Password: [PROTECTED]; ");
-//		sb.append("Enabled: ").append(this.enabled).append("; ");
-//		sb.append("AccountNonExpired: ").append(this.accountNonExpired).append("; ");
-//		sb.append("credentialsNonExpired: ").append(this.credentialsNonExpired)
-//				.append("; ");
-//		sb.append("AccountNonLocked: ").append(this.accountNonLocked).append("; ");
-//
-//		if (!authorities.isEmpty()) {
-//			sb.append("Granted Authorities: ");
-//
-//			boolean first = true;
-//			for (GrantedAuthority auth : authorities) {
-//				if (!first) {
-//					sb.append(",");
-//				}
-//				first = false;
-//
-//				sb.append(auth);
-//			}
-//		}
-//		else {
-//			sb.append("Not granted any authorities");
-//		}
-//
-//		return sb.toString();
-//	}
-
-	
 }

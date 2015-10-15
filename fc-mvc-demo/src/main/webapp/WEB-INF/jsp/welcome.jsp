@@ -4,6 +4,9 @@
 <h4>welcome page</h4>
 
 
-<a href="mvc/store/product-details-12345">Store MVC</a>
+<a href='<c:url value="/login" />'>login</a>
+<a href='<c:url value="/login?logout" />'>logout</a>
 
-<a href="fcmvc/store/product-details-12345">Store MVC + FC</a>
+<a href="<c:url value="/mvc/store/product-details-12345" />">Store MVC</a>
+
+<a href="<c:url value="/fcmvc/store/product-details-12345" />">Store MVC + FC</a>

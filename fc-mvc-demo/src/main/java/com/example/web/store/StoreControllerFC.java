@@ -1,12 +1,15 @@
 package com.example.web.store;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
+import com.example.domain.StoreUser;
 import com.example.srv.BackendService;
 
 
@@ -51,8 +54,6 @@ public class StoreControllerFC {
    @RequestMapping(value = { "/fcmvc/store/footer" }, method = RequestMethod.GET)
    public String footer(ModelMap map) {
 	   
-//	   backendSrv.getFooterData();
-	   
 	   return "store/fcmvc/footer";
    }
 
@@ -62,12 +63,22 @@ public class StoreControllerFC {
 	   return "store/fcmvc/header";
    }
 
-
-   
    @RequestMapping(value = { "/fcmvc/store/user-info" }, method = RequestMethod.GET)
-   public String headerLogo(ModelMap map) {
+   public String getUserProfile(ModelMap map) {
 
-	   backendSrv.getUserdata();
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();	
+		
+		if (null != authentication && authentication.getPrincipal() instanceof StoreUser)
+		{
+			StoreUser user = (StoreUser) authentication.getPrincipal();
+			
+			// get amount of new messages
+			int newMessagesAmount = backendSrv.getNewMessagesAmount(user.getUsername());
+			user.setNewMessagesAmount(newMessagesAmount);
+			
+			map.put("user", user);
+		}
+	   
        return "store/fcmvc/user_info";
    }
    

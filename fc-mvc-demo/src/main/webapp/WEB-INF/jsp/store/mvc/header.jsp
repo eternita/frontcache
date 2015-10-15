@@ -11,12 +11,12 @@
 			</div>
 
 			<div class="col-lg-4 l not-cacheable" style="height: 100px;">
-	 			<fc:include url="/fcmvc/store/user-info" />
+				<%@ include file="/WEB-INF/jsp/store/mvc/user_info.jsp" %>
 			</div>
 
 			<div class="col-lg-12 t cacheable" style="height: 50px;">
 			
-				<%@ include file="/WEB-INF/jsp/store/fcmvc/main_menu.jsp" %>
+				<%@ include file="/WEB-INF/jsp/store/mvc/main_menu.jsp" %>
 			
 			</div>
 

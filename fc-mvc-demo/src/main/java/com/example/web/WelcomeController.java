@@ -18,4 +18,11 @@ public class WelcomeController {
 	   }
 	    
 
+	   @RequestMapping(value = { "/p/welcome**" }, method = RequestMethod.GET)
+	   public String securedIndex(ModelMap map) {
+	       map.put("msg", "Hello Secured Spring 4 Web MVC! from hobbyray");
+	       return "welcome";
+	   }
+	    
+
 }

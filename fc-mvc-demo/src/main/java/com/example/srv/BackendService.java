@@ -8,21 +8,12 @@ import org.springframework.stereotype.Service;
 public class BackendService {
 
 	private Logger logger = Logger.getLogger(getClass().getName());
-	
-//	public String getMainMenu() {
-//		delay(100);
-//		return "main menu : catalog1 | catalog2 | catalog3 | deals | delivery | about us";
-//	}
-//	
-//	
-//	public String getFooterData() {
-//		delay(100);
-//		return "footer: find location | return policy | about us | ...";
-//	}
 
-	public String getUserdata() {
+	
+	public int getNewMessagesAmount(String username) {
 		delay(100);
-		return "userData";
+		int newMessagesAmount = 3;
+		return newMessagesAmount;
 	}
 	
 	public String getProduct(String productId) {
@@ -32,7 +23,7 @@ public class BackendService {
 	}
 
 	public String getProductRecommendations(String productId) {
-		delay(300);
+		delay(100);
 		return "product recommendations";
 	}
 

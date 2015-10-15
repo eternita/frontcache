@@ -19,23 +19,7 @@
 
 		<!-- start header -->
 		<div align="center" class="row l r t b" >
-
-			<div class="col-lg-4 r cacheable" style="height: 100px;">
-			Logo
-			</div>
-
-			<div class="col-lg-4 cacheable" style="height: 100px;">
-			Search input
-			</div>
-
-			<div class="col-lg-4 l not-cacheable" style="height: 100px;">
-			user profile | messages (3) 
-			<br/> wishlist(1) | cart (2)
-			</div>
-
-			<div class="col-lg-12 t cacheable" style="height: 50px;">
-			Main Menu
-			</div>
+			<%@ include file="/WEB-INF/jsp/store/mvc/header.jsp" %>			
 		</div>
 		<!-- end header -->
 
