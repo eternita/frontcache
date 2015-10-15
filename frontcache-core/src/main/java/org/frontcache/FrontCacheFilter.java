@@ -82,7 +82,7 @@ public class FrontCacheFilter implements Filter {
 
 //		logger.info(content + " - before include");
 
-		content = includeProcessor.processIncludes(content, appOriginBaseURL);
+		content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);
 		
 //		logger.info(content + " - after include");
 		

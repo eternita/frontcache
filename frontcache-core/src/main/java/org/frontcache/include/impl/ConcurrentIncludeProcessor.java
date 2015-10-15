@@ -11,6 +11,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
@@ -21,8 +23,8 @@ import org.frontcache.include.IncludeProcessorBase;
  */
 public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements IncludeProcessor {
 
-	private int threadCount = 20;
-	private long timeout = 3000;
+	private int threadAmount = 1; // default 1 thread
+	private long timeout = 10*1000; // default 10 second
 	
     ExecutorService executor = null;
 
@@ -31,9 +33,27 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	@Override
 	public void init(Properties properties) {
-		threadCount = 20;
-		timeout = 3000;
-	    executor = Executors.newFixedThreadPool(threadCount); 
+		
+		
+		try
+		{
+			String threadAmountStr = properties.getProperty("include_processor.concurent.thread_amount");
+			threadAmount = Integer.parseInt(threadAmountStr); 
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		logger.info("amount of threads: " + threadAmount);
+		
+		try
+		{
+			String timeoutStr = properties.getProperty("include_processor.concurent.timeout");
+			timeout = Integer.parseInt(timeoutStr); 
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		logger.info("timeout: " + timeout);
+		
+	    executor = Executors.newFixedThreadPool(threadAmount); 
 	}
 
 
@@ -49,9 +69,9 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param appOriginBaseURL
 	 * @return
 	 */
-	public String processIncludes(String content, String appOriginBaseURL)
+	public String processIncludes(String content, String appOriginBaseURL, HttpServletRequest httpRequest)
 	{
-		List<IncludeResolutionPlaceholder> includes = parseIncludes(content, appOriginBaseURL);
+		List<IncludeResolutionPlaceholder> includes = parseIncludes(content, appOriginBaseURL, httpRequest);
 		
 		if (null == includes)
 			return content;
@@ -91,7 +111,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param appOriginBaseURL
 	 * @return
 	 */
-	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String appOriginBaseURL)
+	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String appOriginBaseURL, HttpServletRequest httpRequest)
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
 		
@@ -112,7 +132,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 						includes = new ArrayList<IncludeResolutionPlaceholder>();
 					
 					// save placeholder
-					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, appOriginBaseURL + includeURL));
+					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, appOriginBaseURL + includeURL, httpRequest));
 					
 					scanIdx = endIdx;
 				} else {
@@ -162,16 +182,19 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		int endIdx;
 		String includeURL;
 		String content;
-		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL) {
+		HttpServletRequest httpRequest;
+		
+		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, HttpServletRequest httpRequest) {
 			super();
 			this.startIdx = startIdx;
 			this.endIdx = endIdx;
 			this.includeURL = includeURL;
+			this.httpRequest = httpRequest;
 		}
 
 	    @Override
 	    public IncludeResolutionPlaceholder call() throws Exception {
-			this.content = callInclude(this.includeURL);
+			this.content = callInclude(this.includeURL, this.httpRequest);
 	        return this;
 	    }
 		

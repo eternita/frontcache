@@ -8,7 +8,8 @@ import java.net.URLConnection;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-import org.frontcache.include.IncludeProcessor;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * 
@@ -18,11 +19,14 @@ import org.frontcache.include.IncludeProcessor;
 public abstract class IncludeProcessorBase implements IncludeProcessor {
 
 	
-	private Logger logger = Logger.getLogger(getClass().getName());
+	protected Logger logger = Logger.getLogger(getClass().getName());
 
 	protected static final String START_MARKER = "<fc:include";
 	protected static final String END_MARKER = "/>";
 	
+	private static final String SET_COOKIE_SEPARATOR = "; ";
+	private static final String COOKIE = "Cookie";
+
 	public IncludeProcessorBase() {
 	}
 
@@ -60,21 +64,60 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 
 	}
 	
-	
-	protected String callInclude(String url)
-	{
-		String data = new String(callBin(url));
-		logger.info("include call - " + url);
-		return data;
-	}
 
-    private byte[] callBin(String url)
+	/**
+	 * read cookies from original request and convert to string to be passed to further call (include)
+	 * 
+	 * @param httpRequest
+	 * @return
+	 */
+	private String getCookies(HttpServletRequest httpRequest)
+	{
+        Cookie[] cookies = httpRequest.getCookies();
+        if (null != cookies)
+        {
+    		StringBuffer cookieStringBuffer = new StringBuffer();
+
+        	for (int i = 0; i < cookies.length; i++)
+        	{
+        		Cookie c = cookies[i];
+        		if (null == c)
+        			continue;
+        		
+				cookieStringBuffer.append(c.getName());
+				cookieStringBuffer.append("=");
+				cookieStringBuffer.append(c.getValue());
+				if (i + 1 < cookies.length) // has next
+					cookieStringBuffer.append(SET_COOKIE_SEPARATOR);
+        	}
+            return cookieStringBuffer.toString();
+        }		
+        
+        return null;
+	}
+	
+//	protected String callInclude(String url, HttpServletRequest httpRequest)
+//	{
+//		String data = new String(callBin(url, httpRequest));
+//		logger.info("include call - " + url);
+//		return data;
+//	}
+
+	protected String callInclude(String url, HttpServletRequest httpRequest)
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        
         InputStream is = null;
         try {
             URL u = new URL(url);
             URLConnection uc = u.openConnection();
+
+            // translate cookies
+            String cookies = getCookies(httpRequest);
+            if (null != cookies)
+    			uc.setRequestProperty(COOKIE, cookies);
+            
+            
             is = uc.getInputStream();
             int bytesRead = 0;
             int bufferSize = 4000;
@@ -85,7 +128,6 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
         } catch (Exception e) {
         	e.printStackTrace();
             // TODO Auto-generated catch block
-//            Logger.error(ImageUtils.class, e);
         } finally {
             if (null != is)
             {
@@ -94,28 +136,21 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
                 } catch (IOException e) {
                 	e.printStackTrace();
                     // TODO Auto-generated catch block
-//                    Logger.error(ImageUtils.class, e);
                 }
             }
         }
-        return baos.toByteArray();
+        
+		String dataStr = new String(baos.toByteArray());
+        
+        return dataStr;
     }
-
-
 
 	@Override
 	public void init(Properties properties) {
-		// TODO Auto-generated method stub
-		
 	}
-
-
 
 	@Override
 	public void destroy() {
-		// TODO Auto-generated method stub
-		
 	}	
-	
 	
 }
