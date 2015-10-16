@@ -7,6 +7,7 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
+import org.frontcache.WebComponent;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 
 public interface CacheProcessor {
@@ -17,6 +18,9 @@ public interface CacheProcessor {
 
 	public void init(Properties properties);
 	public void destroy();
+	
+	public void putToCache(String url, WebComponent component);
+	public WebComponent getFromCache(String url);
 	
 	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException;
 	

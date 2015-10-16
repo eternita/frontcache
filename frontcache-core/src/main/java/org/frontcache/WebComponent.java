@@ -1,7 +1,6 @@
-package org.frontcache.cache;
+package org.frontcache;
 
 import java.io.Serializable;
-import java.util.Map;
 
 public class WebComponent implements Serializable {
 
@@ -12,9 +11,11 @@ public class WebComponent implements Serializable {
 	 */
 	private static final long serialVersionUID = 1L;
 
-	private Map<String, String> headers;
+//	private Map<String, String> headers;
 
 	private String content;
+	
+	private String contentType;
 	
 	private int cacheMaxAge = 0;
 	
@@ -22,7 +23,6 @@ public class WebComponent implements Serializable {
 	
 	
 	public WebComponent() {
-		// TODO Auto-generated constructor stub
 	}
 
 	public boolean isCacheable()
@@ -39,16 +39,13 @@ public class WebComponent implements Serializable {
 		this.cacheMaxAge = cacheMaxAge;
 	}
 
+	public String getContentType() {
+		return contentType;
+	}
 
-//	public String getUrl() {
-//		return url;
-//	}
-//
-//
-//	public void setUrl(String url) {
-//		this.url = url;
-//	}
-
+	public void setContentType(String contentType) {
+		this.contentType = contentType;
+	}
 
 	public String getContent() {
 		return content;
@@ -57,14 +54,6 @@ public class WebComponent implements Serializable {
 
 	public void setContent(String content) {
 		this.content = content;
-	}
-
-	public Map<String, String> getHeaders() {
-		return headers;
-	}
-
-	public void setHeaders(Map<String, String> headers) {
-		this.headers = headers;
 	}
 	
 }

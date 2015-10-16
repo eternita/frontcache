@@ -11,29 +11,28 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
+import org.frontcache.FCUtils;
+import org.frontcache.WebComponent;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 
 public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = Logger.getLogger(getClass().getName());
 
-	private static final String CONTENT_TYPE_KEY = "CONTENT_TYPE_KEY";
-
-	abstract protected void putToCache(String url, WebComponent component);
-	abstract protected WebComponent getFromCache(String url);
+//	private static final String CONTENT_TYPE_KEY = "CONTENT_TYPE_KEY";
 	
 	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException 
 	{
 	
 		String urlStr = getRequestURL(httpRequest);
 		
-		WebComponent cachedRequest = getFromCache(urlStr);
+		WebComponent cachedWebComponent = getFromCache(urlStr);
 		
 		String content = null;
-		Map<String, String> headers = null;
+//		Map<String, String> headers = null;
 
 		
-		if (null == cachedRequest)
+		if (null == cachedWebComponent)
 		{
 			logger.info(urlStr + " - dynamic call");
 			
@@ -41,120 +40,35 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 						
 			content = response.getContentString();
 			
-			cachedRequest = str2component(content);
+			cachedWebComponent = FCUtils.parseWebComponent(content);
 			
 			// save to cache
-			if (cachedRequest.isCacheable())
+			if (cachedWebComponent.isCacheable())
 			{
 				// cache headers as well
-				headers = new HashMap<String, String>();
-				for (String headerKey : response.getHeaderNames())
-					headers.put(headerKey, response.getHeader(headerKey));
+//				headers = new HashMap<String, String>();
+//				for (String headerKey : response.getHeaderNames())
+//					headers.put(headerKey, response.getHeader(headerKey));
 
-				headers.put(CONTENT_TYPE_KEY, response.getContentType());
+//				headers.put(CONTENT_TYPE_KEY, response.getContentType());
 
-				cachedRequest.setHeaders(headers);
+				cachedWebComponent.setContentType(response.getContentType());
 				
-				putToCache(urlStr, cachedRequest);
+				putToCache(urlStr, cachedWebComponent);
 			}
 			
 		} else {
 			
 			logger.info(urlStr + " - cache hit");
-			content = cachedRequest.getContent();
-			headers = cachedRequest.getHeaders();
-			response.setContentType(headers.get(CONTENT_TYPE_KEY));
+			content = cachedWebComponent.getContent();
+//			headers = cachedWebComponent.getHeaders();
+			response.setContentType(cachedWebComponent.getContentType());
 			
 		}
 
 		
 		return content;
 	}
-	
-	/**
-	 * wrap String to WebComponent.
-	 * Check for header - extract caching options.
-	 * 
-	 * @param content
-	 * @return
-	 */
-	private WebComponent str2component (String content)
-	{
-		WebComponent component = new WebComponent();
-		
-		int cacheMaxAgeSec = DEFAULT_CACHE_MAX_AGE;
-		
-		String outStr = null;
-		final String START_MARKER = "<fc:component";
-		final String END_MARKER = "/>";
-		
-		int startIdx = content.indexOf(START_MARKER);
-		if (-1 < startIdx)
-		{
-			int endIdx = content.indexOf(END_MARKER, startIdx);
-			if (-1 < endIdx)
-			{
-				String includeTagStr = content.substring(startIdx, endIdx + END_MARKER.length());
-				cacheMaxAgeSec = getCacheMaxAge(includeTagStr);
-				
-				
-				// exclude tag from content
-				outStr = content.substring(0, startIdx)   +   
-						 content.substring(endIdx + END_MARKER.length(), content.length());
-				
-			} else {
-				// can't find closing 
-				outStr = content;
-			}
-			
-			
-		} else {
-			outStr = content;
-		}
-
-		component.setContent(outStr);
-		component.setCacheMaxAge(cacheMaxAgeSec);
-		
-		return component;
-	}
-	
-	/**
-	 * 
-	 * @param content
-	 * @return
-	 */
-	private int getCacheMaxAge(String content)
-	{
-		logger.info("component tag - " + content);
-		final String START_MARKER = "cache-max-age=\"";
-		int startIdx = content.indexOf(START_MARKER);
-		if (-1 < startIdx)
-		{
-			int endIdx = content.indexOf("\"", startIdx + START_MARKER.length());
-			if (-1 < endIdx)
-			{
-				String maxAgeStr = content.substring(startIdx + START_MARKER.length(), endIdx);
-				logger.info("component cache-max-age - " + maxAgeStr);
-				try
-				{
-					return Integer.parseInt(maxAgeStr);
-				} catch (Exception e) {
-					logger.warning("can't parse component cache-max-age - " + maxAgeStr + " defalut is used (" + DEFAULT_CACHE_MAX_AGE + ")");
-					return DEFAULT_CACHE_MAX_AGE;
-				}
-				
-			} else {
-				// can't find closing 
-				return DEFAULT_CACHE_MAX_AGE;
-			}
-			
-			
-		} else {
-			// no cache-max-age attribute
-			return DEFAULT_CACHE_MAX_AGE;
-		}
-
-	}	
 	
 	
 	/**

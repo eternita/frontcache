@@ -2,9 +2,9 @@ package org.frontcache.cache.impl.ehcache;
 
 import java.util.Properties;
 
+import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
-import org.frontcache.cache.WebComponent;
 
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
@@ -66,13 +66,13 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 
 
 	@Override
-	protected void putToCache(String url, WebComponent component) {
+	public void putToCache(String url, WebComponent component) {
 		logger.info(url);
 		cache.put(new Element(url, component));
 	}
 
 	@Override
-	protected WebComponent getFromCache(String url) {
+	public WebComponent getFromCache(String url) {
 		logger.info(url);
 		Element el = cache.get(url);
 		if (null != el)

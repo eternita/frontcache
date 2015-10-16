@@ -13,3 +13,12 @@ cache-max-age="-1" - forever
 cache-max-age="0" - never
 
 cache-max-age="60" - 60 sec
+
+---
+
+Cache use complete URL as key. e.g.
+http://localhost:8080/fc-mvc-demo/fcmvc/store/product-details-12345
+http://localhost:8080/fc-mvc-demo/fcmvc/store/user-info
+
+----
+Includes are "read only" from http-headers prospective - e.g. http-headers/cookies which set inside includes are not visible

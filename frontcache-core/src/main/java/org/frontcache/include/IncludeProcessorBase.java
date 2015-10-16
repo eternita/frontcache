@@ -3,6 +3,7 @@ package org.frontcache.include;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Properties;
@@ -10,6 +11,10 @@ import java.util.logging.Logger;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
+
+import org.frontcache.FCUtils;
+import org.frontcache.WebComponent;
+import org.frontcache.cache.CacheProcessor;
 
 /**
  * 
@@ -27,10 +32,16 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	private static final String SET_COOKIE_SEPARATOR = "; ";
 	private static final String COOKIE = "Cookie";
 
+	protected CacheProcessor cacheProcessor;
+	
 	public IncludeProcessorBase() {
 	}
 
 	
+	public void setCacheProcessor(CacheProcessor cacheProcessor)
+	{
+		this.cacheProcessor = cacheProcessor;
+	}
 	
 
 	/**
@@ -95,22 +106,28 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
         
         return null;
 	}
-	
-//	protected String callInclude(String url, HttpServletRequest httpRequest)
-//	{
-//		String data = new String(callBin(url, httpRequest));
-//		logger.info("include call - " + url);
-//		return data;
-//	}
 
-	protected String callInclude(String url, HttpServletRequest httpRequest)
+	protected String callInclude(String urlSrt, HttpServletRequest httpRequest)
     {
+
+		// check if cache is ON and response is cached
+		if (null != cacheProcessor)
+		{
+			WebComponent cachedWebComponent = cacheProcessor.getFromCache(urlSrt);
+			if (null != cachedWebComponent)
+				return cachedWebComponent.getContent();
+		}
+		
+		
+		// do dynamic call 
+		int httpResponseCode = -1;
+		String contentType = "";
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         
         InputStream is = null;
         try {
-            URL u = new URL(url);
-            URLConnection uc = u.openConnection();
+            URL u = new URL(urlSrt);
+            HttpURLConnection uc = (HttpURLConnection) u.openConnection();
 
             // translate cookies
             String cookies = getCookies(httpRequest);
@@ -125,6 +142,9 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
              while ((bytesRead = is.read(byteBuffer)) != -1) {
                  baos.write(byteBuffer, 0, bytesRead);
              }
+             
+             httpResponseCode = uc.getResponseCode();
+             contentType = uc.getContentType();
         } catch (Exception e) {
         	e.printStackTrace();
             // TODO Auto-generated catch block
@@ -139,8 +159,22 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
                 }
             }
         }
+		
+        String dataStr = new String(baos.toByteArray());
         
-		String dataStr = new String(baos.toByteArray());
+        if (200 == httpResponseCode || 201 == httpResponseCode)
+        {
+        	// response is OK -> check if response is subject to cache
+    		if (null != cacheProcessor)
+    		{
+    			WebComponent cachedWebComponent = FCUtils.parseWebComponent(dataStr);
+    			if (cachedWebComponent.isCacheable())
+    			{
+    				cachedWebComponent.setContentType(contentType);
+    				cacheProcessor.putToCache(urlSrt, cachedWebComponent);
+    			}
+    		}
+        }
         
         return dataStr;
     }
