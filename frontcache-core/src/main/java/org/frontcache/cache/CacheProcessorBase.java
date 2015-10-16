@@ -2,8 +2,6 @@ package org.frontcache.cache;
 
 import java.io.IOException;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -18,8 +16,6 @@ import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = Logger.getLogger(getClass().getName());
-
-//	private static final String CONTENT_TYPE_KEY = "CONTENT_TYPE_KEY";
 	
 	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException 
 	{
@@ -29,7 +25,6 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		WebComponent cachedWebComponent = getFromCache(urlStr);
 		
 		String content = null;
-//		Map<String, String> headers = null;
 
 		
 		if (null == cachedWebComponent)
@@ -45,15 +40,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			// save to cache
 			if (cachedWebComponent.isCacheable())
 			{
-				// cache headers as well
-//				headers = new HashMap<String, String>();
-//				for (String headerKey : response.getHeaderNames())
-//					headers.put(headerKey, response.getHeader(headerKey));
-
-//				headers.put(CONTENT_TYPE_KEY, response.getContentType());
-
 				cachedWebComponent.setContentType(response.getContentType());
-				
 				putToCache(urlStr, cachedWebComponent);
 			}
 			
@@ -61,12 +48,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			
 			logger.info(urlStr + " - cache hit");
 			content = cachedWebComponent.getContent();
-//			headers = cachedWebComponent.getHeaders();
 			response.setContentType(cachedWebComponent.getContentType());
-			
 		}
 
-		
 		return content;
 	}
 	

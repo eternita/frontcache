@@ -16,9 +16,10 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	
 	private static final String EHCACHE_CONFIG_FILE_KEY = "cache.ehcache_config";
 	
-	private static final String FRONT_CACHE = "FRONT_CACHE";
+	private static final String FRONT_CACHE = "FRONT_CACHE"; // cache name inside config file (e.g. ehcache-config.xml)
 
 	CacheManager ehCacheMgr = null;
+	
     Cache cache = null;
 	
 
@@ -64,21 +65,34 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 		}
 	}	
 
-
+	/**
+	 * 
+	 */
 	@Override
 	public void putToCache(String url, WebComponent component) {
 		logger.info(url);
 		cache.put(new Element(url, component));
 	}
 
+	/**
+	 * 
+	 */
 	@Override
 	public WebComponent getFromCache(String url) {
 		logger.info(url);
 		Element el = cache.get(url);
-		if (null != el)
-			return (WebComponent) el.getObjectValue();
+		if (null == el)
+			return null;
 		
-		return null;
+		WebComponent comp = (WebComponent) el.getObjectValue();
+
+		if (comp.isExpired())
+		{
+			cache.remove(url);
+			return null;
+		}
+		
+		return comp;
 	}	
 
 

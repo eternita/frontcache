@@ -60,7 +60,18 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 
 	@Override
 	public WebComponent getFromCache(String url) {
-		return cache.get(url);
+		
+		WebComponent comp = cache.get(url);
+		if (null == comp)
+			return null;
+		
+		if (comp.isExpired())
+		{
+			cache.remove(url);
+			return null;
+		}
+		
+		return comp;
 	}
 
 	@Override

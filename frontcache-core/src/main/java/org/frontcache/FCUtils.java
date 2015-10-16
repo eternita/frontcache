@@ -20,9 +20,7 @@ public class FCUtils {
 	 */
 	public static final WebComponent parseWebComponent (String content)
 	{
-		WebComponent component = new WebComponent();
-		
-		int cacheMaxAgeSec = CacheProcessor.DEFAULT_CACHE_MAX_AGE;
+		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
 		
 		String outStr = null;
 		final String START_MARKER = "<fc:component";
@@ -51,8 +49,7 @@ public class FCUtils {
 			outStr = content;
 		}
 
-		component.setContent(outStr);
-		component.setCacheMaxAge(cacheMaxAgeSec);
+		WebComponent component = new WebComponent(outStr, cacheMaxAgeSec);
 		
 		return component;
 	}
@@ -60,7 +57,7 @@ public class FCUtils {
 	/**
 	 * 
 	 * @param content
-	 * @return
+	 * @return time to live in cache in seconds
 	 */
 	private static int getCacheMaxAge(String content)
 	{
@@ -78,19 +75,19 @@ public class FCUtils {
 				{
 					return Integer.parseInt(maxAgeStr);
 				} catch (Exception e) {
-					logger.warning("can't parse component cache-max-age - " + maxAgeStr + " defalut is used (" + CacheProcessor.DEFAULT_CACHE_MAX_AGE + ")");
-					return CacheProcessor.DEFAULT_CACHE_MAX_AGE;
+					logger.warning("can't parse component cache-max-age - " + maxAgeStr + " defalut is used (NO_CACHE)");
+					return CacheProcessor.NO_CACHE;
 				}
 				
 			} else {
 				// can't find closing 
-				return CacheProcessor.DEFAULT_CACHE_MAX_AGE;
+				return CacheProcessor.NO_CACHE;
 			}
 			
 			
 		} else {
 			// no cache-max-age attribute
-			return CacheProcessor.DEFAULT_CACHE_MAX_AGE;
+			return CacheProcessor.NO_CACHE;
 		}
 
 	}	
