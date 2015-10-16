@@ -4,9 +4,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
-import org.frontcache.cache.WebComponent;
 
 public class InMemoryCache extends CacheProcessorBase implements CacheProcessor {
 
@@ -44,7 +44,7 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 	}	
 
 	@Override
-	protected void putToCache(String url, WebComponent component) {
+	public void putToCache(String url, WebComponent component) {
 		
 		int newSize = currentSize + component.getContent().length();
 		if (newSize < maxSize)
@@ -59,7 +59,7 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 	}
 
 	@Override
-	protected WebComponent getFromCache(String url) {
+	public WebComponent getFromCache(String url) {
 		return cache.get(url);
 	}
 

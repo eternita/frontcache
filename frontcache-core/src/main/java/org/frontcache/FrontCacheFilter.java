@@ -37,7 +37,6 @@ public class FrontCacheFilter implements Filter {
 	@Override
 	public void init(FilterConfig arg0) throws ServletException {
 
-		
 		cacheProcessor = CacheManager.getInstance();
 		
 		includeProcessor = IncludeProcessorManager.getInstance();
@@ -79,24 +78,21 @@ public class FrontCacheFilter implements Filter {
 			content = wrappedResponse.getContentString();
 		}
 
-
-//		logger.info(content + " - before include");
-
 		content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);
-		
-//		logger.info(content + " - after include");
-		
 		
 		// populate input response		
 		populateOriginalResponse(response, wrappedResponse, content);
 		return;
 	}
-	
+
+	/**
+	 * 
+	 * @param httpResponse
+	 * @return
+	 */
 	private FrontCacheHttpResponseWrapper getHttpResponseWrapper(HttpServletResponse httpResponse)
 	{
 		FrontCacheHttpResponseWrapper wrappedResponse = new HttpResponseWrapperImpl(httpResponse);
-//		HttpResponseWrapper4Static wrappedResponse = new HttpResponseWrapper4Static(httpResponse);
-		
 		return wrappedResponse;
 	}
 
@@ -114,8 +110,8 @@ public class FrontCacheFilter implements Filter {
 		byte[] data = content.getBytes();
 		originalResponse.getOutputStream().write(data);
 		originalResponse.setContentLengthLong(data.length);
-		// TODO: set for cached only ?
-		originalResponse.setCharacterEncoding(UTF8);
+
+		originalResponse.setCharacterEncoding(UTF8); // ? support other encodings
 		originalResponse.setContentType(wrappedResponse.getContentType());
 	}
 
