@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -15,6 +14,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.frontcache.FCUtils;
 import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.reqlog.RequestLogger;
 
 /**
  * 
@@ -107,15 +107,20 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
         return null;
 	}
 
-	protected String callInclude(String urlSrt, HttpServletRequest httpRequest)
+	protected String callInclude(String urlStr, HttpServletRequest httpRequest)
     {
 
+		long start = System.currentTimeMillis();
 		// check if cache is ON and response is cached
 		if (null != cacheProcessor)
 		{
-			WebComponent cachedWebComponent = cacheProcessor.getFromCache(urlSrt);
+			WebComponent cachedWebComponent = cacheProcessor.getFromCache(urlStr);
 			if (null != cachedWebComponent)
+			{
+				
+				RequestLogger.logRequest(urlStr, false, System.currentTimeMillis() - start);
 				return cachedWebComponent.getContent();
+			}
 		}
 		
 		
@@ -126,7 +131,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
         
         InputStream is = null;
         try {
-            URL u = new URL(urlSrt);
+            URL u = new URL(urlStr);
             HttpURLConnection uc = (HttpURLConnection) u.openConnection();
 
             // translate cookies
@@ -171,11 +176,14 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
     			if (cachedWebComponent.isCacheable())
     			{
     				cachedWebComponent.setContentType(contentType);
-    				cacheProcessor.putToCache(urlSrt, cachedWebComponent);
+    				cacheProcessor.putToCache(urlStr, cachedWebComponent);
     			}
     		}
         }
-        
+//        TODO: fix it for remote includes
+//    FOR THE SAME APP -> DO NOT LOG DYNAMIC REQUEST - IT WILL BE LOGGED in PageCacheFilter    
+//		RequestLogger.logRequest(urlStr, true, System.currentTimeMillis() - start);
+		
         return dataStr;
     }
 

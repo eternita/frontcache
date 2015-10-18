@@ -23,6 +23,13 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 			String maxSizeStr = properties.getProperty("cache.inmemory.maxsize");
 			String countStr = maxSizeStr;
 			
+			if (null == maxSizeStr)
+			{
+				logger.info("cache.inmemory.maxsize is not defined. Please define");
+				logger.info("max cache size is " + maxSize);
+				return;
+			}
+			
 			if (maxSizeStr.endsWith("G"))
 			{
 				countStr = maxSizeStr.substring(0, maxSizeStr.indexOf("G"));
