@@ -16,6 +16,7 @@ import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
+import org.frontcache.reqlog.RequestLogger;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 import org.frontcache.wrapper.HttpResponseWrapperImpl;
 
@@ -41,6 +42,8 @@ public class FrontCacheFilter implements Filter {
 		
 		includeProcessor = IncludeProcessorManager.getInstance();
 			
+		includeProcessor.setCacheProcessor(cacheProcessor);
+		
 		return;
 	}
 
@@ -73,9 +76,14 @@ public class FrontCacheFilter implements Filter {
 		{
 			content = cacheProcessor.processCacheableRequest(httpRequest, wrappedResponse, chain);
 		} else {
-			logger.info(httpRequest.getRequestURL().toString() + " - dynamic call");
+			long start = System.currentTimeMillis();
+			boolean isRequestDynamic = true;
+			
 			chain.doFilter(request, wrappedResponse); // run request to origin
 			content = wrappedResponse.getContentString();
+			
+			RequestLogger.logRequest(httpRequest.getRequestURL().toString(), isRequestDynamic, System.currentTimeMillis() - start);
+			
 		}
 
 		content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);

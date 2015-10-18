@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.frontcache.FCUtils;
 import org.frontcache.WebComponent;
+import org.frontcache.reqlog.RequestLogger;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 
 public abstract class CacheProcessorBase implements CacheProcessor {
@@ -19,7 +20,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	
 	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException 
 	{
-	
+		long start = System.currentTimeMillis();
+		boolean isRequestDynamic = true;
+
 		String urlStr = getRequestURL(httpRequest);
 		
 		WebComponent cachedWebComponent = getFromCache(urlStr);
@@ -29,7 +32,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		
 		if (null == cachedWebComponent)
 		{
-			logger.info(urlStr + " - dynamic call");
+			isRequestDynamic = true;
 			
 			chain.doFilter(httpRequest, response); // run request to origin
 						
@@ -46,11 +49,12 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			
 		} else {
 			
-			logger.info(urlStr + " - cache hit");
+			isRequestDynamic = false;
 			content = cachedWebComponent.getContent();
 			response.setContentType(cachedWebComponent.getContentType());
 		}
 
+		RequestLogger.logRequest(httpRequest.getRequestURL().toString(), isRequestDynamic, System.currentTimeMillis() - start);
 		return content;
 	}
 	
