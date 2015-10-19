@@ -82,7 +82,7 @@ public class FrontCacheFilter implements Filter {
 			chain.doFilter(request, wrappedResponse); // run request to origin
 			content = wrappedResponse.getContentString();
 			
-			RequestLogger.logRequest(httpRequest.getRequestURL().toString(), isRequestDynamic, System.currentTimeMillis() - start);
+			RequestLogger.logRequest(httpRequest.getRequestURL().toString(), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
 			
 		}
 
