@@ -54,7 +54,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			response.setContentType(cachedWebComponent.getContentType());
 		}
 
-		RequestLogger.logRequest(httpRequest.getRequestURL().toString(), isRequestDynamic, System.currentTimeMillis() - start);
+		RequestLogger.logRequest(httpRequest.getRequestURL().toString(), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
 		return content;
 	}
 	

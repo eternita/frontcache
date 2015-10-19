@@ -118,7 +118,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			if (null != cachedWebComponent)
 			{
 				
-				RequestLogger.logRequest(urlStr, false, System.currentTimeMillis() - start);
+				RequestLogger.logRequest(urlStr, false, System.currentTimeMillis() - start, (null == cachedWebComponent.getContent()) ? -1 : cachedWebComponent.getContent().length());
 				return cachedWebComponent.getContent();
 			}
 		}
