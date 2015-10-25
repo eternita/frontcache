@@ -25,14 +25,14 @@ public class FrontCacheTest {
 		webClient.close();
 	}
 
-	@Test
-	public void staticRead() throws Exception {
-
-		TextPage page = webClient.getPage(BASE_URI + "1/a.txt");
-		String pageAsText = page.getContent();
-		assertEquals("a", pageAsText);
-	}
-
+//	@Test
+//	public void staticRead() throws Exception {
+//
+//		TextPage page = webClient.getPage(BASE_URI + "1/a.txt");
+//		String pageAsText = page.getContent();
+//		assertEquals("a", pageAsText);
+//	}
+//
 //	@Test
 //	public void staticInclude() throws Exception {
 //		

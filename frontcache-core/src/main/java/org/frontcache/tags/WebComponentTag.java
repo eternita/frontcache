@@ -17,7 +17,7 @@ public class WebComponentTag extends SimpleTagSupport {
 	public void doTag() throws JspException, IOException {
 
 		JspWriter out = getJspContext().getOut();
-		out.println("<fc:component cache-max-age=\"" + maxage + "\" />");
+		out.println("<fc:component maxage=\"" + maxage + "\" />");
 	}
 
 }

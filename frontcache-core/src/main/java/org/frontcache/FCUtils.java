@@ -61,8 +61,7 @@ public class FCUtils {
 	 */
 	private static int getCacheMaxAge(String content)
 	{
-		logger.info("component tag - " + content);
-		final String START_MARKER = "cache-max-age=\"";
+		final String START_MARKER = "maxage=\"";
 		int startIdx = content.indexOf(START_MARKER);
 		if (-1 < startIdx)
 		{
@@ -70,23 +69,24 @@ public class FCUtils {
 			if (-1 < endIdx)
 			{
 				String maxAgeStr = content.substring(startIdx + START_MARKER.length(), endIdx);
-				logger.info("component cache-max-age - " + maxAgeStr);
 				try
 				{
 					return Integer.parseInt(maxAgeStr);
 				} catch (Exception e) {
-					logger.warning("can't parse component cache-max-age - " + maxAgeStr + " defalut is used (NO_CACHE)");
+					logger.info("can't parse component maxage - " + maxAgeStr + " defalut is used (NO_CACHE)");
 					return CacheProcessor.NO_CACHE;
 				}
 				
 			} else {
+				logger.info("no closing tag for - " + content);
 				// can't find closing 
 				return CacheProcessor.NO_CACHE;
 			}
 			
 			
 		} else {
-			// no cache-max-age attribute
+			// no maxage attribute
+			logger.info("no maxage attribute for - " + content);
 			return CacheProcessor.NO_CACHE;
 		}
 

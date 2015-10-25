@@ -89,7 +89,7 @@ public class FrontCacheFilter implements Filter {
 		content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);
 		
 		// populate input response		
-		populateOriginalResponse(response, wrappedResponse, content);
+		populateOriginalResponse((HttpServletResponse) response, wrappedResponse, content);
 		return;
 	}
 
@@ -112,15 +112,16 @@ public class FrontCacheFilter implements Filter {
 	 * @param content
 	 * @throws IOException
 	 */
-	private void populateOriginalResponse(ServletResponse originalResponse, FrontCacheHttpResponseWrapper wrappedResponse, String content) throws IOException
+	private void populateOriginalResponse(HttpServletResponse originalResponse, FrontCacheHttpResponseWrapper wrappedResponse, String content) throws IOException
 	{
 		// populate input response		
-		byte[] data = content.getBytes();
-		originalResponse.getOutputStream().write(data);
-		originalResponse.setContentLengthLong(data.length);
+//		byte[] data = content.getBytes();
+//		originalResponse.setContentLengthLong(data.length);
 
 		originalResponse.setCharacterEncoding(UTF8); // ? support other encodings
 		originalResponse.setContentType(wrappedResponse.getContentType());
+//		originalResponse.getOutputStream().write(data);
+		originalResponse.getWriter().write(content);
 	}
 
 	
