@@ -1,1 +1,1 @@
-<fc:component cache-max-age="0" />a
+<fc:component maxage="0" />a
