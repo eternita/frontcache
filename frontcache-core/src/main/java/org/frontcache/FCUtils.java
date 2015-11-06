@@ -1,6 +1,9 @@
 package org.frontcache;
 
+import java.util.Enumeration;
 import java.util.logging.Logger;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.frontcache.cache.CacheProcessor;
 
@@ -10,6 +13,38 @@ public class FCUtils {
 	}
 	
 	private static Logger logger = Logger.getLogger(FCUtils.class.getName());
+	
+	
+	/**
+	 * 
+	 * @param request
+	 * @return
+	 */
+	public static String getRequestURL(HttpServletRequest request)
+	{
+        String requestURL = request.getRequestURL().toString();
+        
+        if ("GET".equals(request.getMethod()))
+        {
+        	// add parameters for storing 
+        	// POST method parameters are not stored because they can be huge (e.g. file upload)
+        	StringBuffer sb = new StringBuffer(requestURL);
+        	Enumeration paramNames = request.getParameterNames();
+        	if (paramNames.hasMoreElements())
+        		sb.append("?");
+
+        	while (paramNames.hasMoreElements()){
+        		String name = (String) paramNames.nextElement();
+        		sb.append(name).append("=").append(request.getParameter(name));
+        		
+        		if (paramNames.hasMoreElements())
+        			sb.append("&");
+        	}
+        	requestURL = sb.toString();
+        }	
+        return requestURL;
+	}
+	
 
 	/**
 	 * wrap String to WebComponent.

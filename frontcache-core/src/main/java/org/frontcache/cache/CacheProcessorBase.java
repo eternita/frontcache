@@ -1,7 +1,6 @@
 package org.frontcache.cache;
 
 import java.io.IOException;
-import java.util.Enumeration;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -23,7 +22,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		long start = System.currentTimeMillis();
 		boolean isRequestDynamic = true;
 
-		String urlStr = getRequestURL(httpRequest);
+		String urlStr = FCUtils.getRequestURL(httpRequest);
 		
 		WebComponent cachedWebComponent = getFromCache(urlStr);
 		
@@ -39,6 +38,8 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			content = response.getContentString();
 			
 			cachedWebComponent = FCUtils.parseWebComponent(content);
+			// remove custom component tag from response string
+			content = cachedWebComponent.getContent();
 			
 			// save to cache
 			if (cachedWebComponent.isCacheable())
@@ -54,39 +55,11 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			response.setContentType(cachedWebComponent.getContentType());
 		}
 
-		RequestLogger.logRequest(httpRequest.getRequestURL().toString(), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
+		RequestLogger.logRequest(urlStr, isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
 		return content;
 	}
 	
-	
-	/**
-	 * 
-	 * @param request
-	 * @return
-	 */
-	private String getRequestURL(HttpServletRequest request)
-	{
-        String requestURL = request.getRequestURL().toString();
-        
-        if ("GET".equals(request.getMethod()))
-        {
-        	// add parameters for storing 
-        	// POST method parameters are not stored because they can be huge (e.g. file upload)
-        	StringBuffer sb = new StringBuffer(requestURL);
-        	Enumeration paramNames = request.getParameterNames();
-        	if (paramNames.hasMoreElements())
-        	{
-        		sb.append("?");
-        	}
-        	while (paramNames.hasMoreElements()){
-        		String name = (String) paramNames.nextElement();
-        		sb.append(name).append("=").append(request.getParameter(name)).append("&");            		
-        	}
-        	requestURL = sb.toString();
-        }	
-        return requestURL;
-	}
-	
+
 
 	@Override
 	public void init(Properties properties) {

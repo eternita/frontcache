@@ -81,8 +81,14 @@ public class FrontCacheFilter implements Filter {
 			
 			chain.doFilter(request, wrappedResponse); // run request to origin
 			content = wrappedResponse.getContentString();
-			
-			RequestLogger.logRequest(httpRequest.getRequestURL().toString(), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
+			if (null != content)
+			{
+				// remove custom component tag from response string
+				WebComponent webComponent = FCUtils.parseWebComponent(content);
+				content = webComponent.getContent();
+			}
+
+			RequestLogger.logRequest(FCUtils.getRequestURL(httpRequest), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
 			
 		}
 
