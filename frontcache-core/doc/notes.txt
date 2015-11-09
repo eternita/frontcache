@@ -6,13 +6,13 @@ url="http://frontcache.org/4/b.jsp" - global call
 
 ----
 
-<fc:component cache-max-age="-1" />
+<fc:component maxage="-1" />
 
-cache-max-age="-1" - forever
+maxage="-1" - forever
 
-cache-max-age="0" - never
+maxage="0" - never
 
-cache-max-age="60" - 60 sec
+maxage="60" - 60 sec
 
 ---
 

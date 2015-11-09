@@ -1,5 +1,7 @@
 package org.frontcache.cache.impl;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -86,6 +88,28 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 		cache.clear();
 		
 		return;
+	}
+
+	@Override
+	public void removeFromCache(String filter) {
+
+		List<String> removeList = new ArrayList<String>();
+		
+		for(String key : cache.keySet())
+		{
+			if (-1 < key.indexOf(filter))
+				removeList.add(key);	
+		}
+		
+		for(String key : removeList)
+			cache.remove(key);
+
+		return;
+	}
+
+	@Override
+	public void removeFromCacheAll() {
+		cache.clear();
 	}	
 
 	

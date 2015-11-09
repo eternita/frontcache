@@ -20,6 +20,8 @@ public interface CacheProcessor {
 	
 	public void putToCache(String url, WebComponent component);
 	public WebComponent getFromCache(String url);
+	public void removeFromCache(String filter);
+	public void removeFromCacheAll();
 	
 	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException;
 	

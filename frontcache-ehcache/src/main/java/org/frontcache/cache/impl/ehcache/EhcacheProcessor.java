@@ -1,5 +1,7 @@
 package org.frontcache.cache.impl.ehcache;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import org.frontcache.WebComponent;
@@ -93,6 +95,26 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 		}
 		
 		return comp;
+	}
+
+	@Override
+	public void removeFromCache(String filter) {
+		List<Object> removeList = new ArrayList<Object>();
+		
+		for(Object key : cache.getKeys())
+		{
+			String str = key.toString();
+			if (-1 < str.indexOf(filter))
+				removeList.add(key);	
+		}
+		
+		for(Object key : removeList)
+			cache.remove(key);
+	}
+
+	@Override
+	public void removeFromCacheAll() {
+		cache.removeAll();
 	}	
 
 
