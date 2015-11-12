@@ -10,9 +10,9 @@ import org.frontcache.include.IncludeProcessorBase;
  * Processing URL example <fc:include url="/some/url/here" />
  *
  */
-public class BasicIncludeProcessor extends IncludeProcessorBase implements IncludeProcessor {
+public class SerialIncludeProcessor extends IncludeProcessorBase implements IncludeProcessor {
 
-	public BasicIncludeProcessor() {
+	public SerialIncludeProcessor() {
 	}
 
 	/**

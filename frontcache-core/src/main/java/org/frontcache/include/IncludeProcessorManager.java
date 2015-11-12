@@ -3,7 +3,7 @@ package org.frontcache.include;
 import java.util.logging.Logger;
 
 import org.frontcache.FCConfig;
-import org.frontcache.include.impl.BasicIncludeProcessor;
+import org.frontcache.include.impl.SerialIncludeProcessor;
 
 
 
@@ -44,7 +44,7 @@ public class IncludeProcessorManager {
 			logger.severe("Cant instantiate " + implStr + ". Default implementation is loaded");
 			
 			// 
-			return new BasicIncludeProcessor();
+			return new SerialIncludeProcessor();
 		}
 		
 		
