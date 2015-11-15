@@ -141,9 +141,12 @@ public class FrontCacheFilter implements Filter {
 	 */
 	private String getDefaultOriginBaseURL(HttpServletRequest httpRequest)
 	{
-		
-		String protocol = httpRequest.getProtocol();
-		protocol = protocol.substring(0, httpRequest.getProtocol().indexOf("/"));
+
+		String protocol = null;
+		if (httpRequest.isSecure())
+			protocol = "https";
+		else
+			protocol = "http";
 		
 		return protocol + "://" + httpRequest.getServerName() + ":" + httpRequest.getServerPort() + httpRequest.getContextPath();
 	}
