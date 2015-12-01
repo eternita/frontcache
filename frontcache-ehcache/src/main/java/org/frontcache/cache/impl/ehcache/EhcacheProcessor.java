@@ -81,7 +81,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	 */
 	@Override
 	public WebComponent getFromCache(String url) {
-		logger.info(url);
+		logger.fine(url);
 		Element el = cache.get(url);
 		if (null == el)
 			return null;
