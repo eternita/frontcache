@@ -106,7 +106,25 @@ public class FCUtils {
 				String maxAgeStr = content.substring(startIdx + START_MARKER.length(), endIdx);
 				try
 				{
-					return Integer.parseInt(maxAgeStr);
+					int multiplyPrefix = 1;
+					if (maxAgeStr.endsWith("d")) // days
+					{
+						maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+						multiplyPrefix = 86400; // 24 * 60 * 60
+					} else if (maxAgeStr.endsWith("h")) { // hours
+						maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+						multiplyPrefix = 3600; // 60 * 60
+					} else if (maxAgeStr.endsWith("m")) { // minutes
+						maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+						multiplyPrefix = 60;
+					} else if (maxAgeStr.endsWith("s")) { // seconds
+						maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+						multiplyPrefix = 1;
+					} else {
+						// seconds
+					}
+					
+					return multiplyPrefix * Integer.parseInt(maxAgeStr); // time to live in cache in seconds
 				} catch (Exception e) {
 					logger.info("can't parse component maxage - " + maxAgeStr + " defalut is used (NO_CACHE)");
 					return CacheProcessor.NO_CACHE;
