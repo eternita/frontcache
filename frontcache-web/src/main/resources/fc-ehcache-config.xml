@@ -1,0 +1,15 @@
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../config/ehcache.xsd">
+
+
+    <diskStore path="/Users/spa/tmp1"/>
+              
+                
+    <cache name="FRONT_CACHE"
+       maxElementsInMemory="3"
+       eternal="true"
+       overflowToDisk="true"
+       diskPersistent="false" 
+       memoryStoreEvictionPolicy="LFU"
+        />
+        
+</ehcache>

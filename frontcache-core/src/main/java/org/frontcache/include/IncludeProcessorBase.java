@@ -1,14 +1,9 @@
 package org.frontcache.include;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 
 import org.frontcache.FCUtils;
@@ -29,8 +24,6 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	protected static final String START_MARKER = "<fc:include";
 	protected static final String END_MARKER = "/>";
 	
-	private static final String SET_COOKIE_SEPARATOR = "; ";
-	private static final String COOKIE = "Cookie";
 
 	protected CacheProcessor cacheProcessor;
 	
@@ -74,39 +67,13 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		}
 
 	}
-	
 
 	/**
-	 * read cookies from original request and convert to string to be passed to further call (include)
 	 * 
+	 * @param urlStr
 	 * @param httpRequest
 	 * @return
 	 */
-	private String getCookies(HttpServletRequest httpRequest)
-	{
-        Cookie[] cookies = httpRequest.getCookies();
-        if (null != cookies)
-        {
-    		StringBuffer cookieStringBuffer = new StringBuffer();
-
-        	for (int i = 0; i < cookies.length; i++)
-        	{
-        		Cookie c = cookies[i];
-        		if (null == c)
-        			continue;
-        		
-				cookieStringBuffer.append(c.getName());
-				cookieStringBuffer.append("=");
-				cookieStringBuffer.append(c.getValue());
-				if (i + 1 < cookies.length) // has next
-					cookieStringBuffer.append(SET_COOKIE_SEPARATOR);
-        	}
-            return cookieStringBuffer.toString();
-        }		
-        
-        return null;
-	}
-
 	protected String callInclude(String urlStr, HttpServletRequest httpRequest)
     {
 
@@ -125,47 +92,11 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		
 		
 		// do dynamic call 
-		int httpResponseCode = -1;
-		String contentType = "";
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        
-        InputStream is = null;
-        try {
-            URL u = new URL(urlStr);
-            HttpURLConnection uc = (HttpURLConnection) u.openConnection();
+		Map<String, Object> respMap = FCUtils.dynamicCall(urlStr, httpRequest);
 
-            // translate cookies
-            String cookies = getCookies(httpRequest);
-            if (null != cookies)
-    			uc.setRequestProperty(COOKIE, cookies);
-            
-            
-            is = uc.getInputStream();
-            int bytesRead = 0;
-            int bufferSize = 4000;
-             byte[] byteBuffer = new byte[bufferSize];              
-             while ((bytesRead = is.read(byteBuffer)) != -1) {
-                 baos.write(byteBuffer, 0, bytesRead);
-             }
-             
-             httpResponseCode = uc.getResponseCode();
-             contentType = uc.getContentType();
-        } catch (Exception e) {
-        	e.printStackTrace();
-            // TODO Auto-generated catch block
-        } finally {
-            if (null != is)
-            {
-                try {
-                    is.close();
-                } catch (IOException e) {
-                	e.printStackTrace();
-                    // TODO Auto-generated catch block
-                }
-            }
-        }
-		
-        String dataStr = new String(baos.toByteArray());
+		int httpResponseCode = (Integer) respMap.get("httpResponseCode");
+		String contentType = (String) respMap.get("contentType");
+        String dataStr = (String) respMap.get("dataStr");
         
         if (200 == httpResponseCode || 201 == httpResponseCode)
         {
@@ -173,6 +104,8 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
     		if (null != cacheProcessor)
     		{
     			WebComponent cachedWebComponent = FCUtils.parseWebComponent(dataStr);
+				// remove custom component tag from response string
+				dataStr = cachedWebComponent.getContent(); 
     			if (cachedWebComponent.isCacheable())
     			{
     				cachedWebComponent.setContentType(contentType);
