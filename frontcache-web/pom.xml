@@ -1,0 +1,28 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.frontcache</groupId>
+		<artifactId>parent</artifactId>
+		<version>0.2.0</version>
+	</parent>
+
+	<artifactId>frontcache-web</artifactId>
+	<packaging>war</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.frontcache</groupId>
+            <artifactId>frontcache-core</artifactId>
+            <version>${frontcache.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.frontcache</groupId>
+            <artifactId>frontcache-ehcache</artifactId>
+            <version>${frontcache.version}</version>
+        </dependency>
+        
+    </dependencies>
+
+
+</project>

@@ -11,6 +11,7 @@
     <url>https://github.com/frontcache</url>
 
     <modules>
+        <module>frontcache-web</module>
         <module>frontcache-core</module>
         <module>frontcache-ehcache</module>
         <module>fc-mvc-demo</module>
