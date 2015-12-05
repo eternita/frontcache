@@ -1,8 +1,16 @@
 package org.frontcache;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Logger;
 
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 
 import org.frontcache.cache.CacheProcessor;
@@ -13,6 +21,100 @@ public class FCUtils {
 	}
 	
 	private static Logger logger = Logger.getLogger(FCUtils.class.getName());
+	
+	private static final String SET_COOKIE_SEPARATOR = "; ";
+	private static final String COOKIE = "Cookie";
+	
+	/**
+	 * read cookies from original request and convert to string to be passed to further call (include)
+	 * 
+	 * @param httpRequest
+	 * @return
+	 */
+	private static String getCookies(HttpServletRequest httpRequest)
+	{
+        Cookie[] cookies = httpRequest.getCookies();
+        if (null != cookies)
+        {
+    		StringBuffer cookieStringBuffer = new StringBuffer();
+
+        	for (int i = 0; i < cookies.length; i++)
+        	{
+        		Cookie c = cookies[i];
+        		if (null == c)
+        			continue;
+        		
+				cookieStringBuffer.append(c.getName());
+				cookieStringBuffer.append("=");
+				cookieStringBuffer.append(c.getValue());
+				if (i + 1 < cookies.length) // has next
+					cookieStringBuffer.append(SET_COOKIE_SEPARATOR);
+        	}
+            return cookieStringBuffer.toString();
+        }		
+        
+        return null;
+	}
+	
+	/**
+	 * 
+	 * @param urlStr
+	 * @param httpRequest
+	 * @return
+	 */
+	public static Map<String, Object> dynamicCall(String urlStr, HttpServletRequest httpRequest)
+    {
+
+		Map<String, Object> respMap = new HashMap<String, Object>();
+		// do dynamic call 
+		int httpResponseCode = -1;
+		String contentType = "";
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        
+        InputStream is = null;
+        try {
+            URL u = new URL(urlStr);
+            HttpURLConnection uc = (HttpURLConnection) u.openConnection();
+
+            // translate cookies
+            String cookies = getCookies(httpRequest);
+            if (null != cookies)
+    			uc.setRequestProperty(COOKIE, cookies);
+            
+            
+            is = uc.getInputStream();
+            int bytesRead = 0;
+            int bufferSize = 4000;
+             byte[] byteBuffer = new byte[bufferSize];              
+             while ((bytesRead = is.read(byteBuffer)) != -1) {
+                 baos.write(byteBuffer, 0, bytesRead);
+             }
+             
+             httpResponseCode = uc.getResponseCode();
+             contentType = uc.getContentType();
+        } catch (Exception e) {
+        	e.printStackTrace();
+            // TODO Auto-generated catch block
+        } finally {
+            if (null != is)
+            {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                	e.printStackTrace();
+                    // TODO Auto-generated catch block
+                }
+            }
+        }
+		
+        String dataStr = new String(baos.toByteArray());
+
+        respMap.put("httpResponseCode", httpResponseCode);
+        respMap.put("contentType", contentType);
+        respMap.put("dataStr", dataStr);
+        return respMap;
+    }
+	
 	
 	
 	/**
@@ -45,6 +147,20 @@ public class FCUtils {
         return requestURL;
 	}
 	
+	/**
+	 * http://www.coinshome.net/en/welcome.htm -> /en/welcome.htm
+	 * 
+	 * @param request
+	 * @return
+	 */
+	public static String getRequestURLWithoutHostPort(HttpServletRequest request)
+	{
+        String requestURL = getRequestURL(request);
+        int sIdx = 10; // requestURL.indexOf("://"); // http://www.coinshome.net/en/welcome.htm
+        int idx = requestURL.indexOf("/", sIdx);
+
+        return requestURL.substring(idx);
+	}
 
 	/**
 	 * wrap String to WebComponent.
