@@ -27,28 +27,33 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		WebComponent cachedWebComponent = getFromCache(urlStr);
 		
 		String content = null;
-
+		long lengthBytes = -1;
 		
 		if (null == cachedWebComponent)
 		{
 			isRequestDynamic = true;
 			
 			// do dynamic call 
-			Map<String, Object> respMap = FCUtils.dynamicCall(urlStr, httpRequest);
+			Map<String, Object> respMap = FCUtils.dynamicCall(urlStr, httpRequest, response);
 
-//			int httpResponseCode = (Integer) respMap.get("httpResponseCode");
 			String contentType = (String) respMap.get("contentType");
 	        content = (String) respMap.get("dataStr");
-			
-			cachedWebComponent = FCUtils.parseWebComponent(content);
-			// remove custom component tag from response string
-			content = cachedWebComponent.getContent();
-			
-			// save to cache
-			if (cachedWebComponent.isCacheable())
+	        String contentLenghtStr = (String) respMap.get("Content-Length");
+	        if (null != contentLenghtStr)
+	        	lengthBytes = Long.parseLong(contentLenghtStr);
+	        
+			if (null != contentType && -1 < contentType.indexOf("text"))
 			{
-				cachedWebComponent.setContentType(contentType);
-				putToCache(urlStr, cachedWebComponent);
+				cachedWebComponent = FCUtils.parseWebComponent(content);
+				// remove custom component tag from response string
+				content = cachedWebComponent.getContent();
+				
+				// save to cache
+				if (cachedWebComponent.isCacheable())
+				{
+					cachedWebComponent.setContentType(contentType);
+					putToCache(urlStr, cachedWebComponent);
+				}
 			}
 			
 		} else {
@@ -56,9 +61,11 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			isRequestDynamic = false;
 			content = cachedWebComponent.getContent();
 			response.setContentType(cachedWebComponent.getContentType());
+			lengthBytes = 2*content.length();
 		}
 
-		RequestLogger.logRequest(urlStr, isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
+		
+		RequestLogger.logRequest(urlStr, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
 		return content;
 	}
 	

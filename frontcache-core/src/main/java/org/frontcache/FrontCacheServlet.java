@@ -63,38 +63,46 @@ public class FrontCacheServlet extends HttpServlet {
 
 		String requestURLWithoutHostPort = FCUtils.getRequestURLWithoutHostPort(httpRequest); 
 		String requestURL = appOriginBaseURL + requestURLWithoutHostPort; 
-				
+			
+		String acceptHeader = httpRequest.getHeader("Accept");
 //		logger.info(requestURL);
 		
 		String content = null;
-		if (null != cacheProcessor)
+		if (null != cacheProcessor && (null != acceptHeader && -1 < acceptHeader.indexOf("text")))
 		{
 			content = cacheProcessor.processCacheableRequest(httpRequest, resp, requestURL);
 		} else {
 			long start = System.currentTimeMillis();
 			boolean isRequestDynamic = true;
-			
+
+			long lengthBytes = -1;
+
 			// do dynamic call 
 			Map<String, Object> respMap = FCUtils.dynamicCall(requestURL, httpRequest);
-
-			int httpResponseCode = (Integer) respMap.get("httpResponseCode");
-			String contentType = (String) respMap.get("contentType");
 	        content = (String) respMap.get("dataStr");
-			if (null != content)
+			String contentType = (String) respMap.get("contentType");
+	        String contentLenghtStr = (String) respMap.get("Content-Length");
+	        if (null != contentLenghtStr)
+	        	lengthBytes = Long.parseLong(contentLenghtStr);
+
+	        if ((null != content)
+				&& (null != contentType && -1 < contentType.indexOf("text")))
 			{
 				// remove custom component tag from response string
 				WebComponent webComponent = FCUtils.parseWebComponent(content);
 				content = webComponent.getContent();
+				lengthBytes = 2*content.length();
 			}
 
-			RequestLogger.logRequest(requestURL, isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
+			RequestLogger.logRequest(requestURL, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
 			
 		}
 
-		content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);
-
-
-		resp.getOutputStream().write(content.getBytes());
+		if (null != content)
+		{
+			content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);
+			resp.getOutputStream().write(content.getBytes());
+		}
 		return;
 	}
 
