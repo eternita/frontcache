@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.frontcache</groupId>
 		<artifactId>parent</artifactId>
-		<version>0.2.0</version>
+		<version>0.3.0</version>
 	</parent>
 
 	<artifactId>frontcache-ehcache</artifactId>
