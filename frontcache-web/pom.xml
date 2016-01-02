@@ -10,6 +10,11 @@
 	<artifactId>frontcache-web</artifactId>
 	<packaging>war</packaging>
 
+
+	<properties>
+		<jettyVersion>9.3.4.RC1</jettyVersion>
+	</properties>
+	
     <dependencies>
         <dependency>
             <groupId>org.frontcache</groupId>
@@ -22,6 +27,17 @@
             <version>${frontcache.version}</version>
         </dependency>
         
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-server</artifactId>
+			<version>${jettyVersion}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-servlet</artifactId>
+			<version>${jettyVersion}</version>
+		</dependency>
+		
     </dependencies>
 
 

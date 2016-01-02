@@ -13,6 +13,7 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.frontcache.FrontCacheServlet;
 
 public class Main {
@@ -32,6 +33,35 @@ public class Main {
 			throw new FileNotFoundException(keystoreFile.getAbsolutePath());
 		}
 
+//        // Path to as-built jetty-distribution directory
+//        String jettyHomeBuild = "/Users/spa/git/frontcache/frontcache-core/dist.srt/jetty";
+//         
+//        // Find jetty home and base directories
+//        String homePath = System.getProperty("jetty.home", jettyHomeBuild);
+//        File homeDir = new File(homePath);
+//        if (!homeDir.exists())
+//        {
+//            throw new FileNotFoundException(homeDir.getAbsolutePath());
+//        }
+//        String basePath = System.getProperty("jetty.base", homeDir + "/demo-base");
+//        File baseDir = new File(basePath);
+//        if(!baseDir.exists())
+//        {
+//            throw new FileNotFoundException(baseDir.getAbsolutePath());
+//        }
+         
+        // Configure jetty.home and jetty.base system properties
+//        String jetty_home = homeDir.getAbsolutePath();
+//        String jetty_base = baseDir.getAbsolutePath();
+//        System.setProperty("jetty.home", jetty_home);
+//        System.setProperty("jetty.base", jetty_base);
+ 
+ 
+        // === jetty.xml ===
+        // Setup Threadpool
+        QueuedThreadPool threadPool = new QueuedThreadPool();
+        threadPool.setMaxThreads(500);
+ 		
 		Server server = new Server();
 
 		// HTTP Configuration
