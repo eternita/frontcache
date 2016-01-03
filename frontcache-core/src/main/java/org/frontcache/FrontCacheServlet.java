@@ -89,7 +89,7 @@ public class FrontCacheServlet extends HttpServlet {
 				&& (null != contentType && -1 < contentType.indexOf("text")))
 			{
 				// remove custom component tag from response string
-				WebComponent webComponent = FCUtils.parseWebComponent(content);
+				WebComponent webComponent = FCUtils.parseWebComponent(requestURL, content);
 				content = webComponent.getContent();
 				lengthBytes = 2*content.length();
 			}

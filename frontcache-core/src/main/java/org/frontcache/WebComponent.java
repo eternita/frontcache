@@ -1,6 +1,8 @@
 package org.frontcache;
 
 import java.io.Serializable;
+import java.util.Map;
+import java.util.Set;
 
 import org.frontcache.cache.CacheProcessor;
 
@@ -12,7 +14,13 @@ public class WebComponent implements Serializable {
 	 */
 	private static final long serialVersionUID = 1L;
 
+	private String url;
+	
 	private String content;
+	
+	private Map<String, String> headers;
+	
+	private Set<String> tags;
 	
 	private String contentType;
 	
@@ -22,11 +30,49 @@ public class WebComponent implements Serializable {
 	private long expireTimeMillis = CacheProcessor.NO_CACHE;
 	
 	
-	public WebComponent(String content, int cacheMaxAgeSec) {
+	public WebComponent(String url, String content, int cacheMaxAgeSec) {
 		super();
 		this.content = content;
 		setExpireTime(cacheMaxAgeSec);
 	}
+
+	
+	
+	public String getUrl() {
+		return url;
+	}
+
+
+
+	public void setUrl(String url) {
+		this.url = url;
+	}
+
+
+
+	public Map<String, String> getHeaders() {
+		return headers;
+	}
+
+
+
+	public void setHeaders(Map<String, String> headers) {
+		this.headers = headers;
+	}
+
+
+
+	public Set<String> getTags() {
+		return tags;
+	}
+
+
+
+	public void setTags(Set<String> tags) {
+		this.tags = tags;
+	}
+
+
 
 	/**
 	 * 
