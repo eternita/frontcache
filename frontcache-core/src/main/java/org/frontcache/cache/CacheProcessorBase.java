@@ -44,7 +44,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	        
 			if (null != contentType && -1 < contentType.indexOf("text"))
 			{
-				cachedWebComponent = FCUtils.parseWebComponent(content);
+				cachedWebComponent = FCUtils.parseWebComponent(urlStr, content);
 				// remove custom component tag from response string
 				content = cachedWebComponent.getContent();
 				
@@ -89,7 +89,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 						
 			content = response.getContentString();
 			
-			cachedWebComponent = FCUtils.parseWebComponent(content);
+			cachedWebComponent = FCUtils.parseWebComponent(urlStr, content);
 			// remove custom component tag from response string
 			content = cachedWebComponent.getContent();
 			

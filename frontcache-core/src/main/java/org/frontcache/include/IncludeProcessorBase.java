@@ -103,7 +103,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
         	// response is OK -> check if response is subject to cache
     		if (null != cacheProcessor)
     		{
-    			WebComponent cachedWebComponent = FCUtils.parseWebComponent(dataStr);
+    			WebComponent cachedWebComponent = FCUtils.parseWebComponent(urlStr, dataStr);
 				// remove custom component tag from response string
 				dataStr = cachedWebComponent.getContent(); 
     			if (cachedWebComponent.isCacheable())

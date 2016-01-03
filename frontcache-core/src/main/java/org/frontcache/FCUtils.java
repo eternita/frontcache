@@ -195,7 +195,7 @@ public class FCUtils {
 	 * @param content
 	 * @return
 	 */
-	public static final WebComponent parseWebComponent (String content)
+	public static final WebComponent parseWebComponent (String urlStr, String content)
 	{
 		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
 		
@@ -226,7 +226,7 @@ public class FCUtils {
 			outStr = content;
 		}
 
-		WebComponent component = new WebComponent(outStr, cacheMaxAgeSec);
+		WebComponent component = new WebComponent(urlStr, outStr, cacheMaxAgeSec);
 		
 		return component;
 	}

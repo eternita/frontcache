@@ -21,7 +21,11 @@ import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 import org.frontcache.wrapper.HttpResponseWrapperImpl;
 
 
-
+/**
+ * 
+ * @deprecated use standalone app
+ *
+ */
 public class FrontCacheFilter implements Filter {
 
 	private Logger logger = Logger.getLogger(getClass().getName());
@@ -84,7 +88,7 @@ public class FrontCacheFilter implements Filter {
 			if (null != content)
 			{
 				// remove custom component tag from response string
-				WebComponent webComponent = FCUtils.parseWebComponent(content);
+				WebComponent webComponent = FCUtils.parseWebComponent(FCUtils.getRequestURL(httpRequest), content);
 				content = webComponent.getContent();
 			}
 
