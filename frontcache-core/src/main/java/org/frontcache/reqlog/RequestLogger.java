@@ -62,7 +62,7 @@ public class RequestLogger {
 		// dynamic_flag runtime_millis datalength_bytes url
 		sb.append(isDynamicFlag)
 		.append(SEPARATOR).append(runtimeMillis)
-		.append(SEPARATOR).append(2 * lengthBytes) // x2 because each char is 2 bytes
+		.append(SEPARATOR).append(lengthBytes) 
 		.append(SEPARATOR).append(url);
 
 		logger.trace(sb.toString());

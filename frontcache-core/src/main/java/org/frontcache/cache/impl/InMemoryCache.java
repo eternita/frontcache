@@ -110,7 +110,8 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 	@Override
 	public void removeFromCacheAll() {
 		cache.clear();
-	}	
+	}
+
 
 	
 }

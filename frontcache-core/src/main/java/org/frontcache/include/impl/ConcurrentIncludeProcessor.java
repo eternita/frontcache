@@ -11,8 +11,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import javax.servlet.http.HttpServletRequest;
-
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.http.client.HttpClient;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
@@ -69,9 +69,9 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param appOriginBaseURL
 	 * @return
 	 */
-	public String processIncludes(String content, String appOriginBaseURL, HttpServletRequest httpRequest)
+	public String processIncludes(String content, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
-		List<IncludeResolutionPlaceholder> includes = parseIncludes(content, appOriginBaseURL, httpRequest);
+		List<IncludeResolutionPlaceholder> includes = parseIncludes(content, appOriginBaseURL, requestHeaders, client);
 		
 		if (null == includes)
 			return content;
@@ -111,7 +111,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param appOriginBaseURL
 	 * @return
 	 */
-	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String appOriginBaseURL, HttpServletRequest httpRequest)
+	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
 		
@@ -132,7 +132,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 						includes = new ArrayList<IncludeResolutionPlaceholder>();
 					
 					// save placeholder
-					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, appOriginBaseURL + includeURL, httpRequest));
+					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, appOriginBaseURL + includeURL, requestHeaders, client));
 					
 					scanIdx = endIdx;
 				} else {
@@ -182,19 +182,21 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		int endIdx;
 		String includeURL;
 		String content;
-		HttpServletRequest httpRequest;
+		MultiValuedMap<String, String> requestHeaders; 
+		HttpClient client;
 		
-		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, HttpServletRequest httpRequest) {
+		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, MultiValuedMap<String, String> requestHeaders, HttpClient client) {
 			super();
 			this.startIdx = startIdx;
 			this.endIdx = endIdx;
 			this.includeURL = includeURL;
-			this.httpRequest = httpRequest;
+			this.requestHeaders = requestHeaders;
+			this.client = client;
 		}
 
 	    @Override
 	    public IncludeResolutionPlaceholder call() throws Exception {
-			this.content = callInclude(this.includeURL, this.httpRequest);
+			this.content = callInclude(this.includeURL, this.requestHeaders, this.client);
 	        return this;
 	    }
 		

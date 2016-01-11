@@ -24,8 +24,8 @@ public class Main {
 
 	public static void main(String[] args) throws Exception {
 
-		int httpPort = 8083;
-		int httpsPort = 8043;
+		int httpPort = 9080;
+		int httpsPort = 9443;
 		String jettyDistKeystore = "/Users/spa/Development/tools/keystore";
 		String keystorePath = System.getProperty("example.keystore", jettyDistKeystore);
 		File keystoreFile = new File(keystorePath);

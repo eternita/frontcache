@@ -1,15 +1,12 @@
 package org.frontcache.include;
 
-import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-import javax.servlet.http.HttpServletRequest;
-
-import org.frontcache.FCUtils;
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.http.client.HttpClient;
 import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheProcessor;
-import org.frontcache.reqlog.RequestLogger;
 
 /**
  * 
@@ -74,50 +71,19 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * @param httpRequest
 	 * @return
 	 */
-	protected String callInclude(String urlStr, HttpServletRequest httpRequest)
+	protected String callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client)
     {
-
-		long start = System.currentTimeMillis();
-		// check if cache is ON and response is cached
-		if (null != cacheProcessor)
-		{
-			WebComponent cachedWebComponent = cacheProcessor.getFromCache(urlStr);
-			if (null != cachedWebComponent)
-			{
-				
-				RequestLogger.logRequest(urlStr, false, System.currentTimeMillis() - start, (null == cachedWebComponent.getContent()) ? -1 : cachedWebComponent.getContent().length());
-				return cachedWebComponent.getContent();
-			}
+		
+		WebComponent cachedWebComponent;
+		try {
+			cachedWebComponent = cacheProcessor.processRequest(urlStr, requestHeaders, client);
+			return cachedWebComponent.getContent();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		
-		
-		// do dynamic call 
-		Map<String, Object> respMap = FCUtils.dynamicCall(urlStr, httpRequest);
-
-		int httpResponseCode = (Integer) respMap.get("httpResponseCode");
-		String contentType = (String) respMap.get("contentType");
-        String dataStr = (String) respMap.get("dataStr");
-        
-        if (200 == httpResponseCode || 201 == httpResponseCode)
-        {
-        	// response is OK -> check if response is subject to cache
-    		if (null != cacheProcessor)
-    		{
-    			WebComponent cachedWebComponent = FCUtils.parseWebComponent(urlStr, dataStr);
-				// remove custom component tag from response string
-				dataStr = cachedWebComponent.getContent(); 
-    			if (cachedWebComponent.isCacheable())
-    			{
-    				cachedWebComponent.setContentType(contentType);
-    				cacheProcessor.putToCache(urlStr, cachedWebComponent);
-    			}
-    		}
-        }
-//        TODO: fix it for remote includes
-//    FOR THE SAME APP -> DO NOT LOG DYNAMIC REQUEST - IT WILL BE LOGGED in PageCacheFilter    
-//		RequestLogger.logRequest(urlStr, true, System.currentTimeMillis() - start);
-		
-        return dataStr;
+		return "";
     }
 
 	@Override

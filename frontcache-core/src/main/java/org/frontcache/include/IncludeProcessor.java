@@ -2,8 +2,8 @@ package org.frontcache.include;
 
 import java.util.Properties;
 
-import javax.servlet.http.HttpServletRequest;
-
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.http.client.HttpClient;
 import org.frontcache.cache.CacheProcessor;
 
 /**
@@ -16,7 +16,7 @@ public interface IncludeProcessor {
 	public void init(Properties properties);
 	public void destroy();
 
-	public String processIncludes(String content, String appOriginBaseURL, HttpServletRequest httpRequest);
+	public String processIncludes(String content, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client);
 	
 	public void setCacheProcessor(CacheProcessor cacheProcessor);
 

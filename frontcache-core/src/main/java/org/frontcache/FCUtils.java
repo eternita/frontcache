@@ -5,22 +5,32 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.http.Header;
+import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicHeader;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.core.RequestContext;
+
 
 public class FCUtils {
 
@@ -30,118 +40,169 @@ public class FCUtils {
 	private static Logger logger = Logger.getLogger(FCUtils.class.getName());
 	
 	/**
+	 * GET method only for text requests
 	 * 
 	 * @param urlStr
 	 * @param httpRequest
+	 * @param httpResponse
 	 * @return
 	 */
-	public static Map<String, Object> dynamicCall(String urlStr, HttpServletRequest httpRequest)
+	public static WebComponent dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception
     {
-		return dynamicCall(urlStr, httpRequest, null);
-    }
-	
-	
-	/**
-	 * 
-	 * @param urlStr
-	 * @param httpRequest
-	 * @param resp
-	 * @return
-	 */
-	public static Map<String, Object> dynamicCall(String urlStr, HttpServletRequest httpRequest, HttpServletResponse resp)
-    {
-		System.out.println("call origin " + urlStr);
-		Map<String, Object> respMap = new HashMap<String, Object>();
-		// do dynamic call 
-		int httpResponseCode = -1;
-		
-		
-		HttpClient client = HttpClientBuilder.create().build();
+//		System.out.println("call origin " + urlStr);
+
 		HttpGet request = new HttpGet(urlStr);
 		
 		// translate headers
-		Enumeration<String> headerNames = httpRequest.getHeaderNames(); 
-		while(headerNames.hasMoreElements())
-		{
-			String hName = headerNames.nextElement();
-			request.addHeader(hName, httpRequest.getHeader(hName));
-		}
-
-		HttpResponse response;
-		String contentType = null;
-		try {
-			response = client.execute(request);
-			httpResponseCode = response.getStatusLine().getStatusCode();
-			System.out.println("Response Code : " + httpResponseCode);
-			
-			if (null != resp)
-				resp.setStatus(httpResponseCode);
-				
-			if (httpResponseCode < 200 || httpResponseCode > 399)
-			{
-				// error
-		        respMap.put("httpResponseCode", httpResponseCode);
-				return respMap;
-			}
-			
-			for (Header respHeader : response.getAllHeaders())
-			{
-				if (null != resp)
-					resp.addHeader(respHeader.getName(), respHeader.getValue());
-				
-				if ("Content-Type".equals(respHeader.getName()))
-					contentType = respHeader.getValue();
-			}
-			
-			if (null != contentType && -1 < contentType.indexOf("text")) {
-				// response is a text - extract String for caching + do in-out
-				// copy
-				OutputStream respOut = null;
-				if (null != resp)
-					respOut = resp.getOutputStream();
-				
-				BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-
-				StringBuffer result = new StringBuffer();
-				String line = "";
-				while ((line = rd.readLine()) != null) {
-					result.append(line);
-					if (null != resp)
-						respOut.write(line.getBytes());
-				}
-				
-				String dataStr = result.toString();
-		        respMap.put("dataStr", dataStr);
-	        	respMap.put("Content-Length", "" + dataStr.length());
-			} else {
-				// not a text - do in-out copy
-				if (null != resp)
-				{
-					if (httpResponseCode >= 200 && httpResponseCode < 299) // do not copy if 304 (cached)
-					{
-						InputStream is = response.getEntity().getContent();
-						IOUtils.copy(is, resp.getOutputStream());
-					}
-					
-			        String contentLenghtHeader = resp.getHeader("Content-Length");
-			        if (null != contentLenghtHeader)
-			        	respMap.put("Content-Length", contentLenghtHeader);
-				}
-			}
-			
-		} catch (ClientProtocolException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        
-        respMap.put("httpResponseCode", httpResponseCode);
-        respMap.put("contentType", contentType);
-        return respMap;
-    }
+		Header[] httpHeaders = convertHeaders(requestHeaders);
+		for (Header header : httpHeaders)
+			request.addHeader(header);
 		
+		HttpResponse response;
+//		try {
+			response = client.execute(request);
+			
+			return httpResponse2WebComponent(urlStr, response);
+
+//		} catch (Exception e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+//		
+//        return null;
+    }
+	
+	private static WebComponent httpResponse2WebComponent(String url, HttpResponse response) throws Exception
+	{
+		
+		
+		int httpResponseCode = response.getStatusLine().getStatusCode();
+			
+		if (httpResponseCode < 200 || httpResponseCode > 299)
+		{
+			// error
+//			throw new RuntimeException("Wrong response code " + httpResponseCode);
+		}
+
+		String contentType = "";
+		Header contentTypeHeader = response.getFirstHeader("Content-Type");
+		if (null != contentTypeHeader)
+			contentType = contentTypeHeader.getValue();
+		
+		if (-1 == contentType.indexOf("text"))
+			throw new RuntimeException("Wrong content type is returned " + contentType);
+			
+
+		BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+		StringBuffer result = new StringBuffer();
+		String line = null;
+		while ((line = rd.readLine()) != null) {
+			result.append(line);
+		}
+		
+		String dataStr = result.toString();
+//        respMap.put("dataStr", dataStr);
+//    	respMap.put("Content-Length", "" + dataStr.length());
+		
+		WebComponent webComponent = parseWebComponent(url, dataStr);
+
+		webComponent.setStatusCode(httpResponseCode);
+		
+		// get headers
+		MultiValuedMap<String, String> headers = revertHeaders(response.getAllHeaders());
+		webComponent.setHeaders(headers);
+		webComponent.setContentType(contentType);
+				
+		return webComponent;
+	}
+	
+    /**
+     * returns query params as a Map with String keys and Lists of Strings as values
+     * @return
+     */
+    public static Map<String, List<String>> getQueryParams() {
+
+        Map<String, List<String>> qp = RequestContext.getCurrentContext().getRequestQueryParams();
+        if (qp != null) return qp;
+
+        HttpServletRequest request = RequestContext.getCurrentContext().getRequest();
+
+        qp = new HashMap<String, List<String>>();
+
+        if (request.getQueryString() == null) return null;
+        StringTokenizer st = new StringTokenizer(request.getQueryString(), "&");
+        int i;
+
+        while (st.hasMoreTokens()) {
+            String s = st.nextToken();
+            i = s.indexOf("=");
+            if (i > 0 && s.length() >= i + 1) {
+                String name = s.substring(0, i);
+                String value = s.substring(i + 1);
+
+                try {
+                    name = URLDecoder.decode(name, "UTF-8");
+                } catch (Exception e) {
+                }
+                try {
+                    value = URLDecoder.decode(value, "UTF-8");
+                } catch (Exception e) {
+                }
+
+                List<String> valueList = qp.get(name);
+                if (valueList == null) {
+                    valueList = new LinkedList<String>();
+                    qp.put(name, valueList);
+                }
+
+                valueList.add(value);
+            }
+            else if (i == -1)
+            {
+                String name=s;
+                String value="";
+                try {
+                    name = URLDecoder.decode(name, "UTF-8");
+                } catch (Exception e) {
+                }
+               
+                List<String> valueList = qp.get(name);
+                if (valueList == null) {
+                    valueList = new LinkedList<String>();
+                    qp.put(name, valueList);
+                }
+
+                valueList.add(value);
+                
+            }
+        }
+
+        RequestContext.getCurrentContext().setRequestQueryParams(qp);
+        return qp;
+    }
+	
+    public static MultiValuedMap<String, String> revertHeaders(Header[] headers) {
+		MultiValuedMap<String, String> map = new ArrayListValuedHashMap<String, String>();
+		for (Header header : headers) {
+			String name = header.getName();
+			map.put(name, header.getValue());
+//			if (!map.containsKey(name)) {
+//				map.put(name, new ArrayList<String>());
+//			}
+//			map.get(name).add(header.getValue());
+		}
+		return map;
+	}
+
+	public static Header[] convertHeaders(MultiValuedMap<String, String> headers) {
+		List<Header> list = new ArrayList<>();
+		for (String name : headers.keySet()) {
+			for (String value : headers.get(name)) {
+				list.add(new BasicHeader(name, value));
+			}
+		}
+		return list.toArray(new BasicHeader[0]);
+	}
 	
 	/**
 	 * 
@@ -172,6 +233,36 @@ public class FCUtils {
         }	
         return requestURL;
 	}
+
+	public static String getQueryString() throws UnsupportedEncodingException {
+		HttpServletRequest request = RequestContext.getCurrentContext().getRequest();
+		MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request);
+		StringBuilder query=new StringBuilder();
+		
+		for (String paramKey : params.keySet())
+		{
+			String key=URLEncoder.encode(paramKey, "UTF-8");
+			for (String value : params.get(paramKey))
+			{
+				query.append("&");
+				query.append(key);
+				query.append("=");
+				query.append(URLEncoder.encode(value, "UTF-8"));
+			}
+			
+		}		
+//		for (Map.Entry<String, List<String>> entry : params.entrySet()) {
+//			String key=URLEncoder.encode(entry.getKey(), "UTF-8");
+//			for (String value : entry.getValue()) {
+//				query.append("&");
+//				query.append(key);
+//				query.append("=");
+//				query.append(URLEncoder.encode(value, "UTF-8"));
+//			}
+//		}
+		return (query.length()>0) ? "?" + query.substring(1) : "";
+	}
+
 	
 	/**
 	 * http://www.coinshome.net/en/welcome.htm -> /en/welcome.htm
@@ -188,6 +279,16 @@ public class FCUtils {
         return requestURL.substring(idx);
 	}
 
+    /**
+     * return true if the client requested gzip content
+     *
+     * @param contentEncoding 
+     * @return true if the content-encoding containg gzip
+     */
+    public static boolean isGzipped(String contentEncoding) {
+        return contentEncoding.contains("gzip");
+    }
+    
 	/**
 	 * wrap String to WebComponent.
 	 * Check for header - extract caching options.
@@ -195,7 +296,7 @@ public class FCUtils {
 	 * @param content
 	 * @return
 	 */
-	public static final WebComponent parseWebComponent (String urlStr, String content)
+	private static final WebComponent parseWebComponent (String urlStr, String content)
 	{
 		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
 		
@@ -286,6 +387,88 @@ public class FCUtils {
 		}
 
 	}	
-	
 
+	public static String buildRequestURI(HttpServletRequest request) {
+		String uri = request.getRequestURI();
+		return uri;
+	}		
+
+	public static HttpHost getHttpHost(URL host) {
+		HttpHost httpHost = new HttpHost(host.getHost(), host.getPort(), host.getProtocol());
+		return httpHost;
+	}
+	
+	public static MultiValuedMap<String, String> builRequestQueryParams(HttpServletRequest request) {
+		Map<String, List<String>> map = FCUtils.getQueryParams();
+		MultiValuedMap<String, String> params = new ArrayListValuedHashMap<>();
+		if (map == null) {
+			return params;
+		}
+		for (String key : map.keySet()) {
+			for (String value : map.get(key)) {
+				params.put(key, value);
+			}
+		}
+		return params;
+	}	
+
+	public static MultiValuedMap<String, String> buildRequestHeaders(HttpServletRequest request) {
+
+		MultiValuedMap<String, String> headers = new ArrayListValuedHashMap<>();
+		Enumeration<String> headerNames = request.getHeaderNames();
+		if (headerNames != null) {
+			while (headerNames.hasMoreElements()) {
+				String name = headerNames.nextElement();
+				if (isIncludedHeader(name)) {
+					Enumeration<String> values = request.getHeaders(name);
+					while (values.hasMoreElements()) {
+						String value = values.nextElement();
+						headers.put(name, value);
+					}
+				}
+			}
+		}
+
+		return headers;
+	}
+	
+	private static boolean isIncludedHeader(String headerName) {
+		String name = headerName.toLowerCase();
+
+		switch (name) {
+			case "host":
+			case "connection":
+			case "content-length":
+			case "content-encoding":
+			case "server":
+			case "transfer-encoding":
+				return false;
+			default:
+				return true;
+		}
+	}
+	
+	public static String getVerb(HttpServletRequest request) {
+		String sMethod = request.getMethod();
+		return sMethod.toUpperCase();
+	}	
+
+	public static void writeResponse(InputStream zin, OutputStream out) throws Exception {
+		byte[] bytes = new byte[1024];
+		int bytesRead = -1;
+		while ((bytesRead = zin.read(bytes)) != -1) {
+			try {
+				out.write(bytes, 0, bytesRead);
+				out.flush();
+			}
+			catch (IOException ex) {
+				ex.printStackTrace();
+			}
+			// doubles buffer size if previous read filled it
+			if (bytesRead == bytes.length) {
+				bytes = new byte[bytes.length * 2];
+			}
+		}
+	}
+	
 }
