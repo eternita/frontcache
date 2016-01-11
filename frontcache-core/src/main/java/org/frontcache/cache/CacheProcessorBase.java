@@ -1,24 +1,54 @@
 package org.frontcache.cache;
 
-import java.io.IOException;
-import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.http.client.HttpClient;
 import org.frontcache.FCUtils;
 import org.frontcache.WebComponent;
 import org.frontcache.reqlog.RequestLogger;
-import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 
 public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = Logger.getLogger(getClass().getName());
 
+	@Override
+	public WebComponent processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception {
+
+		long start = System.currentTimeMillis();
+		boolean isRequestDynamic = true;
+		
+		long lengthBytes = -1;
+		WebComponent cachedWebComponent = getFromCache(originUrlStr);
+		
+		if (null == cachedWebComponent)
+		{
+			try
+			{
+				cachedWebComponent = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
+				lengthBytes = cachedWebComponent.getContentLenth();
+
+				// save to cache
+				if (cachedWebComponent.isCacheable())
+					putToCache(originUrlStr, cachedWebComponent);
+
+			} catch (Exception ex)
+			{
+				ex.printStackTrace();
+			}
+				
+		} else {
+			isRequestDynamic = false;
+		}
+		
+		
+		RequestLogger.logRequest(originUrlStr, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
+		
+		return cachedWebComponent;
+	}	
+	
+/*	
 	public String processCacheableRequest(HttpServletRequest httpRequest, HttpServletResponse response, String urlStr) throws IOException, ServletException 
 	{
 		long start = System.currentTimeMillis();
@@ -110,7 +140,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		RequestLogger.logRequest(urlStr, isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
 		return content;
 	}
-	
+//*/	
 	
 //	private String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException 
 //	{

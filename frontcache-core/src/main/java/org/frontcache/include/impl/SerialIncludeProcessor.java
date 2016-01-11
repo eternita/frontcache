@@ -1,7 +1,7 @@
 package org.frontcache.include.impl;
 
-import javax.servlet.http.HttpServletRequest;
-
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.http.client.HttpClient;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
@@ -21,7 +21,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 	 * @param appOriginBaseURL
 	 * @return
 	 */
-	public String processIncludes(String content, String appOriginBaseURL, HttpServletRequest httpRequest)
+	public String processIncludes(String content, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
 		StringBuffer outSb = new StringBuffer();
 		
@@ -39,7 +39,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 					
 					outSb.append(content.substring(scanIdx, startIdx));
 					
-					String includeContent = callInclude(appOriginBaseURL + includeURL, httpRequest);
+					String includeContent = callInclude(appOriginBaseURL + includeURL, requestHeaders, client);
 					
 					outSb.append(includeContent);
 					

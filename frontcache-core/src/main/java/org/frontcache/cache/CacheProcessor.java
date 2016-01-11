@@ -1,15 +1,10 @@
 package org.frontcache.cache;
 
-import java.io.IOException;
 import java.util.Properties;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.http.client.HttpClient;
 import org.frontcache.WebComponent;
-import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 
 public interface CacheProcessor {
 
@@ -24,10 +19,12 @@ public interface CacheProcessor {
 	public void removeFromCache(String filter);
 	public void removeFromCacheAll();
 	
+	public WebComponent processRequest(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception;
+
 	// used in filter
-	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException;
+//	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException;
 	
 	// used in servlet
-	public String processCacheableRequest(HttpServletRequest httpRequest, HttpServletResponse response, String urlStr) throws IOException, ServletException;
+//	public String processCacheableRequest(HttpServletRequest httpRequest, HttpServletResponse response, String urlStr) throws IOException, ServletException;
 	
 }

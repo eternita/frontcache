@@ -41,10 +41,10 @@ public class CacheManager {
 				return cacheProcessor;
 			}
 		} catch (Exception ex) {
-			logger.severe("Cant instantiate " + cacheImplStr);
+			logger.severe("Cant instantiate " + cacheImplStr + " Fallback - " + NoCacheProcessor.class.getName());
 		}
 		
-		return null;
+		return new NoCacheProcessor();
 	}
 
 }

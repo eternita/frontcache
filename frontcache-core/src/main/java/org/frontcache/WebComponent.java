@@ -1,9 +1,9 @@
 package org.frontcache;
 
 import java.io.Serializable;
-import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.collections4.MultiValuedMap;
 import org.frontcache.cache.CacheProcessor;
 
 public class WebComponent implements Serializable {
@@ -14,11 +14,16 @@ public class WebComponent implements Serializable {
 	 */
 	private static final long serialVersionUID = 1L;
 
+	private int statusCode = -1; // for redirects
+	
 	private String url;
 	
 	private String content;
 	
-	private Map<String, String> headers;
+	/**
+	 * Some headers, such as Accept-Language can be sent by clients as several headers each with a different value rather than sending the header as a comma separated list
+	 */
+	private MultiValuedMap<String, String> headers;
 	
 	private Set<String> tags;
 	
@@ -34,10 +39,20 @@ public class WebComponent implements Serializable {
 		super();
 		this.content = content;
 		setExpireTime(cacheMaxAgeSec);
+	}	
+	
+	public int getStatusCode() {
+		return statusCode;
 	}
 
-	
-	
+
+
+	public void setStatusCode(int statusCode) {
+		this.statusCode = statusCode;
+	}
+
+
+
 	public String getUrl() {
 		return url;
 	}
@@ -50,13 +65,13 @@ public class WebComponent implements Serializable {
 
 
 
-	public Map<String, String> getHeaders() {
+	public MultiValuedMap<String, String> getHeaders() {
 		return headers;
 	}
 
 
 
-	public void setHeaders(Map<String, String> headers) {
+	public void setHeaders(MultiValuedMap<String, String> headers) {
 		this.headers = headers;
 	}
 
@@ -112,7 +127,26 @@ public class WebComponent implements Serializable {
 	 */
 	public boolean isCacheable()
 	{
-		return expireTimeMillis != CacheProcessor.NO_CACHE;
+		if (expireTimeMillis == CacheProcessor.NO_CACHE)
+			return false;
+		
+		if (null == headers)
+			return false;
+		
+		if (null == contentType || -1 == contentType.indexOf("text"))
+			return false;
+
+			
+//		for (String name : headers.keySet()) {
+//			for (String value : headers.get(name)) {
+//				if ("Content-Type".equals(name) && -1 < value.indexOf("text"))
+//					return true;
+//			}
+//		}
+		
+		return true;
+		
+//		return expireTimeMillis != CacheProcessor.NO_CACHE;
 	}
 
 	/**
@@ -147,6 +181,19 @@ public class WebComponent implements Serializable {
 			return true;
 		
 		return false;
+	}
+
+	/**
+	 * content length in bytes
+	 * 
+	 * @return
+	 */
+	public long getContentLenth() 
+	{
+		if (null != getContent())
+			return 2*getContent().length();
+		
+		return -1;
 	}
 	
 }

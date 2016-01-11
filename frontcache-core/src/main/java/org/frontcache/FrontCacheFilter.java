@@ -67,39 +67,39 @@ public class FrontCacheFilter implements Filter {
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
 		
-		HttpServletRequest httpRequest = (HttpServletRequest) request;	
-		FrontCacheHttpResponseWrapper wrappedResponse = getHttpResponseWrapper((HttpServletResponse) response);
-		
-		
-		// if no appOriginBaseURL -> use current app
-		if (null == appOriginBaseURL)
-			appOriginBaseURL = getDefaultOriginBaseURL(httpRequest);
-	
-		String content = null;
-		if (null != cacheProcessor)
-		{
-			content = cacheProcessor.processCacheableRequest(httpRequest, wrappedResponse, chain);
-		} else {
-			long start = System.currentTimeMillis();
-			boolean isRequestDynamic = true;
-			
-			chain.doFilter(request, wrappedResponse); // run request to origin
-			content = wrappedResponse.getContentString();
-			if (null != content)
-			{
-				// remove custom component tag from response string
-				WebComponent webComponent = FCUtils.parseWebComponent(FCUtils.getRequestURL(httpRequest), content);
-				content = webComponent.getContent();
-			}
-
-			RequestLogger.logRequest(FCUtils.getRequestURL(httpRequest), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
-			
-		}
-
-		content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);
-		
-		// populate input response		
-		populateOriginalResponse((HttpServletResponse) response, wrappedResponse, content);
+//		HttpServletRequest httpRequest = (HttpServletRequest) request;	
+//		FrontCacheHttpResponseWrapper wrappedResponse = getHttpResponseWrapper((HttpServletResponse) response);
+//		
+//		
+//		// if no appOriginBaseURL -> use current app
+//		if (null == appOriginBaseURL)
+//			appOriginBaseURL = getDefaultOriginBaseURL(httpRequest);
+//	
+//		String content = null;
+//		if (null != cacheProcessor)
+//		{
+//			content = cacheProcessor.processCacheableRequest(httpRequest, wrappedResponse, chain);
+//		} else {
+//			long start = System.currentTimeMillis();
+//			boolean isRequestDynamic = true;
+//			
+//			chain.doFilter(request, wrappedResponse); // run request to origin
+//			content = wrappedResponse.getContentString();
+//			if (null != content)
+//			{
+//				// remove custom component tag from response string
+//				WebComponent webComponent = FCUtils.parseWebComponent(FCUtils.getRequestURL(httpRequest), content);
+//				content = webComponent.getContent();
+//			}
+//
+//			RequestLogger.logRequest(FCUtils.getRequestURL(httpRequest), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
+//			
+//		}
+//
+//		content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);
+//		
+//		// populate input response		
+//		populateOriginalResponse((HttpServletResponse) response, wrappedResponse, content);
 		return;
 	}
 
