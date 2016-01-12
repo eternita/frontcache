@@ -28,7 +28,6 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.message.BasicHeader;
-import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheProcessor;
 
 
@@ -47,7 +46,7 @@ public class FCUtils {
 	 * @param httpResponse
 	 * @return
 	 */
-	public static WebComponent dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception
+	public static WebResponse dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception
     {
 //		System.out.println("call origin " + urlStr);
 
@@ -72,7 +71,7 @@ public class FCUtils {
 //        return null;
     }
 	
-	private static WebComponent httpResponse2WebComponent(String url, HttpResponse response) throws Exception
+	private static WebResponse httpResponse2WebComponent(String url, HttpResponse response) throws Exception
 	{
 		
 		
@@ -104,16 +103,16 @@ public class FCUtils {
 //        respMap.put("dataStr", dataStr);
 //    	respMap.put("Content-Length", "" + dataStr.length());
 		
-		WebComponent webComponent = parseWebComponent(url, dataStr);
+		WebResponse webResponse = parseWebComponent(url, dataStr);
 
-		webComponent.setStatusCode(httpResponseCode);
+		webResponse.setStatusCode(httpResponseCode);
 		
 		// get headers
 		MultiValuedMap<String, String> headers = revertHeaders(response.getAllHeaders());
-		webComponent.setHeaders(headers);
-		webComponent.setContentType(contentType);
+		webResponse.setHeaders(headers);
+		webResponse.setContentType(contentType);
 				
-		return webComponent;
+		return webResponse;
 	}
 	
     /**
@@ -290,13 +289,13 @@ public class FCUtils {
     }
     
 	/**
-	 * wrap String to WebComponent.
+	 * wrap String to WebResponse.
 	 * Check for header - extract caching options.
 	 * 
 	 * @param content
 	 * @return
 	 */
-	private static final WebComponent parseWebComponent (String urlStr, String content)
+	private static final WebResponse parseWebComponent (String urlStr, String content)
 	{
 		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
 		
@@ -327,7 +326,7 @@ public class FCUtils {
 			outStr = content;
 		}
 
-		WebComponent component = new WebComponent(urlStr, outStr, cacheMaxAgeSec);
+		WebResponse component = new WebResponse(urlStr, outStr, cacheMaxAgeSec);
 		
 		return component;
 	}

@@ -5,8 +5,8 @@ import java.util.logging.Logger;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
-import org.frontcache.WebComponent;
 import org.frontcache.core.FCUtils;
+import org.frontcache.core.WebResponse;
 import org.frontcache.reqlog.RequestLogger;
 
 public abstract class CacheProcessorBase implements CacheProcessor {
@@ -14,13 +14,13 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	protected Logger logger = Logger.getLogger(getClass().getName());
 
 	@Override
-	public WebComponent processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception {
+	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestDynamic = true;
 		
 		long lengthBytes = -1;
-		WebComponent cachedWebComponent = getFromCache(originUrlStr);
+		WebResponse cachedWebComponent = getFromCache(originUrlStr);
 		
 		if (null == cachedWebComponent)
 		{
@@ -54,7 +54,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		long start = System.currentTimeMillis();
 		boolean isRequestDynamic = true;
 
-		WebComponent cachedWebComponent = getFromCache(urlStr);
+		WebResponse cachedWebComponent = getFromCache(urlStr);
 		
 		String content = null;
 		long lengthBytes = -1;
@@ -106,7 +106,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 		String urlStr = FCUtils.getRequestURL(httpRequest);
 		
-		WebComponent cachedWebComponent = getFromCache(urlStr);
+		WebResponse cachedWebComponent = getFromCache(urlStr);
 		
 		String content = null;
 
@@ -149,7 +149,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 //
 //		String urlStr = FCUtils.getRequestURL(httpRequest);
 //		
-//		WebComponent cachedWebComponent = getFromCache(urlStr);
+//		WebResponse cachedWebComponent = getFromCache(urlStr);
 //		
 //		String content = null;
 //
