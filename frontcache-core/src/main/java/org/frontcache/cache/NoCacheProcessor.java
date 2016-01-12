@@ -5,8 +5,8 @@ import java.util.logging.Logger;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
-import org.frontcache.FCUtils;
 import org.frontcache.WebComponent;
+import org.frontcache.core.FCUtils;
 import org.frontcache.reqlog.RequestLogger;
 
 public class NoCacheProcessor implements CacheProcessor {

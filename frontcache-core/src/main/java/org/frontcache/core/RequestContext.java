@@ -2,7 +2,6 @@ package org.frontcache.core;
 
 import java.io.InputStream;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,7 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.frontcache.FCUtils;
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 
 
 /**
@@ -357,12 +357,12 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      *
      * @return the List<Pair<String, String>> of headers sent back from the origin
      */
-    public List<Pair<String, String>> getOriginResponseHeaders() {
+    public MultiValuedMap<String, String> getOriginResponseHeaders() {
         if (get("originResponseHeaders") == null) {
-            List<Pair<String, String>> originResponseHeaders = new ArrayList<Pair<String, String>>();
+        	MultiValuedMap<String, String> originResponseHeaders = new ArrayListValuedHashMap<>();
             putIfAbsent("originResponseHeaders", originResponseHeaders);
         }
-        return (List<Pair<String, String>>) get("originResponseHeaders");
+        return (MultiValuedMap<String, String>) get("originResponseHeaders");
     }
     
     /**
@@ -371,14 +371,15 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      */
     public boolean isCacheableResponse()
     {
-		List<Pair<String, String>> originResponseHeaders = getOriginResponseHeaders();
+    	MultiValuedMap<String, String> originResponseHeaders = getOriginResponseHeaders();
 		
-		for (Pair<String, String> it : originResponseHeaders) {
-			if ("Content-Type".equals(it.first()) 
-					&& -1 < it.second().indexOf("text"))
-				return true;
+		for (String key : originResponseHeaders.keySet()) {
+			for (String value : originResponseHeaders.get(key)) {
+				if ("Content-Type".equals(key) 
+						&& -1 < value.indexOf("text"))
+					return true;
+			}
 		}
-
     	return false;
     }
 
@@ -403,7 +404,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * @param value
      */
     public void addOriginResponseHeader(String name, String value) {
-        getOriginResponseHeaders().add(new Pair<String, String>(name, value));
+        getOriginResponseHeaders().put(name, value);
     }
 
     /**
