@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
+import org.frontcache.FrontCacheClient;
 import org.frontcache.WebComponent;
 import org.frontcache.core.FCUtils;
 import org.frontcache.reqlog.RequestLogger;
@@ -71,4 +72,27 @@ public class NoCacheProcessor implements CacheProcessor {
 
 	}
 
+	@Override
+	public FrontCacheClient getFrontCacheClient() {
+		return new NoCacheClient();
+	}
+
 }
+
+/**
+ * 
+ * 
+ *
+ */
+class NoCacheClient extends FrontCacheClient {
+
+	public void remove(String filter)
+	{		
+	}
+	
+	public void removeAll()
+	{		
+	}
+	
+}
+

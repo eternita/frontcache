@@ -6,7 +6,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.frontcache.FrontCacheClient;
 import org.frontcache.WebComponent;
+import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
 
@@ -112,6 +114,34 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 		cache.clear();
 	}
 
-
+	@Override
+	public FrontCacheClient getFrontCacheClient() {
+		return new InMemoryCacheClient();
+	}
 	
 }
+
+/**
+ * 
+ * 
+ *
+ */
+class InMemoryCacheClient extends FrontCacheClient {
+
+	private static CacheProcessor cacheProcessor = CacheManager.getInstance(); 
+
+
+	public void remove(String filter)
+	{		
+		if (null != cacheProcessor)
+			cacheProcessor.removeFromCache(filter);
+	}
+	
+	public void removeAll()
+	{		
+		if (null != cacheProcessor)
+			cacheProcessor.removeFromCacheAll();
+	}
+	
+}
+
