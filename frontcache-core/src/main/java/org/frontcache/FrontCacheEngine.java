@@ -9,7 +9,6 @@ import java.net.URL;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Logger;
@@ -49,7 +48,7 @@ import org.apache.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
-import org.frontcache.core.Pair;
+import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
@@ -451,14 +450,16 @@ public class FrontCacheEngine {
 	private void addResponseHeaders() {
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletResponse servletResponse = context.getResponse();
-		List<Pair<String, String>> originResponseHeaders = context.getOriginResponseHeaders();
+		MultiValuedMap<String, String> originResponseHeaders = context.getOriginResponseHeaders();
 
 		servletResponse.addHeader(FCHeaders.X_FC_INSTANCE, fcInstanceId);
 		servletResponse.setStatus(context.getResponseStatusCode());
 		
 		if (originResponseHeaders != null) {
-			for (Pair<String, String> it : originResponseHeaders) {
-				servletResponse.addHeader(it.first(), it.second());
+			for (String key : originResponseHeaders.keySet()) {
+				for (String value : originResponseHeaders.get(key)) {
+					servletResponse.addHeader(key, value);
+				}
 			}
 		}
 		RequestContext ctx = RequestContext.getCurrentContext();

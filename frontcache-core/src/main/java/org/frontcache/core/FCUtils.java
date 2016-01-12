@@ -1,4 +1,4 @@
-package org.frontcache;
+package org.frontcache.core;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,8 +28,8 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.message.BasicHeader;
+import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheProcessor;
-import org.frontcache.core.RequestContext;
 
 
 public class FCUtils {
