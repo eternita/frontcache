@@ -49,6 +49,7 @@ import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
+import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.reqlog.RequestLogger;
@@ -193,20 +194,20 @@ public class FrontCacheEngine {
 			MultiValuedMap<String, String> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 
 			// TODO: throw exception in response is not cacheable !
-			WebComponent webComponent = cacheProcessor.processRequest(originRequestURL, requestHeaders, httpClient);
+			WebResponse webResponse = cacheProcessor.processRequest(originRequestURL, requestHeaders, httpClient);
 
 
 			// include processor
-			if (null != webComponent.getContent())
+			if (null != webResponse.getContent())
 			{
-				String content = webComponent.getContent(); 
+				String content = webResponse.getContent(); 
 				content = includeProcessor.processIncludes(content, appOriginBaseURL, requestHeaders, httpClient);
-				webComponent.setContent(content);
+				webResponse.setContent(content);
 			}
 			
 			
-			addResponseHeaders(webComponent);
-			writeResponse(webComponent);
+			addResponseHeaders(webResponse);
+			writeResponse(webResponse);
 			
 		} else {
 			long start = System.currentTimeMillis();
@@ -423,11 +424,11 @@ public class FrontCacheEngine {
 		}
 	}
 
-	private void writeResponse(WebComponent webComponent) throws Exception {
+	private void writeResponse(WebResponse webResponse) throws Exception {
 		RequestContext context = RequestContext.getCurrentContext();
 
 		// there is no body to send
-		if (null == webComponent.getContent()) {
+		if (null == webResponse.getContent()) {
 			return;
 		}
 		
@@ -435,7 +436,7 @@ public class FrontCacheEngine {
 		servletResponse.setCharacterEncoding("UTF-8");
 		OutputStream outStream = servletResponse.getOutputStream();
 		try {
-			String body = webComponent.getContent();
+			String body = webResponse.getContent();
 			FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes()), outStream);
 		}
 		finally {
@@ -475,17 +476,17 @@ public class FrontCacheEngine {
 //		}
 	}	
 
-	private void addResponseHeaders(WebComponent webComponent) {
+	private void addResponseHeaders(WebResponse webResponse) {
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletResponse servletResponse = context.getResponse();
 
-		servletResponse.setStatus(webComponent.getStatusCode());
+		servletResponse.setStatus(webResponse.getStatusCode());
 		
 		servletResponse.addHeader(FCHeaders.X_FC_INSTANCE, fcInstanceId);
 		
-		if (webComponent.getHeaders() != null) {
-			for (String name : webComponent.getHeaders().keySet()) {
-				for (String value : webComponent.getHeaders().get(name)) {
+		if (webResponse.getHeaders() != null) {
+			for (String name : webResponse.getHeaders().keySet()) {
+				for (String value : webResponse.getHeaders().get(name)) {
 					servletResponse.addHeader(name, value);
 				}
 			}

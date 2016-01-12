@@ -6,8 +6,8 @@ import java.util.logging.Logger;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheClient;
-import org.frontcache.WebComponent;
 import org.frontcache.core.FCUtils;
+import org.frontcache.core.WebResponse;
 import org.frontcache.reqlog.RequestLogger;
 
 public class NoCacheProcessor implements CacheProcessor {
@@ -15,13 +15,13 @@ public class NoCacheProcessor implements CacheProcessor {
 	protected Logger logger = Logger.getLogger(getClass().getName());
 
 	@Override
-	public WebComponent processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception {
+	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestDynamic = true;
 		long lengthBytes = -1;
 		
-		WebComponent cachedWebComponent = null;
+		WebResponse cachedWebComponent = null;
 		try
 		{
 			cachedWebComponent = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
@@ -49,13 +49,13 @@ public class NoCacheProcessor implements CacheProcessor {
 	}
 
 	@Override
-	public void putToCache(String url, WebComponent component) {
+	public void putToCache(String url, WebResponse component) {
 		// TODO Auto-generated method stub
 
 	}
 
 	@Override
-	public WebComponent getFromCache(String url) {
+	public WebResponse getFromCache(String url) {
 		// TODO Auto-generated method stub
 		return null;
 	}

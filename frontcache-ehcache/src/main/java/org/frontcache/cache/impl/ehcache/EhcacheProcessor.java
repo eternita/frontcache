@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Properties;
 
 import org.frontcache.FrontCacheClient;
-import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
+import org.frontcache.core.WebResponse;
 
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
@@ -72,7 +72,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	 * 
 	 */
 	@Override
-	public void putToCache(String url, WebComponent component) {
+	public void putToCache(String url, WebResponse component) {
 		logger.info(url);
 		cache.put(new Element(url, component));
 	}
@@ -81,13 +81,13 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	 * 
 	 */
 	@Override
-	public WebComponent getFromCache(String url) {
+	public WebResponse getFromCache(String url) {
 		logger.fine(url);
 		Element el = cache.get(url);
 		if (null == el)
 			return null;
 		
-		WebComponent comp = (WebComponent) el.getObjectValue();
+		WebResponse comp = (WebResponse) el.getObjectValue();
 
 		if (comp.isExpired())
 		{

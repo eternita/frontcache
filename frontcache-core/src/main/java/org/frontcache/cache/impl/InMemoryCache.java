@@ -7,15 +7,15 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.frontcache.FrontCacheClient;
-import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
+import org.frontcache.core.WebResponse;
 
 public class InMemoryCache extends CacheProcessorBase implements CacheProcessor {
 
 
-	private Map<String, WebComponent> cache = new ConcurrentHashMap<String, WebComponent>();
+	private Map<String, WebResponse> cache = new ConcurrentHashMap<String, WebResponse>();
 
 	private int currentSize = 0;
 	private int maxSize = 0;
@@ -55,7 +55,7 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 	}	
 
 	@Override
-	public void putToCache(String url, WebComponent component) {
+	public void putToCache(String url, WebResponse component) {
 		
 		int newSize = currentSize + component.getContent().length();
 		if (newSize < maxSize)
@@ -70,9 +70,9 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 	}
 
 	@Override
-	public WebComponent getFromCache(String url) {
+	public WebResponse getFromCache(String url) {
 		
-		WebComponent comp = cache.get(url);
+		WebResponse comp = cache.get(url);
 		if (null == comp)
 			return null;
 		

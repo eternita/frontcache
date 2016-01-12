@@ -88,8 +88,8 @@ public class FrontCacheFilter implements Filter {
 //			if (null != content)
 //			{
 //				// remove custom component tag from response string
-//				WebComponent webComponent = FCUtils.parseWebComponent(FCUtils.getRequestURL(httpRequest), content);
-//				content = webComponent.getContent();
+//				WebResponse webResponse = FCUtils.parseWebComponent(FCUtils.getRequestURL(httpRequest), content);
+//				content = webResponse.getContent();
 //			}
 //
 //			RequestLogger.logRequest(FCUtils.getRequestURL(httpRequest), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());

@@ -1,4 +1,4 @@
-package org.frontcache;
+package org.frontcache.core;
 
 import java.io.Serializable;
 import java.util.Set;
@@ -6,7 +6,7 @@ import java.util.Set;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.frontcache.cache.CacheProcessor;
 
-public class WebComponent implements Serializable {
+public class WebResponse implements Serializable {
 
 
 	/**
@@ -35,7 +35,7 @@ public class WebComponent implements Serializable {
 	private long expireTimeMillis = CacheProcessor.NO_CACHE;
 	
 	
-	public WebComponent(String url, String content, int cacheMaxAgeSec) {
+	public WebResponse(String url, String content, int cacheMaxAgeSec) {
 		super();
 		this.content = content;
 		setExpireTime(cacheMaxAgeSec);
