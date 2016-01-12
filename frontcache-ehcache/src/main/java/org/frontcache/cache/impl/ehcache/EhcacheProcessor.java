@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import org.frontcache.FrontCacheClient;
 import org.frontcache.WebComponent;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
@@ -115,8 +116,24 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	@Override
 	public void removeFromCacheAll() {
 		cache.removeAll();
+	}
+
+	@Override
+	public FrontCacheClient getFrontCacheClient() {
+		return new EhcacheClient();
 	}	
+	
+}
 
+// TODO: impl me
+class EhcacheClient extends FrontCacheClient {
 
+	public void remove(String filter)
+	{		
+	}
+	
+	public void removeAll()
+	{		
+	}
 	
 }

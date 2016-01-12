@@ -4,6 +4,7 @@ import java.util.Properties;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
+import org.frontcache.FrontCacheClient;
 import org.frontcache.WebComponent;
 
 public interface CacheProcessor {
@@ -20,6 +21,8 @@ public interface CacheProcessor {
 	public void removeFromCacheAll();
 	
 	public WebComponent processRequest(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception;
+	
+	public FrontCacheClient getFrontCacheClient();
 
 	// used in filter
 //	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException;

@@ -20,7 +20,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.collections4.MultiValuedMap;
-//import org.apache.http.HttpHeaders;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -57,9 +56,11 @@ import org.frontcache.reqlog.RequestLogger;
 public class FrontCacheEngine {
 
 	private String appOriginBaseURL = null;
-	private String fcInstanceId = null;	// used to determine which front cache processed request (forwarded by GEO LB e.g. route53 AWS)
+	
+	private String fcInstanceId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
 	
 	private static int fcConnectionsMaxTotal = 200;
+	
 	private static int fcConnectionsMaxPerRoute = 20;
 
 	private IncludeProcessor includeProcessor = null;
@@ -68,10 +69,10 @@ public class FrontCacheEngine {
 
 	protected Logger logger = Logger.getLogger(getClass().getName());
 	
-	private final Timer connectionManagerTimer = new Timer(
-			"FrontCacheEngine.connectionManagerTimer", true);
+	private final Timer connectionManagerTimer = new Timer("FrontCacheEngine.connectionManagerTimer", true);
 
 	private PoolingHttpClientConnectionManager connectionManager;
+	
 	private CloseableHttpClient httpClient;
 	
 	public FrontCacheEngine() {
@@ -81,6 +82,7 @@ public class FrontCacheEngine {
 	private void initialize() {
 
 		appOriginBaseURL = FCConfig.getProperty("app_origin_base_url");
+		
 		fcInstanceId = FCConfig.getProperty("fc_instance_id");
 			
 		cacheProcessor = CacheManager.getInstance();
