@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 
 /**
@@ -68,22 +69,15 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	/**
 	 * 
 	 * @param urlStr
-	 * @param httpRequest
+	 * @param requestHeaders
+	 * @param client
 	 * @return
 	 */
-	protected String callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client)
+	protected String callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
     {
 		
-		WebResponse cachedWebComponent;
-		try {
-			cachedWebComponent = cacheProcessor.processRequest(urlStr, requestHeaders, client);
-			return cachedWebComponent.getContent();
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		return "";
+		WebResponse cachedWebComponent = cacheProcessor.processRequest(urlStr, requestHeaders, client);
+		return cachedWebComponent.getContent();
     }
 
 	@Override
