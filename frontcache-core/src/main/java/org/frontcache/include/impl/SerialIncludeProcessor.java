@@ -2,6 +2,7 @@ package org.frontcache.include.impl;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
+import org.frontcache.core.FrontCacheException;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
@@ -39,9 +40,29 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 					
 					outSb.append(content.substring(scanIdx, startIdx));
 					
-					String includeContent = callInclude(appOriginBaseURL + includeURL, requestHeaders, client);
+					String includeContent;
+					try {
+						includeContent = callInclude(appOriginBaseURL + includeURL, requestHeaders, client);
+						outSb.append(includeContent);
+
+					} catch (FrontCacheException e) {
+						logger.severe("unexpected error processing include " + includeURL);
+						
+						outSb.append(includeURL);
+						outSb.append("<!-- error processing include " + includeURL);
+						outSb.append(e.getMessage());
+						outSb.append(" -->");
+
+					} catch (Exception e) {
+						logger.severe("unexpected error processing include " + includeURL);
+						e.printStackTrace();
+						
+						outSb.append(includeURL);
+						outSb.append("<!-- unexpected error processing include " + includeURL);
+						outSb.append(e.getMessage());
+						outSb.append(" -->");
+					}
 					
-					outSb.append(includeContent);
 					
 					scanIdx = endIdx + END_MARKER.length();
 				} else {

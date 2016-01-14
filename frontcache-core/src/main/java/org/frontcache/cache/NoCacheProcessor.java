@@ -7,6 +7,7 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheClient;
 import org.frontcache.core.FCUtils;
+import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 import org.frontcache.reqlog.RequestLogger;
 
@@ -15,7 +16,7 @@ public class NoCacheProcessor implements CacheProcessor {
 	protected Logger logger = Logger.getLogger(getClass().getName());
 
 	@Override
-	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception {
+	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;

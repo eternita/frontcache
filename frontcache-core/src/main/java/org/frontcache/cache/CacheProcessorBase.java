@@ -44,6 +44,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				
 		} else {
 			isRequestDynamic = false;
+			lengthBytes = cachedWebComponent.getContentLenth();			
 		}
 		
 		

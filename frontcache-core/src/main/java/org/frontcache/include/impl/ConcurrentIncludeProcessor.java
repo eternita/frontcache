@@ -13,6 +13,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
+import org.frontcache.core.FrontCacheException;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
@@ -79,8 +80,6 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
         List<Future<IncludeResolutionPlaceholder>> futureList = new ArrayList<Future<IncludeResolutionPlaceholder>>(includes.size());
 		for (IncludeResolutionPlaceholder inc : includes)
 		{
-			//TODO: for cached - run serial
-			
 			// run concurrent include resolution
             futureList.add(executor.submit(inc));
 		}
@@ -196,7 +195,33 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	    @Override
 	    public IncludeResolutionPlaceholder call() throws Exception {
-			this.content = callInclude(this.includeURL, this.requestHeaders, this.client);
+	    	
+			try {
+				this.content = callInclude(this.includeURL, this.requestHeaders, this.client);
+
+			} catch (FrontCacheException e) {
+				logger.severe("unexpected error processing include " + includeURL);
+				
+				StringBuffer outSb = new StringBuffer();
+				outSb.append(includeURL);
+				outSb.append("<!-- error processing include " + includeURL);
+				outSb.append(e.getMessage());
+				outSb.append(" -->");
+				this.content = outSb.toString();
+
+			} catch (Exception e) {
+				e.printStackTrace();
+				logger.severe("unexpected error processing include " + includeURL);
+				
+				StringBuffer outSb = new StringBuffer();
+				outSb.append(includeURL);
+				outSb.append("<!-- unexpected error processing include " + includeURL);
+				outSb.append(e.getMessage());
+				outSb.append(" -->");
+				this.content = outSb.toString();
+			}
+	    	
+//			this.content = callInclude(this.includeURL, this.requestHeaders, this.client);
 	        return this;
 	    }
 		

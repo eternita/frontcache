@@ -5,6 +5,7 @@ import java.util.Properties;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheClient;
+import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 
 public interface CacheProcessor {
@@ -20,7 +21,7 @@ public interface CacheProcessor {
 	public void removeFromCache(String filter);
 	public void removeFromCacheAll();
 	
-	public WebResponse processRequest(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception;
+	public WebResponse processRequest(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException;
 	
 	public FrontCacheClient getFrontCacheClient();
 
