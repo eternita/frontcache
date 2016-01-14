@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FCUtils;
+import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 import org.frontcache.reqlog.RequestLogger;
 
@@ -14,9 +15,10 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	protected Logger logger = Logger.getLogger(getClass().getName());
 
 	@Override
-	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception {
+	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException {
 
 		long start = System.currentTimeMillis();
+		boolean isRequestCacheable = true;
 		boolean isRequestDynamic = true;
 		
 		long lengthBytes = -1;
@@ -33,8 +35,10 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				if (cachedWebComponent.isCacheable())
 					putToCache(originUrlStr, cachedWebComponent);
 
-			} catch (Exception ex)
-			{
+			} catch (FrontCacheException ex) {
+				throw ex;
+			} catch (Exception ex) {
+				
 				ex.printStackTrace();
 			}
 				
@@ -43,7 +47,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		}
 		
 		
-		RequestLogger.logRequest(originUrlStr, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
+		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
 		
 		return cachedWebComponent;
 	}	

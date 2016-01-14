@@ -48,6 +48,7 @@ import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
+import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessor;
@@ -186,7 +187,6 @@ public class FrontCacheEngine {
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
 		String originRequestURL = appOriginBaseURL + context.getRequestURI();
-//		System.out.println(originRequestURL);
 
 		
 		if (context.isCacheableRequest()) // GET method & Accept header contain 'text'
@@ -194,37 +194,48 @@ public class FrontCacheEngine {
 			MultiValuedMap<String, String> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 
 			// TODO: throw exception in response is not cacheable !
-			WebResponse webResponse = cacheProcessor.processRequest(originRequestURL, requestHeaders, httpClient);
-
-
-			// include processor
-			if (null != webResponse.getContent())
+			WebResponse webResponse = null;
+			try
 			{
-				String content = webResponse.getContent(); 
-				content = includeProcessor.processIncludes(content, appOriginBaseURL, requestHeaders, httpClient);
-				webResponse.setContent(content);
+				webResponse = cacheProcessor.processRequest(originRequestURL, requestHeaders, httpClient);
+			} catch (FrontCacheException fce) {
+				// content/response is not cacheable (e.g. response type is not text) 
+				fce.printStackTrace();
 			}
-			
-			
-			addResponseHeaders(webResponse);
-			writeResponse(webResponse);
-			
-		} else {
-			long start = System.currentTimeMillis();
-			boolean isRequestDynamic = true;
 
-			
-			forwardToOrigin();
-			
-			long lengthBytes = -1; // TODO: set/get content length from context
+			if (null != webResponse)
+			{
+				// include processor
+				if (null != webResponse.getContent())
+				{
+					String content = webResponse.getContent(); 
+					content = includeProcessor.processIncludes(content, appOriginBaseURL, requestHeaders, httpClient);
+					webResponse.setContent(content);
+				}
+				
+				
+				addResponseHeaders(webResponse);
+				writeResponse(webResponse);
+				return;
+			} else {
+				// content/response is not cacheable (e.g. response type is not text) 
+				
+				// do dynamic call below (forwardToOrigin)
+			}
 
-			RequestLogger.logRequest(originRequestURL, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);			
-			addResponseHeaders();
-			writeResponse();
-			
 		}
 		
-		
+		// do dynamic call to origin
+		{
+			long start = System.currentTimeMillis();
+			boolean isRequestCacheable = false;
+			boolean isRequestDynamic = true;
+			long lengthBytes = -1; // TODO: set/get content length from context or just keep -1 ?
+			forwardToOrigin();		
+			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);			
+			addResponseHeaders();
+			writeResponse();
+		}		
 		return;
 	}
 
@@ -284,7 +295,7 @@ public class FrontCacheEngine {
 		HttpHost httpHost = FCUtils.getHttpHost(host);
 		uri = (host.getPath() + uri).replaceAll("/{2,}", "/");
 		
-		System.out.println("forward (no-cache) " + httpHost + uri);
+//		System.out.println("forward (no-cache) " + httpHost + uri);
 		
 		HttpRequest httpRequest;
 		switch (verb.toUpperCase()) {

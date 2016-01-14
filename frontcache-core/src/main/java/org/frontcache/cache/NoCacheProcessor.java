@@ -18,6 +18,7 @@ public class NoCacheProcessor implements CacheProcessor {
 	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception {
 
 		long start = System.currentTimeMillis();
+		boolean isRequestCacheable = true;
 		boolean isRequestDynamic = true;
 		long lengthBytes = -1;
 		
@@ -31,7 +32,7 @@ public class NoCacheProcessor implements CacheProcessor {
 			ex.printStackTrace();
 		}
 
-		RequestLogger.logRequest(originUrlStr, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
+		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
 
 		return cachedWebComponent;
 	}

@@ -46,10 +46,8 @@ public class FCUtils {
 	 * @param httpResponse
 	 * @return
 	 */
-	public static WebResponse dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws Exception
+	public static WebResponse dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
     {
-//		System.out.println("call origin " + urlStr);
-
 		HttpGet request = new HttpGet(urlStr);
 		
 		// translate headers
@@ -58,20 +56,18 @@ public class FCUtils {
 			request.addHeader(header);
 		
 		HttpResponse response;
-//		try {
+		try {
 			response = client.execute(request);
 			
 			return httpResponse2WebComponent(urlStr, response);
 
-//		} catch (Exception e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//		
-//        return null;
+		} catch (IOException ioe) {
+			throw new FrontCacheException("Can't read from origin (" + urlStr + ")", ioe);
+		}
+		
     }
 	
-	private static WebResponse httpResponse2WebComponent(String url, HttpResponse response) throws Exception
+	private static WebResponse httpResponse2WebComponent(String url, HttpResponse response) throws FrontCacheException, IOException
 	{
 		
 		
@@ -89,7 +85,7 @@ public class FCUtils {
 			contentType = contentTypeHeader.getValue();
 		
 		if (-1 == contentType.indexOf("text"))
-			throw new RuntimeException("Wrong content type is returned " + contentType);
+			throw new FrontCacheException("Not cacheable content type (" + contentType + ") for " + url);
 			
 
 		BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
@@ -100,8 +96,6 @@ public class FCUtils {
 		}
 		
 		String dataStr = result.toString();
-//        respMap.put("dataStr", dataStr);
-//    	respMap.put("Content-Length", "" + dataStr.length());
 		
 		WebResponse webResponse = parseWebComponent(url, dataStr);
 
