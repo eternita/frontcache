@@ -27,7 +27,6 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 
     protected static Class<? extends RequestContext> contextClass = RequestContext.class;
 
-    private static RequestContext testContext = null;
 
     protected static final ThreadLocal<? extends RequestContext> threadLocal = new ThreadLocal<RequestContext>() {
         @Override
@@ -54,14 +53,6 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         contextClass = clazz;
     }
 
-    /**
-     * set an overriden "test" context
-     *
-     * @param context
-     */
-    public static void testSetCurrentContext(RequestContext context) {
-        testContext = context;
-    }
 
     /**
      * Get the current RequestContext
@@ -69,8 +60,6 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * @return the current RequestContext
      */
     public static RequestContext getCurrentContext() {
-        if (testContext != null) return testContext;
-
         RequestContext context = threadLocal.get();
         return context;
     }
@@ -119,22 +108,6 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         if (value != null) put(key, value);
         else remove(key);
     }
-
-//    /**
-//     * true if  zuulEngineRan
-//     *
-//     * @return
-//     */
-//    public boolean getZuulEngineRan() {
-//        return getBoolean("zuulEngineRan");
-//    }
-//
-//    /**
-//     * sets zuulEngineRan to true
-//     */
-//    public void setZuulEngineRan() {
-//        put("zuulEngineRan", true);
-//    }
 
     /**
      * @return the HttpServletRequest from the "request" key
@@ -188,57 +161,6 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 
     }
 
-//    /**
-//     * sets  debugRouting
-//     *
-//     * @param bDebug
-//     */
-//    public void setDebugRouting(boolean bDebug) {
-//        set("debugRouting", bDebug);
-//    }
-//
-//    /**
-//     * @return "debugRouting"
-//     */
-//    public boolean debugRouting() {
-//        return getBoolean("debugRouting");
-//    }
-//
-//    /**
-//     * sets "debugRequestHeadersOnly" to bHeadersOnly
-//     *
-//     * @param bHeadersOnly
-//     */
-//    public void setDebugRequestHeadersOnly(boolean bHeadersOnly) {
-//        set("debugRequestHeadersOnly", bHeadersOnly);
-//
-//    }
-//
-//    /**
-//     * @return "debugRequestHeadersOnly"
-//     */
-//    public boolean debugRequestHeadersOnly() {
-//        return getBoolean("debugRequestHeadersOnly");
-//    }
-//
-//    /**
-//     * sets "debugRequest"
-//     *
-//     * @param bDebug
-//     */
-//    public void setDebugRequest(boolean bDebug) {
-//        set("debugRequest", bDebug);
-//    }
-//
-//    /**
-//     * gets debugRequest
-//     *
-//     * @return debugRequest
-//     */
-//    public boolean debugRequest() {
-//        return getBoolean("debugRequest");
-//    }
-
     /**
      * removes "routeHost" key
      */
@@ -247,42 +169,21 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
     /**
-     * sets routeHost
+     * sets originHost
      *
-     * @param routeHost a URL
+     * @param originHost a URL
      */
-    public void setRouteHost(URL routeHost) {
-        set("routeHost", routeHost);
+    public void setOriginHost(URL originHost) {
+        set("originHost", originHost);
     }
 
     /**
-     * @return "routeHost" URL
+     * @return "originHost" URL
      */
-    public URL getRouteHost() {
-        return (URL) get("routeHost");
+    public URL getOriginHost() {
+        return (URL) get("originHost");
     }
 
-//    /**
-//     * appends filter name and status to the filter execution history for the
-//     * current request
-//     * 
-//     * @param executedFilters - name of the filter
-//     */
-//    public void addFilterExecutionSummary(String name, String status, long time) {
-//            StringBuilder sb = getFilterExecutionSummary();
-//            if (sb.length() > 0) sb.append(", ");
-//            sb.append(name).append('[').append(status).append(']').append('[').append(time).append("ms]");
-//    }
-//
-//    /**
-//     * @return String that represents the filter execution history for the current request
-//     */
-//    public StringBuilder getFilterExecutionSummary() {
-//        if (get("executedFilters") == null) {
-//            putIfAbsent("executedFilters", new StringBuilder());
-//        }
-//        return (StringBuilder) get("executedFilters");
-//    }
     
     /**
      * sets the "responseBody" value as a String. This is the response sent back to the client.
@@ -435,6 +336,16 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     	return (String) get("requestURI");
     }
 
+    public void setRequestQueryString(String requestQueryString)
+    {
+        set("requestQueryString", requestQueryString);
+    }
+    
+    public String getRequestQueryString()
+    {
+    	return (String) get("requestQueryString");
+    }
+    
     /**
      * sets the content-length from the origin response
      *
