@@ -12,7 +12,7 @@ import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.WebResponse;
 
-public class InMemoryCache extends CacheProcessorBase implements CacheProcessor {
+public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheProcessor {
 
 
 	private Map<String, WebResponse> cache = new ConcurrentHashMap<String, WebResponse>();
@@ -24,12 +24,12 @@ public class InMemoryCache extends CacheProcessorBase implements CacheProcessor 
 	public void init(Properties properties) {
 		try
 		{
-			String maxSizeStr = properties.getProperty("cache.inmemory.maxsize");
+			String maxSizeStr = properties.getProperty("front-cache.cache-processor.impl.in-memory.maxsize");
 			String countStr = maxSizeStr;
 			
 			if (null == maxSizeStr)
 			{
-				logger.info("cache.inmemory.maxsize is not defined. Please define");
+				logger.info("front-cache.cache-processor.impl.in-memory.maxsize is not defined. Please define");
 				logger.info("max cache size is " + maxSize);
 				return;
 			}

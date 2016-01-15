@@ -38,7 +38,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		
 		try
 		{
-			String threadAmountStr = properties.getProperty("include_processor.concurent.thread_amount");
+			String threadAmountStr = properties.getProperty("front-cache.include-processor.impl.concurrent.thread-amount");
 			threadAmount = Integer.parseInt(threadAmountStr); 
 		} catch (Exception ex) {
 			ex.printStackTrace();
@@ -47,7 +47,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		
 		try
 		{
-			String timeoutStr = properties.getProperty("include_processor.concurent.timeout");
+			String timeoutStr = properties.getProperty("front-cache.include-processor.impl.concurrent.timeout");
 			timeout = Integer.parseInt(timeoutStr); 
 		} catch (Exception ex) {
 			ex.printStackTrace();

@@ -26,7 +26,7 @@ public class RequestLogger {
 
 	private final static String SEPARATOR = " ";
 	
-	private final static String CONFIG_FILE_KEY = "request_logs_config";
+	private final static String CONFIG_FILE_KEY = "front-cache.request-logs-config";
 	
 	private final static String DEFAULT_CONFIG_FILE = "fc-log-config-default.xml";
 
