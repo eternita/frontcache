@@ -57,7 +57,9 @@ import org.frontcache.reqlog.RequestLogger;
 
 public class FrontCacheEngine {
 
-	private String appOriginBaseURL = null;
+	private String appOriginBaseURLStr = null;
+	
+	private URL appOriginBaseURL = null;
 	
 	private String fcInstanceId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
 	
@@ -83,7 +85,14 @@ public class FrontCacheEngine {
 	
 	private void initialize() {
 
-		appOriginBaseURL = FCConfig.getProperty("app_origin_base_url");
+		appOriginBaseURLStr = FCConfig.getProperty("app_origin_base_url");
+		
+		try {
+			appOriginBaseURL = new URL(appOriginBaseURLStr);
+		} catch (MalformedURLException e) {
+			throw new RuntimeException("Invalid app_origin_base_url (" + appOriginBaseURLStr + ")", e);
+		}
+
 		
 		fcInstanceId = FCConfig.getProperty("fc_instance_id");
 			
@@ -180,20 +189,27 @@ public class FrontCacheEngine {
         ctx.setResponse(servletResponse);
 		String uri = FCUtils.buildRequestURI(servletRequest);
 		ctx.setRequestURI(uri);
+		String queryString = FCUtils.getQueryString(servletRequest);
+		ctx.setRequestQueryString(queryString);
+		
+		ctx.setOriginHost(appOriginBaseURL);
+		
     }	
+    
     
 	public void processRequest() throws Exception
 	{
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
-		String originRequestURL = appOriginBaseURL + context.getRequestURI();
+		String originRequestURL = appOriginBaseURLStr + context.getRequestURI() + context.getRequestQueryString();
 
+		String currentRequestBaseURL = FCUtils.getBaseURL(httpRequest);
+//		System.out.println("-- " + currentRequestBaseURL);
 		
 		if (context.isCacheableRequest()) // GET method & Accept header contain 'text'
 		{
 			MultiValuedMap<String, String> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 
-			// TODO: throw exception in response is not cacheable !
 			WebResponse webResponse = null;
 			try
 			{
@@ -209,7 +225,7 @@ public class FrontCacheEngine {
 				if (null != webResponse.getContent())
 				{
 					String content = webResponse.getContent(); 
-					content = includeProcessor.processIncludes(content, appOriginBaseURL, requestHeaders, httpClient);
+					content = includeProcessor.processIncludes(content, currentRequestBaseURL, requestHeaders, httpClient);
 					webResponse.setContent(content);
 				}
 				
@@ -244,12 +260,6 @@ public class FrontCacheEngine {
 	{
 		RequestContext context = RequestContext.getCurrentContext();
 		
-		try {
-			context.setRouteHost(new URL(appOriginBaseURL));
-		} catch (MalformedURLException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 
 		HttpServletRequest request = context.getRequest();
 		MultiValuedMap<String, String> headers = FCUtils.buildRequestHeaders(request);
@@ -291,7 +301,9 @@ public class FrontCacheEngine {
 	private HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
 			MultiValuedMap<String, String> headers, MultiValuedMap<String, String> params, InputStream requestEntity)
 					throws Exception {
-		URL host = RequestContext.getCurrentContext().getRouteHost();
+		RequestContext context = RequestContext.getCurrentContext();
+
+		URL host = context.getOriginHost();
 		HttpHost httpHost = FCUtils.getHttpHost(host);
 		uri = (host.getPath() + uri).replaceAll("/{2,}", "/");
 		
@@ -300,22 +312,22 @@ public class FrontCacheEngine {
 		HttpRequest httpRequest;
 		switch (verb.toUpperCase()) {
 		case "POST":
-			HttpPost httpPost = new HttpPost(uri + FCUtils.getQueryString());
+			HttpPost httpPost = new HttpPost(uri + context.getRequestQueryString());
 			httpRequest = httpPost;
 			httpPost.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
 			break;
 		case "PUT":
-			HttpPut httpPut = new HttpPut(uri + FCUtils.getQueryString());
+			HttpPut httpPut = new HttpPut(uri + context.getRequestQueryString());
 			httpRequest = httpPut;
 			httpPut.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
 			break;
 		case "PATCH":
-			HttpPatch httpPatch = new HttpPatch(uri + FCUtils.getQueryString());
+			HttpPatch httpPatch = new HttpPatch(uri + context.getRequestQueryString());
 			httpRequest = httpPatch;
 			httpPatch.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
 			break;
 		default:
-			httpRequest = new BasicHttpRequest(verb, uri + FCUtils.getQueryString());
+			httpRequest = new BasicHttpRequest(verb, uri + context.getRequestQueryString());
 		}
 		
 		

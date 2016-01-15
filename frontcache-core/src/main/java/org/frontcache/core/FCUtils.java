@@ -39,6 +39,26 @@ public class FCUtils {
 	private static Logger logger = Logger.getLogger(FCUtils.class.getName());
 	
 	/**
+	 * e.g. http://localhost:8080
+	 * 
+	 * @param httpRequest
+	 * @return
+	 */
+    public static String getBaseURL(HttpServletRequest httpRequest)
+    {
+    	StringBuffer sb = new StringBuffer();
+    	if (httpRequest.isSecure())
+    		sb.append("https://");
+    	else
+    		sb.append("http://");
+    	sb.append(httpRequest.getServerName());
+    	sb.append(":");
+    	sb.append(httpRequest.getServerPort());
+    	return sb.toString();
+    }
+
+	
+	/**
 	 * GET method only for text requests
 	 * 
 	 * @param urlStr
@@ -227,32 +247,27 @@ public class FCUtils {
         return requestURL;
 	}
 
-	public static String getQueryString() throws UnsupportedEncodingException {
-		HttpServletRequest request = RequestContext.getCurrentContext().getRequest();
+	public static String getQueryString(HttpServletRequest request) {
 		MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request);
 		StringBuilder query=new StringBuilder();
 		
-		for (String paramKey : params.keySet())
-		{
-			String key=URLEncoder.encode(paramKey, "UTF-8");
-			for (String value : params.get(paramKey))
+		try {
+			for (String paramKey : params.keySet())
 			{
-				query.append("&");
-				query.append(key);
-				query.append("=");
-				query.append(URLEncoder.encode(value, "UTF-8"));
-			}
-			
-		}		
-//		for (Map.Entry<String, List<String>> entry : params.entrySet()) {
-//			String key=URLEncoder.encode(entry.getKey(), "UTF-8");
-//			for (String value : entry.getValue()) {
-//				query.append("&");
-//				query.append(key);
-//				query.append("=");
-//				query.append(URLEncoder.encode(value, "UTF-8"));
-//			}
-//		}
+				String key = URLEncoder.encode(paramKey, "UTF-8");
+				for (String value : params.get(paramKey))
+				{
+					query.append("&");
+					query.append(key);
+					query.append("=");
+					query.append(URLEncoder.encode(value, "UTF-8"));
+				}
+				
+			}		
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+
 		return (query.length()>0) ? "?" + query.substring(1) : "";
 	}
 
