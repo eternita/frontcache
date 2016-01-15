@@ -61,7 +61,9 @@ public class FrontCacheEngine {
 	
 	private URL appOriginBaseURL = null;
 	
-	private String fcInstanceId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
+	private String fcHostId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
+	
+	private final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
 	
 	private static int fcConnectionsMaxTotal = 200;
 	
@@ -85,16 +87,18 @@ public class FrontCacheEngine {
 	
 	private void initialize() {
 
-		appOriginBaseURLStr = FCConfig.getProperty("app_origin_base_url");
+		appOriginBaseURLStr = FCConfig.getProperty("front-cache.app-origin-base-url");
 		
 		try {
 			appOriginBaseURL = new URL(appOriginBaseURLStr);
 		} catch (MalformedURLException e) {
-			throw new RuntimeException("Invalid app_origin_base_url (" + appOriginBaseURLStr + ")", e);
+			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + appOriginBaseURLStr + ")", e);
 		}
 
 		
-		fcInstanceId = FCConfig.getProperty("fc_instance_id");
+		fcHostId = FCConfig.getProperty("front-cache.host-name");
+		if (null == fcHostId)
+			fcHostId = DEFAULT_FRONTCACHE_HOST_NAME_VALUE;
 			
 		cacheProcessor = CacheManager.getInstance();
 
@@ -478,7 +482,7 @@ public class FrontCacheEngine {
 		HttpServletResponse servletResponse = context.getResponse();
 		MultiValuedMap<String, String> originResponseHeaders = context.getOriginResponseHeaders();
 
-		servletResponse.addHeader(FCHeaders.X_FC_INSTANCE, fcInstanceId);
+		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
 		servletResponse.setStatus(context.getResponseStatusCode());
 		
 		if (originResponseHeaders != null) {
@@ -505,7 +509,7 @@ public class FrontCacheEngine {
 
 		servletResponse.setStatus(webResponse.getStatusCode());
 		
-		servletResponse.addHeader(FCHeaders.X_FC_INSTANCE, fcInstanceId);
+		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
 		
 		if (webResponse.getHeaders() != null) {
 			for (String name : webResponse.getHeaders().keySet()) {

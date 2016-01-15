@@ -24,7 +24,7 @@ public class IncludeProcessorManager {
 	
 	private static IncludeProcessor getIncludeProcessor()
 	{
-		String implStr = FCConfig.getProperty("include_processor.impl");
+		String implStr = FCConfig.getProperty("front-cache.include-processor.impl");
 		try
 		{
 
@@ -41,7 +41,7 @@ public class IncludeProcessorManager {
 				return cacheProcessor;
 			}
 		} catch (Exception ex) {
-			logger.severe("Cant instantiate " + implStr + ". Default implementation is loaded");
+			logger.severe("Cant instantiate " + implStr + ". Default implementation is loaded: " + SerialIncludeProcessor.class.getCanonicalName());
 			
 			// 
 			return new SerialIncludeProcessor();

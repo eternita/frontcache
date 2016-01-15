@@ -23,7 +23,7 @@ public class CacheManager {
 	
 	private static CacheProcessor getCacheProcessor()
 	{
-		String cacheImplStr = FCConfig.getProperty("cache.impl");
+		String cacheImplStr = FCConfig.getProperty("front-cache.cache-processor.impl");
 
 		try
 		{

@@ -30,7 +30,7 @@ public class FrontCacheFilter implements Filter {
 
 	private Logger logger = Logger.getLogger(getClass().getName());
 	
-	private String appOriginBaseURL = FCConfig.getProperty("app_origin_base_url");
+	private String appOriginBaseURL = FCConfig.getProperty("front-cache.app-origin-base-url");
 	
 	private final String UTF8 = "UTF-8";
 	
