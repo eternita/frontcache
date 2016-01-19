@@ -46,6 +46,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 						outSb.append(includeContent);
 
 					} catch (FrontCacheException e) {
+						e.printStackTrace();
 						logger.severe("unexpected error processing include " + includeURL);
 						
 						outSb.append(includeURL);
