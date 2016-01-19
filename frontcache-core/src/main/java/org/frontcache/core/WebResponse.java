@@ -34,9 +34,18 @@ public class WebResponse implements Serializable {
 	// 123456789 expiration time in ms
 	private long expireTimeMillis = CacheProcessor.NO_CACHE;
 	
+	/**
+	 * some responses has no body (e.g. response for redirect)
+	 * 
+	 * @param url
+	 */
+	public WebResponse(String url) {
+		super();
+		this.url = url;
+	}
 	
 	public WebResponse(String url, String content, int cacheMaxAgeSec) {
-		super();
+		this(url);
 		this.content = content;
 		setExpireTime(cacheMaxAgeSec);
 	}	
@@ -73,6 +82,18 @@ public class WebResponse implements Serializable {
 
 	public void setHeaders(MultiValuedMap<String, String> headers) {
 		this.headers = headers;
+		
+		if (null != content)
+		{
+			// fix content length
+			if(this.headers.containsKey("Content-Length"))
+			{
+				this.headers.remove("Content-Length");
+				this.headers.put("Content-Length", "" + getContentLenth());
+			}
+		}
+		
+		return;
 	}
 
 
@@ -191,7 +212,7 @@ public class WebResponse implements Serializable {
 	public long getContentLenth() 
 	{
 		if (null != getContent())
-			return 2*getContent().length();
+			return getContent().length();
 		
 		return -1;
 	}
