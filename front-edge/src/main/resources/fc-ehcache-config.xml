@@ -1,0 +1,25 @@
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../config/ehcache.xsd">
+
+ 
+    <diskStore path="/path/to/cache"/>
+
+
+    <defaultCache
+       maxElementsInMemory="1000"
+       eternal="false"
+       overflowToDisk="false"
+       timeToIdleSeconds="360000"
+       timeToLiveSeconds="360000"
+       memoryStoreEvictionPolicy="LFU"
+      />
+  
+        
+    <cache name="FRONT_CACHE"
+       maxElementsInMemory="100"
+       eternal="true"
+       overflowToDisk="true"
+       diskPersistent="true" 
+       memoryStoreEvictionPolicy="LFU"
+        />
+
+</ehcache>
