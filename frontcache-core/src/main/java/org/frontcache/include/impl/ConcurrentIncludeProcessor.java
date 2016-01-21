@@ -67,12 +67,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	/**
 	 * 
 	 * @param content
-	 * @param appOriginBaseURL
+	 * @param hostURL
 	 * @return
 	 */
-	public String processIncludes(String content, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
+	public String processIncludes(String content, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
-		List<IncludeResolutionPlaceholder> includes = parseIncludes(content, appOriginBaseURL, requestHeaders, client);
+		List<IncludeResolutionPlaceholder> includes = parseIncludes(content, hostURL, requestHeaders, client);
 		
 		if (null == includes)
 			return content;
@@ -107,10 +107,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	/**
 	 * 
 	 * @param content
-	 * @param appOriginBaseURL
+	 * @param hostURL
 	 * @return
 	 */
-	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
+	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
 		
@@ -131,7 +131,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 						includes = new ArrayList<IncludeResolutionPlaceholder>();
 					
 					// save placeholder
-					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, appOriginBaseURL + includeURL, requestHeaders, client));
+					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, requestHeaders, client));
 					
 					scanIdx = endIdx;
 				} else {
