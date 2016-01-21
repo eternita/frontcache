@@ -19,10 +19,10 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 	/**
 	 * 
 	 * @param content
-	 * @param appOriginBaseURL
+	 * @param hostURL
 	 * @return
 	 */
-	public String processIncludes(String content, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
+	public String processIncludes(String content, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
 		StringBuffer outSb = new StringBuffer();
 		
@@ -42,7 +42,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 					
 					String includeContent;
 					try {
-						includeContent = callInclude(appOriginBaseURL + includeURL, requestHeaders, client);
+						includeContent = callInclude(hostURL + includeURL, requestHeaders, client);
 						outSb.append(includeContent);
 
 					} catch (FrontCacheException e) {

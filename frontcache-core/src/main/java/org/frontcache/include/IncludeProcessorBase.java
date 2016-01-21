@@ -6,9 +6,8 @@ import java.util.logging.Logger;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.cache.CacheProcessor;
-import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
-import org.frontcache.core.WebResponse;
+import org.frontcache.include.impl.f.BotIncludeProcessorFilter;
 
 /**
  * 
@@ -23,7 +22,8 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	protected static final String START_MARKER = "<fc:include";
 	protected static final String END_MARKER = "/>";
 	
-
+	private IncludeProcessorFilter incProcessorFilter = new BotIncludeProcessorFilter();
+	
 	protected CacheProcessor cacheProcessor;
 	
 	public IncludeProcessorBase() {
@@ -76,9 +76,13 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 */
 	protected String callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
     {
-		// recursive call to FCServlet
-		WebResponse webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);
-		return webResponse.getContent();
+		
+		// recursive call to FCServlet (through bot filter / to cache sessionless requestsØ)
+		return incProcessorFilter.callInclude(urlStr, requestHeaders, client);
+		
+//		// recursive call to FCServlet
+//		WebResponse webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);
+//		return webResponse.getContent();
 		
 //		WebResponse cachedWebComponent = cacheProcessor.processRequest(urlStr, requestHeaders, client);
 //		return cachedWebComponent.getContent();
@@ -93,3 +97,4 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	}	
 	
 }
+
