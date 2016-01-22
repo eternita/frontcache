@@ -162,10 +162,19 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
     /**
-     * removes "routeHost" key
+     * sets frontCacheHost
+     *
+     * @param frontCacheHost a URL
      */
-    public void removeRouteHost() {
-        remove("routeHost");
+    public void setFrontCacheHost(String frontCacheHost) {
+        set("frontCacheHost", frontCacheHost);
+    }
+
+    /**
+     * @return "frontCacheHost" URL
+     */
+    public String getFrontCacheHost() {
+        return (String) get("frontCacheHost");
     }
 
     /**

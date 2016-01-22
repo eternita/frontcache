@@ -99,35 +99,60 @@ public class FCUtils {
 //			throw new RuntimeException("Wrong response code " + httpResponseCode);
 		}
 
+		// get headers
+		MultiValuedMap<String, String> headers = revertHeaders(response.getAllHeaders());
+		
+		// process redirects
+		Header locationHeader = response.getFirstHeader("Location");
+		if (null != locationHeader)
+		{
+			String originLocation = locationHeader.getValue();
+			
+			RequestContext context = RequestContext.getCurrentContext();
+			String currentRequestBaseURL = context.getFrontCacheHost();
+			
+			String fcLocation = currentRequestBaseURL + buildRequestURI(originLocation);
+			headers.remove("Location");
+			headers.put("Location", fcLocation);
+		}
+		
 		String contentType = "";
 		Header contentTypeHeader = response.getFirstHeader("Content-Type");
 		if (null != contentTypeHeader)
 			contentType = contentTypeHeader.getValue();
 		
+		WebResponse webResponse = null;
 		if (-1 == contentType.indexOf("text"))
-			throw new FrontCacheException("Not cacheable content type (" + contentType + ") for " + url);
-			
+		{
+//			throw new FrontCacheException("Not cacheable content type (" + contentType + ") for " + url);
+			webResponse = new WebResponse(url);
 
-		BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-		StringBuffer result = new StringBuffer();
-		String line = null;
-		while ((line = rd.readLine()) != null) {
-			result.append(line);
+		} else {
+			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+			StringBuffer result = new StringBuffer();
+			String line = null;
+			while ((line = rd.readLine()) != null) {
+				result.append(line);
+			}
+			
+			String dataStr = result.toString();
+			webResponse = parseWebComponent(url, dataStr);
 		}
-		
-		String dataStr = result.toString();
-		
-		WebResponse webResponse = parseWebComponent(url, dataStr);
 
 		webResponse.setStatusCode(httpResponseCode);
-		
-		// get headers
-		MultiValuedMap<String, String> headers = revertHeaders(response.getAllHeaders());
 		webResponse.setHeaders(headers);
-		webResponse.setContentType(contentType);
+		
+		if (!"".equals(contentType))
+			webResponse.setContentType(contentType);
 				
 		return webResponse;
 	}
+	
+//	private static void replaceRedirectHeaderInOrigingRequest(MultiValuedMap<String, String> headers)
+//	{
+//		
+//		return;
+//	}
 	
     /**
      * returns query params as a Map with String keys and Lists of Strings as values
@@ -401,6 +426,25 @@ public class FCUtils {
 		return uri;
 	}		
 
+	/**
+	 * http://localhost:8080/coin_instance_details.htm? -> /coin_instance_details.htm?
+	 * 
+	 * @param urlStr
+	 * @return
+	 */
+	public static String buildRequestURI(String urlStr) {
+		
+		int idx = urlStr.indexOf("//");
+		if (-1 < idx)
+		{
+			idx = urlStr.indexOf("/", idx + "//".length());
+			if (-1 < idx)
+				return urlStr.substring(idx);
+		} 
+		
+		return urlStr;
+	}		
+	
 	public static HttpHost getHttpHost(URL host) {
 		HttpHost httpHost = new HttpHost(host.getHost(), host.getPort(), host.getProtocol());
 		return httpHost;

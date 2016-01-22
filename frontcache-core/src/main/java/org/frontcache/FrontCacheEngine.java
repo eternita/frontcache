@@ -264,9 +264,9 @@ public class FrontCacheEngine {
 		ctx.setRequestURI(uri);
 		String queryString = FCUtils.getQueryString(servletRequest);
 		ctx.setRequestQueryString(queryString);
-		
-		ctx.setOriginHost(getRouteUrl(ctx));
-		
+		ctx.setFrontCacheHost(FCUtils.getBaseURL(servletRequest));
+        ctx.setOriginHost(getRouteUrl(ctx));
+	
     }	
     
     
@@ -276,7 +276,8 @@ public class FrontCacheEngine {
 		HttpServletRequest httpRequest = context.getRequest();
 		String originRequestURL = getRouteUrl(context) + context.getRequestURI() + context.getRequestQueryString();
 
-		String currentRequestBaseURL = FCUtils.getBaseURL(httpRequest);
+		String currentRequestBaseURL = context.getFrontCacheHost();
+		
 //		System.out.println("-- " + currentRequestBaseURL);
 		
 		if (context.isCacheableRequest()) // GET method & Accept header contain 'text'
