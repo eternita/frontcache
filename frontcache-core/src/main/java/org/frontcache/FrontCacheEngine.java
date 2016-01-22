@@ -1,12 +1,20 @@
 package org.frontcache;
 
 import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
+import java.net.Socket;
 import java.net.URL;
+import java.net.UnknownHostException;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Timer;
@@ -20,6 +28,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -37,6 +46,7 @@ import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
@@ -51,6 +61,7 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
+
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.reqlog.RequestLogger;
@@ -58,12 +69,14 @@ import org.frontcache.reqlog.RequestLogger;
 public class FrontCacheEngine {
 
 	private String appOriginBaseURLStr = null;
-	
-	private URL appOriginBaseURL = null;
+	private String forwardHttpPort = null;
+	private String forwardHttpsPort = null;
+	private String keyStorePath = null;
+	private String keyStorePassword = null;
 	
 	private String fcHostId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
 	
-	private final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
+	public final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
 	
 	private static int fcConnectionsMaxTotal = 200;
 	
@@ -87,13 +100,12 @@ public class FrontCacheEngine {
 	
 	private void initialize() {
 
-		appOriginBaseURLStr = FCConfig.getProperty("front-cache.app-origin-base-url");
+		keyStorePath = FCConfig.getProperty("front-cache.keystore-path");
+		keyStorePassword = FCConfig.getProperty("front-cache.keystore-password");
 		
-		try {
-			appOriginBaseURL = new URL(appOriginBaseURLStr);
-		} catch (MalformedURLException e) {
-			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + appOriginBaseURLStr + ")", e);
-		}
+		appOriginBaseURLStr = FCConfig.getProperty("front-cache.app-origin-base-url");
+		forwardHttpPort = FCConfig.getProperty("front-cache.forward-http-port");
+		forwardHttpsPort = FCConfig.getProperty("front-cache.forward-https-port");
 
 		
 		fcHostId = FCConfig.getProperty("front-cache.host-name");
@@ -119,6 +131,31 @@ public class FrontCacheEngine {
 		}, 30000, 5000);
 	}
 
+	private URL getRouteUrl(RequestContext context) {
+		boolean isSecure = context.getRequest().isSecure();
+		StringBuffer str = new StringBuffer();
+		if (isSecure)
+		{
+			str.append("https");	
+		} else {
+			str.append("http");	
+		}
+		str.append("://").append(appOriginBaseURLStr).append(":");
+		if (isSecure) {
+			str.append(forwardHttpsPort);
+		} else {
+			str.append(forwardHttpPort);
+		}
+
+		try {
+			URL routeUrl = new URL(str.toString());
+			return  routeUrl;
+		} catch (MalformedURLException e) {
+			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + appOriginBaseURLStr + ")", e);
+		}
+
+	}
+	
 	public void stop() {
 		connectionManagerTimer.cancel();
 	}
@@ -152,27 +189,16 @@ public class FrontCacheEngine {
 
 	private PoolingHttpClientConnectionManager newConnectionManager() {
 		try {
-			
-			final SSLContext sslContext = SSLContext.getInstance("SSL");
-			sslContext.init(null, new TrustManager[]{new X509TrustManager() {
-				@Override
-				public void checkClientTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-				}
+		        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		        trustStore.load(new FileInputStream(keyStorePath), keyStorePassword.toCharArray());
 
-				@Override
-				public void checkServerTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-				}
-
-				@Override
-				public X509Certificate[] getAcceptedIssuers() {
-					return null;
-				}
-			}}, new SecureRandom());
-			
+		        MySSLSocketFactory sf = new MySSLSocketFactory(trustStore);
+		        sf.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+				
 
 			final Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
 					.register("http", PlainConnectionSocketFactory.INSTANCE)
-					.register("https", new SSLConnectionSocketFactory(sslContext))
+					.register("https", sf)
 					.build();
 
 			connectionManager = new PoolingHttpClientConnectionManager(registry);
@@ -186,6 +212,49 @@ public class FrontCacheEngine {
 		}
 	}
 	
+	public static class MySSLSocketFactory extends SSLSocketFactory {
+		private SSLContext sslContext = SSLContext.getInstance("TLS");
+
+		public MySSLSocketFactory(KeyStore truststore) throws NoSuchAlgorithmException,
+				KeyManagementException, KeyStoreException, UnrecoverableKeyException {
+			super(truststore);
+			TrustManager tm = new X509TrustManager() {
+
+				@Override
+				public void checkClientTrusted(X509Certificate[] chain, String authType)
+						throws CertificateException {
+				}
+
+				@Override
+				public void checkServerTrusted(X509Certificate[] chain, String authType)
+						throws CertificateException {
+				}
+
+				@Override
+				public X509Certificate[] getAcceptedIssuers() {
+					return null;
+				}
+
+			};
+			TrustManager[] tms = new TrustManager[1];
+			tms[0] = tm;
+			this.sslContext.init(null, tms, null);
+		}
+
+		@Override
+		public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
+				throws IOException, UnknownHostException {
+			return this.sslContext.getSocketFactory().createSocket(socket, host, port,
+					autoClose);
+		}
+
+		@Override
+		public Socket createSocket() throws IOException {
+			return this.sslContext.getSocketFactory().createSocket();
+		}
+
+	}
+	
     public void init(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
 
         RequestContext ctx = RequestContext.getCurrentContext();
@@ -195,11 +264,9 @@ public class FrontCacheEngine {
 		ctx.setRequestURI(uri);
 		String queryString = FCUtils.getQueryString(servletRequest);
 		ctx.setRequestQueryString(queryString);
-		
 		ctx.setFrontCacheHost(FCUtils.getBaseURL(servletRequest));
-		
-		ctx.setOriginHost(appOriginBaseURL);
-		
+        ctx.setOriginHost(getRouteUrl(ctx));
+	
     }	
     
     
@@ -207,7 +274,7 @@ public class FrontCacheEngine {
 	{
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
-		String originRequestURL = appOriginBaseURLStr + context.getRequestURI() + context.getRequestQueryString();
+		String originRequestURL = getRouteUrl(context) + context.getRequestURI() + context.getRequestQueryString();
 
 		String currentRequestBaseURL = context.getFrontCacheHost();
 		
@@ -340,6 +407,11 @@ public class FrontCacheEngine {
 		
 		try {
 			httpRequest.setHeaders(FCUtils.convertHeaders(headers));
+			Header acceptEncoding = httpRequest.getFirstHeader("accept-encoding");
+			if (acceptEncoding != null && acceptEncoding.getValue().contains("gzip"))
+			{
+				httpRequest.setHeader("accept-encoding", "gzip");
+			}
 			HttpResponse originResponse = httpclient.execute(httpHost, httpRequest);
 			return originResponse;
 		} finally {
