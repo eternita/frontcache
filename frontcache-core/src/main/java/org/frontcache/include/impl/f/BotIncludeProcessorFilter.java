@@ -10,14 +10,31 @@ import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessorFilter;
 
+/**
+ * 
+ * TODO: make it configurable and optional
+ *
+ */
 public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 {
 	private Map<String, String> cache = new ConcurrentHashMap<String, String>();
+
+	// TODO: move to config file
+	private String[] botUserAgentKeywords = new String[] {
+			"Googlebot", "msnbot", "bingbot", "YandexBot", "YandexDirect", "Baiduspider", "Yahoo! Slurp",
+			"majestic12", "Mail.RU_Bot", "EasouSpider", "voilabot", "AhrefsBot", "orangebot", "SemrushBot"};
+	
+
+			
+	public BotIncludeProcessorFilter() {
+		super();
+	}
 
 	public String callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
 	{
 		if (isBot(requestHeaders))
 		{
+			requestHeaders.remove("cookie");
 			// work with cache			
 			String content = cache.get(urlStr);
 			if (null != content)
@@ -41,7 +58,24 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 	
 	private boolean isBot(MultiValuedMap<String, String> requestHeaders)
 	{
-		System.out.println(requestHeaders);
+//		System.out.println(requestHeaders);
+		
+		if (null != requestHeaders.get("user-agent"))
+		{
+			for (String userAgent : requestHeaders.get("user-agent"))
+				if (isBot(userAgent))
+					return true;
+		}
 		return false;
 	}
+	
+	private boolean isBot(String userAgent)
+	{
+		for (String botKeyword : botUserAgentKeywords)
+			if (userAgent.contains(botKeyword))
+				return true;
+			
+		return false;
+	}
+	
 }
