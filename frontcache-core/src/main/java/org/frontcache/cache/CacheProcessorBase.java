@@ -28,6 +28,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		{
 			try
 			{
+				//TODO: remove me after migration from FC filter in coinshome.net
+				requestHeaders.put("X-AVOID-CHN-FRONTCACHE", "true");
+				
 				cachedWebComponent = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
 				lengthBytes = cachedWebComponent.getContentLenth();
 
