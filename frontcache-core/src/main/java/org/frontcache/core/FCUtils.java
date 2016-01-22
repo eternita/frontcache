@@ -82,7 +82,7 @@ public class FCUtils {
 			return httpResponse2WebComponent(urlStr, response);
 
 		} catch (IOException ioe) {
-			throw new FrontCacheException("Can't read from origin (" + urlStr + ")", ioe);
+			throw new FrontCacheException("Can't read from " + urlStr, ioe);
 		}
 		
     }

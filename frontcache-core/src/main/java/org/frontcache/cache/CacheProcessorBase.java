@@ -22,38 +22,39 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		boolean isRequestDynamic = true;
 		
 		long lengthBytes = -1;
-		WebResponse cachedWebComponent = getFromCache(originUrlStr);
+		WebResponse cachedWebResponse = getFromCache(originUrlStr);
 		
-		if (null == cachedWebComponent)
+		if (null == cachedWebResponse)
 		{
 			try
 			{
 				//TODO: remove me after migration from FC filter in coinshome.net
 				requestHeaders.put("X-AVOID-CHN-FRONTCACHE", "true");
 				
-				cachedWebComponent = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
-				lengthBytes = cachedWebComponent.getContentLenth();
+				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
+				lengthBytes = cachedWebResponse.getContentLenth();
 
 				// save to cache
-				if (cachedWebComponent.isCacheable())
-					putToCache(originUrlStr, cachedWebComponent);
+				if (cachedWebResponse.isCacheable())
+					putToCache(originUrlStr, cachedWebResponse.copy()); // put to cache copy
 
 			} catch (FrontCacheException ex) {
 				throw ex;
 			} catch (Exception ex) {
-				
 				ex.printStackTrace();
+				throw new FrontCacheException(ex);
 			}
 				
 		} else {
+			cachedWebResponse = cachedWebResponse.copy(); //to avoid modification instance in cache
 			isRequestDynamic = false;
-			lengthBytes = cachedWebComponent.getContentLenth();			
+			lengthBytes = cachedWebResponse.getContentLenth();			
 		}
 		
 		
 		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
 		
-		return cachedWebComponent;
+		return cachedWebResponse;
 	}	
 	
 /*	

@@ -1,9 +1,11 @@
 package org.frontcache.core;
 
 import java.io.Serializable;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.frontcache.cache.CacheProcessor;
 
 public class WebResponse implements Serializable {
@@ -216,5 +218,30 @@ public class WebResponse implements Serializable {
 		
 		return -1;
 	}
-	
+
+    
+    public WebResponse copy() {
+    	WebResponse copy = new WebResponse(this.url);
+    	copy.content = this.content;
+    	copy.contentType = this.contentType;
+    	copy.expireTimeMillis = this.expireTimeMillis;
+    	copy.statusCode = this.statusCode;
+    	
+    	if (null != this.tags)
+    	{
+    		copy.tags = new HashSet<String>();
+    		copy.tags.addAll(this.tags);
+    	}
+    	
+    	if (null != headers)
+    	{
+    		copy.headers = new ArrayListValuedHashMap<String, String>();
+    		
+    		for (String name : this.headers.keySet()) 
+    			for (String value : headers.get(name)) 
+    				copy.headers.put(name, value);
+    	}
+    	
+        return copy;
+    }	
 }
