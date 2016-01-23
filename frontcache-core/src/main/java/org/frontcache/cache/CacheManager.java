@@ -41,6 +41,7 @@ public class CacheManager {
 				return cacheProcessor;
 			}
 		} catch (Exception ex) {
+			ex.printStackTrace();
 			logger.severe("Cant instantiate " + cacheImplStr + " Fallback - " + NoCacheProcessor.class.getName());
 		}
 		
