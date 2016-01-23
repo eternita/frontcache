@@ -219,17 +219,33 @@ public class FCUtils {
         return qp;
     }
 	
+    /**
+     * revert header from HttpClient format (call to origin) to Map 
+     * 
+     * @param headers
+     * @return
+     */
     public static MultiValuedMap<String, String> revertHeaders(Header[] headers) {
 		MultiValuedMap<String, String> map = new ArrayListValuedHashMap<String, String>();
 		for (Header header : headers) {
 			String name = header.getName();
-			map.put(name, header.getValue());
-//			if (!map.containsKey(name)) {
-//				map.put(name, new ArrayList<String>());
-//			}
-//			map.get(name).add(header.getValue());
+			
+			if (isIncludedHeaderToResponse(name))
+				map.put(name, header.getValue());
 		}
 		return map;
+	}
+    
+	private static boolean isIncludedHeaderToResponse(String headerName) {
+		String name = headerName.toLowerCase();
+
+		switch (name) {
+			case "content-length": // do not use 'content-length' because 'transfer-encoding' is used 
+			case "transfer-encoding": // put it here to avoid duplicates 
+				return false;
+			default:
+				return true;
+		}
 	}
 
 	public static Header[] convertHeaders(MultiValuedMap<String, String> headers) {
@@ -499,6 +515,7 @@ public class FCUtils {
 				return true;
 		}
 	}
+	
 	
 	public static String getVerb(HttpServletRequest request) {
 		String sMethod = request.getMethod();
