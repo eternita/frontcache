@@ -85,15 +85,15 @@ public class WebResponse implements Serializable {
 	public void setHeaders(MultiValuedMap<String, String> headers) {
 		this.headers = headers;
 		
-		if (null != content)
-		{
-			// fix content length
-			if(this.headers.containsKey("Content-Length"))
-			{
-				this.headers.remove("Content-Length");
-				this.headers.put("Content-Length", "" + getContentLenth());
-			}
-		}
+//		if (null != content)
+//		{
+//			// fix content length
+//			if(this.headers.containsKey("Content-Length"))
+//			{
+//				this.headers.remove("Content-Length");
+//				this.headers.put("Content-Length", "" + getContentLenth());
+//			}
+//		}
 		
 		return;
 	}

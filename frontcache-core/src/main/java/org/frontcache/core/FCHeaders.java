@@ -1,8 +1,8 @@
 package org.frontcache.core;
 
 public class FCHeaders {
-    public static final String TRANSFER_ENCODING = "transfer-encoding";
-    public static final String CHUNKED = "chunked";
+//    public static final String TRANSFER_ENCODING = "transfer-encoding";
+//    public static final String CHUNKED = "chunked";
     public static final String ORIGIN = "Origin";
     public static final String CONTENT_ENCODING = "Content-Encoding";
     public static final String ACCEPT_ENCODING = "accept-encoding";
