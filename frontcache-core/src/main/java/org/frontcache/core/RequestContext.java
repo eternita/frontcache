@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
+import org.apache.http.client.methods.CloseableHttpResponse;
 
 
 /**
@@ -235,6 +236,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return getBoolean("responseGZipped", true);
     }
 
+    
     /**
      * @return the InputStream Response
      */
@@ -417,6 +419,13 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         put("requestQueryParams", qp);
     }
 
+    public CloseableHttpResponse getHttpClientResponse() {
+        return (CloseableHttpResponse) get("httpClientResponse");
+    }
+    
+    public void setHttpClientResponse(CloseableHttpResponse response) {
+    	this.set("httpClientResponse", response);
+    }
 
 
 }
