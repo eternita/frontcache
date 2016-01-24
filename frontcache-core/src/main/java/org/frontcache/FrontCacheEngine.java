@@ -13,7 +13,6 @@ import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -29,6 +28,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.Header;
+import org.apache.http.HeaderElement;
+import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -37,22 +38,25 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.RedirectStrategy;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPatch;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicHttpRequest;
+import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
@@ -61,7 +65,6 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
-
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.reqlog.RequestLogger;
@@ -168,11 +171,30 @@ public class FrontCacheEngine {
 				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
 				.build();
 
+	    ConnectionKeepAliveStrategy keepAliveStrategy = new ConnectionKeepAliveStrategy() {
+	        @Override
+	        public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
+	            HeaderElementIterator it = new BasicHeaderElementIterator
+	                (response.headerIterator(HTTP.CONN_KEEP_ALIVE));
+	            while (it.hasNext()) {
+	                HeaderElement he = it.nextElement();
+	                String param = he.getName();
+	                String value = he.getValue();
+	                if (value != null && param.equalsIgnoreCase
+	                   ("timeout")) {
+	                    return Long.parseLong(value) * 1000;
+	                }
+	            }
+	            return 10 * 1000;
+	        }
+	    };
+	    
 		return HttpClients.custom()
 				.setConnectionManager(newConnectionManager())
 				.setDefaultRequestConfig(requestConfig)
 //				.setSSLHostnameVerifier(new NoopHostnameVerifier()) // for SSL do not verify certificate's host 
 				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
+				.setKeepAliveStrategy(keepAliveStrategy)
 				.setRedirectStrategy(new RedirectStrategy() {
 					@Override
 					public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
@@ -306,6 +328,9 @@ public class FrontCacheEngine {
 				
 				addResponseHeaders(webResponse);
 				writeResponse(webResponse);
+				
+				if (null != context.getHttpClientResponse())
+					context.getHttpClientResponse().close();
 				return;
 			} else {
 				// content/response is not cacheable (e.g. response type is not text) 
@@ -325,6 +350,8 @@ public class FrontCacheEngine {
 			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);			
 			addResponseHeaders();
 			writeResponse();
+			if (null != context.getHttpClientResponse())
+				context.getHttpClientResponse().close();
 		}		
 		return;
 	}
@@ -423,6 +450,10 @@ public class FrontCacheEngine {
 	}	
 	
 	private void setResponse(HttpResponse response) throws IOException {
+		
+		RequestContext context = RequestContext.getCurrentContext();
+		context.setHttpClientResponse((CloseableHttpResponse) response);
+		
 		setResponse(response.getStatusLine().getStatusCode(),
 				response.getEntity() == null ? null : response.getEntity().getContent(),
 				FCUtils.revertHeaders(response.getAllHeaders()));
@@ -522,8 +553,10 @@ public class FrontCacheEngine {
 				outStream.close();
 			}
 			catch (IOException ex) {
+				ex.printStackTrace();
 			}
 		}
+		
 	}
 
 	private void writeResponse(WebResponse webResponse) throws Exception {
@@ -547,8 +580,10 @@ public class FrontCacheEngine {
 				outStream.close();
 			}
 			catch (IOException ex) {
+				ex.printStackTrace();
 			}
 		}
+		
 		return;
 	}
 	
