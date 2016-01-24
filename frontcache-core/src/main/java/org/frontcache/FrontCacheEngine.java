@@ -573,6 +573,7 @@ public class FrontCacheEngine {
 		try {
 			String body = webResponse.getContent();
 			FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes("UTF-8")), outStream);
+			
 		}
 		finally {
 			try {
