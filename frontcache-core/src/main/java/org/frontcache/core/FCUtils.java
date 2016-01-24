@@ -26,6 +26,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.message.BasicHeader;
 import org.frontcache.cache.CacheProcessor;
@@ -75,14 +76,21 @@ public class FCUtils {
 		for (Header header : httpHeaders)
 			request.addHeader(header);
 		
-		HttpResponse response;
+		HttpResponse response = null;
 		try {
 			response = client.execute(request);
-			
-			return httpResponse2WebComponent(urlStr, response);
+			WebResponse webResp = httpResponse2WebComponent(urlStr, response);
+			return webResp;
 
 		} catch (IOException ioe) {
 			throw new FrontCacheException("Can't read from " + urlStr, ioe);
+		} finally {
+			if (null != response)
+				try {
+					((CloseableHttpResponse) response).close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				} 
 		}
 		
     }
