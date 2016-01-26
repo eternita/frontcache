@@ -286,7 +286,8 @@ public class FrontCacheEngine {
 		ctx.setRequestURI(uri);
 		String queryString = FCUtils.getQueryString(servletRequest);
 		ctx.setRequestQueryString(queryString);
-		ctx.setFrontCacheHost(FCUtils.getBaseURL(servletRequest));
+		ctx.setFrontCacheHost(FCUtils.getHost(servletRequest));
+		ctx.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
         ctx.setOriginHost(getRouteUrl(ctx));
 	
     }	
@@ -297,8 +298,8 @@ public class FrontCacheEngine {
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
 		String originRequestURL = getRouteUrl(context) + context.getRequestURI() + context.getRequestQueryString();
-
-		String currentRequestBaseURL = context.getFrontCacheHost();
+		
+		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost();
 		
 //		System.out.println("-- " + currentRequestBaseURL);
 		
@@ -572,8 +573,7 @@ public class FrontCacheEngine {
 		OutputStream outStream = servletResponse.getOutputStream();
 		try {
 			String body = webResponse.getContent();
-			FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes("UTF-8")), outStream);
-			
+			FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes()), outStream);
 		}
 		finally {
 			try {

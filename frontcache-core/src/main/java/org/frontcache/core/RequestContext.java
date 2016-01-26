@@ -179,6 +179,22 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
     /**
+     * 
+     * @param frontCacheProtocol
+     */
+    public void setFrontCacheProtocol(String frontCacheProtocol) {
+        set("frontCacheProtocol", frontCacheProtocol);
+    }
+
+    /**
+     * 
+     * @return
+     */
+    public String getFrontCacheProtocol() {
+        return (String) get("frontCacheProtocol");
+    }
+    
+    /**
      * sets originHost
      *
      * @param originHost a URL
