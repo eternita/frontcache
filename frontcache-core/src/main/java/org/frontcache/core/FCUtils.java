@@ -40,24 +40,27 @@ public class FCUtils {
 	private static Logger logger = Logger.getLogger(FCUtils.class.getName());
 	
 	/**
-	 * e.g. http://localhost:8080
+	 * e.g. localhost:8080
 	 * 
 	 * @param httpRequest
 	 * @return
 	 */
-    public static String getBaseURL(HttpServletRequest httpRequest)
+    public static String getHost(HttpServletRequest httpRequest)
     {
     	StringBuffer sb = new StringBuffer();
-    	if (httpRequest.isSecure())
-    		sb.append("https://");
-    	else
-    		sb.append("http://");
     	sb.append(httpRequest.getServerName());
     	sb.append(":");
     	sb.append(httpRequest.getServerPort());
     	return sb.toString();
     }
 
+    public static String getProtocol(HttpServletRequest httpRequest)
+    {
+    	if (httpRequest.isSecure())
+    		return "https";
+    	else
+    		return "http";
+    }
 	
 	/**
 	 * GET method only for text requests
@@ -117,9 +120,9 @@ public class FCUtils {
 			String originLocation = locationHeader.getValue();
 			
 			RequestContext context = RequestContext.getCurrentContext();
-			String currentRequestBaseURL = context.getFrontCacheHost();
+//			String currentRequestBaseURL = context.getFrontCacheHost();
 			
-			String fcLocation = currentRequestBaseURL + buildRequestURI(originLocation);
+			String fcLocation = getRequestProtocol(originLocation) + "://" + context.getFrontCacheHost() + buildRequestURI(originLocation);
 			headers.remove("Location");
 			headers.put("Location", fcLocation);
 		}
@@ -467,6 +470,20 @@ public class FCUtils {
 		} 
 		
 		return urlStr;
+	}
+	
+	/**
+	 * http://localhost:8080/coin_instance_details.htm? -> http
+	 * @param urlStr
+	 * @return
+	 */
+	public static String getRequestProtocol(String urlStr) {
+		
+		int idx = urlStr.indexOf(":");
+		if (-1 < idx)
+			return urlStr.substring(0, idx);
+		
+		return ""; // default
 	}		
 	
 	public static HttpHost getHttpHost(URL host) {
