@@ -14,6 +14,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
@@ -70,12 +71,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param hostURL
 	 * @return
 	 */
-	public String processIncludes(String content, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
+	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
-		List<IncludeResolutionPlaceholder> includes = parseIncludes(content, hostURL, requestHeaders, client);
+		List<IncludeResolutionPlaceholder> includes = parseIncludes(parentWebResponse.getContent(), hostURL, requestHeaders, client);
 		
 		if (null == includes)
-			return content;
+			return parentWebResponse;
 
         List<Future<IncludeResolutionPlaceholder>> futureList = new ArrayList<Future<IncludeResolutionPlaceholder>>(includes.size());
 		for (IncludeResolutionPlaceholder inc : includes)
@@ -100,8 +101,8 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
         }
 		
         // replace placeholders with content
-		String out = replaceIncludePlaceholders(content, includes);
-		return out;
+		WebResponse agregatedWebResponse = replaceIncludePlaceholders(parentWebResponse.getContent(), includes);
+		return agregatedWebResponse;
 	}	
 
 	/**
@@ -152,23 +153,27 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param includes
 	 * @return
 	 */
-	private String replaceIncludePlaceholders(String content, List<IncludeResolutionPlaceholder> includes)
+	private WebResponse replaceIncludePlaceholders(String content, List<IncludeResolutionPlaceholder> includes)
 	{
 		int scanIdx = 0;
 		
 		// paste content from includes to output doc
+		WebResponse webResponse = new WebResponse("aggregation in " + this.getClass().getName());
+		
 		StringBuffer outSb = new StringBuffer();
 		for (int i = 0; i < includes.size(); i++)
 		{
 			IncludeResolutionPlaceholder inc = includes.get(i);
 			
 			outSb.append(content.substring(scanIdx, inc.startIdx));
-			outSb.append(inc.content);
+			outSb.append(inc.webResponse.getContent());
+			mergeIncludeResponseHeaders(webResponse.getHeaders(), inc.webResponse.getHeaders());
 
 			scanIdx = inc.endIdx;
 		}
 		outSb.append(content.substring(scanIdx)); // data after the last include
-		return outSb.toString();
+		webResponse.setContent(outSb.toString());
+		return webResponse;
 	}
 	
 	/**
@@ -180,7 +185,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		int startIdx;
 		int endIdx;
 		String includeURL;
-		String content;
+		WebResponse webResponse;
 		MultiValuedMap<String, String> requestHeaders; 
 		HttpClient client;
 		
@@ -197,7 +202,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	    public IncludeResolutionPlaceholder call() throws Exception {
 	    	
 			try {
-				this.content = callInclude(this.includeURL, this.requestHeaders, this.client);
+				this.webResponse = callInclude(this.includeURL, this.requestHeaders, this.client);
 
 			} catch (FrontCacheException e) {
 				logger.severe("unexpected error processing include " + includeURL);
@@ -207,7 +212,8 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				outSb.append("<!-- error processing include " + includeURL);
 				outSb.append(e.getMessage());
 				outSb.append(" -->");
-				this.content = outSb.toString();
+				this.webResponse = new WebResponse(this.includeURL);
+				this.webResponse.setContent(outSb.toString());
 
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -218,7 +224,8 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				outSb.append("<!-- unexpected error processing include " + includeURL);
 				outSb.append(e.getMessage());
 				outSb.append(" -->");
-				this.content = outSb.toString();
+				this.webResponse = new WebResponse(this.includeURL);
+				this.webResponse.setContent(outSb.toString());
 			}
 	    	
 //			this.content = callInclude(this.includeURL, this.requestHeaders, this.client);

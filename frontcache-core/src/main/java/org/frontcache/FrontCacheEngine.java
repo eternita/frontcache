@@ -1,9 +1,11 @@
 package org.frontcache;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.Socket;
@@ -16,9 +18,13 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -71,9 +77,17 @@ import org.frontcache.reqlog.RequestLogger;
 
 public class FrontCacheEngine {
 
-	private String appOriginBaseURLStr = null;
-	private String forwardHttpPort = null;
-	private String forwardHttpsPort = null;
+	private final static String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "cache-ignore-uris.conf";
+	
+	private List <Pattern> uriIgnorePatterns = new ArrayList<Pattern>();
+
+	private String originHost = null;
+	private String originHttpPort = null;
+	private String originHttpsPort = null;
+	
+	private String frontcacheHttpPort = null;
+	private String frontcacheHttpsPort = null;
+	
 	private String keyStorePath = null;
 	private String keyStorePassword = null;
 	
@@ -102,14 +116,16 @@ public class FrontCacheEngine {
 	}
 	
 	private void initialize() {
-
+		
 		keyStorePath = FCConfig.getProperty("front-cache.keystore-path");
 		keyStorePassword = FCConfig.getProperty("front-cache.keystore-password");
 		
-		appOriginBaseURLStr = FCConfig.getProperty("front-cache.app-origin-base-url");
-		forwardHttpPort = FCConfig.getProperty("front-cache.forward-http-port");
-		forwardHttpsPort = FCConfig.getProperty("front-cache.forward-https-port");
+		originHost = FCConfig.getProperty("front-cache.origin-host");
+		originHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
+		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 
+		frontcacheHttpPort = FCConfig.getProperty("front-cache.http-port", "80");
+		frontcacheHttpsPort = FCConfig.getProperty("front-cache.https-port", "443");
 		
 		fcHostId = FCConfig.getProperty("front-cache.host-name");
 		if (null == fcHostId)
@@ -132,9 +148,12 @@ public class FrontCacheEngine {
 				connectionManager.closeExpiredConnections();
 			}
 		}, 30000, 5000);
+		
+		loadCacheIgnoreURIPatterns();
+		return;
 	}
 
-	private URL getRouteUrl(RequestContext context) {
+	private URL getOriginUrl(RequestContext context) {
 		boolean isSecure = context.getRequest().isSecure();
 		StringBuffer str = new StringBuffer();
 		if (isSecure)
@@ -143,18 +162,18 @@ public class FrontCacheEngine {
 		} else {
 			str.append("http");	
 		}
-		str.append("://").append(appOriginBaseURLStr).append(":");
+		str.append("://").append(originHost).append(":");
 		if (isSecure) {
-			str.append(forwardHttpsPort);
+			str.append(originHttpsPort);
 		} else {
-			str.append(forwardHttpPort);
+			str.append(originHttpPort);
 		}
 
 		try {
 			URL routeUrl = new URL(str.toString());
 			return  routeUrl;
 		} catch (MalformedURLException e) {
-			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + appOriginBaseURLStr + ")", e);
+			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + originHost + ")", e);
 		}
 
 	}
@@ -224,6 +243,7 @@ public class FrontCacheEngine {
 					.build();
 
 			connectionManager = new PoolingHttpClientConnectionManager(registry);
+			connectionManager = new PoolingHttpClientConnectionManager();
 			
 			connectionManager.setMaxTotal(fcConnectionsMaxTotal);
 			connectionManager.setDefaultMaxPerRoute(fcConnectionsMaxPerRoute);
@@ -287,23 +307,35 @@ public class FrontCacheEngine {
 		String queryString = FCUtils.getQueryString(servletRequest);
 		ctx.setRequestQueryString(queryString);
 		ctx.setFrontCacheHost(FCUtils.getHost(servletRequest));
+		ctx.setFrontCacheHttpPort(frontcacheHttpPort);
+		ctx.setFrontCacheHttpsPort(frontcacheHttpsPort);
+		
 		ctx.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
-        ctx.setOriginHost(getRouteUrl(ctx));
+        ctx.setOriginURL(getOriginUrl(ctx));
 	
     }	
     
+    private boolean ignoreCache(String uri)
+    {
+    	for (Pattern p : uriIgnorePatterns)
+    		if (p.matcher(uri).find()) 
+    			return true;
+    	
+    	return false;
+
+    }
     
 	public void processRequest() throws Exception
 	{
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
-		String originRequestURL = getRouteUrl(context) + context.getRequestURI() + context.getRequestQueryString();
+		String originRequestURL = getOriginUrl(context) + context.getRequestURI() + context.getRequestQueryString();
 		
-		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost();
+		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + ":" + httpRequest.getServerPort();
 		
 //		System.out.println("-- " + currentRequestBaseURL);
 		
-		if (context.isCacheableRequest()) // GET method & Accept header contain 'text'
+		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method & Accept header contain 'text'
 		{
 			MultiValuedMap<String, String> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 
@@ -321,9 +353,14 @@ public class FrontCacheEngine {
 				// include processor
 				if (null != webResponse.getContent())
 				{
-					String content = webResponse.getContent(); 
-					content = includeProcessor.processIncludes(content, currentRequestBaseURL, requestHeaders, httpClient);
-					webResponse.setContent(content);
+					// include processor return new webResponse with processed includes and merged headers
+					WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient);
+					
+					// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
+					webResponse.setContent(incWebResponse.getContent());
+					
+//					String content = webResponse.getContent();
+//					webResponse.setContent(content);
 				}
 				
 				
@@ -405,7 +442,7 @@ public class FrontCacheEngine {
 					throws Exception {
 		RequestContext context = RequestContext.getCurrentContext();
 
-		URL host = context.getOriginHost();
+		URL host = context.getOriginURL();
 		HttpHost httpHost = FCUtils.getHttpHost(host);
 		uri = (host.getPath() + uri).replaceAll("/{2,}", "/");
 		
@@ -593,6 +630,17 @@ public class FrontCacheEngine {
 		HttpServletResponse servletResponse = context.getResponse();
 		MultiValuedMap<String, String> originResponseHeaders = context.getOriginResponseHeaders();
 
+		// process redirects
+		if (null != originResponseHeaders.get("Location") && 0 < originResponseHeaders.get("Location").size())
+		{
+			String originLocation = originResponseHeaders.remove("Location").iterator().next();
+			// TODO: check protocol and set corresponding port 
+			String fcLocation = FCUtils.getRequestProtocol(originLocation) + "://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + FCUtils.buildRequestURI(originLocation);
+			originResponseHeaders.put("Location", fcLocation);
+		}
+		
+		
+		
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
 		servletResponse.setStatus(context.getResponseStatusCode());
 		
@@ -642,5 +690,54 @@ public class FrontCacheEngine {
 ////		}
 	}	
 	
+	private void loadCacheIgnoreURIPatterns() {
+		BufferedReader confReader = null;
+		InputStream is = null;
+		try 
+		{
+			is = this.getClass().getClassLoader().getResourceAsStream(CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
+			if (null == is)
+			{
+				logger.info("Cache ignore URI patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
+				return;
+			}
+
+			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+			String patternStr;
+			int patternCounter = 0;
+			while ((patternStr = confReader.readLine()) != null) {
+				try {
+					if (patternStr.trim().startsWith("#")) // handle comments
+						continue;
+					
+					if (0 == patternStr.trim().length()) // skip empty
+						continue;
+					
+					uriIgnorePatterns.add(Pattern.compile(patternStr));
+					patternCounter++;
+				} catch (PatternSyntaxException ex) {
+					logger.info("Cache ignore URI pattern - " + patternStr + " is not loaded");					
+				}
+			}
+			logger.info("Successfully loaded " + patternCounter +  " cache ignore URI patterns");					
+			
+		} catch (Exception e) {
+			logger.info("Cache ignore URI patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
+		} finally {
+			if (null != confReader)
+			{
+				try {
+					confReader.close();
+				} catch (IOException e) { }
+			}
+			if (null != is)
+			{
+				try {
+					is.close();
+				} catch (IOException e) { }
+			}
+		}
+		
+	}
 		
 }
