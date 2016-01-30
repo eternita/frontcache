@@ -17,7 +17,7 @@ import org.frontcache.include.IncludeProcessorFilter;
  */
 public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 {
-	private Map<String, String> cache = new ConcurrentHashMap<String, String>();
+	private Map<String, WebResponse> cache = new ConcurrentHashMap<String, WebResponse>();
 
 	// TODO: move to config file
 	private String[] botUserAgentKeywords = new String[] {
@@ -30,28 +30,27 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 		super();
 	}
 
-	public String callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
+	public WebResponse callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
 	{
 		if (isBot(requestHeaders))
 		{
 			requestHeaders.remove("cookie");
 			// work with cache			
-			String content = cache.get(urlStr);
-			if (null != content)
-				return content;
+			WebResponse webResponse = cache.get(urlStr);
+			if (null != webResponse)
+				return webResponse;
 
 			// recursive call to FCServlet
-			WebResponse webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);
-			content = webResponse.getContent();
+			webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);
 			
-			cache.put(urlStr, content);
+			cache.put(urlStr, webResponse);
 			
-			return content;
+			return webResponse;
 
 		} else {
 			// recursive call to FCServlet
 			WebResponse webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);
-			return webResponse.getContent();
+			return webResponse;
 		}
 		
 	}

@@ -8,7 +8,7 @@
        maxElementsInMemory="3"
        eternal="true"
        overflowToDisk="true"
-       diskPersistent="false" 
+       diskPersistent="true" 
        memoryStoreEvictionPolicy="LFU"
         />
         

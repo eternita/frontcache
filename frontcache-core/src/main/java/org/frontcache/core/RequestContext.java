@@ -194,20 +194,12 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return (String) get("frontCacheProtocol");
     }
     
-    /**
-     * sets originHost
-     *
-     * @param originHost a URL
-     */
-    public void setOriginHost(URL originHost) {
-        set("originHost", originHost);
+    public void setOriginURL(URL originURL) {
+        set("originURL", originURL);
     }
 
-    /**
-     * @return "originHost" URL
-     */
-    public URL getOriginHost() {
-        return (URL) get("originHost");
+    public URL getOriginURL() {
+        return (URL) get("originURL");
     }
 
     
@@ -443,5 +435,19 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     	this.set("httpClientResponse", response);
     }
 
+    public void setFrontCacheHttpPort(String frontCacheHttpPort) {
+        set("frontCacheHttpPort", frontCacheHttpPort);
+    }
 
+    public String getFrontCacheHttpPort() {
+        return (String) get("frontCacheHttpPort");
+    }
+
+    public void setFrontCacheHttpsPort(String frontCacheHttpsPort) {
+        set("frontCacheHttpsPort", frontCacheHttpsPort);
+    }
+
+    public String getFrontCacheHttpsPort() {
+        return (String) get("frontCacheHttpsPort");
+    }
 }

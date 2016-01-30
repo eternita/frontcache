@@ -10,6 +10,12 @@ public class FCConfig {
 
     private static Properties config = loadProperties("front-cache.properties");
 	
+    public static String getProperty(String key, String defaultValue)
+    {
+        return (null != config.getProperty(key)) ? config.getProperty(key) : defaultValue; 
+        
+    }
+
     public static String getProperty(String key)
     {
         return config.getProperty(key);

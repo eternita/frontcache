@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
@@ -28,15 +29,21 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		{
 			try
 			{
-				//TODO: remove me after migration from FC filter in coinshome.net
-				requestHeaders.put("X-AVOID-CHN-FRONTCACHE", "true");
+				//TODO: remove me after migration from FC filter in coinshome.net (or can be used for back compatibility)
+				requestHeaders.put(FCHeaders.X_AVOID_CHN_FRONTCACHE, "true");
 				
 				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
 				lengthBytes = cachedWebResponse.getContentLenth();
 
 				// save to cache
 				if (cachedWebResponse.isCacheable())
-					putToCache(originUrlStr, cachedWebResponse.copy()); // put to cache copy
+				{
+					WebResponse copy4cache = cachedWebResponse.copy();
+					
+					copy4cache.getHeaders().remove("Set-Cookie");
+					
+					putToCache(originUrlStr, copy4cache); // put to cache copy
+				}
 
 			} catch (FrontCacheException ex) {
 				throw ex;

@@ -24,6 +24,7 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
+import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -49,8 +50,6 @@ public class FCUtils {
     {
     	StringBuffer sb = new StringBuffer();
     	sb.append(httpRequest.getServerName());
-    	sb.append(":");
-    	sb.append(httpRequest.getServerPort());
     	return sb.toString();
     }
 
@@ -72,16 +71,18 @@ public class FCUtils {
 	 */
 	public static WebResponse dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
     {
-		HttpGet request = new HttpGet(urlStr);
-		
-		// translate headers
-		Header[] httpHeaders = convertHeaders(requestHeaders);
-		for (Header header : httpHeaders)
-			request.addHeader(header);
-		
 		HttpResponse response = null;
+
 		try {
-			response = client.execute(request);
+			HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
+			HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(urlStr));//(verb, uri + context.getRequestQueryString());
+
+			// translate headers
+			Header[] httpHeaders = convertHeaders(requestHeaders);
+			for (Header header : httpHeaders)
+				httpRequest.addHeader(header);
+			
+			response = client.execute(httpHost, httpRequest);
 			WebResponse webResp = httpResponse2WebComponent(urlStr, response);
 			return webResp;
 
@@ -122,7 +123,8 @@ public class FCUtils {
 			RequestContext context = RequestContext.getCurrentContext();
 //			String currentRequestBaseURL = context.getFrontCacheHost();
 			
-			String fcLocation = getRequestProtocol(originLocation) + "://" + context.getFrontCacheHost() + buildRequestURI(originLocation);
+			// TODO: check protocol and set corresponding port 
+			String fcLocation = getRequestProtocol(originLocation) + "://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
 			headers.remove("Location");
 			headers.put("Location", fcLocation);
 		}
@@ -142,7 +144,13 @@ public class FCUtils {
 			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
 			StringBuffer result = new StringBuffer();
 			String line = null;
+			boolean firstLine = true;
 			while ((line = rd.readLine()) != null) {
+				if (firstLine) 
+					firstLine = false;
+				else
+					result.append("\n"); // append '\n' because it's lost during rd.readLine() (in between lines)
+				
 				result.append(line);
 			}
 			
@@ -158,12 +166,6 @@ public class FCUtils {
 				
 		return webResponse;
 	}
-	
-//	private static void replaceRedirectHeaderInOrigingRequest(MultiValuedMap<String, String> headers)
-//	{
-//		
-//		return;
-//	}
 	
     /**
      * returns query params as a Map with String keys and Lists of Strings as values

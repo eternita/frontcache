@@ -11,4 +11,8 @@ public class FCHeaders {
     public static final String CONNECTION = "Connection";
     public static final String KEEP_ALIVE = "keep-alive";
     public static final String HOST = "Host";
+    
+	//TODO: remove me after migration from FC filter in coinshome.net (or can be used for back compatibility)
+    public static final String X_AVOID_CHN_FRONTCACHE = "X-AVOID-CHN-FRONTCACHE";
+    
 }
