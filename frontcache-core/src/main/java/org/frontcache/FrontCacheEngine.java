@@ -634,8 +634,9 @@ public class FrontCacheEngine {
 		if (null != originResponseHeaders.get("Location") && 0 < originResponseHeaders.get("Location").size())
 		{
 			String originLocation = originResponseHeaders.remove("Location").iterator().next();
-			// TODO: check protocol and set corresponding port 
-			String fcLocation = FCUtils.getRequestProtocol(originLocation) + "://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + FCUtils.buildRequestURI(originLocation);
+			
+			String fcLocation = FCUtils.transformRedirectURL(originLocation);
+
 			originResponseHeaders.put("Location", fcLocation);
 		}
 		
