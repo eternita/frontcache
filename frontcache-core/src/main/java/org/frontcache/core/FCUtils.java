@@ -99,6 +99,19 @@ public class FCUtils {
 		
     }
 	
+	public static String transformRedirectURL(String originLocation)
+	{
+		String fcLocation = null;
+		RequestContext context = RequestContext.getCurrentContext();
+		String protocol = getRequestProtocol(originLocation);
+		if ("https".equalsIgnoreCase(protocol))
+			fcLocation = "https://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
+		else // http
+			fcLocation = "http://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpPort() + buildRequestURI(originLocation);
+		
+		return fcLocation;
+	}
+	
 	private static WebResponse httpResponse2WebComponent(String url, HttpResponse response) throws FrontCacheException, IOException
 	{
 		
@@ -120,11 +133,8 @@ public class FCUtils {
 		{
 			String originLocation = locationHeader.getValue();
 			
-			RequestContext context = RequestContext.getCurrentContext();
-//			String currentRequestBaseURL = context.getFrontCacheHost();
-			
-			// TODO: check protocol and set corresponding port 
-			String fcLocation = getRequestProtocol(originLocation) + "://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
+			String fcLocation = transformRedirectURL(originLocation);
+				
 			headers.remove("Location");
 			headers.put("Location", fcLocation);
 		}
