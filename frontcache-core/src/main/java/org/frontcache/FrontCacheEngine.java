@@ -2,7 +2,6 @@ package org.frontcache;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -29,6 +28,8 @@ import java.util.regex.PatternSyntaxException;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -49,11 +50,7 @@ import org.apache.http.client.methods.HttpPatch;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.config.Registry;
-import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
-import org.apache.http.conn.socket.ConnectionSocketFactory;
-import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -88,8 +85,8 @@ public class FrontCacheEngine {
 	private String frontcacheHttpPort = null;
 	private String frontcacheHttpsPort = null;
 	
-	private String keyStorePath = null;
-	private String keyStorePassword = null;
+//	private String keyStorePath = null;
+//	private String keyStorePassword = null;
 	
 	private String fcHostId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
 	
@@ -111,16 +108,36 @@ public class FrontCacheEngine {
 	
 	private CloseableHttpClient httpClient;
 	
-	public FrontCacheEngine() {
+	
+	private static FrontCacheEngine instance;
+	
+	private static CacheInvalidator cacheInvalidator;
+
+	public static FrontCacheEngine getFrontCache(){
+		if (null == instance) {
+			instance = new FrontCacheEngine();
+		}
+		return instance;
+	}
+	
+	public static CacheInvalidator getCacheInvalidator()
+	{
+		if (null == cacheInvalidator)
+			cacheInvalidator = new CacheInvalidator(CacheManager.getInstance());
+
+		return cacheInvalidator;
+	}
+	
+	private FrontCacheEngine() {
 		initialize();
 	}
 	
 	private void initialize() {
 		
-		keyStorePath = FCConfig.getProperty("front-cache.keystore-path");
-		keyStorePassword = FCConfig.getProperty("front-cache.keystore-password");
+//		keyStorePath = FCConfig.getProperty("front-cache.keystore-path");
+//		keyStorePassword = FCConfig.getProperty("front-cache.keystore-password");
 		
-		originHost = FCConfig.getProperty("front-cache.origin-host");
+		originHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
 		originHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 
@@ -178,7 +195,15 @@ public class FrontCacheEngine {
 
 	}
 	
-	public void stop() {
+	
+	@Override
+	protected void finalize() throws Throwable {
+		// TODO Auto-generated method stub
+		super.finalize();
+		stop();
+	}
+
+	private void stop() {
 		connectionManagerTimer.cancel();
 	}
 
@@ -230,19 +255,19 @@ public class FrontCacheEngine {
 
 	private PoolingHttpClientConnectionManager newConnectionManager() {
 		try {
-		        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-		        trustStore.load(new FileInputStream(keyStorePath), keyStorePassword.toCharArray());
+//		        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+//		        trustStore.load(new FileInputStream(keyStorePath), keyStorePassword.toCharArray());
 
-		        MySSLSocketFactory sf = new MySSLSocketFactory(trustStore);
-		        sf.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+//		        MySSLSocketFactory sf = new MySSLSocketFactory(trustStore);
+//		        sf.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
 				
 
-			final Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
-					.register("http", PlainConnectionSocketFactory.INSTANCE)
-					.register("https", sf)
-					.build();
+//			final Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
+//					.register("http", PlainConnectionSocketFactory.INSTANCE)
+//					.register("https", sf)
+//					.build();
 
-			connectionManager = new PoolingHttpClientConnectionManager(registry);
+//			connectionManager = new PoolingHttpClientConnectionManager(registry);
 			connectionManager = new PoolingHttpClientConnectionManager();
 			
 			connectionManager.setMaxTotal(fcConnectionsMaxTotal);
@@ -297,6 +322,15 @@ public class FrontCacheEngine {
 
 	}
 	
+    public void init(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) {
+    	this.init(servletRequest, servletResponse);
+    	
+        RequestContext ctx = RequestContext.getCurrentContext();
+        ctx.setFilterChain(filterChain);
+		ctx.setFrontCacheHost(originHost); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
+		return;
+    }
+	
     public void init(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
 
         RequestContext ctx = RequestContext.getCurrentContext();
@@ -312,7 +346,7 @@ public class FrontCacheEngine {
 		
 		ctx.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
         ctx.setOriginURL(getOriginUrl(ctx));
-	
+        return;
     }	
     
     private boolean ignoreCache(String uri)
@@ -395,30 +429,41 @@ public class FrontCacheEngine {
 	}
 
 	
-	private void forwardToOrigin()
+	private void forwardToOrigin() throws IOException, ServletException
 	{
 		RequestContext context = RequestContext.getCurrentContext();
+		HttpServletRequest request = context.getRequest();
+		
+		if (context.isFilterMode())
+		{
+			HttpServletResponse response = context.getResponse();
+			FilterChain chain = context.getFilterChain();
+			chain.doFilter(request, response);
+		} else {
+			
+			// stand alone mode
+			
+			MultiValuedMap<String, String> headers = FCUtils.buildRequestHeaders(request);
+			MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request);
+			String verb = FCUtils.getVerb(request);
+			InputStream requestEntity = getRequestBody(request);
+			String uri = context.getRequestURI();
+
+			try {
+				HttpResponse response = forward(httpClient, verb, uri, request, headers, params, requestEntity);
+				
+				// response 2 context
+				setResponse(response);
+				
+			}
+			catch (Exception ex) {
+				ex.printStackTrace();
+				context.set("error.status_code", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+				context.set("error.exception", ex);
+			}
+		}
 		
 
-		HttpServletRequest request = context.getRequest();
-		MultiValuedMap<String, String> headers = FCUtils.buildRequestHeaders(request);
-		MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request);
-		String verb = FCUtils.getVerb(request);
-		InputStream requestEntity = getRequestBody(request);
-		String uri = context.getRequestURI();
-
-		try {
-			HttpResponse response = forward(httpClient, verb, uri, request, headers, params, requestEntity);
-			
-			// response 2 context
-			setResponse(response);
-			
-		}
-		catch (Exception ex) {
-			ex.printStackTrace();
-			context.set("error.status_code", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-			context.set("error.exception", ex);
-		}
 		
 		return;
 	}

@@ -1,7 +1,6 @@
 package org.frontcache;
 
 import java.io.IOException;
-import java.util.logging.Logger;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -12,41 +11,22 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.frontcache.cache.CacheManager;
-import org.frontcache.cache.CacheProcessor;
-import org.frontcache.include.IncludeProcessor;
-import org.frontcache.include.IncludeProcessorManager;
-import org.frontcache.reqlog.RequestLogger;
-import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
-import org.frontcache.wrapper.HttpResponseWrapperImpl;
+import org.frontcache.core.RequestContext;
 
 
 /**
  * 
- * @deprecated use standalone app
  *
  */
 public class FrontCacheFilter implements Filter {
 
-	private Logger logger = Logger.getLogger(getClass().getName());
-	
-	private String appOriginBaseURL = FCConfig.getProperty("front-cache.app-origin-base-url");
-	
-	private final String UTF8 = "UTF-8";
-	
-	private IncludeProcessor includeProcessor = null;
-	
-	private CacheProcessor cacheProcessor = null; // can be null (no caching)
+	private FrontCacheEngine fcEngine = null;
 	
 	
 	@Override
 	public void init(FilterConfig arg0) throws ServletException {
 
-		cacheProcessor = CacheManager.getInstance();
-		
-		includeProcessor = IncludeProcessorManager.getInstance();
-			
-		includeProcessor.setCacheProcessor(cacheProcessor);
+		fcEngine = FrontCacheEngine.getFrontCache();
 		
 		return;
 	}
@@ -54,108 +34,29 @@ public class FrontCacheFilter implements Filter {
 	@Override
 	public void destroy() {
 
-		if (null != cacheProcessor)
-			cacheProcessor.destroy();
-		
-		if (null != includeProcessor)
-			includeProcessor.destroy();
-		
+		fcEngine = null;
 		return;
 	}
 
 	@Override
-	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+	public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain)
 			throws IOException, ServletException {
 		
-//		HttpServletRequest httpRequest = (HttpServletRequest) request;	
-//		FrontCacheHttpResponseWrapper wrappedResponse = getHttpResponseWrapper((HttpServletResponse) response);
-//		
-//		
-//		// if no appOriginBaseURL -> use current app
-//		if (null == appOriginBaseURL)
-//			appOriginBaseURL = getDefaultOriginBaseURL(httpRequest);
-//	
-//		String content = null;
-//		if (null != cacheProcessor)
-//		{
-//			content = cacheProcessor.processCacheableRequest(httpRequest, wrappedResponse, chain);
-//		} else {
-//			long start = System.currentTimeMillis();
-//			boolean isRequestDynamic = true;
-//			
-//			chain.doFilter(request, wrappedResponse); // run request to origin
-//			content = wrappedResponse.getContentString();
-//			if (null != content)
-//			{
-//				// remove custom component tag from response string
-//				WebResponse webResponse = FCUtils.parseWebComponent(FCUtils.getRequestURL(httpRequest), content);
-//				content = webResponse.getContent();
-//			}
-//
-//			RequestLogger.logRequest(FCUtils.getRequestURL(httpRequest), isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
-//			
-//		}
-//
-//		content = includeProcessor.processIncludes(content, appOriginBaseURL, httpRequest);
-//		
-//		// populate input response		
-//		populateOriginalResponse((HttpServletResponse) response, wrappedResponse, content);
+        try {
+        	fcEngine.init((HttpServletRequest) servletRequest, (HttpServletResponse) servletResponse, chain);
+        	
+            fcEngine.processRequest();
+        } catch (Throwable e) {
+        	e.printStackTrace();
+        	// TODO: handle error
+        } finally {
+            RequestContext.getCurrentContext().unset();
+        }
+		
 		return;
 	}
 
-	/**
-	 * 
-	 * @param httpResponse
-	 * @return
-	 */
-	private FrontCacheHttpResponseWrapper getHttpResponseWrapper(HttpServletResponse httpResponse)
-	{
-		FrontCacheHttpResponseWrapper wrappedResponse = new HttpResponseWrapperImpl(httpResponse);
-		return wrappedResponse;
-	}
-
 	
-	/**
-	 * 
-	 * @param originalResponse
-	 * @param wrappedResponse
-	 * @param content
-	 * @throws IOException
-	 */
-	private void populateOriginalResponse(HttpServletResponse originalResponse, FrontCacheHttpResponseWrapper wrappedResponse, String content) throws IOException
-	{
-		// populate input response		
-//		byte[] data = content.getBytes();
-//		originalResponse.setContentLengthLong(data.length);
-
-		originalResponse.setCharacterEncoding(UTF8); // ? support other encodings
-		originalResponse.setContentType(wrappedResponse.getContentType());
-//		originalResponse.getOutputStream().write(data);
-		originalResponse.getWriter().write(content);
-	}
-
-	
-	/**
-	 * Extracts origin base url from request
-	 * 
-	 * http://localhost:8080/demo-fc/hello-world.jsp -> http://localhost:8080/demo-fc
-	 * 
-	 * @param httpRequest
-	 * @return
-	 */
-	private String getDefaultOriginBaseURL(HttpServletRequest httpRequest)
-	{
-
-		String protocol = null;
-		if (httpRequest.isSecure())
-			protocol = "https";
-		else
-			protocol = "http";
-		
-		return protocol + "://" + httpRequest.getServerName() + ":" + httpRequest.getServerPort() + httpRequest.getContextPath();
-	}
-
-
 	
 }
 

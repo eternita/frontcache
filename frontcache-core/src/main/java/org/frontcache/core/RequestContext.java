@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -450,4 +451,26 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public String getFrontCacheHttpsPort() {
         return (String) get("frontCacheHttpsPort");
     }
+    
+    public void setFilterChain(FilterChain filterChain) {
+        set("filterChain", filterChain);
+    }
+
+    public FilterChain getFilterChain() {
+        return (FilterChain) get("filterChain");
+    }
+    
+    /**
+     * Check if run as ServletFilter
+     * 
+     * @return
+     */
+    public boolean isFilterMode()
+    {
+    	if (null != getFilterChain())
+    		return true;
+    	
+    	return false;
+    }
+        
 }
