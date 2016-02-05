@@ -18,7 +18,10 @@ import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.logging.Logger;
 
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
@@ -31,6 +34,8 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.message.BasicHeader;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
+import org.frontcache.wrapper.HttpResponseWrapperImpl;
 
 
 public class FCUtils {
@@ -64,12 +69,34 @@ public class FCUtils {
 	/**
 	 * GET method only for text requests
 	 * 
+	 * for cache processor - it can use both (httpClient or filter)
+	 * 
 	 * @param urlStr
 	 * @param httpRequest
 	 * @param httpResponse
 	 * @return
 	 */
 	public static WebResponse dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
+    {
+		RequestContext context = RequestContext.getCurrentContext();
+		if (context.isFilterMode())
+			return dynamicCallFilter();
+		else
+			return dynamicCallHttpClient(urlStr, requestHeaders, client);
+
+				
+    }
+
+	/**
+	 * for includes - they allways use httpClient
+	 * 
+	 * @param urlStr
+	 * @param requestHeaders
+	 * @param client
+	 * @return
+	 * @throws FrontCacheException
+	 */
+	public static WebResponse dynamicCallHttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
     {
 		HttpResponse response = null;
 
@@ -99,17 +126,78 @@ public class FCUtils {
 		
     }
 	
-	public static String transformRedirectURL(String originLocation)
+	private static WebResponse dynamicCallFilter() throws FrontCacheException
 	{
-		String fcLocation = null;
 		RequestContext context = RequestContext.getCurrentContext();
-		String protocol = getRequestProtocol(originLocation);
-		if ("https".equalsIgnoreCase(protocol))
-			fcLocation = "https://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
-		else // http
-			fcLocation = "http://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpPort() + buildRequestURI(originLocation);
+		HttpServletRequest httpRequest = context.getRequest();
+		HttpServletResponse httpResponse = context.getResponse();
+		FilterChain chain = context.getFilterChain();
+
+		FrontCacheHttpResponseWrapper wrappedResponse = new HttpResponseWrapperImpl(httpResponse);
 		
-		return fcLocation;
+		try {
+			chain.doFilter(httpRequest, wrappedResponse); // run request to origin
+			
+			String url = getRequestURL(httpRequest);
+			WebResponse webResponse = httpResponse2WebComponent(url, wrappedResponse);
+			return webResponse;
+			
+		} catch (IOException | ServletException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			throw new FrontCacheException("FilterChain exception", e);
+		} 
+		
+//		return null;
+	}
+
+	/**
+	 * is used in ServletFilter mode
+	 * 
+	 * @param url
+	 * @param originWrappedResponse
+	 * @return
+	 * @throws FrontCacheException
+	 * @throws IOException
+	 */
+	private static WebResponse httpResponse2WebComponent(String url, FrontCacheHttpResponseWrapper originWrappedResponse) throws FrontCacheException, IOException
+	{
+		WebResponse webResponse = null;
+		
+		String contentType = originWrappedResponse.getContentType();
+		String dataStr = originWrappedResponse.getContentString();
+		if (null != dataStr && dataStr.length() > 0)
+		{
+			webResponse = parseWebComponent(url, dataStr);
+				
+			if (null == contentType || -1 == contentType.indexOf("text"))
+			{
+				contentType = "text"; // 
+				webResponse.setContentType(contentType);
+			}
+		}
+
+		if (!"".equals(contentType))
+			webResponse.setContentType(contentType);
+				
+
+		webResponse.setStatusCode(originWrappedResponse.getStatus());
+
+		// get headers
+		MultiValuedMap<String, String> headers = new ArrayListValuedHashMap<String, String>();
+		for (String headerName : originWrappedResponse.getHeaderNames())
+			if (isIncludedHeaderToResponse(headerName))
+				headers.put(headerName, originWrappedResponse.getHeader(headerName));
+		
+		// filter may not set up content type yet -> check and setup 
+		if (null != dataStr && 0 == headers.get("Content-Type").size())
+		{
+			headers.put("Content-Type", contentType); 
+		}
+
+		webResponse.setHeaders(headers);
+		
+		return webResponse;
 	}
 	
 	private static WebResponse httpResponse2WebComponent(String url, HttpResponse response) throws FrontCacheException, IOException
@@ -176,6 +264,20 @@ public class FCUtils {
 				
 		return webResponse;
 	}
+	
+	public static String transformRedirectURL(String originLocation)
+	{
+		String fcLocation = null;
+		RequestContext context = RequestContext.getCurrentContext();
+		String protocol = getRequestProtocol(originLocation);
+		if ("https".equalsIgnoreCase(protocol))
+			fcLocation = "https://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
+		else // http
+			fcLocation = "http://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpPort() + buildRequestURI(originLocation);
+		
+		return fcLocation;
+	}
+	
 	
     /**
      * returns query params as a Map with String keys and Lists of Strings as values

@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
-import org.frontcache.FrontCacheClient;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
@@ -23,19 +22,13 @@ public class NoCacheProcessor implements CacheProcessor {
 		boolean isRequestDynamic = true;
 		long lengthBytes = -1;
 		
-		WebResponse cachedWebComponent = null;
-		try
-		{
-			cachedWebComponent = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
-			lengthBytes = cachedWebComponent.getContentLenth();
-		} catch (Exception ex)
-		{
-			ex.printStackTrace();
-		}
+		WebResponse cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
+
+		lengthBytes = cachedWebResponse.getContentLenth();
 
 		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
 
-		return cachedWebComponent;
+		return cachedWebResponse;
 	}
 
 	@Override
@@ -74,27 +67,7 @@ public class NoCacheProcessor implements CacheProcessor {
 
 	}
 
-	@Override
-	public FrontCacheClient getFrontCacheClient() {
-		return new NoCacheClient();
-	}
-
 }
 
-/**
- * 
- * 
- *
- */
-class NoCacheClient extends FrontCacheClient {
 
-	public void remove(String filter)
-	{		
-	}
-	
-	public void removeAll()
-	{		
-	}
-	
-}
 

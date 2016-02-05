@@ -35,7 +35,7 @@ public class FrontCacheServlet extends HttpServlet {
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
 		
-		fcEngine = new FrontCacheEngine();
+		fcEngine = FrontCacheEngine.getFrontCache();
 		
 		return;
 	}
@@ -43,7 +43,8 @@ public class FrontCacheServlet extends HttpServlet {
 	@Override
 	public void destroy() {
 		super.destroy();
-		fcEngine.stop();
+//		fcEngine.stop();
+		fcEngine = null;
 	}	
 
 

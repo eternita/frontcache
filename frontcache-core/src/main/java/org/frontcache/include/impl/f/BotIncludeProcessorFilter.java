@@ -41,15 +41,18 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 				return webResponse;
 
 			// recursive call to FCServlet
-			webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);
+			webResponse = FCUtils.dynamicCallHttpClient(urlStr, requestHeaders, client);
 			
-			cache.put(urlStr, webResponse);
+			
+			// TODO: put to cache if response is not cacheable (otherwise it's cached by the 'main' cache)
+			if (null != webResponse && null != webResponse.getContent())
+				cache.put(urlStr, webResponse);
 			
 			return webResponse;
 
 		} else {
 			// recursive call to FCServlet
-			WebResponse webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);
+			WebResponse webResponse = FCUtils.dynamicCallHttpClient(urlStr, requestHeaders, client);
 			return webResponse;
 		}
 		

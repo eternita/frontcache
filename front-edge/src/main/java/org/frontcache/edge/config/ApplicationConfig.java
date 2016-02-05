@@ -2,7 +2,6 @@ package org.frontcache.edge.config;
 
 import org.frontcache.edge.CoinsRequestContext;
 import org.frontcache.edge.filter.pre.FrontCachePreFilter;
-import org.frontcache.edge.filter.route.ForwardFilter;
 import org.frontcache.edge.filter.route.SimpleHostRoutingFilter;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;

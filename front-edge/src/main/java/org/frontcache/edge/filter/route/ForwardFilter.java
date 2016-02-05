@@ -9,7 +9,7 @@ public class ForwardFilter extends ZuulFilter {
 	private FrontCacheEngine fcEngine;
 	public ForwardFilter()
 	{
-		fcEngine = new FrontCacheEngine();
+		fcEngine = FrontCacheEngine.getFrontCache();
 	}
 
 	@Override

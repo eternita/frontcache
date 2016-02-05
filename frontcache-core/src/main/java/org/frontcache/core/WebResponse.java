@@ -14,7 +14,7 @@ public class WebResponse implements Serializable {
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 4L; // v0.4 -> 4, v1.0 -> 10
 
 	private int statusCode = -1; // for redirects
 	

@@ -36,7 +36,7 @@ public class FrontCachePreFilter extends ZuulFilter{
 		appOriginBaseURLStr = FCConfig.getProperty("front-cache.app-origin-base-url");
 		forwardHttpPort = FCConfig.getProperty("front-cache.forward-http-port");
 		forwardHttpsPort = FCConfig.getProperty("front-cache.forward-https-port");
-		fcEngine = new FrontCacheEngine();
+		fcEngine = FrontCacheEngine.getFrontCache();
 		Config cacheConfig = ConfigFactory.load().getConfig(FCConstants.CACHE_REGEX);
 		for (Map.Entry<String, ConfigValue> entry : cacheConfig.entrySet()) {
 			try {
