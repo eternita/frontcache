@@ -48,7 +48,9 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 					
 					try {
 						WebResponse webResponse = callInclude(hostURL + includeURL, requestHeaders, client);
+						outSb.append("<!-- start fc:include ").append(includeURL).append(" -->"); // for debugging
 						outSb.append(webResponse.getContent());
+						outSb.append("<!-- end fc:include ").append(includeURL).append(" -->"); // for debugging	
 						mergeIncludeResponseHeaders(outHeaders, webResponse.getHeaders());
 						includeCounter++;
 
