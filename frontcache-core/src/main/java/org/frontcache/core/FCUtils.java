@@ -175,6 +175,10 @@ public class FCUtils {
 				contentType = "text"; // 
 				webResponse.setContentType(contentType);
 			}
+		} else {
+			webResponse = new WebResponse(url);
+			logger.info(url + " has response with no data");
+			
 		}
 
 		if (!"".equals(contentType))
@@ -487,11 +491,12 @@ public class FCUtils {
 				String includeTagStr = content.substring(startIdx, endIdx + END_MARKER.length());
 				cacheMaxAgeSec = getCacheMaxAge(includeTagStr);
 				
-				
 				// exclude tag from content
-				outStr = content.substring(0, startIdx)   +   
-						 content.substring(endIdx + END_MARKER.length(), content.length());
-				
+				StringBuffer outSb = new StringBuffer();
+				outSb.append(content.substring(0, startIdx));
+				outSb.append("<!-- fc:component ttl=").append(cacheMaxAgeSec).append("sec -->"); // comment out tag (leave it for debugging purpose)
+				outSb.append(content.substring(endIdx + END_MARKER.length(), content.length()));
+				outStr = outSb.toString();
 			} else {
 				// can't find closing 
 				outStr = content;
