@@ -41,6 +41,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					WebResponse copy4cache = cachedWebResponse.copy();
 					
 					copy4cache.getHeaders().remove("Set-Cookie");
+					copy4cache.getHeaders().remove("Date");
 					
 					putToCache(originUrlStr, copy4cache); // put to cache copy
 				}
