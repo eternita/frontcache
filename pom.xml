@@ -14,9 +14,9 @@
         <module>frontcache-web</module>
         <module>frontcache-core</module>
         <module>frontcache-ehcache</module>
-        <module>frontcache-jclient</module>
+		<module>front-edge</module>
+		
         <module>fc-mvc-demo</module>
-	<module>front-edge</module>
 <!--
         <module>frontcache-tests</module>
 -->        
