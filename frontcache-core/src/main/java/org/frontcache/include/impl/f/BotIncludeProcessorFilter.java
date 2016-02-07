@@ -59,9 +59,7 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 	}
 	
 	private boolean isBot(MultiValuedMap<String, String> requestHeaders)
-	{
-//		System.out.println(requestHeaders);
-		
+	{		
 		if (null != requestHeaders.get("user-agent"))
 		{
 			for (String userAgent : requestHeaders.get("user-agent"))

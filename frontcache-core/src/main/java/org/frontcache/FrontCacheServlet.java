@@ -15,21 +15,14 @@ import org.frontcache.core.RequestContext;
 
 public class FrontCacheServlet extends HttpServlet {
 
-	/**
-	 * 
-	 */
 	private static final long serialVersionUID = 1L;
 
 	protected Logger logger = Logger.getLogger(getClass().getName());
 	
 	FrontCacheEngine fcEngine = null;
 	
-	/**
-	 * 
-	 */
 	public FrontCacheServlet() {
 	}
-	
 	
 	@Override
 	public void init(ServletConfig config) throws ServletException {
@@ -43,7 +36,6 @@ public class FrontCacheServlet extends HttpServlet {
 	@Override
 	public void destroy() {
 		super.destroy();
-//		fcEngine.stop();
 		fcEngine = null;
 	}	
 

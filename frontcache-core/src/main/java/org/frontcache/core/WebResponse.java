@@ -8,6 +8,12 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.frontcache.cache.CacheProcessor;
 
+/**
+ * 
+ * Container for web response. Usually it's text response for GET method.  
+ * 
+ *
+ */
 public class WebResponse implements Serializable {
 
 
@@ -80,37 +86,32 @@ public class WebResponse implements Serializable {
 		return headers;
 	}
 
-
-
+	/**
+	 * 
+	 * @param headers
+	 */
 	public void setHeaders(MultiValuedMap<String, String> headers) {
 		this.headers = headers;
-		
-//		if (null != content)
-//		{
-//			// fix content length
-//			if(this.headers.containsKey("Content-Length"))
-//			{
-//				this.headers.remove("Content-Length");
-//				this.headers.put("Content-Length", "" + getContentLenth());
-//			}
-//		}
 		
 		return;
 	}
 
-
-
+	/**
+	 * 
+	 * @return
+	 */
 	public Set<String> getTags() {
 		return tags;
 	}
 
 
-
+	/**
+	 * 
+	 * @param tags
+	 */
 	public void setTags(Set<String> tags) {
 		this.tags = tags;
 	}
-
-
 
 	/**
 	 * 
@@ -145,31 +146,25 @@ public class WebResponse implements Serializable {
 	}
 
 	/**
+	 * Check if response is cacheable 
 	 * 
 	 * @return
 	 */
 	public boolean isCacheable()
 	{
-		if (expireTimeMillis == CacheProcessor.NO_CACHE)
-			return false;
+		if (expireTimeMillis == CacheProcessor.NO_CACHE) 
+			return false; // do not cache marker
 		
-		if (null == headers)
-			return false;
+		if (null == headers)  
+			return false; // no header
 		
-		if (null == contentType || -1 == contentType.indexOf("text"))
-			return false;
-
-			
-//		for (String name : headers.keySet()) {
-//			for (String value : headers.get(name)) {
-//				if ("Content-Type".equals(name) && -1 < value.indexOf("text"))
-//					return true;
-//			}
-//		}
+		if (null == content) 
+			return false;  // no data
 		
-		return true;
+		if (null == contentType || -1 == contentType.indexOf("text")) 
+			return false;  // response data is not text
 		
-//		return expireTimeMillis != CacheProcessor.NO_CACHE;
+		return true; 
 	}
 
 	/**
@@ -219,7 +214,10 @@ public class WebResponse implements Serializable {
 		return -1;
 	}
 
-    
+    /**
+     * 
+     * @return
+     */
     public WebResponse copy() {
     	WebResponse copy = new WebResponse(this.url);
     	copy.content = this.content;

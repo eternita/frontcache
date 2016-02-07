@@ -35,8 +35,6 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	@Override
 	public void init(Properties properties) {
-		
-		
 		try
 		{
 			String threadAmountStr = properties.getProperty("front-cache.include-processor.impl.concurrent.thread-amount");
@@ -57,7 +55,6 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		
 	    executor = Executors.newFixedThreadPool(threadAmount); 
 	}
-
 
 
 	@Override
@@ -230,7 +227,6 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				this.webResponse.setContent(outSb.toString());
 			}
 	    	
-//			this.content = callInclude(this.includeURL, this.requestHeaders, this.client);
 	        return this;
 	    }
 		

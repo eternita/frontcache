@@ -278,7 +278,8 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      *
      * @return the List<Pair<String, String>> of headers sent back from the origin
      */
-    public MultiValuedMap<String, String> getOriginResponseHeaders() {
+    @SuppressWarnings("unchecked")
+	public MultiValuedMap<String, String> getOriginResponseHeaders() {
         if (get("originResponseHeaders") == null) {
         	MultiValuedMap<String, String> originResponseHeaders = new ArrayListValuedHashMap<>();
             putIfAbsent("originResponseHeaders", originResponseHeaders);
@@ -377,7 +378,6 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
             set("originContentLength", i);
         } catch (NumberFormatException e) {
         	e.printStackTrace();
-//            LOG.warn("error parsing origin content length", e);
         }
     }
 
@@ -415,7 +415,8 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     /**
      * @return Map<String, List<String>>  of the request Query Parameters
      */
-    public Map<String, List<String>> getRequestQueryParams() {
+    @SuppressWarnings("unchecked")
+	public Map<String, List<String>> getRequestQueryParams() {
         return (Map<String, List<String>>) get("requestQueryParams");
     }
 
