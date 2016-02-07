@@ -7,16 +7,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
-import java.net.Socket;
 import java.net.URL;
-import java.net.UnknownHostException;
-import java.security.KeyManagementException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
@@ -25,9 +16,6 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -51,7 +39,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
-import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
@@ -279,49 +266,12 @@ public class FrontCacheEngine {
 		}
 	}
 	
-	public static class MySSLSocketFactory extends SSLSocketFactory {
-		private SSLContext sslContext = SSLContext.getInstance("TLS");
-
-		public MySSLSocketFactory(KeyStore truststore) throws NoSuchAlgorithmException,
-				KeyManagementException, KeyStoreException, UnrecoverableKeyException {
-			super(truststore);
-			TrustManager tm = new X509TrustManager() {
-
-				@Override
-				public void checkClientTrusted(X509Certificate[] chain, String authType)
-						throws CertificateException {
-				}
-
-				@Override
-				public void checkServerTrusted(X509Certificate[] chain, String authType)
-						throws CertificateException {
-				}
-
-				@Override
-				public X509Certificate[] getAcceptedIssuers() {
-					return null;
-				}
-
-			};
-			TrustManager[] tms = new TrustManager[1];
-			tms[0] = tm;
-			this.sslContext.init(null, tms, null);
-		}
-
-		@Override
-		public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
-				throws IOException, UnknownHostException {
-			return this.sslContext.getSocketFactory().createSocket(socket, host, port,
-					autoClose);
-		}
-
-		@Override
-		public Socket createSocket() throws IOException {
-			return this.sslContext.getSocketFactory().createSocket();
-		}
-
-	}
-	
+	/**
+	 * 
+	 * @param servletRequest
+	 * @param servletResponse
+	 * @param filterChain
+	 */
     public void init(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) {
     	this.init(servletRequest, servletResponse);
     	
@@ -330,7 +280,12 @@ public class FrontCacheEngine {
 		ctx.setFrontCacheHost(originHost); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
 		return;
     }
-	
+
+    /**
+     * 
+     * @param servletRequest
+     * @param servletResponse
+     */
     public void init(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
 
         RequestContext ctx = RequestContext.getCurrentContext();
@@ -359,6 +314,10 @@ public class FrontCacheEngine {
 
     }
     
+    /**
+     * 
+     * @throws Exception
+     */
 	public void processRequest() throws Exception
 	{
 		RequestContext context = RequestContext.getCurrentContext();
@@ -366,8 +325,6 @@ public class FrontCacheEngine {
 		String originRequestURL = getOriginUrl(context) + context.getRequestURI() + context.getRequestQueryString();
 		
 		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + ":" + httpRequest.getServerPort();
-		
-//		System.out.println("-- " + currentRequestBaseURL);
 		
 		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method & Accept header contain 'text'
 		{
@@ -392,9 +349,6 @@ public class FrontCacheEngine {
 					
 					// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
 					webResponse.setContent(incWebResponse.getContent());
-					
-//					String content = webResponse.getContent();
-//					webResponse.setContent(content);
 				}
 				
 				
@@ -406,7 +360,6 @@ public class FrontCacheEngine {
 				return;
 			} else {
 				// content/response is not cacheable (e.g. response type is not text) 
-				
 				// do dynamic call below (forwardToOrigin)
 			}
 
@@ -427,7 +380,6 @@ public class FrontCacheEngine {
 		}		
 		return;
 	}
-
 	
 	private void forwardToOrigin() throws IOException, ServletException
 	{
@@ -463,8 +415,6 @@ public class FrontCacheEngine {
 			}
 		}
 		
-
-		
 		return;
 	}
 
@@ -490,8 +440,6 @@ public class FrontCacheEngine {
 		URL host = context.getOriginURL();
 		HttpHost httpHost = FCUtils.getHttpHost(host);
 		uri = (host.getPath() + uri).replaceAll("/{2,}", "/");
-		
-//		System.out.println("forward (no-cache) " + httpHost + uri);
 		
 		HttpRequest httpRequest;
 		switch (verb.toUpperCase()) {
@@ -578,7 +526,6 @@ public class FrontCacheEngine {
 			return;
 		}
 		HttpServletResponse servletResponse = context.getResponse();
-//		servletResponse.setCharacterEncoding("UTF-8");
 		OutputStream outStream = servletResponse.getOutputStream();
 		InputStream is = null;
 		try {
@@ -587,42 +534,10 @@ public class FrontCacheEngine {
 				FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes()), outStream);
 				return;
 			}
-			boolean isGzipRequested = false;
-			final String requestEncoding = context.getRequest().getHeader(
-					FCHeaders.ACCEPT_ENCODING);
 
-			if (requestEncoding != null
-					&& FCUtils.isGzipped(requestEncoding)) {
-				isGzipRequested = true;
-			}
 			is = context.getResponseDataStream();
 			InputStream inputStream = is;
 			if (is != null) {
-/*				
-				if (context.sendZuulResponse()) {
-					// if origin response is gzipped, and client has not requested gzip,
-					// decompress stream
-					// before sending to client
-					// else, stream gzip directly to client
-					if (context.getResponseGZipped() && !isGzipRequested) {
-						try {
-							inputStream = new GZIPInputStream(is);
-						}
-						catch (java.util.zip.ZipException ex) {
-							log.debug("gzip expected but not "
-									+ "received assuming unencoded response "
-									+ RequestContext.getCurrentContext().getRequest()
-											.getRequestURL().toString());
-							inputStream = is;
-						}
-					}
-					else if (context.getResponseGZipped() && isGzipRequested) {
-						servletResponse.setHeader(FCHeaders.CONTENT_ENCODING, "gzip");
-					}
-//					writeResponse(inputStream, outStream);
-				}
-//*/				
-				
 				FCUtils.writeResponse(inputStream, outStream);
 			}
 
@@ -685,8 +600,6 @@ public class FrontCacheEngine {
 			originResponseHeaders.put("Location", fcLocation);
 		}
 		
-		
-		
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
 		servletResponse.setStatus(context.getResponseStatusCode());
 		
@@ -723,17 +636,6 @@ public class FrontCacheEngine {
 				}
 			}
 		}
-		// TO
-		
-//		RequestContext ctx = RequestContext.getCurrentContext();
-//		Long contentLength = ctx.getOriginContentLength();
-//		// Only inserts Content-Length if origin provides it and origin response is not
-//		// gzipped
-////		if (SET_CONTENT_LENGTH.get()) {
-//			if (contentLength != null && !ctx.getResponseGZipped()) {
-//				servletResponse.setContentLength(contentLength.intValue());
-//			}
-////		}
 	}	
 	
 	private void loadCacheIgnoreURIPatterns() {

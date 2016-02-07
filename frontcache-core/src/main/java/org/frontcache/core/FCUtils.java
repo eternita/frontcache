@@ -148,7 +148,6 @@ public class FCUtils {
 			throw new FrontCacheException("FilterChain exception", e);
 		} 
 		
-//		return null;
 	}
 
 	/**
@@ -239,7 +238,6 @@ public class FCUtils {
 		WebResponse webResponse = null;
 		if (-1 == contentType.indexOf("text"))
 		{
-//			throw new FrontCacheException("Not cacheable content type (" + contentType + ") for " + url);
 			webResponse = new WebResponse(url);
 
 		} else {
