@@ -1,67 +1,14 @@
 subprojects {
     apply plugin: 'java'
-    apply plugin: 'maven'
-	apply plugin: 'war'
 	
     version = '0.4.0-SNAPSHOT'
     group = 'frontcache'
 	
-    configurations {
-		providedCompile
-        shellRuntime.extendsFrom runtime
-        testIntegrationCompile {
-            extendsFrom testCompile
-        }
-        testIntegrationRuntime {
-            extendsFrom testIntegrationCompile, testRuntime
-        }
-    }
 
     dependencies {
-
-//      compile         '::'
-		
+		testCompile 'junit:junit:4.12'
     }
 	
-    sourceSets {
-        main {
-            sourceSets.main.output.resourcesDir = sourceSets.main.output.classesDir
-        }
-        testIntegration {
-            java.srcDir file('src/test-integration/java')
-            resources.srcDir file('src/test-integration/resources')
-            sourceSets.testIntegration.output.resourcesDir = sourceSets.testIntegration.output.classesDir
-            compileClasspath = sourceSets.main.output + sourceSets.test.output + configurations.testIntegrationCompile
-            runtimeClasspath = output + compileClasspath + configurations.testIntegrationRuntime
-        }
-    }
-    
-    task testIntegration(type: Test, dependsOn: jar) {
-        testClassesDir = sourceSets.testIntegration.output.classesDir
-        classpath = sourceSets.testIntegration.runtimeClasspath
-        systemProperty 'app.env', 'test'
-        systemProperty 'jar.path', jar.archivePath
-        systemProperty 'echoOut', 'true'
-        systemProperty 'echoErr', 'true'
-        jvmArgs = ["-Xmx1024m", "-Xms256m",  "-XX:MaxPermSize=512m", "-XX:PermSize=128m"]
-
-		testLogging {
-			showStandardStreams = true
-		}
-		
-    }
-
-    build {
-        dependsOn testIntegration
-    }
-
-    test {
-        systemProperty 'echoOut', 'true'
-        systemProperty 'echoErr', 'true'
-
-    }        
-
-
     repositories {
         mavenLocal()
         mavenCentral()
@@ -74,6 +21,8 @@ task wrapper(type: Wrapper) {
 }
 
 project(':frontcache-core') {
+	apply plugin: 'war'
+
     dependencies {
         providedCompile         'javax.servlet:javax.servlet-api:3.1.0'
 		providedCompile         'javax.servlet.jsp:jsp-api:2.0'
@@ -99,6 +48,7 @@ project(':frontcache-web') {
     apply plugin: 'war'
     apply plugin: 'jetty'
 
+	jettyRun.daemon = true
     httpPort = 9080
     stopPort = 9081
     stopKey = 'frontcache-web'
@@ -108,20 +58,52 @@ project(':frontcache-web') {
         compile project(':frontcache-core')
         compile project(':frontcache-ehcache')
 		
+		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		providedCompile         'org.eclipse.jetty:jetty-server:9.3.4.RC1'
 		providedCompile         'org.eclipse.jetty:jetty-servlet:9.3.4.RC1'
 		
     }
 
+	sourceSets {
+		integrationTest {
+			java.srcDir file('src/test-integration/java')
+			resources.srcDir file('src/test-integration/resources')
+			compileClasspath = sourceSets.main.output + configurations.testRuntime
+			runtimeClasspath = output + compileClasspath
+		}
+	}
+	task startFC {
+		dependsOn jettyRun
+		doLast {
+			println "Front Cache started"
+		}
+	}
+	
+	task stopFC {
+		finalizedBy jettyStop
+		doLast {
+			println "Front Cache stopped"
+		}
+	}
+
+	task integrationTest(type: Test) {
+		description = 'Runs the integration tests.'
+		group = 'verification'
+		testClassesDir = sourceSets.integrationTest.output.classesDir
+		classpath = sourceSets.integrationTest.runtimeClasspath
+		reports.html.destination = file("$reports.html.destination/integration")
+		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
+		dependsOn startFC
+		finalizedBy stopFC
+	}
+	
+	
+//	tasks.withType(Test) {
+//		testLogging {
+//			showStandardStreams = true
+//			exceptionFormat 'full'
+//		}
+//	}
+	
+	check.dependsOn integrationTest
 }
-//jettyRun {
-//	def httpConnector = new org.mortbay.jetty.nio.SelectChannelConnector();
-//	httpConnector.port = 9080
-//	def httpsConnector = new org.mortbay.jetty.security.SslSocketConnector();
-//	httpsConnector.port = 9443
-//	httpsConnector.keystore = "keystore.jks"
-//	httpsConnector.keyPassword = "keystorepwd"
-//	httpsConnector.truststore = "cacerts"
-//	httpsConnector.trustPassword = "cacertspwd"
-//	connectors [httpConnector, httpsConnector]
-//}
