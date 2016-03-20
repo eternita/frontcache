@@ -36,6 +36,7 @@ public class FrontCacheServlet extends HttpServlet {
 	@Override
 	public void destroy() {
 		super.destroy();
+		FrontCacheEngine.destroy();
 		fcEngine = null;
 	}	
 

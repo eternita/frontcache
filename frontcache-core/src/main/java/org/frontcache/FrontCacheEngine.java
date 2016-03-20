@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.logging.Logger;
+//import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -48,6 +48,8 @@ import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicHttpRequest;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
@@ -87,7 +89,7 @@ public class FrontCacheEngine {
 	
 	private CacheProcessor cacheProcessor = null; 
 
-	protected Logger logger = Logger.getLogger(getClass().getName());
+	protected Logger logger = LogManager.getLogger(FrontCacheEngine.class.getName()); //Logger.getLogger(getClass().getName());
 	
 	private final Timer connectionManagerTimer = new Timer("FrontCacheEngine.connectionManagerTimer", true);
 
@@ -105,6 +107,13 @@ public class FrontCacheEngine {
 			instance = new FrontCacheEngine();
 		}
 		return instance;
+	}
+
+	public static void destroy(){
+		if (null != instance) {
+			instance.stop();
+			instance = null;
+		}
 	}
 	
 	public static CacheInvalidator getCacheInvalidator()
@@ -192,6 +201,13 @@ public class FrontCacheEngine {
 
 	private void stop() {
 		connectionManagerTimer.cancel();
+		
+		if (null != includeProcessor)
+			includeProcessor.destroy();
+		
+		if (null != cacheProcessor)
+			cacheProcessor.destroy();
+		
 	}
 
 	
@@ -323,8 +339,11 @@ public class FrontCacheEngine {
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
 		String originRequestURL = getOriginUrl(context) + context.getRequestURI() + context.getRequestQueryString();
-		
+		logger.debug("originRequestURL: " + originRequestURL);
+		System.out.println("originRequestURL: " + originRequestURL);
 		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + ":" + httpRequest.getServerPort();
+		logger.debug("currentRequestBaseURL: " + currentRequestBaseURL);
+		System.out.println("currentRequestBaseURL: " + currentRequestBaseURL);
 		
 		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method & Accept header contain 'text'
 		{

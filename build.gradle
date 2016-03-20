@@ -1,10 +1,35 @@
+import org.akhikhl.gretty.AppBeforeIntegrationTestTask
+
+
+buildscript {
+	repositories {
+	  jcenter()
+	}
+  
+	dependencies {
+	  classpath 'org.akhikhl.gretty:gretty:+' // use gretty to run Jetty9 (servlet 3.1.0 container)
+	}
+  }
+  
+  
 subprojects {
     apply plugin: 'java'
 	
     version = '0.4.0-SNAPSHOT'
     group = 'frontcache'
 	
-
+	configurations {
+		provided
+	}
+	 
+	sourceSets {
+		main {
+			compileClasspath += configurations.provided
+			test.compileClasspath += configurations.provided
+			test.runtimeClasspath += configurations.provided
+		}
+	}
+	
     dependencies {
 		testCompile 'junit:junit:4.12'
     }
@@ -14,18 +39,24 @@ subprojects {
         mavenCentral()
     }
     
+	tasks.withType(Test) {
+		testLogging {
+			showStandardStreams = true
+			exceptionFormat 'full'
+		}
+	}
+
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.9'
+    gradleVersion = '2.12'
 }
 
 project(':frontcache-core') {
-	apply plugin: 'war'
-
+	
     dependencies {
-        providedCompile         'javax.servlet:javax.servlet-api:3.1.0'
-		providedCompile         'javax.servlet.jsp:jsp-api:2.0'
+        provided         'javax.servlet:javax.servlet-api:3.1.0'
+		provided         'javax.servlet.jsp:jsp-api:2.0'
 		
         compile         'org.apache.httpcomponents:httpclient:4.5.1'
         compile         'commons-io:commons-io:2.4'
@@ -33,6 +64,7 @@ project(':frontcache-core') {
         compile         'org.apache.logging.log4j:log4j-api:2.4.1'
         compile         'org.apache.logging.log4j:log4j-core:2.4.1'
     }
+	
 }
 
 
@@ -46,23 +78,20 @@ project(':frontcache-ehcache') {
 
 project(':frontcache-web') {
     apply plugin: 'war'
-    apply plugin: 'jetty'
+	apply plugin: 'org.akhikhl.gretty'
 
-	jettyRun.daemon = true
-    httpPort = 9080
-    stopPort = 9081
-    stopKey = 'frontcache-web'
-    war.baseName = ''
-
-    dependencies {
-        compile project(':frontcache-core')
-        compile project(':frontcache-ehcache')
-		
-		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
-		providedCompile         'org.eclipse.jetty:jetty-server:9.3.4.RC1'
-		providedCompile         'org.eclipse.jetty:jetty-servlet:9.3.4.RC1'
-		
-    }
+	gretty {
+		port = 9080		
+		statusPort = 9080		
+		servicePort = 9080		
+//		contextPath = '/fc-test'
+		contextPath = '/'
+		servletContainer = 'tomcat7' // jetty9 or tomcat7 or tomcat8
+//		inplaceMode = 'hard'
+//		loggingLevel = 'All'
+		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
+	}
+	
 
 	sourceSets {
 		integrationTest {
@@ -72,20 +101,22 @@ project(':frontcache-web') {
 			runtimeClasspath = output + compileClasspath
 		}
 	}
-	task startFC {
-		dependsOn jettyRun
-		doLast {
-			println "Front Cache started"
-		}
+	
+    dependencies {
+        compile project(':frontcache-core')
+        compile project(':frontcache-ehcache')
+		
+		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
+		compile 'jstl:jstl:1.2'
+//		compile 'org.glassfish.jersey.containers:jersey-container-servlet-core:2.22.2'
+		
+    }
+
+	test {
+		reports.html.destination = file("$reports.html.destination/unit")
+		reports.junitXml.destination = file("$reports.junitXml.destination/unit")
 	}
 	
-	task stopFC {
-		finalizedBy jettyStop
-		doLast {
-			println "Front Cache stopped"
-		}
-	}
-
 	task integrationTest(type: Test) {
 		description = 'Runs the integration tests.'
 		group = 'verification'
@@ -93,17 +124,31 @@ project(':frontcache-web') {
 		classpath = sourceSets.integrationTest.runtimeClasspath
 		reports.html.destination = file("$reports.html.destination/integration")
 		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
-		dependsOn startFC
-		finalizedBy stopFC
+//		dependsOn startAndPrepareDatabase
+//		finalizedBy stopDatabase
 	}
 	
-	
-//	tasks.withType(Test) {
-//		testLogging {
-//			showStandardStreams = true
-//			exceptionFormat 'full'
-//		}
+//	test {
+//		include '**/Test*.*'
+//		include '**/*Test.*'
+//		exclude '**/*IT.*'
+//	  }
+//	  
+//	
+//	
+//	task integrationTest(type: Test) { // , dependsOn: 'appStartWar'
+//	  outputs.upToDateWhen { false }
+//	  include '**/*IT.*'
+//	
+//	//  	doFirst {
+//	//  		tasks.appRunWar.execute()
+//	//  	}
+//	  
 //	}
+//	
 	
-	check.dependsOn integrationTest
+	check {
+		dependsOn integrationTest
+	}
+	
 }
