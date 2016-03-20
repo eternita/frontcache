@@ -95,6 +95,14 @@ public class FrontCacheEngine {
 	
 	private CloseableHttpClient httpClient;
 	
+	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output 
+	
+	static {
+		String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
+		if ("true".equalsIgnoreCase(debugCommentsStr))
+			debugComments = true;		
+	}
+	
 	
 	private static FrontCacheEngine instance;
 	
