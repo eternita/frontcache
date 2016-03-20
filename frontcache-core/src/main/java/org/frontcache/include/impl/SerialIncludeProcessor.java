@@ -3,6 +3,7 @@ package org.frontcache.include.impl;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.http.client.HttpClient;
+import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessor;
@@ -48,9 +49,14 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 					
 					try {
 						WebResponse webResponse = callInclude(hostURL + includeURL, requestHeaders, client);
-						outSb.append("<!-- start fc:include ").append(includeURL).append(" -->"); // for debugging
+						if (FrontCacheEngine.debugComments)
+							outSb.append("<!-- start fc:include ").append(includeURL).append(" -->"); // for debugging
+						
 						outSb.append(webResponse.getContent());
-						outSb.append("<!-- end fc:include ").append(includeURL).append(" -->"); // for debugging	
+						
+						if (FrontCacheEngine.debugComments)
+							outSb.append("<!-- end fc:include ").append(includeURL).append(" -->"); // for debugging
+						
 						mergeIncludeResponseHeaders(outHeaders, webResponse.getHeaders());
 						includeCounter++;
 

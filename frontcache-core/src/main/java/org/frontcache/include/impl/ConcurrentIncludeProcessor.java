@@ -13,6 +13,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
+import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessor;
@@ -163,9 +164,14 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			IncludeResolutionPlaceholder inc = includes.get(i);
 			
 			outSb.append(content.substring(scanIdx, inc.startIdx));
-			outSb.append("<!-- start fc:include ").append(inc.includeURL).append(" -->");
+			if (FrontCacheEngine.debugComments)
+				outSb.append("<!-- start fc:include ").append(inc.includeURL).append(" -->");
+			
 			outSb.append(inc.webResponse.getContent());
-			outSb.append("<!-- end fc:include ").append(inc.includeURL).append(" -->");
+			
+			if (FrontCacheEngine.debugComments)
+				outSb.append("<!-- end fc:include ").append(inc.includeURL).append(" -->");
+			
 			mergeIncludeResponseHeaders(webResponse.getHeaders(), inc.webResponse.getHeaders());
 
 			scanIdx = inc.endIdx;
