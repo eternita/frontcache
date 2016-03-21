@@ -45,6 +45,40 @@ subprojects {
 			exceptionFormat 'full'
 		}
 	}
+	
+	sourceSets {
+		integrationTest {
+			java.srcDir file('src/test-integration/java')
+			resources.srcDir file('src/test-integration/resources')
+			compileClasspath = sourceSets.main.output + configurations.testRuntime
+			runtimeClasspath = output + compileClasspath
+		}
+	}
+
+	test {
+		reports.html.destination = file("$reports.html.destination/unit")
+		reports.junitXml.destination = file("$reports.junitXml.destination/unit")
+		
+		if (System.getProperty('DEBUG', 'false') == 'true') {
+			jvmArgs '-Xdebug',
+				'-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8001'
+		}
+	}
+	
+	task integrationTest(type: Test) {
+		description = 'Runs the integration tests.'
+		group = 'verification'
+		testClassesDir = sourceSets.integrationTest.output.classesDir
+		classpath = sourceSets.integrationTest.runtimeClasspath
+		reports.html.destination = file("$reports.html.destination/integration")
+		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
+		
+//		if (System.getProperty('DEBUG', 'false') == 'true') {
+//			jvmArgs '-Xdebug',
+//				'-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8002'
+//		}
+	}
+
 
 }
 
@@ -75,30 +109,22 @@ project(':frontcache-ehcache') {
     }
 }
 
-
 project(':frontcache-web') {
+	
+}
+
+
+project(':frontcache-filter-tests') {
     apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
 
 	gretty {
 		port = 9080		
-		statusPort = 9080		
-		servicePort = 9080		
-//		contextPath = '/fc-test'
 		contextPath = '/'
-		servletContainer = 'tomcat7' // jetty9 or tomcat7 or tomcat8
-//		inplaceMode = 'hard'
-//		loggingLevel = 'All'
-		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
-	}
-	
-
-	sourceSets {
-		integrationTest {
-			java.srcDir file('src/test-integration/java')
-			resources.srcDir file('src/test-integration/resources')
-			compileClasspath = sourceSets.main.output + configurations.testRuntime
-			runtimeClasspath = output + compileClasspath
+		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
+		integrationTestTask = 'test' // existing gradle task (it will be surrounded with start/stop)
+		if (System.getProperty('DEBUG', 'false') == 'true') {
+			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
 		}
 	}
 	
@@ -108,47 +134,39 @@ project(':frontcache-web') {
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		compile 'jstl:jstl:1.2'
-//		compile 'org.glassfish.jersey.containers:jersey-container-servlet-core:2.22.2'
-		
     }
-
-	test {
-		reports.html.destination = file("$reports.html.destination/unit")
-		reports.junitXml.destination = file("$reports.junitXml.destination/unit")
-	}
-	
-	task integrationTest(type: Test) {
-		description = 'Runs the integration tests.'
-		group = 'verification'
-		testClassesDir = sourceSets.integrationTest.output.classesDir
-		classpath = sourceSets.integrationTest.runtimeClasspath
-		reports.html.destination = file("$reports.html.destination/integration")
-		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
-//		dependsOn startAndPrepareDatabase
-//		finalizedBy stopDatabase
-	}
-	
-//	test {
-//		include '**/Test*.*'
-//		include '**/*Test.*'
-//		exclude '**/*IT.*'
-//	  }
-//	  
-//	
-//	
-//	task integrationTest(type: Test) { // , dependsOn: 'appStartWar'
-//	  outputs.upToDateWhen { false }
-//	  include '**/*IT.*'
-//	
-//	//  	doFirst {
-//	//  		tasks.appRunWar.execute()
-//	//  	}
-//	  
-//	}
-//	
 	
 	check {
 		dependsOn integrationTest
 	}
 	
 }
+
+project(':frontcache-standalone-tests') {
+	apply plugin: 'war'
+	apply plugin: 'org.akhikhl.gretty'
+
+	gretty {
+		port = 9080
+		contextPath = '/'
+		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
+		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
+		if (System.getProperty('DEBUG', 'false') == 'true') {
+			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
+		}
+	}
+	
+	dependencies {
+		compile project(':frontcache-core')
+		compile project(':frontcache-ehcache')
+		
+		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
+		compile 'jstl:jstl:1.2'
+	}
+	
+	check {
+		dependsOn integrationTest
+	}
+	
+}
+

@@ -4,8 +4,8 @@
          xmlns:web="http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
          version="3.1" xmlns="http://xmlns.jcp.org/xml/ns/javaee">
              
-	<display-name>Front Cache tests</display-name>
-	<description>Front Cache tests</description>
+	<display-name>front-cache-filter-tests</display-name>
+	<description>Front Cache tests  (filter mode)</description>
 
   <filter>
      <description>Front Cache Filter</description>
