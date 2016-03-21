@@ -19,7 +19,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 
 	
 	protected Logger logger = Logger.getLogger(getClass().getName());
-
+	
 	protected static final String START_MARKER = "<fc:include";
 	protected static final String END_MARKER = "/>";
 	
@@ -34,6 +34,30 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	public void setCacheProcessor(CacheProcessor cacheProcessor)
 	{
 		this.cacheProcessor = cacheProcessor;
+	}
+
+	public boolean hasIncludes(WebResponse webResponse, int recursionLevel) 
+	{
+		String content = webResponse.getContent();
+
+		if (null == content)
+			return false;
+		
+		if (recursionLevel >= MAX_RECURSION_LEVEL)
+			return false;
+		
+		int startIdx = content.indexOf(START_MARKER);
+		if (-1 < startIdx)
+		{
+			int endIdx = content.indexOf(END_MARKER, startIdx);
+			if (-1 < endIdx && (endIdx - startIdx) < MAX_INCLUDE_LENGHT)
+			{
+				return true;
+			}
+		}
+		
+		return false;
+		
 	}
 	
 	protected void mergeIncludeResponseHeaders(MultiValuedMap<String, String> outHeaders, MultiValuedMap<String, String> includeResponseHeaders) 

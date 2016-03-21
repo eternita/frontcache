@@ -352,11 +352,16 @@ public class FrontCacheEngine {
 				// include processor
 				if (null != webResponse.getContent())
 				{
-					// include processor return new webResponse with processed includes and merged headers
-					WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient);
-					
-					// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
-					webResponse.setContent(incWebResponse.getContent());
+					// check process includes with recursion (resolve includes up to deepest level defined in includeProcessor)
+					int recursionLevel = 0;
+					while (includeProcessor.hasIncludes(webResponse, recursionLevel++))
+					{
+						// include processor return new webResponse with processed includes and merged headers
+						WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient);
+						
+						// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
+						webResponse.setContent(incWebResponse.getContent());
+					}
 				}
 				
 				
