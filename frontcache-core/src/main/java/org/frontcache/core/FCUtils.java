@@ -33,6 +33,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.message.BasicHeader;
+import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 import org.frontcache.wrapper.HttpResponseWrapperImpl;
@@ -44,7 +45,7 @@ public class FCUtils {
 	}
 	
 	private static Logger logger = Logger.getLogger(FCUtils.class.getName());
-	
+		
 	/**
 	 * e.g. localhost:8080
 	 * 
@@ -492,7 +493,8 @@ public class FCUtils {
 				// exclude tag from content
 				StringBuffer outSb = new StringBuffer();
 				outSb.append(content.substring(0, startIdx));
-				outSb.append("<!-- fc:component ttl=").append(cacheMaxAgeSec).append("sec -->"); // comment out tag (leave it for debugging purpose)
+				if (FrontCacheEngine.debugComments)
+					outSb.append("<!-- fc:component ttl=").append(cacheMaxAgeSec).append("sec -->"); // comment out tag (leave it for debugging purpose)
 				outSb.append(content.substring(endIdx + END_MARKER.length(), content.length()));
 				outStr = outSb.toString();
 			} else {

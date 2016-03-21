@@ -97,6 +97,14 @@ public class FrontCacheEngine {
 	
 	private CloseableHttpClient httpClient;
 	
+	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output 
+	
+	static {
+		String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
+		if ("true".equalsIgnoreCase(debugCommentsStr))
+			debugComments = true;		
+	}
+	
 	
 	private static FrontCacheEngine instance;
 	
@@ -363,11 +371,16 @@ public class FrontCacheEngine {
 				// include processor
 				if (null != webResponse.getContent())
 				{
-					// include processor return new webResponse with processed includes and merged headers
-					WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient);
-					
-					// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
-					webResponse.setContent(incWebResponse.getContent());
+					// check process includes with recursion (resolve includes up to deepest level defined in includeProcessor)
+					int recursionLevel = 0;
+					while (includeProcessor.hasIncludes(webResponse, recursionLevel++))
+					{
+						// include processor return new webResponse with processed includes and merged headers
+						WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient);
+						
+						// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
+						webResponse.setContent(incWebResponse.getContent());
+					}
 				}
 				
 				
