@@ -110,6 +110,7 @@ project(':frontcache-ehcache') {
 }
 
 project(':frontcache-web') {
+	apply plugin: 'war'
 	
 }
 
