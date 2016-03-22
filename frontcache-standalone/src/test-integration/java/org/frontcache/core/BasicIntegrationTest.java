@@ -25,19 +25,11 @@ public class BasicIntegrationTest {
 	public void tearDown() throws Exception {
 		webClient.close();
 	}
-	
-	@Test
-	public void test() throws Exception {
-
-		System.out.println("Hi Mister from Integration test");
-	}
 
 	@Test
 	public void jspInclude() throws Exception {
 		
-//		HtmlPage page = webClient.getPage(BASE_URI + "en/coin-x-y-z-BQB_AAEBDT0AAAElluVzfAP..htm");
 		HtmlPage page = webClient.getPage(BASE_URI + "en/coin-x-y-z-AuEKX9ISkuwAAAFT8ntrNpK2.htm");
-//		assertEquals("ab", page.getPage().asText());
 
 		Assert.assertNotNull(page.getPage().asText());
 

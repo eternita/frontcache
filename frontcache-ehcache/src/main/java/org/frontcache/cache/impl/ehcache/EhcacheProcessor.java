@@ -1,9 +1,12 @@
 package org.frontcache.cache.impl.ehcache;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.WebResponse;
@@ -36,7 +39,13 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 		}
 		
 		logger.info("Loading " + ehCacheConfigFile);
-		ehCacheMgr = CacheManager.create( EhcacheProcessor.class.getClassLoader().getResource(ehCacheConfigFile));
+		InputStream is = FCConfig.getConfigInputStream(ehCacheConfigFile);
+		ehCacheMgr = CacheManager.create(is);
+		
+		if (null != is)
+		try {
+			is.close();
+		} catch (IOException e) {		}
 		
         cache = ehCacheMgr.getCache(FRONT_CACHE);
         if (null == cache)

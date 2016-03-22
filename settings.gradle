@@ -1,2 +1,2 @@
 rootProject.name = 'frontcache'
-include 'frontcache-core', 'frontcache-ehcache', 'frontcache-filter-tests', 'frontcache-standalone-tests', 'frontcache-web'
+include 'frontcache-core', 'frontcache-ehcache', 'frontcache-standalone', 'frontcache-filter-tests', 'frontcache-standalone-tests', 'frontcache-web'

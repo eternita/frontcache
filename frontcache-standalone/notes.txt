@@ -1,0 +1,7 @@
+Set up environment variable FRONTCACHE_HOME
+ 
+FRONTCACHE_HOME=
+
+or system variable
+
+frontcache.home=

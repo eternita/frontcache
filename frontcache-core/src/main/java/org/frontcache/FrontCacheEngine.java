@@ -99,19 +99,18 @@ public class FrontCacheEngine {
 	
 	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output 
 	
-	static {
-		String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
-		if ("true".equalsIgnoreCase(debugCommentsStr))
-			debugComments = true;		
-	}
-	
-	
 	private static FrontCacheEngine instance;
 	
 	private static CacheInvalidator cacheInvalidator;
 
 	public static FrontCacheEngine getFrontCache(){
 		if (null == instance) {
+			FCConfig.init();
+			
+			String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
+			if ("true".equalsIgnoreCase(debugCommentsStr))
+				debugComments = true;		
+			
 			instance = new FrontCacheEngine();
 		}
 		return instance;
@@ -673,7 +672,7 @@ public class FrontCacheEngine {
 		InputStream is = null;
 		try 
 		{
-			is = this.getClass().getClassLoader().getResourceAsStream(CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
+			is = FCConfig.getConfigInputStream(CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
 			if (null == is)
 			{
 				logger.info("Cache ignore URI patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
