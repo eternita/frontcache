@@ -348,10 +348,8 @@ public class FrontCacheEngine {
 		HttpServletRequest httpRequest = context.getRequest();
 		String originRequestURL = getOriginUrl(context) + context.getRequestURI() + context.getRequestQueryString();
 		logger.debug("originRequestURL: " + originRequestURL);
-		System.out.println("originRequestURL: " + originRequestURL);
 		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + ":" + httpRequest.getServerPort();
 		logger.debug("currentRequestBaseURL: " + currentRequestBaseURL);
-		System.out.println("currentRequestBaseURL: " + currentRequestBaseURL);
 		
 		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method & Accept header contain 'text'
 		{
