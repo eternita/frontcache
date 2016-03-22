@@ -114,6 +114,35 @@ project(':frontcache-web') {
 	
 }
 
+project(':frontcache-standalone') {
+	apply plugin: 'war'
+	apply plugin: 'org.akhikhl.gretty'
+
+	gretty {
+		port = 9080
+		contextPath = '/'
+		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
+		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
+//		jvmArgs = ['-Dfrontcache.home=/Users/spa/git/frontcache/frontcache-standalone/FRONTCACHE_HOME1']
+		if (System.getProperty('DEBUG', 'false') == 'true') {
+			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003'
+//				, '-Dfrontcache.home=/Users/spa/git/frontcache/frontcache-standalone/FRONTCACHE_HOME1'
+				]
+		}
+	}
+	
+	dependencies {
+		compile project(':frontcache-core')
+		compile project(':frontcache-ehcache')
+		
+		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
+		compile 'jstl:jstl:1.2'
+	}
+	
+	check {
+		dependsOn integrationTest
+	}
+}	
 
 project(':frontcache-filter-tests') {
     apply plugin: 'war'

@@ -1,6 +1,7 @@
 package org.frontcache.core;
 
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -38,7 +39,7 @@ public class BasicIntegrationTest {
 		HtmlPage page = webClient.getPage(BASE_URI + "en/coin-x-y-z-AuEKX9ISkuwAAAFT8ntrNpK2.htm");
 //		assertEquals("ab", page.getPage().asText());
 
-		System.out.println(page.getPage().asText());
+		Assert.assertNotNull(page.getPage().asText());
 
 	}
 //*/	

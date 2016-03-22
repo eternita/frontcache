@@ -1,5 +1,7 @@
 package org.frontcache;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
@@ -8,12 +10,22 @@ import java.util.Properties;
 
 public class FCConfig {
 
-    private static Properties config = loadProperties("front-cache.properties");
+	public static final String FRONT_CACHE_HOME_SYSTEM_KEY = "frontcache.home"; 
+	public static final String FRONT_CACHE_HOME_ENVIRONMENT_KEY = "FRONTCACHE_HOME"; 
+	private static final String FRONT_CACHE_CONFIG = "front-cache.properties"; 
+
+    private static Properties config;
 	
+    public static void init()
+    {
+    	config = loadProperties();
+    	if (null == config)
+    		throw new RuntimeException("Can't load " + FRONT_CACHE_CONFIG + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + " (environment variable)");
+    }
+    
     public static String getProperty(String key, String defaultValue)
     {
         return (null != config.getProperty(key)) ? config.getProperty(key) : defaultValue; 
-        
     }
 
     public static String getProperty(String key)
@@ -46,25 +58,87 @@ public class FCConfig {
     	return props;
     }
     
-    
-	private static Properties loadProperties(String fName)
+	private static Properties loadProperties()
 	{
+		
+		InputStream is = getConfigInputStream(FRONT_CACHE_CONFIG);
+		
+		if (null == is)
+			return null;
+		
 		Properties config = new Properties();
-		InputStream is = null;
 		try 
 		{
-			is = FCConfig.class.getClassLoader().getResourceAsStream(fName);
 			config.load(is);
 		} catch (Exception e) {
-			throw new RuntimeException("can't read front-cache.properties " + fName, e);
+			return null;
 		} finally {
-			if (null != is)
-			{
-				try {
-					is.close();
-				} catch (IOException e) { }
-			}
+			try {
+				is.close();
+			} catch (IOException e) { }
 		}
 		return config;
-	}    
+	}
+    
+	/**
+	 * 
+	 * 1. get input stream from inside jars (/front-cache.properties)
+	 * 2. get input stream from system variable frontcache.home
+	 * 3. get input stream from environment variable FRONTCACHE_HOME/conf/front-cache.properties
+	 *
+	 * 
+	 * @param name
+	 * @return
+	 */
+	public static InputStream getConfigInputStream(String name)
+	{
+		
+		InputStream is = null;
+		
+		// 1. get input stream from inside jars (/front-cache.properties)
+		try 
+		{
+			is = FCConfig.class.getClassLoader().getResourceAsStream(name);
+		} catch (Exception e) {		}
+		if (null != is)
+			return is;
+		
+		
+		// 2. get input stream from system variable frontcache.home
+		String frontcacheHome = System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY);
+		
+		if (null != frontcacheHome)
+		{
+			File fcConfig = new File(new File(frontcacheHome), "conf/" + name);
+			if (fcConfig.exists())
+			{
+				try {
+					is = new FileInputStream(fcConfig);
+				} catch (Exception e) {		}
+			}
+		}
+		
+		if (null != is)
+			return is;
+		
+		// 3. get input stream from environment variable FRONTCACHE_HOME/conf/front-cache.properties
+		frontcacheHome = System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY);
+		
+		if (null != frontcacheHome)
+		{
+			File fcConfig = new File(new File(frontcacheHome), "conf/" + name);
+			if (fcConfig.exists())
+			{
+				try {
+					is = new FileInputStream(fcConfig);
+				} catch (Exception e) {		}
+			}
+		}
+		
+    	if (null == is)
+    		throw new RuntimeException("Can't load " + name + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + " (environment variable)");
+		
+		return is;
+	}
+	
 }

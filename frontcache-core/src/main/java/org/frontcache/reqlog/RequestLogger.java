@@ -39,13 +39,14 @@ public class RequestLogger {
 		if (null == configFileName)
 			configFileName = DEFAULT_CONFIG_FILE;
 		
-		InputStream reqLogConfigIS = RequestLogger.class.getClassLoader().getResourceAsStream(configFileName);
+		InputStream reqLogConfigIS = FCConfig.getConfigInputStream(configFileName);
 		if (null != reqLogConfigIS)
 		{
 			ConfigurationSource source;
 			try {
 				source = new ConfigurationSource(reqLogConfigIS);
 		        Configurator.initialize(null, source);
+		        reqLogConfigIS.close();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
