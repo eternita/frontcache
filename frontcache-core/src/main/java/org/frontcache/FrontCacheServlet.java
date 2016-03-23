@@ -1,7 +1,6 @@
 package org.frontcache;
 
 import java.io.IOException;
-import java.util.logging.Logger;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -12,12 +11,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.core.RequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FrontCacheServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
 
-	protected Logger logger = Logger.getLogger(getClass().getName());
+	protected Logger logger = LoggerFactory.getLogger(getClass());
 	
 	FrontCacheEngine fcEngine = null;
 	

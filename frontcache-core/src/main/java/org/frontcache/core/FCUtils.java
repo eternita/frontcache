@@ -16,7 +16,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
-import java.util.logging.Logger;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -37,6 +36,8 @@ import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 import org.frontcache.wrapper.HttpResponseWrapperImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class FCUtils {
@@ -44,7 +45,7 @@ public class FCUtils {
 	private FCUtils() {
 	}
 	
-	private static Logger logger = Logger.getLogger(FCUtils.class.getName());
+	private static Logger logger = LoggerFactory.getLogger(FCUtils.class);
 		
 	/**
 	 * e.g. localhost:8080

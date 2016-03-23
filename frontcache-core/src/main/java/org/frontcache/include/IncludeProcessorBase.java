@@ -1,7 +1,6 @@
 package org.frontcache.include;
 
 import java.util.Properties;
-import java.util.logging.Logger;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
@@ -9,6 +8,8 @@ import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.impl.f.BotIncludeProcessorFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 
@@ -18,7 +19,7 @@ import org.frontcache.include.impl.f.BotIncludeProcessorFilter;
 public abstract class IncludeProcessorBase implements IncludeProcessor {
 
 	
-	protected Logger logger = Logger.getLogger(getClass().getName());
+	protected Logger logger = LoggerFactory.getLogger(getClass());
 	
 	protected static final String START_MARKER = "<fc:include";
 	protected static final String END_MARKER = "/>";
@@ -82,7 +83,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 */
 	protected String getIncludeURL(String content)
 	{
-		logger.fine("include tag - " + content);
+		logger.debug("include tag - " + content);
 		final String START_MARKER = "url=\"";
 		int startIdx = content.indexOf(START_MARKER);
 		if (-1 < startIdx)
@@ -91,7 +92,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			if (-1 < endIdx)
 			{
 				String urlValue = content.substring(startIdx + START_MARKER.length(), endIdx);
-				logger.fine("include URL - " + urlValue);
+				logger.debug("include URL - " + urlValue);
 				return urlValue;
 			} else {
 				// can't find closing 

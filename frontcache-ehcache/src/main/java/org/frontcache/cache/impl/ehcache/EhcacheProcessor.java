@@ -81,7 +81,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	 */
 	@Override
 	public void putToCache(String url, WebResponse component) {
-		logger.fine(url);
+		logger.debug(url);
 		cache.put(new Element(url, component));
 	}
 
@@ -90,7 +90,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	 */
 	@Override
 	public WebResponse getFromCache(String url) {
-		logger.fine(url);
+		logger.debug(url);
 		Element el = cache.get(url);
 		if (null == el)
 			return null;

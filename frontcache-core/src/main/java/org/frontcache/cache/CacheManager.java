@@ -1,14 +1,15 @@
 package org.frontcache.cache;
 
-import java.util.logging.Logger;
 
 import org.frontcache.FCConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 
 public class CacheManager {
 
-	private static Logger logger = Logger.getLogger(CacheManager.class.getName());
+	private static Logger logger = LoggerFactory.getLogger(CacheManager.class);
 	private CacheManager() {}
 	
 	private static CacheProcessor instance;
@@ -42,7 +43,7 @@ public class CacheManager {
 			}
 		} catch (Exception ex) {
 			ex.printStackTrace();
-			logger.severe("Cant instantiate " + cacheImplStr + " Fallback - " + NoCacheProcessor.class.getName());
+			logger.error("Cant instantiate " + cacheImplStr + " Fallback - " + NoCacheProcessor.class.getName());
 		}
 		
 		return new NoCacheProcessor();

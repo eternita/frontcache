@@ -1,15 +1,16 @@
 package org.frontcache.include;
 
-import java.util.logging.Logger;
 
 import org.frontcache.FCConfig;
 import org.frontcache.include.impl.SerialIncludeProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 
 public class IncludeProcessorManager {
 
-	private static Logger logger = Logger.getLogger(IncludeProcessorManager.class.getName());
+	private static Logger logger = LoggerFactory.getLogger(IncludeProcessorManager.class);
 	private IncludeProcessorManager() {}
 	
 	private static IncludeProcessor instance;
@@ -41,7 +42,7 @@ public class IncludeProcessorManager {
 				return cacheProcessor;
 			}
 		} catch (Exception ex) {
-			logger.severe("Cant instantiate " + implStr + ". Default implementation is loaded: " + SerialIncludeProcessor.class.getCanonicalName());
+			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + SerialIncludeProcessor.class.getCanonicalName());
 			
 			// 
 			return new SerialIncludeProcessor();

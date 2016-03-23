@@ -210,7 +210,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				this.webResponse = callInclude(this.includeURL, this.requestHeaders, this.client);
 
 			} catch (FrontCacheException e) {
-				logger.severe("unexpected error processing include " + includeURL);
+				logger.error("unexpected error processing include " + includeURL);
 				
 				StringBuffer outSb = new StringBuffer();
 				outSb.append(includeURL);
@@ -222,7 +222,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 			} catch (Exception e) {
 				e.printStackTrace();
-				logger.severe("unexpected error processing include " + includeURL);
+				logger.error("unexpected error processing include " + includeURL);
 				
 				StringBuffer outSb = new StringBuffer();
 				outSb.append(includeURL);

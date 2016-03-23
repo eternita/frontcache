@@ -1,15 +1,10 @@
 package com.example.srv;
 
-import java.util.logging.Logger;
-
 import org.springframework.stereotype.Service;
 
 @Service
 public class BackendService {
 
-	private Logger logger = Logger.getLogger(getClass().getName());
-
-	
 	public int getNewMessagesAmount(String username) {
 		delay(100);
 		int newMessagesAmount = 3;
