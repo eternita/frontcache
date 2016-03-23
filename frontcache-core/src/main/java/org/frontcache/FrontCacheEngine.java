@@ -2,6 +2,7 @@ package org.frontcache;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -12,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-//import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -48,8 +48,6 @@ import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicHttpRequest;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
@@ -60,6 +58,8 @@ import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.reqlog.RequestLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FrontCacheEngine {
 
@@ -74,9 +74,6 @@ public class FrontCacheEngine {
 	private String frontcacheHttpPort = null;
 	private String frontcacheHttpsPort = null;
 	
-//	private String keyStorePath = null;
-//	private String keyStorePassword = null;
-	
 	private String fcHostId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
 	
 	public final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
@@ -89,7 +86,7 @@ public class FrontCacheEngine {
 	
 	private CacheProcessor cacheProcessor = null; 
 
-	protected Logger logger = LogManager.getLogger(FrontCacheEngine.class.getName()); //Logger.getLogger(getClass().getName());
+	protected Logger logger = LoggerFactory.getLogger(FrontCacheEngine.class); 
 	
 	private final Timer connectionManagerTimer = new Timer("FrontCacheEngine.connectionManagerTimer", true);
 
@@ -103,9 +100,28 @@ public class FrontCacheEngine {
 	
 	private static CacheInvalidator cacheInvalidator;
 
-	public static FrontCacheEngine getFrontCache(){
+	private final static String LOG_CONFIG_FILE_KEY = "front-cache.request-logs-config";
+	
+	public static FrontCacheEngine getFrontCache() {
 		if (null == instance) {
 			FCConfig.init();
+			
+	    	if (null != FCConfig.getProperty(LOG_CONFIG_FILE_KEY))
+	    	{
+	    		// override slf4j configuration
+	    		try
+	    		{
+		    		String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+		    		File slf4jConfigFile = new File(new File(frontcacheHome), "conf/" + FCConfig.getProperty(LOG_CONFIG_FILE_KEY));
+		    		
+		    		if (slf4jConfigFile.exists())
+				    	System.setProperty("logback.configurationFile", slf4jConfigFile.getAbsolutePath());
+
+	    		} catch (Exception ex) {
+	    			ex.printStackTrace();
+	    		} 
+	    	}
+			
 			
 			String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
 			if ("true".equalsIgnoreCase(debugCommentsStr))

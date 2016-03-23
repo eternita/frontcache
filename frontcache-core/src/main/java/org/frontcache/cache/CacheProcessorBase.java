@@ -1,7 +1,6 @@
 package org.frontcache.cache;
 
 import java.util.Properties;
-import java.util.logging.Logger;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
@@ -10,10 +9,12 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 import org.frontcache.reqlog.RequestLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class CacheProcessorBase implements CacheProcessor {
 
-	protected Logger logger = Logger.getLogger(getClass().getName());
+	protected Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Override
 	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException {

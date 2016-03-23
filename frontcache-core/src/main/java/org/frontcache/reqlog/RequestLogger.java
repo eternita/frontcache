@@ -3,11 +3,13 @@ package org.frontcache.reqlog;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.config.ConfigurationSource;
-import org.apache.logging.log4j.core.config.Configurator;
+//import org.apache.logging.log4j.LogManager;
+//import org.apache.logging.log4j.Logger;
+//import org.apache.logging.log4j.core.config.ConfigurationSource;
+//import org.apache.logging.log4j.core.config.Configurator;
 import org.frontcache.FCConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *  Log requests to file (log4j2) for statistics and further analysis
@@ -25,35 +27,32 @@ import org.frontcache.FCConfig;
 public class RequestLogger {
 
 	private final static String SEPARATOR = " ";
-	
-	private final static String CONFIG_FILE_KEY = "front-cache.request-logs-config";
-	
-	private final static String DEFAULT_CONFIG_FILE = "fc-log-config-default.xml";
 
-	private static Logger logger = null;
+	private static Logger logger = LoggerFactory.getLogger(RequestLogger.class);
+	
 
-	static {
-		
-		String configFileName = FCConfig.getProperty(CONFIG_FILE_KEY);
-		
-		if (null == configFileName)
-			configFileName = DEFAULT_CONFIG_FILE;
-		
-		InputStream reqLogConfigIS = FCConfig.getConfigInputStream(configFileName);
-		if (null != reqLogConfigIS)
-		{
-			ConfigurationSource source;
-			try {
-				source = new ConfigurationSource(reqLogConfigIS);
-		        Configurator.initialize(null, source);
-		        reqLogConfigIS.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-        
-		logger = LogManager.getLogger(RequestLogger.class.getName());
-	}
+//	static {
+//		
+//		String configFileName = FCConfig.getProperty(CONFIG_FILE_KEY);
+//		
+//		if (null == configFileName)
+//			configFileName = DEFAULT_CONFIG_FILE;
+//		
+//		InputStream reqLogConfigIS = FCConfig.getConfigInputStream(configFileName);
+//		if (null != reqLogConfigIS)
+//		{
+//			ConfigurationSource source;
+//			try {
+//				source = new ConfigurationSource(reqLogConfigIS);
+//		        Configurator.initialize(null, source);
+//		        reqLogConfigIS.close();
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
+//		}
+//        
+//		logger = LogManager.getLogger(RequestLogger.class.getName());
+//	}
 	
 
 	private RequestLogger() {

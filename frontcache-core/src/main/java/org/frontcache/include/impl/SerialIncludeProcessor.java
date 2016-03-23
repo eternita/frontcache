@@ -62,7 +62,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 
 					} catch (FrontCacheException e) {
 						e.printStackTrace();
-						logger.severe("unexpected error processing include " + includeURL);
+						logger.error("unexpected error processing include " + includeURL);
 						
 						outSb.append(includeURL);
 						outSb.append("<!-- error processing include " + includeURL);
@@ -70,7 +70,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 						outSb.append(" -->");
 
 					} catch (Exception e) {
-						logger.severe("unexpected error processing include " + includeURL);
+						logger.error("unexpected error processing include " + includeURL);
 						e.printStackTrace();
 						
 						outSb.append(includeURL);

@@ -11,14 +11,29 @@ import java.util.Properties;
 public class FCConfig {
 
 	public static final String FRONT_CACHE_HOME_SYSTEM_KEY = "frontcache.home"; 
-	public static final String FRONT_CACHE_HOME_ENVIRONMENT_KEY = "FRONTCACHE_HOME"; 
+	
+	public static final String FRONT_CACHE_HOME_ENVIRONMENT_KEY = "FRONTCACHE_HOME";
+	
 	private static final String FRONT_CACHE_CONFIG = "front-cache.properties"; 
 
     private static Properties config;
 	
     public static void init()
     {
+    	
+		// check / set frontcache.home java system variable
+		String frontcacheHome = System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY);
+		
+		if (null == frontcacheHome)
+		{
+			frontcacheHome = System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY);
+			if (null != frontcacheHome)
+				System.setProperty(FRONT_CACHE_HOME_SYSTEM_KEY, frontcacheHome);
+		}
+		
+    	
     	config = loadProperties();
+    	
     	if (null == config)
     		throw new RuntimeException("Can't load " + FRONT_CACHE_CONFIG + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + " (environment variable)");
     }
