@@ -130,7 +130,7 @@ project(':frontcache-filter-tests') {
 	
     dependencies {
         compile project(':frontcache-core')
-        compile project(':frontcache-ehcache')
+//		compile project(':frontcache-ehcache') - no persistence cache for tests
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		compile 'jstl:jstl:1.2'
