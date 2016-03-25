@@ -86,7 +86,7 @@ public class FrontCacheEngine {
 	
 	private CacheProcessor cacheProcessor = null; 
 
-	protected Logger logger = LoggerFactory.getLogger(FrontCacheEngine.class); 
+	protected Logger logger = null;  
 	
 	private final Timer connectionManagerTimer = new Timer("FrontCacheEngine.connectionManagerTimer", true);
 
@@ -148,13 +148,13 @@ public class FrontCacheEngine {
 	}
 	
 	private FrontCacheEngine() {
+		
 		initialize();
 	}
 	
 	private void initialize() {
 		
-//		keyStorePath = FCConfig.getProperty("front-cache.keystore-path");
-//		keyStorePassword = FCConfig.getProperty("front-cache.keystore-password");
+		logger = LoggerFactory.getLogger(FrontCacheEngine.class);
 		
 		originHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
 		originHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
