@@ -19,6 +19,7 @@ import com.gargoylesoftware.htmlunit.WebClient;
 public class StandaloneIntegrationTest {
 
 	public static final String BASE_URI = "http://localhost:9080/";
+	public static final int ORIGIN_APP_PORT = 8080;
 	
 	static Server server = null;
 	WebClient webClient = null;
@@ -26,11 +27,13 @@ public class StandaloneIntegrationTest {
 	@BeforeClass
 	public static void setUpBeforeClass() throws Exception {
 		
-        server = new Server(8080);
+        server = new Server(ORIGIN_APP_PORT);
         
         WebAppContext webapp = new WebAppContext();
         webapp.setContextPath("/");
-        File warFile = new File("/Users/spa/git/frontcache/frontcache-standalone-tests/src/test-integration/webapp");
+        String frontcacheStandaloneTestWebDir = System.getProperty("frontcache.standalone.test.web.dir");
+//        File warFile = new File("/Users/spa/git/frontcache/frontcache-standalone-tests/src/test-integration/webapp");
+        File warFile = new File(frontcacheStandaloneTestWebDir);
         webapp.setWar(warFile.getAbsolutePath());
         
         
@@ -53,10 +56,8 @@ public class StandaloneIntegrationTest {
 
         
         server.setHandler(webapp);
-        
-        server.start();		
-        Thread.sleep(10000);
-        
+        server.start();		        
+        return;
 	}
 
 	@AfterClass
