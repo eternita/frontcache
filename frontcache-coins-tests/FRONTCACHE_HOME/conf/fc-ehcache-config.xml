@@ -1,7 +1,7 @@
 <ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../config/ehcache.xsd">
 
 	<!-- ${FRONTCACHE_HOME}/cache/ -->    
-    <diskStore path="/Users/spa/git/frontcache/frontcache-standalone-tests/FRONTCACHE_HOME/cache"/>
+    <diskStore path="/Users/spa/git/frontcache/frontcache-coins-tests/FRONTCACHE_HOME/cache"/>
               
                 
     <cache name="FRONT_CACHE"

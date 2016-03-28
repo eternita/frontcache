@@ -199,3 +199,34 @@ project(':frontcache-standalone-tests') {
 	
 }
 
+project(':frontcache-coins-tests') {
+	apply plugin: 'war'
+	apply plugin: 'org.akhikhl.gretty'
+
+	gretty {
+		port = 9080
+		contextPath = '/'
+		servletContainer = 'tomcat7' // jetty9 or tomcat7 or tomcat8
+		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
+		jvmArgs = ['-Dfrontcache.home=' + projectDir + '/FRONTCACHE_HOME']
+//		if (System.getProperty('DEBUG', 'false') == 'true') {
+//			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir + '/FRONTCACHE_HOME']
+//		}
+	}
+	
+	integrationTest{
+		jvmArgs '-Dfrontcache.standalone.test.web.dir=' + projectDir + '/src/test-integration/webapp'
+	}
+
+	dependencies {
+		compile project(':frontcache-core')
+//		compile project(':frontcache-ehcache') - no persistence cache for tests
+		
+	}
+
+	check {
+		dependsOn integrationTest
+	}
+	
+}
+
