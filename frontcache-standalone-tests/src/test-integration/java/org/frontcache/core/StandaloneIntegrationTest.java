@@ -5,7 +5,6 @@ import static org.junit.Assert.assertEquals;
 import java.io.File;
 
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.webapp.Configuration;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -15,11 +14,12 @@ import org.junit.Test;
 
 import com.gargoylesoftware.htmlunit.TextPage;
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
 public class StandaloneIntegrationTest {
 
-	public static final String BASE_URI = "http://localhost:9080/";
-	public static final int ORIGIN_APP_PORT = 8080;
+	public static final String TEST_BASE_URI = "http://localhost:9080/";
+	public static final int ORIGIN_APP_PORT = 9080;
 	
 	static Server server = null;
 	WebClient webClient = null;
@@ -31,30 +31,10 @@ public class StandaloneIntegrationTest {
         
         WebAppContext webapp = new WebAppContext();
         webapp.setContextPath("/");
-        String frontcacheStandaloneTestWebDir = System.getProperty("frontcache.standalone.test.web.dir");
-//        File warFile = new File("/Users/spa/git/frontcache/frontcache-standalone-tests/src/test-integration/webapp");
+        String frontcacheStandaloneTestWebDir = System.getProperty("frontcache.standalone.frontcache.web.dir");
         File warFile = new File(frontcacheStandaloneTestWebDir);
         webapp.setWar(warFile.getAbsolutePath());
-        
-        
-        // This webapp will use jsps and jstl. We need to enable the
-        // AnnotationConfiguration in order to correctly
-        // set up the jsp container
-        Configuration.ClassList classlist = Configuration.ClassList
-                .setServerDefault( server );
-        classlist.addBefore(
-                "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
-                "org.eclipse.jetty.annotations.AnnotationConfiguration" );
  
-        // Set the ContainerIncludeJarPattern so that jetty examines these
-        // container-path jars for tlds, web-fragments etc.
-        // If you omit the jar that contains the jstl .tlds, the jsp engine will
-        // scan for them instead.
-//        webapp.setAttribute(
-//                "org.eclipse.jetty.server.webapp.ContainerIncludeJarPattern",
-//                ".*/[^/]*servlet-api-[^/]*\\.jar$|.*/javax.servlet.jsp.jstl-.*\\.jar$|.*/[^/]*taglibs.*\\.jar$" );
-
-        
         server.setHandler(webapp);
         server.start();		        
         return;
@@ -80,15 +60,39 @@ public class StandaloneIntegrationTest {
 	@Test
 	public void test1() throws Exception {
 		
-		TextPage page = webClient.getPage(BASE_URI + "1/a.txt");
+		TextPage page = webClient.getPage(TEST_BASE_URI + "1/a.txt");
 		assertEquals("a", page.getContent());
 	}
 	
 	@Test
 	public void test2() throws Exception {
 		
-		TextPage page = webClient.getPage(BASE_URI + "2/a.txt");
+		TextPage page = webClient.getPage(TEST_BASE_URI + "2/a.txt");
 		assertEquals("ab", page.getContent());
+	}
+	
+	@Test
+	public void jspInclude() throws Exception {
+		
+		HtmlPage page = webClient.getPage(TEST_BASE_URI + "4i/a.jsp");
+		assertEquals("ab", page.getPage().asText());
+
+	}
+	
+	@Test
+	public void jspIncludeAndCache1() throws Exception {
+		
+		HtmlPage page = webClient.getPage(TEST_BASE_URI + "6ci/a.jsp");
+		assertEquals("ab", page.getPage().asText());
+
+	}
+
+	@Test
+	public void jspIncludeAndCache2() throws Exception {
+		
+		HtmlPage page = webClient.getPage(TEST_BASE_URI + "7ci/a.jsp");
+		assertEquals("ab", page.getPage().asText());
+
 	}
 	
 

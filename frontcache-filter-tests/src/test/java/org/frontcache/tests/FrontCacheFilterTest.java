@@ -13,7 +13,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
 public class FrontCacheFilterTest {
 
-	public static final String BASE_URI = "http://localhost:9080/";
+	public static final String TEST_BASE_URI = "http://localhost:9080/";
 	
 	private WebClient webClient = null;
 
@@ -31,7 +31,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void staticRead() throws Exception {
 
-		TextPage page = webClient.getPage(BASE_URI + "1/a.txt");
+		TextPage page = webClient.getPage(TEST_BASE_URI + "1/a.txt");
 		String pageAsText = page.getContent();
 		assertEquals("a", pageAsText);
 	}
@@ -39,7 +39,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void jsp() throws Exception {
 		
-		HtmlPage page = webClient.getPage(BASE_URI + "3/a.jsp");
+		HtmlPage page = webClient.getPage(TEST_BASE_URI + "3/a.jsp");
 		assertEquals("Hi from JSP", page.getPage().asText());
 
 	}
@@ -47,7 +47,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void jspInclude() throws Exception {
 		
-		HtmlPage page = webClient.getPage(BASE_URI + "4i/a.jsp");
+		HtmlPage page = webClient.getPage(TEST_BASE_URI + "4i/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}
@@ -55,7 +55,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void jspIncludeAndCache1() throws Exception {
 		
-		HtmlPage page = webClient.getPage(BASE_URI + "6ci/a.jsp");
+		HtmlPage page = webClient.getPage(TEST_BASE_URI + "6ci/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}
@@ -63,7 +63,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void jspIncludeAndCache2() throws Exception {
 		
-		HtmlPage page = webClient.getPage(BASE_URI + "7ci/a.jsp");
+		HtmlPage page = webClient.getPage(TEST_BASE_URI + "7ci/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}
