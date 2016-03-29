@@ -36,7 +36,7 @@ public class CommonTests {
 	@Test
 	public void staticRead() throws Exception {
 
-		TextPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/1/a.txt");
+		TextPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/static-read/a.txt");
 		String pageAsText = page.getContent();
 		assertEquals("a", pageAsText);
 	}
@@ -44,7 +44,7 @@ public class CommonTests {
 	@Test
 	public void jsp() throws Exception {
 		
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/3/a.jsp");
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/jsp-read/a.jsp");
 		assertEquals("Hi from JSP", page.getPage().asText());
 
 	}
@@ -52,7 +52,7 @@ public class CommonTests {
 	@Test
 	public void jspInclude() throws Exception {
 		
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/4i/a.jsp");
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/jsp-include/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}
@@ -70,6 +70,22 @@ public class CommonTests {
 		
 		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/7ci/a.jsp");
 		assertEquals("ab", page.getPage().asText());
+
+	}
+	
+	@Test
+	public void jspDeepInclude() throws Exception {
+		
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/deep-include/a.jsp");
+		assertEquals("abcdef", page.getPage().asText());
+
+	}
+	
+	@Test
+	public void redirect() throws Exception {
+		
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/redirect/a.jsp");
+		assertEquals("redirecred", page.getPage().asText());
 
 	}
 }
