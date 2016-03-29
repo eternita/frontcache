@@ -1,0 +1,1 @@
+a<fc:include url="/common/6ci/b.jsp" />

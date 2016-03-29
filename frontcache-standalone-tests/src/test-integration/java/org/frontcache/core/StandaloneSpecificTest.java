@@ -6,6 +6,7 @@ import java.io.File;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
+import org.frontcache.tests.CommonTests;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -14,20 +15,18 @@ import org.junit.Test;
 
 import com.gargoylesoftware.htmlunit.TextPage;
 import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
-public class StandaloneIntegrationTest {
+public class StandaloneSpecificTest {
 
-	public static final String TEST_BASE_URI = "http://localhost:9080/";
-	public static final int ORIGIN_APP_PORT = 9080;
+	private static final int FRONTFACHE_PORT = 9080;
 	
 	static Server server = null;
 	WebClient webClient = null;
-
+	
 	@BeforeClass
 	public static void setUpBeforeClass() throws Exception {
 		
-        server = new Server(ORIGIN_APP_PORT);
+        server = new Server(FRONTFACHE_PORT);
         
         WebAppContext webapp = new WebAppContext();
         webapp.setContextPath("/");
@@ -57,44 +56,13 @@ public class StandaloneIntegrationTest {
 	}
 	
 
-	@Test
-	public void test1() throws Exception {
-		
-		TextPage page = webClient.getPage(TEST_BASE_URI + "1/a.txt");
-		assertEquals("a", page.getContent());
-	}
 	
 	@Test
 	public void test2() throws Exception {
 		
-		TextPage page = webClient.getPage(TEST_BASE_URI + "2/a.txt");
+		TextPage page = webClient.getPage(CommonTests.FRONTCACHE_TEST_BASE_URI + "standalone/2/a.txt");
 		assertEquals("ab", page.getContent());
 	}
 	
-	@Test
-	public void jspInclude() throws Exception {
-		
-		HtmlPage page = webClient.getPage(TEST_BASE_URI + "4i/a.jsp");
-		assertEquals("ab", page.getPage().asText());
-
-	}
-	
-	@Test
-	public void jspIncludeAndCache1() throws Exception {
-		
-		HtmlPage page = webClient.getPage(TEST_BASE_URI + "6ci/a.jsp");
-		assertEquals("ab", page.getPage().asText());
-
-	}
-
-	@Test
-	public void jspIncludeAndCache2() throws Exception {
-		
-		HtmlPage page = webClient.getPage(TEST_BASE_URI + "7ci/a.jsp");
-		assertEquals("ab", page.getPage().asText());
-
-	}
-	
-
 }
 

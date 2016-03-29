@@ -11,11 +11,16 @@ import com.gargoylesoftware.htmlunit.TextPage;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
-public class FrontCacheFilterTest {
+/**
+ * 
+ * Defined tests are run in filter & standalone modes
+ *
+ */
+public class CommonTests {
 
-	public static final String TEST_BASE_URI = "http://localhost:9080/";
+	public static final String FRONTCACHE_TEST_BASE_URI = "http://localhost:9080/";
 	
-	private WebClient webClient = null;
+	protected WebClient webClient = null;
 
 	@Before
 	public void setUp() throws Exception {
@@ -31,7 +36,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void staticRead() throws Exception {
 
-		TextPage page = webClient.getPage(TEST_BASE_URI + "1/a.txt");
+		TextPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/1/a.txt");
 		String pageAsText = page.getContent();
 		assertEquals("a", pageAsText);
 	}
@@ -39,7 +44,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void jsp() throws Exception {
 		
-		HtmlPage page = webClient.getPage(TEST_BASE_URI + "3/a.jsp");
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/3/a.jsp");
 		assertEquals("Hi from JSP", page.getPage().asText());
 
 	}
@@ -47,7 +52,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void jspInclude() throws Exception {
 		
-		HtmlPage page = webClient.getPage(TEST_BASE_URI + "4i/a.jsp");
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/4i/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}
@@ -55,7 +60,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void jspIncludeAndCache1() throws Exception {
 		
-		HtmlPage page = webClient.getPage(TEST_BASE_URI + "6ci/a.jsp");
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/6ci/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}
@@ -63,7 +68,7 @@ public class FrontCacheFilterTest {
 	@Test
 	public void jspIncludeAndCache2() throws Exception {
 		
-		HtmlPage page = webClient.getPage(TEST_BASE_URI + "7ci/a.jsp");
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/7ci/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}

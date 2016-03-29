@@ -31,6 +31,13 @@ subprojects {
 			test.compileClasspath += configurations.provided
 			test.runtimeClasspath += configurations.provided
 		}
+
+		integrationTest {
+			java.srcDir file('src/test-integration/java')
+			resources.srcDir file('src/test-integration/resources')
+			compileClasspath = sourceSets.main.output + configurations.testRuntime
+			runtimeClasspath = output + compileClasspath
+		}
 	}
 	
     dependencies {
@@ -49,15 +56,6 @@ subprojects {
 //		}
 //	}
 	
-	sourceSets {
-		integrationTest {
-			java.srcDir file('src/test-integration/java')
-			resources.srcDir file('src/test-integration/resources')
-			compileClasspath = sourceSets.main.output + configurations.testRuntime
-			runtimeClasspath = output + compileClasspath
-		}
-	}
-
 	test {
 		reports.html.destination = file("$reports.html.destination/unit")
 		reports.junitXml.destination = file("$reports.junitXml.destination/unit")
@@ -141,7 +139,7 @@ project(':frontcache-filter-tests') {
 		port = 9080		
 		contextPath = '/'
 		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
-		integrationTestTask = 'test' // existing gradle task (it will be surrounded with start/stop)
+		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
 		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME']
 		if (System.getProperty('DEBUG', 'false') == 'true') {
 			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME']
@@ -154,6 +152,8 @@ project(':frontcache-filter-tests') {
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		compile 'jstl:jstl:1.2'
+		
+		provided 'junit:junit:4.12' // for common tests		
     }
 	
 	check {
@@ -186,6 +186,7 @@ project(':frontcache-standalone-tests') {
 
 	dependencies {
 		compile project(':frontcache-core')
+		compile project(':frontcache-filter-tests') // for common tests
 //		compile project(':frontcache-ehcache') - no persistence cache for tests
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
