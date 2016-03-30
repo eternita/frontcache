@@ -206,7 +206,7 @@ project(':frontcache-coins') {
 	apply plugin: 'org.akhikhl.gretty'
 
 	gretty {
-		port = 9080
+		port = 80
 		contextPath = '/'
 		servletContainer = 'tomcat7' // jetty9 or tomcat7 or tomcat8
 		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
@@ -224,7 +224,7 @@ project(':frontcache-coins') {
 
 	dependencies {
 		compile project(':frontcache-core')
-//		compile project(':frontcache-ehcache') - no persistence cache for tests
+		compile project(':frontcache-ehcache')
 		
 	}
 

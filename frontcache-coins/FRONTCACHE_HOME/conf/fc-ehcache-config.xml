@@ -1,11 +1,14 @@
 <ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../config/ehcache.xsd">
 
-	<!-- ${FRONTCACHE_HOME}/cache/ -->    
-    <diskStore path="/Users/spa/git/frontcache/frontcache-coins-tests/FRONTCACHE_HOME/cache"/>
+	<!-- ${FRONTCACHE_HOME}/cache/ 
+	
+    <diskStore path="/opt/frontcache/cache"/>
+	-->    
+    <diskStore path="/Users/spa/git/frontcache/frontcache-coins/FRONTCACHE_HOME/cache"/>
               
                 
     <cache name="FRONT_CACHE"
-       maxElementsInMemory="3"
+       maxElementsInMemory="100"
        eternal="true"
        overflowToDisk="true"
        diskPersistent="true" 

@@ -1,12 +1,28 @@
 
-## tests for www.coinshome.net
+## configuration for www.coinshome.net
 
-run it
-./gradlew clean :frontcache-coins-tests:run 
+run it (sudo because of port 80)
+sudo ./gradlew clean :frontcache-coins:run 
 
 to run in debug mode use:
-./gradlew -DDEBUG=true clean :frontcache-coins-tests:run
+sudo ./gradlew -DDEBUG=true clean :frontcache-coins:run
 
 open browser at 
-http://localhost:9080/en/welcome.htm
+http://localhost:80/en/welcome.htm
+
+
+# deployment
+
+create home dir 
+mkdir /opt/frontcache
+
+chown ubuntu /opt/frontcache 
+
+scp -i oregon_key.pem -r /Users/spa/git/frontcache/frontcache-coins/FRONTCACHE_HOME/conf ubuntu@or.coinshome.net:/opt/frontcache
+
+scp -i oregon_key.pem -r /Users/spa/git/frontcache/frontcache-coins/build/libs ubuntu@or.coinshome.net:/opt/frontcache
+
+fix cache storage in RONTCACHE_HOME/conf/fc-ehcache-config.xml
+
+scp -i oregon_key.pem /Users/spa/git/frontcache/frontcache-coins/FRONTCACHE_HOME/conf/fclogs.xml ubuntu@or.coinshome.net:/opt/frontcache/fclogs.xml
 
