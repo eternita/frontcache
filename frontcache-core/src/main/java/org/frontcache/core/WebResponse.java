@@ -50,6 +50,7 @@ public class WebResponse implements Serializable {
 	public WebResponse(String url) {
 		super();
 		this.url = url;
+		this.headers = new ArrayListValuedHashMap<String, String>();
 	}
 	
 	public WebResponse(String url, String content, int cacheMaxAgeSec) {
