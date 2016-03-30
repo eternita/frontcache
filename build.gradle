@@ -201,7 +201,7 @@ project(':frontcache-standalone-tests') {
 	
 }
 
-project(':frontcache-coins-tests') {
+project(':frontcache-coins') {
 	apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
 
