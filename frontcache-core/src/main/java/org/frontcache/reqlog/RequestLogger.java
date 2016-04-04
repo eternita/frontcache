@@ -3,11 +3,17 @@ package org.frontcache.reqlog;
 import java.io.IOException;
 import java.io.InputStream;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.collections4.MultiValuedMap;
 //import org.apache.logging.log4j.LogManager;
 //import org.apache.logging.log4j.Logger;
 //import org.apache.logging.log4j.core.config.ConfigurationSource;
 //import org.apache.logging.log4j.core.config.Configurator;
 import org.frontcache.FCConfig;
+import org.frontcache.core.FCHeaders;
+import org.frontcache.core.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,6 +89,17 @@ public class RequestLogger {
 
 		logger.trace(sb.toString());
 
+		RequestContext context = RequestContext.getCurrentContext();
+        HttpServletRequest request = context.getRequest();
+        if ("true".equalsIgnoreCase(request.getHeader(FCHeaders.X_FRONTCACHE_DEBUG)))
+        {
+    		HttpServletResponse servletResponse = context.getResponse();
+    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE, (isCacheable) ? "true" : "false");
+    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_CACHED, (isDynamic) ? "false" : "true");
+    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME, "" + runtimeMillis);
+    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE, "" + lengthBytes);
+        }
+		
 		return;
 	}
 }
