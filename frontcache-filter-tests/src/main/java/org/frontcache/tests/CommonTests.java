@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.frontcache.core.FCHeaders;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -113,4 +114,45 @@ public class CommonTests {
 		assertEquals("redirecred", page.getPage().asText());
 
 	}
+
+	/**
+	 * check if debug mode available
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void debugMode() throws Exception {
+		
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/debug/a.jsp");
+		assertEquals("a", page.getPage().asText());
+		
+		WebResponse webResponse = page.getWebResponse(); 
+
+		String debugCacheable = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE);
+		assertEquals("true", debugCacheable);
+		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("false", debugCached);
+		String debugResponseTime = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME);
+		Assert.assertNotNull(debugResponseTime);
+		String debugResponseSize = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE);
+		assertEquals("1", debugResponseSize);
+
+		
+		// the same request - response should be cached now
+		page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/debug/a.jsp");
+		assertEquals("a", page.getPage().asText());
+		webResponse = page.getWebResponse(); 
+
+		debugCacheable = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE);
+		assertEquals("true", debugCacheable);
+		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("true", debugCached);
+		debugResponseTime = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME);
+		Assert.assertNotNull(debugResponseTime);
+		debugResponseSize = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE);
+		assertEquals("1", debugResponseSize);
+		
+	}
+	
 }
