@@ -68,21 +68,18 @@ public class RequestLogger {
 	 * 
 	 * @param url - request URL
 	 * @param isCacheable - true if request is run through FrontCache engine (e.g. GET method, text data). false - otherwise (request forwarded to origin)
-	 * @param isDynamic - true if origin has been requested. false/0 - otherwise (it's cacheable & cached).
+	 * @param isCached - true if origin has been cached. false/0 - otherwise (origin is called).
 	 * @param runtimeMillis - runtime is milliseconds
 	 * @param lengthBytes - content length in bytes. 
 	 */
-	public static void logRequest(String url, boolean isCacheable, boolean isDynamic, long runtimeMillis, long lengthBytes) {
+	public static void logRequest(String url, boolean isCacheable, boolean isCached, long runtimeMillis, long lengthBytes) {
 
 		StringBuilder sb = new StringBuilder();
 
-		int isCacheableFlag = (isCacheable) ? 1 : 0;
-		int isDynamicFlag = (isDynamic) ? 1 : 0;
-
 		// FORMAT
 		// dynamic_flag runtime_millis datalength_bytes url
-		sb.append(isCacheableFlag)
-		.append(SEPARATOR).append(isDynamicFlag)
+		sb.append((isCacheable) ? 1 : 0)
+		.append(SEPARATOR).append((isCached) ? 1 : 0)
 		.append(SEPARATOR).append(runtimeMillis)
 		.append(SEPARATOR).append(lengthBytes) 
 		.append(SEPARATOR).append(url);
@@ -95,7 +92,7 @@ public class RequestLogger {
         {
     		HttpServletResponse servletResponse = context.getResponse();
     		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE, (isCacheable) ? "true" : "false");
-    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_CACHED, (isDynamic) ? "false" : "true");
+    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_CACHED, (isCached) ? "true" : "false");
     		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME, "" + runtimeMillis);
     		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE, "" + lengthBytes);
         }

@@ -27,3 +27,5 @@ fix cache storage in RONTCACHE_HOME/conf/fc-ehcache-config.xml
 scp -i oregon_key.pem /Users/spa/git/frontcache/frontcache-coins/FRONTCACHE_HOME/conf/fclogs.xml ubuntu@or.coinshome.net:/opt/frontcache/fclogs.xml
 
 scp -i oregon_key.pem -r /Users/spa/git/frontcache/warmer ubuntu@or.coinshome.net:/opt/frontcache
+
+scp -i singapore_key.pem -r /Users/spa/git/frontcache/frontcache-coins/build/libs ubuntu@sg.coinshome.net:/opt/frontcache

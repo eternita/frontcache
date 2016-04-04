@@ -21,7 +21,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;
-		boolean isRequestDynamic = true;
+		boolean isCached = false;
 		
 		long lengthBytes = -1;
 		WebResponse cachedWebResponse = getFromCache(originUrlStr);
@@ -56,12 +56,12 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				
 		} else {
 			cachedWebResponse = cachedWebResponse.copy(); //to avoid modification instance in cache
-			isRequestDynamic = false;
+			isCached = true;
 			lengthBytes = cachedWebResponse.getContentLenth();			
 		}
 		
 		
-		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
+		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes);
 		
 		return cachedWebResponse;
 	}	

@@ -414,10 +414,10 @@ public class FrontCacheEngine {
 		{
 			long start = System.currentTimeMillis();
 			boolean isRequestCacheable = false;
-			boolean isRequestDynamic = true;
+			boolean isCached = false;
 			long lengthBytes = -1; // TODO: set/get content length from context or just keep -1 ?
 			forwardToOrigin();		
-			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);			
+			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes);			
 			addResponseHeaders();
 			writeResponse();
 			if (null != context.getHttpClientResponse())
