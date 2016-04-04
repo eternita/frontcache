@@ -49,13 +49,18 @@ FrontCache supports couple caching implementations:
  isCacheable (1 - true, 0 - false), isCached  (1 - true, 0 - false), response time (in ms), response size (in bytes)
  
 ### Debuging requests 
-Set http request header X-frontcache.debug = true
+Set http request header 
+```
+X-frontcache.debug = true
+```
 HTTP Response will have following headers with debug info:
 
+```
 X-frontcache.debug.cacheable - isCacheable (true, false)
 X-frontcache.debug.cached - isCached  (true, false)
 X-frontcache.debug.response-time - response time (in ms)
 X-frontcache.debug.response-size - response size (in bytes)
+```
 
  
 ### More / better descriotion is comming soon. 
