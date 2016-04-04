@@ -20,14 +20,14 @@ public class NoCacheProcessor implements CacheProcessor {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;
-		boolean isRequestDynamic = true;
+		boolean isCached = false;
 		long lengthBytes = -1;
 		
 		WebResponse cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
 
 		lengthBytes = cachedWebResponse.getContentLenth();
 
-		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
+		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes);
 
 		return cachedWebResponse;
 	}
