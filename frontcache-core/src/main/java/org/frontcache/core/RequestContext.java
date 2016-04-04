@@ -315,8 +315,10 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     	if (!"GET".equals(FCUtils.getVerb(this.getRequest())))
     		return false;
     	
-        final String requestEncoding = this.getRequest().getHeader(FCHeaders.ACCEPT);
-        return requestEncoding != null && requestEncoding.toLowerCase().contains("text");
+    	return true;
+    	//bot's send requests without header (accept=text/html) #36
+//        final String requestEncoding = this.getRequest().getHeader(FCHeaders.ACCEPT);
+//        return requestEncoding != null && requestEncoding.toLowerCase().contains("text");
     }
     
     /**
