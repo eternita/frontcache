@@ -39,7 +39,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 
 	public boolean hasIncludes(WebResponse webResponse, int recursionLevel) 
 	{
-		String content = webResponse.getContent();
+		byte[] content = webResponse.getContent();
 
 		if (null == content)
 			return false;
@@ -47,10 +47,15 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		if (recursionLevel >= MAX_RECURSION_LEVEL)
 			return false;
 		
-		int startIdx = content.indexOf(START_MARKER);
+		if (!webResponse.isText()) // includes for text only
+			return false;
+
+		String contentStr = new String(content);
+		
+		int startIdx = contentStr.indexOf(START_MARKER);
 		if (-1 < startIdx)
 		{
-			int endIdx = content.indexOf(END_MARKER, startIdx);
+			int endIdx = contentStr.indexOf(END_MARKER, startIdx);
 			if (-1 < endIdx && (endIdx - startIdx) < MAX_INCLUDE_LENGHT)
 			{
 				return true;
