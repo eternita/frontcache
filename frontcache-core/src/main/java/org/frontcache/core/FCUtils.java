@@ -1,15 +1,15 @@
 package org.frontcache.core;
 
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -167,24 +167,21 @@ public class FCUtils {
 		
 		String contentType = originWrappedResponse.getContentType();
 		String dataStr = originWrappedResponse.getContentString();
-		if (null != dataStr && dataStr.length() > 0)
-		{
-			webResponse = parseWebComponent(url, dataStr);
-				
-			if (null == contentType || -1 == contentType.indexOf("text"))
-			{
-				contentType = "text"; // 
-				webResponse.setContentType(contentType);
-			}
-		} else {
-			webResponse = new WebResponse(url);
+		byte[] data = null;
+		if (null != dataStr)
+			data = dataStr.getBytes();
+		else
 			logger.info(url + " has response with no data");
-			
-		}
 
-		if (!"".equals(contentType))
-			webResponse.setContentType(contentType);
-				
+		
+		if (null == contentType || -1 == contentType.indexOf("text"))
+		{
+			contentType = "text"; // 
+		}
+		
+		webResponse = parseWebComponent(url, data, FCUtils.revertHeaders(originWrappedResponse), contentType);
+
+
 
 		webResponse.setStatusCode(originWrappedResponse.getStatus());
 
@@ -238,34 +235,28 @@ public class FCUtils {
 			contentType = contentTypeHeader.getValue();
 		
 		WebResponse webResponse = null;
-		if (-1 == contentType.indexOf("text"))
-		{
-			webResponse = new WebResponse(url);
-
-		} else {
-			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-			StringBuffer result = new StringBuffer();
-			String line = null;
-			boolean firstLine = true;
-			while ((line = rd.readLine()) != null) {
-				if (firstLine) 
-					firstLine = false;
-				else
-					result.append("\n"); // append '\n' because it's lost during rd.readLine() (in between lines)
-				
-				result.append(line);
-			}
-			
-			String dataStr = result.toString();
-			webResponse = parseWebComponent(url, dataStr);
+		
+		byte[] respData = null;
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		InputStream is = response.getEntity().getContent();
+		try {
+			int bytesRead = 0;
+            int bufferSize = 4000;
+	         byte[] byteBuffer = new byte[bufferSize];				
+	         while ((bytesRead = is.read(byteBuffer)) != -1) {
+	             baos.write(byteBuffer, 0, bytesRead);
+	         }
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
+		respData = baos.toByteArray();
+		
+		
+		webResponse = parseWebComponent(url, respData, revertHeaders(response.getAllHeaders()), contentType);
 
 		webResponse.setStatusCode(httpResponseCode);
 		webResponse.setHeaders(headers);
 		
-		if (!"".equals(contentType))
-			webResponse.setContentType(contentType);
-				
 		return webResponse;
 	}
 	
@@ -362,6 +353,15 @@ public class FCUtils {
 			if (isIncludedHeaderToResponse(name))
 				map.put(name, header.getValue());
 		}
+		return map;
+	}
+
+    public static MultiValuedMap<String, String> revertHeaders(HttpServletResponse response) {
+		MultiValuedMap<String, String> map = new ArrayListValuedHashMap<String, String>();
+		for (String name : response.getHeaderNames())
+			if (isIncludedHeaderToResponse(name))
+				map.put(name, response.getHeader(name));
+		
 		return map;
 	}
     
@@ -471,43 +471,78 @@ public class FCUtils {
 	 * wrap String to WebResponse.
 	 * Check for header - extract caching options.
 	 * 
-	 * @param content
+	 * @param contentStr
 	 * @return
 	 */
-	private static final WebResponse parseWebComponent (String urlStr, String content)
+	private static final WebResponse parseWebComponent (String urlStr, byte[] content, MultiValuedMap<String, String> headers, String contentType)
 	{
 		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
+		byte[] outContentBody = content;
 		
-		String outStr = null;
-		final String START_MARKER = "<fc:component";
-		final String END_MARKER = "/>";
-		
-		int startIdx = content.indexOf(START_MARKER);
-		if (-1 < startIdx)
+		// TODO: check headers for component's maxage
+		if (null != headers.get(FCHeaders.X_FRONTCACHE_COMPONENT))
 		{
-			int endIdx = content.indexOf(END_MARKER, startIdx);
-			if (-1 < endIdx)
+			Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+			if (null != collStr && !collStr.isEmpty())
 			{
-				String includeTagStr = content.substring(startIdx, endIdx + END_MARKER.length());
-				cacheMaxAgeSec = getCacheMaxAge(includeTagStr);
+				String cacheMaxAgeSecStr = collStr.iterator().next();
+				try
+				{
+					cacheMaxAgeSec = Integer.parseInt(cacheMaxAgeSecStr);
+				} catch (Exception ex) {}
+			}
+
+			WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSec);
+			component.setContentType(contentType);
+			return component;
+		}
+		
+
+		//  for back compatibility - markup inside text
+		
+		if (null != contentType && -1 < contentType.indexOf("text") && null != content)
+		{
+			// it's text
+
+			String contentStr = new String(content);
+			String outStr = null;
+			final String START_MARKER = "<fc:component";
+			final String END_MARKER = "/>";
+			
+			int startIdx = contentStr.indexOf(START_MARKER);
+			if (-1 < startIdx)
+			{
+				int endIdx = contentStr.indexOf(END_MARKER, startIdx);
+				if (-1 < endIdx)
+				{
+					String includeTagStr = contentStr.substring(startIdx, endIdx + END_MARKER.length());
+					cacheMaxAgeSec = getCacheMaxAge(includeTagStr);
+					
+					// exclude tag from content
+					StringBuffer outSb = new StringBuffer();
+					outSb.append(contentStr.substring(0, startIdx));
+					if (FrontCacheEngine.debugComments)
+						outSb.append("<!-- fc:component ttl=").append(cacheMaxAgeSec).append("sec -->"); // comment out tag (leave it for debugging purpose)
+					outSb.append(contentStr.substring(endIdx + END_MARKER.length(), contentStr.length()));
+					outStr = outSb.toString();
+				} else {
+					// can't find closing 
+					outStr = contentStr;
+				}
 				
-				// exclude tag from content
-				StringBuffer outSb = new StringBuffer();
-				outSb.append(content.substring(0, startIdx));
-				if (FrontCacheEngine.debugComments)
-					outSb.append("<!-- fc:component ttl=").append(cacheMaxAgeSec).append("sec -->"); // comment out tag (leave it for debugging purpose)
-				outSb.append(content.substring(endIdx + END_MARKER.length(), content.length()));
-				outStr = outSb.toString();
 			} else {
-				// can't find closing 
-				outStr = content;
+				outStr = contentStr;
 			}
 			
+			outContentBody = outStr.getBytes();
 		} else {
-			outStr = content;
+			// it's binary data
 		}
+		
 
-		WebResponse component = new WebResponse(urlStr, outStr, cacheMaxAgeSec);
+		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSec);
+		component.setContentType(contentType);
+
 		
 		return component;
 	}

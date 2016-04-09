@@ -27,7 +27,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 	 */
 	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
-		String content = parentWebResponse.getContent();
+		String content = new String(parentWebResponse.getContent());
 		StringBuffer outSb = new StringBuffer();
 		
 		MultiValuedMap<String, String> outHeaders = new ArrayListValuedHashMap<String, String>();
@@ -52,7 +52,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 						if (FrontCacheEngine.debugComments)
 							outSb.append("<!-- start fc:include ").append(includeURL).append(" -->"); // for debugging
 						
-						outSb.append(webResponse.getContent());
+						outSb.append(new String(webResponse.getContent()));
 						
 						if (FrontCacheEngine.debugComments)
 							outSb.append("<!-- end fc:include ").append(includeURL).append(" -->"); // for debugging
@@ -98,8 +98,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 		{   // if no includes - return parent web response
 			return parentWebResponse;
 		} else {
-			WebResponse outResponse = new WebResponse("aggregation in " + this.getClass().getName()); // it has no URL because it's sum of processed include resp texts and include resp headers
-			outResponse.setContent(outSb.toString());
+			WebResponse outResponse = new WebResponse("aggregation in " + this.getClass().getName(), outSb.toString().getBytes()); // it has no URL because it's sum of processed include resp texts and include resp headers
 			outResponse.setHeaders(outHeaders);
 			
 			return outResponse; 
