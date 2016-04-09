@@ -154,5 +154,18 @@ public class CommonTests {
 		assertEquals("1", debugResponseSize);
 		
 	}
+
+	@Test
+	public void httpHeadersMode() throws Exception {
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/fc-headers/a.jsp");
+		assertEquals("a", page.getPage().asText());
+		
+		WebResponse webResponse = page.getWebResponse(); 
+
+		String maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("-1", maxage);
+		
+	}
 	
 }

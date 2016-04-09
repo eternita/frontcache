@@ -71,7 +71,8 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 */
 	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
 	{
-		List<IncludeResolutionPlaceholder> includes = parseIncludes(parentWebResponse.getContent(), hostURL, requestHeaders, client);
+		String contentStr = new String(parentWebResponse.getContent());
+		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, requestHeaders, client);
 		
 		if (null == includes)
 			return parentWebResponse;
@@ -99,7 +100,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
         }
 		
         // replace placeholders with content
-		WebResponse agregatedWebResponse = replaceIncludePlaceholders(parentWebResponse.getContent(), includes);
+		WebResponse agregatedWebResponse = replaceIncludePlaceholders(contentStr, includes);
 		return agregatedWebResponse;
 	}	
 
@@ -177,7 +178,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			scanIdx = inc.endIdx;
 		}
 		outSb.append(content.substring(scanIdx)); // data after the last include
-		webResponse.setContent(outSb.toString());
+		webResponse.setContent(outSb.toString().getBytes());
 		return webResponse;
 	}
 	
@@ -217,8 +218,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				outSb.append("<!-- error processing include " + includeURL);
 				outSb.append(e.getMessage());
 				outSb.append(" -->");
-				this.webResponse = new WebResponse(this.includeURL);
-				this.webResponse.setContent(outSb.toString());
+				this.webResponse = new WebResponse(this.includeURL, outSb.toString().getBytes());
 
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -229,8 +229,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				outSb.append("<!-- unexpected error processing include " + includeURL);
 				outSb.append(e.getMessage());
 				outSb.append(" -->");
-				this.webResponse = new WebResponse(this.includeURL);
-				this.webResponse.setContent(outSb.toString());
+				this.webResponse = new WebResponse(this.includeURL, outSb.toString().getBytes());
 			}
 	    	
 	        return this;
