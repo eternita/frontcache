@@ -226,6 +226,7 @@ project(':frontcache-coins') {
 		compile project(':frontcache-core')
 		compile project(':frontcache-ehcache')
 		
+		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 	}
 
 	check {

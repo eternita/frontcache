@@ -614,8 +614,8 @@ public class FrontCacheEngine {
 		servletResponse.setCharacterEncoding("UTF-8");
 		OutputStream outStream = servletResponse.getOutputStream();
 		try {
-			String body = webResponse.getContent();
-			FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes()), outStream);
+			byte[] body = webResponse.getContent();
+			FCUtils.writeResponse(new ByteArrayInputStream(body), outStream);
 		}
 		finally {
 			try {

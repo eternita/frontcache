@@ -1,6 +1,7 @@
 package org.frontcache.core;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -26,7 +27,7 @@ public class WebResponse implements Serializable {
 	
 	private String url;
 	
-	private String content;
+	private byte[] content;
 	
 	/**
 	 * Some headers, such as Accept-Language can be sent by clients as several headers each with a different value rather than sending the header as a comma separated list
@@ -48,13 +49,17 @@ public class WebResponse implements Serializable {
 	 * @param url
 	 */
 	public WebResponse(String url) {
+		this(url, null, -1);
+	}
+	
+	public WebResponse(String url, byte[] content) {
+		this(url, content, -1);
+	}
+	
+	public WebResponse(String url, byte[] content, int cacheMaxAgeSec) {
 		super();
 		this.url = url;
 		this.headers = new ArrayListValuedHashMap<String, String>();
-	}
-	
-	public WebResponse(String url, String content, int cacheMaxAgeSec) {
-		this(url);
 		this.content = content;
 		setExpireTime(cacheMaxAgeSec);
 	}	
@@ -85,6 +90,25 @@ public class WebResponse implements Serializable {
 
 	public MultiValuedMap<String, String> getHeaders() {
 		return headers;
+	}
+
+	public String getHeader(String name) {
+		
+		Collection<String> headerValues = headers.get(name);
+		
+		if (null != headerValues && !headerValues.isEmpty())
+			return headerValues.iterator().next();
+		
+		return null;
+	}
+	
+	public boolean isText()
+	{
+		String contentType = getContentType();
+		if (null != contentType && -1 < contentType.indexOf("text"))
+			return true;
+		
+		return false;
 	}
 
 	/**
@@ -118,7 +142,7 @@ public class WebResponse implements Serializable {
 	 * 
 	 * @return
 	 */
-	public String getContent() {
+	public byte[] getContent() {
 		return content;
 	}
 
@@ -126,7 +150,7 @@ public class WebResponse implements Serializable {
 	 * 
 	 * @param content
 	 */
-	public void setContent(String content) {
+	public void setContent(byte[] content) {
 		this.content = content;
 	}
 	
@@ -209,8 +233,8 @@ public class WebResponse implements Serializable {
 	 */
 	public long getContentLenth() 
 	{
-		if (null != getContent())
-			return getContent().length();
+		if (null != content)
+			return content.length;
 		
 		return -1;
 	}
@@ -220,8 +244,7 @@ public class WebResponse implements Serializable {
      * @return
      */
     public WebResponse copy() {
-    	WebResponse copy = new WebResponse(this.url);
-    	copy.content = this.content;
+    	WebResponse copy = new WebResponse(this.url, this.content);
     	copy.contentType = this.contentType;
     	copy.expireTimeMillis = this.expireTimeMillis;
     	copy.statusCode = this.statusCode;
