@@ -2,6 +2,7 @@ package org.frontcache.tests;
 
 import static org.junit.Assert.assertEquals;
 
+import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
 import org.junit.After;
 import org.junit.Assert;
@@ -24,6 +25,8 @@ public class CommonTests {
 
 	protected WebClient webClient = null;
 	
+	protected FrontCacheClient fcClient = null;
+	
 	protected Logger logger = LoggerFactory.getLogger(CommonTests.class);  
 
 
@@ -32,6 +35,9 @@ public class CommonTests {
 		webClient = new WebClient();
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		
+		fcClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
+		fcClient.removeFromCacheAll(); // clean up		
 	}
 
 	@After
