@@ -122,6 +122,8 @@ public class CommonTests {
 	public void debugMode() throws Exception {
 		
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		
+		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/debug/a.jsp");
 		assertEquals("a", page.getPage().asText());
 		
@@ -137,7 +139,7 @@ public class CommonTests {
 		assertEquals("1", debugResponseSize);
 
 		
-		// the same request - response should be cached now
+		// second request - the same request - response should be from the cache now
 		page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/debug/a.jsp");
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
