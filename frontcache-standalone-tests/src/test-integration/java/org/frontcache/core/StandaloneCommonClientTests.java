@@ -4,7 +4,7 @@ import java.io.File;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
-import org.frontcache.tests.CommonTests;
+import org.frontcache.tests.CommonClientTests;
 import org.frontcache.tests.TestConfig;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -16,7 +16,7 @@ import org.junit.BeforeClass;
  * 
  *
  */
-public class StandaloneCommonTests extends CommonTests {
+public class StandaloneCommonClientTests extends CommonClientTests {
 
 	static Server server = null;
 	

@@ -112,6 +112,21 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 		cache.clear();
 	}
 	
+	@Override
+	public Map<String, String> getCacheStatus() {
+		Map<String, String> status = super.getCacheStatus();
+		
+		status.put("impl", this.getClass().getName());
+
+		status.put("cached entiries", "" + cache.keySet().size());
+		
+		status.put("current size", "" + currentSize);
+		
+		status.put("max size", "" + maxSize);
+		
+		return status;
+	}
+	
 }
 
 

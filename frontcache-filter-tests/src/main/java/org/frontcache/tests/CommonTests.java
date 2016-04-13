@@ -2,6 +2,7 @@ package org.frontcache.tests;
 
 import static org.junit.Assert.assertEquals;
 
+import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
 import org.junit.After;
 import org.junit.Assert;
@@ -22,9 +23,9 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
  */
 public class CommonTests {
 
-	public static final String FRONTCACHE_TEST_BASE_URI = "http://localhost:9080/";
-	
 	protected WebClient webClient = null;
+	
+	protected FrontCacheClient fcClient = null;
 	
 	protected Logger logger = LoggerFactory.getLogger(CommonTests.class);  
 
@@ -34,6 +35,9 @@ public class CommonTests {
 		webClient = new WebClient();
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		
+		fcClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
+		fcClient.removeFromCacheAll(); // clean up		
 	}
 
 	@After
@@ -44,7 +48,7 @@ public class CommonTests {
 	@Test
 	public void staticRead() throws Exception {
 
-		TextPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/static-read/a.txt");
+		TextPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/static-read/a.txt");
 		String pageAsText = page.getContent();
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
@@ -66,7 +70,7 @@ public class CommonTests {
 	@Test
 	public void jsp() throws Exception {
 		
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/jsp-read/a.jsp");
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/jsp-read/a.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		assertEquals("Hi from JSP", page.getPage().asText());
@@ -76,7 +80,7 @@ public class CommonTests {
 	@Test
 	public void jspInclude() throws Exception {
 		
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/jsp-include/a.jsp");
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/jsp-include/a.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		assertEquals("ab", page.getPage().asText());
@@ -86,7 +90,7 @@ public class CommonTests {
 	@Test
 	public void jspIncludeAndCache1() throws Exception {
 		
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/6ci/a.jsp");
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/6ci/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}
@@ -94,7 +98,7 @@ public class CommonTests {
 	@Test
 	public void jspIncludeAndCache2() throws Exception {
 		
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/7ci/a.jsp");
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/7ci/a.jsp");
 		assertEquals("ab", page.getPage().asText());
 
 	}
@@ -102,7 +106,7 @@ public class CommonTests {
 	@Test
 	public void jspDeepInclude() throws Exception {
 		
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/deep-include/a.jsp");
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/deep-include/a.jsp");
 		assertEquals("abcdef", page.getPage().asText());
 
 	}
@@ -110,7 +114,7 @@ public class CommonTests {
 	@Test
 	public void redirect() throws Exception {
 		
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/redirect/a.jsp");
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/redirect/a.jsp");
 		assertEquals("redirecred", page.getPage().asText());
 
 	}
@@ -124,7 +128,9 @@ public class CommonTests {
 	public void debugMode() throws Exception {
 		
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/debug/a.jsp");
+		
+		// the first request - response should be cached
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/debug/a.jsp");
 		assertEquals("a", page.getPage().asText());
 		
 		WebResponse webResponse = page.getWebResponse(); 
@@ -139,8 +145,8 @@ public class CommonTests {
 		assertEquals("1", debugResponseSize);
 
 		
-		// the same request - response should be cached now
-		page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/debug/a.jsp");
+		// second request - the same request - response should be from the cache now
+		page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/debug/a.jsp");
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 
@@ -158,7 +164,7 @@ public class CommonTests {
 	@Test
 	public void httpHeadersMode() throws Exception {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		HtmlPage page = webClient.getPage(FRONTCACHE_TEST_BASE_URI + "common/fc-headers/a.jsp");
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/fc-headers/a.jsp");
 		assertEquals("a", page.getPage().asText());
 		
 		WebResponse webResponse = page.getWebResponse(); 

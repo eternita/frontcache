@@ -6,7 +6,7 @@ import java.io.File;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
-import org.frontcache.tests.CommonTests;
+import org.frontcache.tests.TestConfig;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -18,15 +18,13 @@ import com.gargoylesoftware.htmlunit.WebClient;
 
 public class StandaloneSpecificTest {
 
-	private static final int FRONTFACHE_PORT = 9080;
-	
 	static Server server = null;
 	WebClient webClient = null;
 	
 	@BeforeClass
 	public static void setUpBeforeClass() throws Exception {
 		
-        server = new Server(FRONTFACHE_PORT);
+        server = new Server(TestConfig.FRONTFACHE_PORT);
         
         WebAppContext webapp = new WebAppContext();
         webapp.setContextPath("/");
@@ -60,7 +58,7 @@ public class StandaloneSpecificTest {
 	@Test
 	public void test2() throws Exception {
 		
-		TextPage page = webClient.getPage(CommonTests.FRONTCACHE_TEST_BASE_URI + "standalone/2/a.txt");
+		TextPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "standalone/2/a.txt");
 		assertEquals("ab", page.getContent());
 	}
 	

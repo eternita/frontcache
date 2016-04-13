@@ -98,8 +98,6 @@ public class FrontCacheEngine {
 	
 	private static FrontCacheEngine instance;
 	
-	private static CacheInvalidator cacheInvalidator;
-
 	private final static String LOG_CONFIG_FILE_KEY = "front-cache.request-logs-config";
 	
 	public static FrontCacheEngine getFrontCache() {
@@ -137,14 +135,6 @@ public class FrontCacheEngine {
 			instance.stop();
 			instance = null;
 		}
-	}
-	
-	public static CacheInvalidator getCacheInvalidator()
-	{
-		if (null == cacheInvalidator)
-			cacheInvalidator = new CacheInvalidator(CacheManager.getInstance());
-
-		return cacheInvalidator;
 	}
 	
 	private FrontCacheEngine() {

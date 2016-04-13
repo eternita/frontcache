@@ -488,7 +488,8 @@ public class FCUtils {
 				String cacheMaxAgeSecStr = collStr.iterator().next();
 				try
 				{
-					cacheMaxAgeSec = Integer.parseInt(cacheMaxAgeSecStr);
+					cacheMaxAgeSec = maxAgeStr2Int(cacheMaxAgeSecStr);				
+					
 				} catch (Exception ex) {}
 			}
 
@@ -562,32 +563,7 @@ public class FCUtils {
 			if (-1 < endIdx)
 			{
 				String maxAgeStr = content.substring(startIdx + START_MARKER.length(), endIdx);
-				try
-				{
-					int multiplyPrefix = 1;
-					if (maxAgeStr.endsWith("d")) // days
-					{
-						maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
-						multiplyPrefix = 86400; // 24 * 60 * 60
-					} else if (maxAgeStr.endsWith("h")) { // hours
-						maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
-						multiplyPrefix = 3600; // 60 * 60
-					} else if (maxAgeStr.endsWith("m")) { // minutes
-						maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
-						multiplyPrefix = 60;
-					} else if (maxAgeStr.endsWith("s")) { // seconds
-						maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
-						multiplyPrefix = 1;
-					} else {
-						// seconds
-					}
-					
-					return multiplyPrefix * Integer.parseInt(maxAgeStr); // time to live in cache in seconds
-				} catch (Exception e) {
-					logger.info("can't parse component maxage - " + maxAgeStr + " defalut is used (NO_CACHE)");
-					return CacheProcessor.NO_CACHE;
-				}
-				
+				return maxAgeStr2Int(maxAgeStr);				
 			} else {
 				logger.info("no closing tag for - " + content);
 				// can't find closing 
@@ -602,6 +578,37 @@ public class FCUtils {
 		}
 
 	}	
+	
+	private static int maxAgeStr2Int(String maxAgeStr)
+	{
+		try
+		{
+			int multiplyPrefix = 1;
+			if ("forever".equalsIgnoreCase(maxAgeStr.trim())) // forever
+			{
+				return CacheProcessor.CACHE_FOREVER;				
+			} else if (maxAgeStr.endsWith("d")) { // days
+				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+				multiplyPrefix = 86400; // 24 * 60 * 60
+			} else if (maxAgeStr.endsWith("h")) { // hours
+				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+				multiplyPrefix = 3600; // 60 * 60
+			} else if (maxAgeStr.endsWith("m")) { // minutes
+				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+				multiplyPrefix = 60;
+			} else if (maxAgeStr.endsWith("s")) { // seconds
+				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+				multiplyPrefix = 1;
+			} else {
+				// seconds
+			}
+			
+			return multiplyPrefix * Integer.parseInt(maxAgeStr); // time to live in cache in seconds
+		} catch (Exception e) {
+			logger.info("can't parse component maxage - " + maxAgeStr + " defalut is used (NO_CACHE)");
+			return CacheProcessor.NO_CACHE;
+		}		
+	}
 
 	public static String buildRequestURI(HttpServletRequest request) {
 		String uri = request.getRequestURI();
