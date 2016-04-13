@@ -99,9 +99,11 @@ task wrapper(type: Wrapper) {
 project(':frontcache-core') {
 	
     dependencies {
-        provided         'javax.servlet:javax.servlet-api:3.1.0'
-		provided         'javax.servlet.jsp:jsp-api:2.0'
+        provided        'javax.servlet:javax.servlet-api:3.1.0'
+		provided        'javax.servlet.jsp:jsp-api:2.0'
 		
+		compile 		'com.fasterxml.jackson.core:jackson-databind:2.1.2'
+		compile         'com.fasterxml.jackson.core:jackson-annotations:2.1.2'		
         compile         'org.apache.httpcomponents:httpclient:4.5.1'
         compile         'commons-io:commons-io:2.4'
         compile         'org.apache.commons:commons-collections4:4.1'
@@ -121,6 +123,13 @@ project(':frontcache-ehcache') {
 	build.dependsOn uploadArchives
 }
 
+project(':frontcache-client') {
+	dependencies {
+		compile project(':frontcache-core')
+	}
+	
+	build.dependsOn uploadArchives
+}
 
 project(':frontcache-web') {
 	apply plugin: 'war'
@@ -148,6 +157,7 @@ project(':frontcache-filter-tests') {
 	
     dependencies {
         compile project(':frontcache-core')
+        compile project(':frontcache-client')
 //		compile project(':frontcache-ehcache') - no persistence cache for tests
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
@@ -206,7 +216,7 @@ project(':frontcache-coins') {
 	apply plugin: 'org.akhikhl.gretty'
 
 	gretty {
-		port = 80
+		port = 9080
 		contextPath = '/'
 		servletContainer = 'tomcat7' // jetty9 or tomcat7 or tomcat8
 		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)

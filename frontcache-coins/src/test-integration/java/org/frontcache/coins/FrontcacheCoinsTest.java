@@ -42,6 +42,7 @@ public class FrontcacheCoinsTest {
 	@Before
 	public void setUp() throws Exception {
 		webClient = new WebClient();
+		webClient.getOptions().setThrowExceptionOnScriptError(false);
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
 	}

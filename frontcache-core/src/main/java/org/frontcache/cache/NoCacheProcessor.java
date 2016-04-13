@@ -1,5 +1,7 @@
 package org.frontcache.cache;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.collections4.MultiValuedMap;
@@ -66,6 +68,14 @@ public class NoCacheProcessor implements CacheProcessor {
 	public void removeFromCacheAll() {
 		// TODO Auto-generated method stub
 
+	}
+
+	@Override
+	public Map<String, String> getCacheStatus() {
+		Map<String, String> status = new HashMap<String, String>();
+		status.put("impl", this.getClass().getName());
+
+		return status;
 	}
 
 }

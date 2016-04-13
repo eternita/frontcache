@@ -12,9 +12,19 @@
         <servlet-class>org.frontcache.FrontCacheServlet</servlet-class>
     </servlet>
 
+    <servlet>
+        <servlet-name>FrontCacheIOServlet</servlet-name>
+        <servlet-class>org.frontcache.FrontCacheIOServlet</servlet-class>
+    </servlet>
+
     <servlet-mapping>
         <servlet-name>FrontCacheServlet</servlet-name>
         <url-pattern>/*</url-pattern>
+    </servlet-mapping>
+	
+    <servlet-mapping>
+        <servlet-name>FrontCacheIOServlet</servlet-name>
+        <url-pattern>/frontcache-io</url-pattern>
     </servlet-mapping>
 
     

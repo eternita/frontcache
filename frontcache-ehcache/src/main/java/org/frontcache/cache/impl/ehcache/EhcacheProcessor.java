@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import org.frontcache.FCConfig;
@@ -124,6 +125,17 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	@Override
 	public void removeFromCacheAll() {
 		cache.removeAll();
+	}
+	
+	@Override
+	public Map<String, String> getCacheStatus() {
+		Map<String, String> status = super.getCacheStatus();
+		
+		status.put("impl", this.getClass().getName());
+
+		status.put("cached entiries", "" + cache.getKeys().size());
+		
+		return status;
 	}
 	
 }

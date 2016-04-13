@@ -1,5 +1,7 @@
 package org.frontcache.cache;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.collections4.MultiValuedMap;
@@ -66,141 +68,14 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		return cachedWebResponse;
 	}	
 	
-/*	
-	public String processCacheableRequest(HttpServletRequest httpRequest, HttpServletResponse response, String urlStr) throws IOException, ServletException 
-	{
-		long start = System.currentTimeMillis();
-		boolean isRequestDynamic = true;
-
-		WebResponse cachedWebComponent = getFromCache(urlStr);
-		
-		String content = null;
-		long lengthBytes = -1;
-		
-		if (null == cachedWebComponent)
-		{
-			isRequestDynamic = true;
-			
-			// do dynamic call 
-			Map<String, Object> respMap = FCUtils.dynamicCall(urlStr, httpRequest, response);
-
-			String contentType = (String) respMap.get("contentType");
-	        content = (String) respMap.get("dataStr");
-	        String contentLenghtStr = (String) respMap.get("Content-Length");
-	        if (null != contentLenghtStr)
-	        	lengthBytes = Long.parseLong(contentLenghtStr);
-	        
-			if (null != contentType && -1 < contentType.indexOf("text"))
-			{
-				cachedWebComponent = FCUtils.parseWebComponent(urlStr, content);
-				// remove custom component tag from response string
-				content = cachedWebComponent.getContent();
-				
-				// save to cache
-				if (cachedWebComponent.isCacheable())
-				{
-					cachedWebComponent.setContentType(contentType);
-					putToCache(urlStr, cachedWebComponent);
-				}
-			}
-			
-		} else {
-			
-			isRequestDynamic = false;
-			content = cachedWebComponent.getContent();
-			response.setContentType(cachedWebComponent.getContentType());
-			lengthBytes = 2*content.length();
-		}
-
-		
-		RequestLogger.logRequest(urlStr, isRequestDynamic, System.currentTimeMillis() - start, lengthBytes);
-		return content;
-	}
 	
-	public String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException 
-	{
-		long start = System.currentTimeMillis();
-		boolean isRequestDynamic = true;
+	@Override
+	public Map<String, String> getCacheStatus() {
+		Map<String, String> status = new HashMap<String, String>();
+		status.put("impl", this.getClass().getName());
 
-		String urlStr = FCUtils.getRequestURL(httpRequest);
-		
-		WebResponse cachedWebComponent = getFromCache(urlStr);
-		
-		String content = null;
-
-		
-		if (null == cachedWebComponent)
-		{
-			isRequestDynamic = true;
-			
-			chain.doFilter(httpRequest, response); // run request to origin
-						
-			content = response.getContentString();
-			
-			cachedWebComponent = FCUtils.parseWebComponent(urlStr, content);
-			// remove custom component tag from response string
-			content = cachedWebComponent.getContent();
-			
-			// save to cache
-			if (cachedWebComponent.isCacheable())
-			{
-				cachedWebComponent.setContentType(response.getContentType());
-				putToCache(urlStr, cachedWebComponent);
-			}
-			
-		} else {
-			
-			isRequestDynamic = false;
-			content = cachedWebComponent.getContent();
-			response.setContentType(cachedWebComponent.getContentType());
-		}
-
-		RequestLogger.logRequest(urlStr, isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
-		return content;
+		return status;
 	}
-//*/	
-	
-//	private String processCacheableRequest(HttpServletRequest httpRequest, FrontCacheHttpResponseWrapper response, FilterChain chain) throws IOException, ServletException 
-//	{
-//		long start = System.currentTimeMillis();
-//		boolean isRequestDynamic = true;
-//
-//		String urlStr = FCUtils.getRequestURL(httpRequest);
-//		
-//		WebResponse cachedWebComponent = getFromCache(urlStr);
-//		
-//		String content = null;
-//
-//		
-//		if (null == cachedWebComponent)
-//		{
-//			isRequestDynamic = true;
-//			
-//			chain.doFilter(httpRequest, response); // run request to origin
-//						
-//			content = response.getContentString();
-//			
-//			cachedWebComponent = FCUtils.parseWebComponent(content);
-//			// remove custom component tag from response string
-//			content = cachedWebComponent.getContent();
-//			
-//			// save to cache
-//			if (cachedWebComponent.isCacheable())
-//			{
-//				cachedWebComponent.setContentType(response.getContentType());
-//				putToCache(urlStr, cachedWebComponent);
-//			}
-//			
-//		} else {
-//			
-//			isRequestDynamic = false;
-//			content = cachedWebComponent.getContent();
-//			response.setContentType(cachedWebComponent.getContentType());
-//		}
-//
-//		RequestLogger.logRequest(urlStr, isRequestDynamic, System.currentTimeMillis() - start, (null == content) ? -1 : content.length());
-//		return content;
-//	}
 	
 
 
