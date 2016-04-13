@@ -18,21 +18,28 @@ public class FrontCacheClient {
 
 	private String frontCacheURL;
 	
+	private String frontCacheURI;
+	
+	private final static String IO_URI = "frontcache-io";
+	
 	private HttpClient client;
 
-	protected FrontCacheClient() {
+	public FrontCacheClient(String frontcacheURL) {
 		client = HttpClientBuilder.create().build();
-	}
-	
-	public FrontCacheClient(String fcURL) {
-		this();
 		
-		if (fcURL.endsWith("/"))
-			this.frontCacheURL = fcURL + "frontcache-io";
+		this.frontCacheURL = frontcacheURL;
+		
+		if (frontcacheURL.endsWith("/"))
+			this.frontCacheURI = frontcacheURL + IO_URI;
 		else
-			this.frontCacheURL = fcURL + "/frontcache-io";
+			this.frontCacheURI = frontcacheURL + "/" + IO_URI;
 	}
 	
+	/**
+	 * 
+	 * @param filter
+	 * @return
+	 */
 	public String removeFromCache(String filter)
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
@@ -48,6 +55,10 @@ public class FrontCacheClient {
 		return null;
 	}
 	
+	/**
+	 * 
+	 * @return
+	 */
 	public String removeFromCacheAll()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
@@ -62,8 +73,11 @@ public class FrontCacheClient {
 		
 		return null;
 	}
-	
-	
+
+	/**
+	 * 
+	 * @return
+	 */
 	public String getCacheState()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
@@ -80,7 +94,7 @@ public class FrontCacheClient {
 	
 	private String requestFrontCache(List<NameValuePair> urlParameters) throws IOException
 	{
-		HttpPost post = new HttpPost(frontCacheURL);
+		HttpPost post = new HttpPost(frontCacheURI);
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 
@@ -99,7 +113,30 @@ public class FrontCacheClient {
 	public String getFrontCacheURL() {
 		return frontCacheURL;
 	}
-	
-	
 
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((frontCacheURI == null) ? 0 : frontCacheURI.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		FrontCacheClient other = (FrontCacheClient) obj;
+		if (frontCacheURI == null) {
+			if (other.frontCacheURI != null)
+				return false;
+		} else if (!frontCacheURI.equals(other.frontCacheURI))
+			return false;
+		return true;
+	}
+	
 }

@@ -69,6 +69,8 @@ subprojects {
 	task integrationTest(type: Test) {
 		description = 'Runs the integration tests.'
 		group = 'verification'
+		maxParallelForks = 1 // run all tests sequentially (due to cache cleanup befor every test)
+		forkEvery = 1 // run all tests sequentially (due to cache cleanup befor every test)
 		testClassesDir = sourceSets.integrationTest.output.classesDir
 		classpath = sourceSets.integrationTest.runtimeClasspath
 		reports.html.destination = file("$reports.html.destination/integration")
