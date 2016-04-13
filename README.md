@@ -26,8 +26,23 @@ Every page can have
 <fc:component /> tag which has chaching directives applied to the page:
 <fc:component maxage="0" /> - do not cache (defalut)
 <fc:component maxage="-1" /> - cache forever
+<fc:component maxage="forever" /> - cache forever
 <fc:component maxage="60" /> - cache for 60 seconds
+<fc:component maxage="60s" /> - cache for 60 seconds
+<fc:component maxage="15m" /> - cache for 15 minutes
+<fc:component maxage="24h" /> - cache for 24 hours
 ```
+The same in case of using HTTP Headers:
+```
+X-frontcache.component.maxage = 0  - do not cache (defalut)
+X-frontcache.component.maxage = -1 - cache forever
+X-frontcache.component.maxage = forever - cache forever
+X-frontcache.component.maxage = 60 - cache for 60 seconds
+X-frontcache.component.maxage = 60s - cache for 60 seconds
+X-frontcache.component.maxage = 15m - cache for 15 minutes
+X-frontcache.component.maxage = 24h - cache for 24 hours
+```
+
 ```
 <fc:include /> tag which specifies URL for data to be included:
 <fc:include url="/mysite/include-header" /> - this include will make HTTP call to the current webb app with URL  '/mysite/include-header'
