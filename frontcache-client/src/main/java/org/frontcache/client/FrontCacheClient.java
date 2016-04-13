@@ -33,12 +33,34 @@ public class FrontCacheClient {
 			this.frontCacheURL = fcURL + "/frontcache-io";
 	}
 	
-	public void removeFromCache(String filter)
+	public String removeFromCache(String filter)
 	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", "invalidate"));
+		urlParameters.add(new BasicNameValuePair("filter", filter));
+		
+		try {
+			return requestFrontCache(urlParameters);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		return null;
 	}
 	
-	public void removeFromCacheAll()
+	public String removeFromCacheAll()
 	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", "invalidate"));
+		urlParameters.add(new BasicNameValuePair("filter", "*"));
+		
+		try {
+			return requestFrontCache(urlParameters);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		return null;
 	}
 	
 	
@@ -46,7 +68,6 @@ public class FrontCacheClient {
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", "get-cache-state"));
-		
 		
 		try {
 			return requestFrontCache(urlParameters);
