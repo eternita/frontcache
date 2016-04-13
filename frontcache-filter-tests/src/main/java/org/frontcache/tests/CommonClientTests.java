@@ -13,7 +13,7 @@ public class CommonClientTests {
 	@Test
 	public void getCacheStatus() throws Exception {
 		
-		FrontCacheClient fcc = new FrontCacheClient(CommonTests.FRONTCACHE_TEST_BASE_URI);
+		FrontCacheClient fcc = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
 		
 		String response = fcc.getCacheState();
 		Assert.assertNotEquals(-1, response.indexOf("cache status"));

@@ -46,10 +46,16 @@ public class FrontCacheIOServlet extends HttpServlet {
 		FrontCacheEngine.destroy();
 		fcEngine = null;
 	}	
-
-
+	
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException 
+	{
+		process(req, resp);
+		return;
+	}
+
+
+	private void process(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException 
 	{
 		String action = req.getParameter("action");
 		if (null == action)
@@ -114,8 +120,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 */
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		// TODO Auto-generated method stub
-		doGet(req, resp);
+		process(req, resp);
+		return;
 	}
 	
 }

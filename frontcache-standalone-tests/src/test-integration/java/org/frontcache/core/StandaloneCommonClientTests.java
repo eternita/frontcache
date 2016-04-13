@@ -5,6 +5,7 @@ import java.io.File;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.frontcache.tests.CommonClientTests;
+import org.frontcache.tests.TestConfig;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
@@ -17,13 +18,12 @@ import org.junit.BeforeClass;
  */
 public class StandaloneCommonClientTests extends CommonClientTests {
 
-	private static final int FRONTFACHE_PORT = 9080;
 	static Server server = null;
 	
 	@BeforeClass
 	public static void setUpBeforeClass() throws Exception {
 		
-        server = new Server(FRONTFACHE_PORT);
+        server = new Server(TestConfig.FRONTFACHE_PORT);
         
         WebAppContext webapp = new WebAppContext();
         webapp.setContextPath("/");
