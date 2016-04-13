@@ -584,8 +584,10 @@ public class FCUtils {
 		try
 		{
 			int multiplyPrefix = 1;
-			if (maxAgeStr.endsWith("d")) // days
+			if ("forever".equalsIgnoreCase(maxAgeStr.trim())) // forever
 			{
+				return CacheProcessor.CACHE_FOREVER;				
+			} else if (maxAgeStr.endsWith("d")) { // days
 				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
 				multiplyPrefix = 86400; // 24 * 60 * 60
 			} else if (maxAgeStr.endsWith("h")) { // hours
