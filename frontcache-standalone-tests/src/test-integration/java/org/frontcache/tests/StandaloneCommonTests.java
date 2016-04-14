@@ -1,4 +1,4 @@
-package org.frontcache.core;
+package org.frontcache.tests;
 
 import java.io.File;
 

@@ -1,4 +1,4 @@
-package org.frontcache.core;
+package org.frontcache.tests.extra;
 
 import static org.junit.Assert.assertEquals;
 
@@ -6,6 +6,7 @@ import java.io.File;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.tests.TestConfig;
 import org.junit.After;
 import org.junit.AfterClass;
