@@ -2,17 +2,12 @@ package org.frontcache.tests;
 
 import static org.junit.Assert.assertEquals;
 
-import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.gargoylesoftware.htmlunit.TextPage;
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebResponse;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
@@ -21,50 +16,20 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
  * Defined tests are run in filter & standalone modes
  *
  */
-public class CommonTests {
+public class CommonTests extends CommonTestsBase {
 
-	protected WebClient webClient = null;
-	
-	protected FrontCacheClient fcClient = null;
-	
-	protected Logger logger = LoggerFactory.getLogger(CommonTests.class);  
 
 
 	@Before
 	public void setUp() throws Exception {
-		webClient = new WebClient();
+		super.setUp();
+
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		
-		fcClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
-		fcClient.removeFromCacheAll(); // clean up		
 	}
 
 	@After
 	public void tearDown() throws Exception {
-		webClient.close();
-	}
-
-	@Test
-	public void staticRead() throws Exception {
-
-		TextPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/static-read/a.txt");
-		String pageAsText = page.getContent();
-		WebResponse webResponse = page.getWebResponse(); 
-		printHeaders(webResponse);
-		assertEquals("a", pageAsText);
-	}
-	
-	protected void printHeaders(WebResponse webResponse)
-	{
-		String debugCacheable = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE);
-		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
-		String debugResponseTime = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME);
-		String debugResponseSize = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE);
-		
-		String logStr = "cacheable: " + debugCacheable + ", cached:" + debugCached + ", responseTime: " + debugResponseTime + ", responseSize: " + debugResponseSize;
-		logger.info(logStr);
-		return;
+		super.tearDown();
 	}
 
 	@Test
