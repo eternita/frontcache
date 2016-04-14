@@ -1,55 +1,42 @@
 package org.frontcache.tests;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.WebResponse;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
-
 import static org.junit.Assert.assertEquals;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.client.FrontCacheCluster;
 import org.frontcache.core.FCHeaders;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
-public class CommonClientTests {
+import com.gargoylesoftware.htmlunit.WebResponse;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
-	protected WebClient webClient = null;
-	
-	protected FrontCacheClient fcClient = null;
-	
+public class ClientTests extends CommonTestsBase {
+
 	private static String FRONTCACHE_CLUSTER_NODE1 = TestConfig.FRONTCACHE_TEST_BASE_URI;
 	
 	private static String FRONTCACHE_CLUSTER_NODE2 = TestConfig.FRONTCACHE_TEST_BASE_URI;
 	
-	protected Logger logger = LoggerFactory.getLogger(CommonClientTests.class);  
-
 	@Before
 	public void setUp() throws Exception {
-		webClient = new WebClient();
+		super.setUp();
+
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		
-		fcClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
-		fcClient.removeFromCacheAll(); // clean up
 	}
 
 	@After
 	public void tearDown() throws Exception {
-		webClient.close();
+		super.tearDown();
 	}
 
 	@Test
 	public void getCacheStatusClient() throws Exception {
 		
-		fcClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
+		frontcacheClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
 		
-		String response = fcClient.getCacheState();
+		String response = frontcacheClient.getCacheState();
 		Assert.assertNotEquals(-1, response.indexOf("cache status"));
 		logger.debug("response " + response);
 	}
@@ -93,8 +80,8 @@ public class CommonClientTests {
 		assertEquals("true", debugCached);
 		
 		// cache invalidation
-		fcClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
-		String response = fcClient.removeFromCache(TEST_URI);
+		frontcacheClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
+		String response = frontcacheClient.removeFromCache(TEST_URI);
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		// third request - the same request - response is dynamic
@@ -156,10 +143,10 @@ public class CommonClientTests {
 		final String TEST_URI_A = "common/cache-invalidation/a.jsp";
 		final String TEST_URI_B = "common/cache-invalidation/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		fcClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
+		frontcacheClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
 		
 		// clean up
-		String response = fcClient.removeFromCacheAll();
+		String response = frontcacheClient.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 
 		// the first request a - response should be cached
@@ -176,14 +163,14 @@ public class CommonClientTests {
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("false", debugCached);
 		
-		response = fcClient.getCacheState();
+		response = frontcacheClient.getCacheState();
 		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"2\""));
 		
 		// cache invalidation
-		response = fcClient.removeFromCacheAll();
+		response = frontcacheClient.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
-		response = fcClient.getCacheState();
+		response = frontcacheClient.getCacheState();
 		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
 		return;
 	}
