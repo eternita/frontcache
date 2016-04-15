@@ -48,7 +48,7 @@ public class FrontCacheClient {
 		
 		try {
 			return requestFrontCache(urlParameters);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
@@ -67,7 +67,7 @@ public class FrontCacheClient {
 		
 		try {
 			return requestFrontCache(urlParameters);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
@@ -85,7 +85,7 @@ public class FrontCacheClient {
 		
 		try {
 			return requestFrontCache(urlParameters);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
