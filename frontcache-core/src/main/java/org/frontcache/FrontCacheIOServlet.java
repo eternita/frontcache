@@ -99,6 +99,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		else
 			CacheManager.getInstance().removeFromCache(filter);
 			
+		logger.info("Invalidation for filter: " + filter);
 		return aResponse;
 	}
 

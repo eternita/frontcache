@@ -168,7 +168,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			if (FrontCacheEngine.debugComments)
 				outSb.append("<!-- start fc:include ").append(inc.includeURL).append(" -->");
 			
-			outSb.append(inc.webResponse.getContent());
+			outSb.append(new String(inc.webResponse.getContent()));
 			
 			if (FrontCacheEngine.debugComments)
 				outSb.append("<!-- end fc:include ").append(inc.includeURL).append(" -->");

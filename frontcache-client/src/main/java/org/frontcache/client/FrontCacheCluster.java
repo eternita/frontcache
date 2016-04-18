@@ -34,7 +34,7 @@ public class FrontCacheCluster {
 	
 	public FrontCacheCluster(String configResourceName) 
 	{
-		Set<String> fcURLSet = loadCacheIgnoreURIPatterns(configResourceName);
+		Set<String> fcURLSet = loadFrontcacheClusterNodes(configResourceName);
 		for (String url : fcURLSet)
 			fcCluster.add(new FrontCacheClient(url));
 	}
@@ -56,7 +56,7 @@ public class FrontCacheCluster {
 		return instance;
 	}
 	
-	private Set<String> loadCacheIgnoreURIPatterns(String configName) {
+	private Set<String> loadFrontcacheClusterNodes(String configName) {
 		Set<String> fcURLSet = new HashSet<String>();
 		BufferedReader confReader = null;
 		InputStream is = null;
