@@ -81,7 +81,7 @@ X-frontcache.debug.response-size - response size (in bytes)
 
 1. checkout
 
-2. add/update gradle.properties to
+2. add/update gradle.properties to ${CHECKOUT_DIR}/frontcache
 
 and set there path to local maven repo - e.g.
 
