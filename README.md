@@ -77,6 +77,30 @@ X-frontcache.debug.response-time - response time (in ms)
 X-frontcache.debug.response-size - response size (in bytes)
 ```
 
+### Development environment setup
+
+1. checkout
+
+2. add/update gradle.properties to
+
+and set there path to local maven repo - e.g.
+
+mavenLocalRepo = file:///Users/spa/.m2/repository
+
+3. create simbol link for standalone tests (to run the same as filter tests)
+
+```
+ln -s ${CHECKOUT_DIR}/frontcache/frontcache-filter-tests/src/main/webapp/common ${CHECKOUT_DIR}/frontcache/frontcache-standalone-tests/src/main/webapp
+on my laptop it looks like this:
+ln -s /Users/spa/git/frontcache/frontcache-filter-tests/src/main/webapp/common /Users/spa/git/frontcache/frontcache-standalone-tests/src/main/webapp
+
+```
+4. build
+
+```
+./gradlew clean build
+```
+ 
  
 ### More / better descriotion is comming soon. 
 Dig in fc-mvc-demo project if you want it earlier. fc-mvc-demo project has the same page implemented using standard MVC approach and using FrontCache.

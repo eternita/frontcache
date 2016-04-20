@@ -29,3 +29,15 @@ scp -i oregon_key.pem /Users/spa/git/frontcache/frontcache-coins/FRONTCACHE_HOME
 scp -i oregon_key.pem -r /Users/spa/git/frontcache/warmer ubuntu@or.coinshome.net:/opt/frontcache
 
 scp -i singapore_key.pem -r /Users/spa/git/frontcache/frontcache-coins/build/libs ubuntu@sg.coinshome.net:/opt/frontcache
+
+# get cache status
+
+http://or.coinshome.net/frontcache-io?action=get-cache-state
+http://sg.coinshome.net/frontcache-io?action=get-cache-state
+http://direct.coinshome.net/frontcache-io?action=get-cache-state
+
+#invalidate abcd1234_key
+http://or.coinshome.net/frontcache-io?action=invalidate&filter=abcd1234_key
+
+#invalidate all
+http://or.coinshome.net/frontcache-io?action=invalidate&filter=*
