@@ -4,7 +4,6 @@ import java.util.Properties;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
-import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.impl.f.BotIncludeProcessorFilter;
@@ -26,16 +25,9 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	
 	private IncludeProcessorFilter incProcessorFilter = new BotIncludeProcessorFilter();
 	
-	protected CacheProcessor cacheProcessor;
-	
 	public IncludeProcessorBase() {
 	}
 
-	
-	public void setCacheProcessor(CacheProcessor cacheProcessor)
-	{
-		this.cacheProcessor = cacheProcessor;
-	}
 
 	public boolean hasIncludes(WebResponse webResponse, int recursionLevel) 
 	{
