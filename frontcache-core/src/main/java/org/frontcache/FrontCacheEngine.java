@@ -17,35 +17,25 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.collections4.MultiValuedMap;
-import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
-import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.ProtocolException;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.RedirectStrategy;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPatch;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
-import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeaderElementIterator;
-import org.apache.http.message.BasicHttpRequest;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
@@ -55,6 +45,7 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.BypassFrontcache;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.reqlog.RequestLogger;
@@ -160,8 +151,6 @@ public class FrontCacheEngine {
 		cacheProcessor = CacheManager.getInstance();
 
 		includeProcessor = IncludeProcessorManager.getInstance();
-
-		includeProcessor.setCacheProcessor(cacheProcessor);
 
 		this.httpClient = newClient();
 
@@ -356,7 +345,7 @@ public class FrontCacheEngine {
 		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + ":" + httpRequest.getServerPort();
 		logger.debug("currentRequestBaseURL: " + currentRequestBaseURL);
 		
-		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method & Accept header contain 'text'
+		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method 
 		{
 			MultiValuedMap<String, String> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 
@@ -393,20 +382,20 @@ public class FrontCacheEngine {
 				if (null != context.getHttpClientResponse())
 					context.getHttpClientResponse().close();
 				return;
-			} else {
-				// content/response is not cacheable (e.g. response type is not text) 
-				// do dynamic call below (forwardToOrigin)
 			}
 
 		}
 		
-		// do dynamic call to origin
+		// do dynamic call to origin (all methods except GET + listed in ignore list)
 		{
 			long start = System.currentTimeMillis();
 			boolean isRequestCacheable = false;
 			boolean isCached = false;
 			long lengthBytes = -1; // TODO: set/get content length from context or just keep -1 ?
-			forwardToOrigin();		
+			
+//			forwardToOrigin();		
+			new BypassFrontcache(httpClient).execute();
+			
 			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes);			
 			addResponseHeaders();
 			writeResponse();
@@ -416,143 +405,6 @@ public class FrontCacheEngine {
 		return;
 	}
 	
-	private void forwardToOrigin() throws IOException, ServletException
-	{
-		RequestContext context = RequestContext.getCurrentContext();
-		HttpServletRequest request = context.getRequest();
-		
-		if (context.isFilterMode())
-		{
-			HttpServletResponse response = context.getResponse();
-			FilterChain chain = context.getFilterChain();
-			chain.doFilter(request, response);
-		} else {
-			
-			// stand alone mode
-			
-			MultiValuedMap<String, String> headers = FCUtils.buildRequestHeaders(request);
-			MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request);
-			String verb = FCUtils.getVerb(request);
-			InputStream requestEntity = getRequestBody(request);
-			String uri = context.getRequestURI();
-
-			try {
-				HttpResponse response = forward(httpClient, verb, uri, request, headers, params, requestEntity);
-				
-				// response 2 context
-				setResponse(response);
-				
-			}
-			catch (Exception ex) {
-				ex.printStackTrace();
-				context.set("error.status_code", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-				context.set("error.exception", ex);
-			}
-		}
-		
-		return;
-	}
-
-
-	/**
-	 * forward all kind of requests (GET, POST, PUT, ...)
-	 * 
-	 * @param httpclient
-	 * @param verb
-	 * @param uri
-	 * @param request
-	 * @param headers
-	 * @param params
-	 * @param requestEntity
-	 * @return
-	 * @throws Exception
-	 */
-	private HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
-			MultiValuedMap<String, String> headers, MultiValuedMap<String, String> params, InputStream requestEntity)
-					throws Exception {
-		RequestContext context = RequestContext.getCurrentContext();
-
-		URL host = context.getOriginURL();
-		HttpHost httpHost = FCUtils.getHttpHost(host);
-		uri = (host.getPath() + uri).replaceAll("/{2,}", "/");
-		
-		HttpRequest httpRequest;
-		switch (verb.toUpperCase()) {
-		case "POST":
-			HttpPost httpPost = new HttpPost(uri + context.getRequestQueryString());
-			httpRequest = httpPost;
-			httpPost.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
-			break;
-		case "PUT":
-			HttpPut httpPut = new HttpPut(uri + context.getRequestQueryString());
-			httpRequest = httpPut;
-			httpPut.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
-			break;
-		case "PATCH":
-			HttpPatch httpPatch = new HttpPatch(uri + context.getRequestQueryString());
-			httpRequest = httpPatch;
-			httpPatch.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
-			break;
-		default:
-			httpRequest = new BasicHttpRequest(verb, uri + context.getRequestQueryString());
-		}
-		
-		
-		try {
-			httpRequest.setHeaders(FCUtils.convertHeaders(headers));
-			Header acceptEncoding = httpRequest.getFirstHeader("accept-encoding");
-			if (acceptEncoding != null && acceptEncoding.getValue().contains("gzip"))
-			{
-				httpRequest.setHeader("accept-encoding", "gzip");
-			}
-			HttpResponse originResponse = httpclient.execute(httpHost, httpRequest);
-			return originResponse;
-		} finally {
-			// When HttpClient instance is no longer needed,
-			// shut down the connection manager to ensure
-			// immediate deallocation of all system resources
-			// httpclient.getConnectionManager().shutdown();
-		}
-	}	
-	
-	private void setResponse(HttpResponse response) throws IOException {
-		
-		RequestContext context = RequestContext.getCurrentContext();
-		context.setHttpClientResponse((CloseableHttpResponse) response);
-		
-		setResponse(response.getStatusLine().getStatusCode(),
-				response.getEntity() == null ? null : response.getEntity().getContent(),
-				FCUtils.revertHeaders(response.getAllHeaders()));
-	}
-	
-	private void setResponse(int status, InputStream entity, MultiValuedMap<String, String> headers) throws IOException {
-		RequestContext context = RequestContext.getCurrentContext();
-		
-		context.setResponseStatusCode(status);
-		
-		if (entity != null) {
-			context.setResponseDataStream(entity);
-		}
-		
-		for (String key : headers.keySet()) {
-			for (String value : headers.get(key)) {
-				context.addOriginResponseHeader(key, value);
-			}
-		}
-
-	}	
-	
-
-	private InputStream getRequestBody(HttpServletRequest request) {
-		InputStream requestEntity = null;
-		try {
-			requestEntity = request.getInputStream();
-		}
-		catch (IOException ex) {
-			// no requestBody is ok.
-		}
-		return requestEntity;
-	}	
 	
 	private void writeResponse() throws Exception {
 		RequestContext context = RequestContext.getCurrentContext();
