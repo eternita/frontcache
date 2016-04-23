@@ -17,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -26,16 +24,14 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.message.BasicHeader;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.hystrix.ThroughFrontcache_HttpClient;
+import org.frontcache.hystrix.ThroughFrontcache_WebFilter;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
-import org.frontcache.wrapper.HttpResponseWrapperImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,75 +78,19 @@ public class FCUtils {
     {
 		RequestContext context = RequestContext.getCurrentContext();
 		if (context.isFilterMode())
-			return dynamicCallFilter();
+			 return new ThroughFrontcache_WebFilter().execute();
 		else
-			return dynamicCallHttpClient(urlStr, requestHeaders, client);
-
-				
+			 return new ThroughFrontcache_HttpClient(urlStr, requestHeaders, client).execute();
     }
 
 	/**
 	 * for includes - they allways use httpClient
-	 * 
-	 * @param urlStr
-	 * @param requestHeaders
-	 * @param client
-	 * @return
-	 * @throws FrontCacheException
 	 */
 	public static WebResponse dynamicCallHttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
     {
-		HttpResponse response = null;
-
-		try {
-			HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
-			HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(urlStr));//(verb, uri + context.getRequestQueryString());
-
-			// translate headers
-			Header[] httpHeaders = convertHeaders(requestHeaders);
-			for (Header header : httpHeaders)
-				httpRequest.addHeader(header);
-			
-			response = client.execute(httpHost, httpRequest);
-			WebResponse webResp = httpResponse2WebComponent(urlStr, response);
-			return webResp;
-
-		} catch (IOException ioe) {
-			throw new FrontCacheException("Can't read from " + urlStr, ioe);
-		} finally {
-			if (null != response)
-				try {
-					((CloseableHttpResponse) response).close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				} 
-		}
-		
+		 return new ThroughFrontcache_HttpClient(urlStr, requestHeaders, client).execute();
     }
 	
-	private static WebResponse dynamicCallFilter() throws FrontCacheException
-	{
-		RequestContext context = RequestContext.getCurrentContext();
-		HttpServletRequest httpRequest = context.getRequest();
-		HttpServletResponse httpResponse = context.getResponse();
-		FilterChain chain = context.getFilterChain();
-
-		FrontCacheHttpResponseWrapper wrappedResponse = new HttpResponseWrapperImpl(httpResponse);
-		
-		try {
-			chain.doFilter(httpRequest, wrappedResponse); // run request to origin
-			
-			String url = getRequestURL(httpRequest);
-			WebResponse webResponse = httpResponse2WebComponent(url, wrappedResponse);
-			return webResponse;
-			
-		} catch (IOException | ServletException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			throw new FrontCacheException("FilterChain exception", e);
-		} 
-		
-	}
 
 	/**
 	 * is used in ServletFilter mode
@@ -161,7 +101,7 @@ public class FCUtils {
 	 * @throws FrontCacheException
 	 * @throws IOException
 	 */
-	private static WebResponse httpResponse2WebComponent(String url, FrontCacheHttpResponseWrapper originWrappedResponse) throws FrontCacheException, IOException
+	public static WebResponse httpResponse2WebComponent(String url, FrontCacheHttpResponseWrapper originWrappedResponse) throws FrontCacheException, IOException
 	{
 		WebResponse webResponse = null;
 		
@@ -202,7 +142,7 @@ public class FCUtils {
 		return webResponse;
 	}
 	
-	private static WebResponse httpResponse2WebComponent(String url, HttpResponse response) throws FrontCacheException, IOException
+	public static WebResponse httpResponse2WebComponent(String url, HttpResponse response) throws FrontCacheException, IOException
 	{
 		
 		

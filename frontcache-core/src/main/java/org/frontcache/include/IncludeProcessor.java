@@ -4,7 +4,6 @@ import java.util.Properties;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
-import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
 
 /**
@@ -26,6 +25,4 @@ public interface IncludeProcessor {
 
 	public WebResponse processIncludes(WebResponse parentWebResponse, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client);
 	
-	public void setCacheProcessor(CacheProcessor cacheProcessor);
-
 }
