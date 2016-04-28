@@ -12,22 +12,26 @@ import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 
 /**
  * 
- * All GET requests (cached & not)
+ * All GET requests which flows through cache (cached & not)
  *
  */
-public class ThroughFrontcache extends HystrixCommand<WebResponse> {
+public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 
 	private final String originUrlStr;
 	private final CacheProcessor cache;
 
-    public ThroughFrontcache(CacheProcessor cache, String originUrlStr) {
+    public FC_ThroughCache(CacheProcessor cache, String originUrlStr) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("ThroughFrontcache"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache"))
                 .andCommandPropertiesDefaults(
                         HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)));
+                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE))
+//                .andCommandPropertiesDefaults(
+//                        HystrixCommandProperties.Setter()
+//                                .withExecutionTimeoutInMilliseconds(2000))                
+        		);
         
         this.originUrlStr = originUrlStr;
         this.cache = cache;

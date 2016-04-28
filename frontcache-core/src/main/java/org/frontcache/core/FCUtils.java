@@ -29,8 +29,8 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.message.BasicHeader;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheProcessor;
-import org.frontcache.hystrix.ThroughFrontcache_HttpClient;
-import org.frontcache.hystrix.ThroughFrontcache_WebFilter;
+import org.frontcache.hystrix.FC_ThroughCache_HttpClient;
+import org.frontcache.hystrix.FC_ThroughCache_WebFilter;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,9 +78,9 @@ public class FCUtils {
     {
 		RequestContext context = RequestContext.getCurrentContext();
 		if (context.isFilterMode())
-			 return new ThroughFrontcache_WebFilter().execute();
+			 return new FC_ThroughCache_WebFilter().execute();
 		else
-			 return new ThroughFrontcache_HttpClient(urlStr, requestHeaders, client).execute();
+			 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client).execute();
     }
 
 	/**
@@ -88,7 +88,7 @@ public class FCUtils {
 	 */
 	public static WebResponse dynamicCallHttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
     {
-		 return new ThroughFrontcache_HttpClient(urlStr, requestHeaders, client).execute();
+		 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client).execute();
     }
 	
 
