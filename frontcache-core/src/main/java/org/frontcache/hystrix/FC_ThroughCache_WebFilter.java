@@ -21,18 +21,22 @@ import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixCommandProperties;
 import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 
-public class ThroughFrontcache_WebFilter extends HystrixCommand<WebResponse> {
+public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 
 
 	String url = "nothing";
-    public ThroughFrontcache_WebFilter() {
+    public FC_ThroughCache_WebFilter() {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("ThroughFrontcache_WebFilter"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache_WebFilter"))
                 .andCommandPropertiesDefaults(
                         HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)));
+                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE))
+//                .andCommandPropertiesDefaults(
+//                        HystrixCommandProperties.Setter()
+//                                .withExecutionTimeoutInMilliseconds(2000))                
+        		);
         
     }
 

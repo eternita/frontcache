@@ -30,18 +30,22 @@ import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixCommandProperties;
 import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 
-public class BypassFrontcache extends HystrixCommand<Object> {
+public class FC_BypassCache extends HystrixCommand<Object> {
 
 	private final HttpClient client;
 
-    public BypassFrontcache(HttpClient client) {
+    public FC_BypassCache(HttpClient client) {
         
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("FC_BypassCache"))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("BypassFrontcache"))
                 .andCommandPropertiesDefaults(
                         HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)));
+                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE))
+//                .andCommandPropertiesDefaults(
+//                        HystrixCommandProperties.Setter()
+//                                .withExecutionTimeoutInMilliseconds(2000))                
+        		);
         
         this.client = client;
     }

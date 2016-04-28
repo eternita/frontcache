@@ -45,7 +45,8 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
-import org.frontcache.hystrix.BypassFrontcache;
+import org.frontcache.hystrix.FC_BypassCache;
+import org.frontcache.hystrix.FC_Total;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.reqlog.RequestLogger;
@@ -332,11 +333,17 @@ public class FrontCacheEngine {
 
     }
     
+	public void processRequest() throws Exception
+	{
+		new FC_Total(this).execute();
+//		processRequestInternal();
+		return;
+	}
     /**
      * 
      * @throws Exception
      */
-	public void processRequest() throws Exception
+	public void processRequestInternal() throws Exception
 	{
 		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
@@ -394,7 +401,7 @@ public class FrontCacheEngine {
 			long lengthBytes = -1; // TODO: set/get content length from context or just keep -1 ?
 			
 //			forwardToOrigin();		
-			new BypassFrontcache(httpClient).execute();
+			new FC_BypassCache(httpClient).execute();
 			
 			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes);			
 			addResponseHeaders();

@@ -22,20 +22,24 @@ import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixCommandProperties;
 import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 
-public class ThroughFrontcache_HttpClient extends HystrixCommand<WebResponse> {
+public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
 	private final String urlStr;
 	private final MultiValuedMap<String, String> requestHeaders;
 	private final HttpClient client;
 
-    public ThroughFrontcache_HttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) {
+    public FC_ThroughCache_HttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("ThroughFrontcache_HttpClient"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache_HttpClient"))
                 .andCommandPropertiesDefaults(
                         HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)));
+                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE))
+//                .andCommandPropertiesDefaults(
+//                        HystrixCommandProperties.Setter()
+//                                .withExecutionTimeoutInMilliseconds(2000))                
+        		);
         
         this.urlStr = urlStr;
         this.requestHeaders = requestHeaders;

@@ -10,7 +10,7 @@ import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
-import org.frontcache.hystrix.ThroughFrontcache;
+import org.frontcache.hystrix.FC_ThroughCache;
 import org.frontcache.reqlog.RequestLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +27,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		boolean isCached = false;
 		
 		long lengthBytes = -1;
-		WebResponse cachedWebResponse = new ThroughFrontcache(this, originUrlStr).execute();
+		WebResponse cachedWebResponse = new FC_ThroughCache(this, originUrlStr).execute();
 
 		
 		if (null == cachedWebResponse)
