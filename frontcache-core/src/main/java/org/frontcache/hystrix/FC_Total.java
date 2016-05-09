@@ -1,6 +1,7 @@
 package org.frontcache.hystrix;
 
 import org.frontcache.FrontCacheEngine;
+import org.frontcache.core.WebResponse;
 
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
@@ -25,10 +26,10 @@ public class FC_Total extends HystrixCommand<Object> {
                 .andCommandKey(HystrixCommandKey.Factory.asKey("FC_Total"))
                 .andCommandPropertiesDefaults(
                         HystrixCommandProperties.Setter()
+                                .withExecutionTimeoutInMilliseconds(2000))
+                .andCommandPropertiesDefaults(
+                        HystrixCommandProperties.Setter()
                                 .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE))
-//                .andCommandPropertiesDefaults(
-//                        HystrixCommandProperties.Setter()
-//                                .withExecutionTimeoutInMilliseconds(2000))
                 );
         this.frontCacheEngine = frontCacheEngine;
         
@@ -40,4 +41,9 @@ public class FC_Total extends HystrixCommand<Object> {
     	return null;
     }
     
+    @Override
+    protected Object getFallback() {
+    	System.out.println("FC_Total - fallback");
+        return null;
+    }
 }
