@@ -5,6 +5,7 @@ import java.util.Properties;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.impl.f.BotIncludeProcessorFilter;
 import org.slf4j.Logger;
@@ -111,11 +112,11 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * @param client
 	 * @return
 	 */
-	protected WebResponse callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
+	protected WebResponse callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
 		
 		// recursive call to FCServlet (through bot filter / to cache sessionless requestsØ)
-		return incProcessorFilter.callInclude(urlStr, requestHeaders, client);
+		return incProcessorFilter.callInclude(urlStr, requestHeaders, client, context);
 		
 //		// recursive call to FCServlet
 //		WebResponse webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);

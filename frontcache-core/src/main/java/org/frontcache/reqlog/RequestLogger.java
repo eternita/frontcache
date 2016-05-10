@@ -1,24 +1,15 @@
 package org.frontcache.reqlog;
 
-import java.io.IOException;
-import java.io.InputStream;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.collections4.MultiValuedMap;
-//import org.apache.logging.log4j.LogManager;
-//import org.apache.logging.log4j.Logger;
-//import org.apache.logging.log4j.core.config.ConfigurationSource;
-//import org.apache.logging.log4j.core.config.Configurator;
-import org.frontcache.FCConfig;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *  Log requests to file (log4j2) for statistics and further analysis
+ *  Log requests to file (slf4j) for statistics and further analysis
  * 
  * 	REQUEST LOGGING FORMAT
  *  1 - true
@@ -35,31 +26,6 @@ public class RequestLogger {
 	private final static String SEPARATOR = " ";
 
 	private static Logger logger = LoggerFactory.getLogger(RequestLogger.class);
-	
-
-//	static {
-//		
-//		String configFileName = FCConfig.getProperty(CONFIG_FILE_KEY);
-//		
-//		if (null == configFileName)
-//			configFileName = DEFAULT_CONFIG_FILE;
-//		
-//		InputStream reqLogConfigIS = FCConfig.getConfigInputStream(configFileName);
-//		if (null != reqLogConfigIS)
-//		{
-//			ConfigurationSource source;
-//			try {
-//				source = new ConfigurationSource(reqLogConfigIS);
-//		        Configurator.initialize(null, source);
-//		        reqLogConfigIS.close();
-//			} catch (IOException e) {
-//				e.printStackTrace();
-//			}
-//		}
-//        
-//		logger = LogManager.getLogger(RequestLogger.class.getName());
-//	}
-	
 
 	private RequestLogger() {
 	}
@@ -72,7 +38,7 @@ public class RequestLogger {
 	 * @param runtimeMillis - runtime is milliseconds
 	 * @param lengthBytes - content length in bytes. 
 	 */
-	public static void logRequest(String url, boolean isCacheable, boolean isCached, long runtimeMillis, long lengthBytes) {
+	public static void logRequest(String url, boolean isCacheable, boolean isCached, long runtimeMillis, long lengthBytes, RequestContext context) {
 
 		StringBuilder sb = new StringBuilder();
 
@@ -86,7 +52,6 @@ public class RequestLogger {
 
 		logger.trace(sb.toString());
 
-		RequestContext context = RequestContext.getCurrentContext();
         HttpServletRequest request = context.getRequest();
         if ("true".equalsIgnoreCase(request.getHeader(FCHeaders.X_FRONTCACHE_DEBUG)))
         {

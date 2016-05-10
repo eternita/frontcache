@@ -11,6 +11,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.regex.Pattern;
@@ -45,7 +46,8 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
-import org.frontcache.hystrix.BypassFrontcache;
+import org.frontcache.hystrix.FC_BypassCache;
+import org.frontcache.hystrix.FC_Total;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.reqlog.RequestLogger;
@@ -111,7 +113,15 @@ public class FrontCacheEngine {
 	    		} 
 	    	}
 			
-			
+	    	Properties hystrixProperties = new Properties();
+	    	try {
+	    		hystrixProperties.load(FCConfig.getConfigInputStream("hystrix.properties"));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+	    	System.getProperties().putAll(hystrixProperties);
+
+	    	
 			String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
 			if ("true".equalsIgnoreCase(debugCommentsStr))
 				debugComments = true;		
@@ -216,7 +226,7 @@ public class FrontCacheEngine {
 	private CloseableHttpClient newClient() {
 		final RequestConfig requestConfig = RequestConfig.custom()
 				.setSocketTimeout(10000)
-				.setConnectTimeout(2000)
+				.setConnectTimeout(3000)
 				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
 				.build();
 
@@ -285,33 +295,20 @@ public class FrontCacheEngine {
 	}
 	
 	/**
+	 * Works for Servlets and ServletFilters
 	 * 
 	 * @param servletRequest
 	 * @param servletResponse
 	 * @param filterChain
 	 */
-    public void init(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) {
-    	this.init(servletRequest, servletResponse);
-    	
-        RequestContext ctx = RequestContext.getCurrentContext();
-        ctx.setFilterChain(filterChain);
-		ctx.setFrontCacheHost(originHost); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
-		return;
-    }
+    private RequestContext init(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) {
 
-    /**
-     * 
-     * @param servletRequest
-     * @param servletResponse
-     */
-    public void init(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
-
-        RequestContext ctx = RequestContext.getCurrentContext();
+        RequestContext ctx = new RequestContext();
         ctx.setRequest(servletRequest);
         ctx.setResponse(servletResponse);
 		String uri = FCUtils.buildRequestURI(servletRequest);
 		ctx.setRequestURI(uri);
-		String queryString = FCUtils.getQueryString(servletRequest);
+		String queryString = FCUtils.getQueryString(servletRequest, ctx);
 		ctx.setRequestQueryString(queryString);
 		ctx.setFrontCacheHost(FCUtils.getHost(servletRequest));
 		ctx.setFrontCacheHttpPort(frontcacheHttpPort);
@@ -319,8 +316,15 @@ public class FrontCacheEngine {
 		
 		ctx.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
         ctx.setOriginURL(getOriginUrl(ctx));
-        return;
-    }	
+
+        if (null != filterChain)
+        {
+            ctx.setFilterChain(filterChain);
+    		ctx.setFrontCacheHost(originHost); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
+        }
+		return ctx;
+    }
+
     
     private boolean ignoreCache(String uri)
     {
@@ -332,13 +336,19 @@ public class FrontCacheEngine {
 
     }
     
+	public void processRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) throws Exception
+	{
+		RequestContext context = init(servletRequest, servletResponse, filterChain);
+		new FC_Total(this, context).execute();
+//		processRequestInternal();
+		return;
+	}
     /**
      * 
      * @throws Exception
      */
-	public void processRequest() throws Exception
+	public void processRequestInternal(RequestContext context) throws Exception
 	{
-		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
 		String originRequestURL = getOriginUrl(context) + context.getRequestURI() + context.getRequestQueryString();
 		logger.debug("originRequestURL: " + originRequestURL);
@@ -352,7 +362,7 @@ public class FrontCacheEngine {
 			WebResponse webResponse = null;
 			try
 			{
-				webResponse = cacheProcessor.processRequest(originRequestURL, requestHeaders, httpClient);
+				webResponse = cacheProcessor.processRequest(originRequestURL, requestHeaders, httpClient, context);
 			} catch (FrontCacheException fce) {
 				// content/response is not cacheable (e.g. response type is not text) 
 				fce.printStackTrace();
@@ -368,7 +378,7 @@ public class FrontCacheEngine {
 					while (includeProcessor.hasIncludes(webResponse, recursionLevel++))
 					{
 						// include processor return new webResponse with processed includes and merged headers
-						WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient);
+						WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient, context);
 						
 						// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
 						webResponse.setContent(incWebResponse.getContent());
@@ -376,8 +386,8 @@ public class FrontCacheEngine {
 				}
 				
 				
-				addResponseHeaders(webResponse);
-				writeResponse(webResponse);
+				addResponseHeaders(webResponse, context);
+				writeResponse(webResponse, context);
 				
 				if (null != context.getHttpClientResponse())
 					context.getHttpClientResponse().close();
@@ -394,11 +404,11 @@ public class FrontCacheEngine {
 			long lengthBytes = -1; // TODO: set/get content length from context or just keep -1 ?
 			
 //			forwardToOrigin();		
-			new BypassFrontcache(httpClient).execute();
+			new FC_BypassCache(httpClient, context).execute();
 			
-			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes);			
-			addResponseHeaders();
-			writeResponse();
+			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);			
+			addResponseHeaders(context);
+			writeResponse(context);
 			if (null != context.getHttpClientResponse())
 				context.getHttpClientResponse().close();
 		}		
@@ -406,8 +416,7 @@ public class FrontCacheEngine {
 	}
 	
 	
-	private void writeResponse() throws Exception {
-		RequestContext context = RequestContext.getCurrentContext();
+	private void writeResponse(RequestContext context) throws Exception {
 		// there is no body to send
 		if (context.getResponseBody() == null && context.getResponseDataStream() == null) {
 			return;
@@ -416,8 +425,8 @@ public class FrontCacheEngine {
 		OutputStream outStream = servletResponse.getOutputStream();
 		InputStream is = null;
 		try {
-			if (RequestContext.getCurrentContext().getResponseBody() != null) {
-				String body = RequestContext.getCurrentContext().getResponseBody();
+			if (context.getResponseBody() != null) {
+				String body = context.getResponseBody();
 				FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes()), outStream);
 				return;
 			}
@@ -444,8 +453,7 @@ public class FrontCacheEngine {
 		
 	}
 
-	private void writeResponse(WebResponse webResponse) throws Exception {
-		RequestContext context = RequestContext.getCurrentContext();
+	private void writeResponse(WebResponse webResponse, RequestContext context) throws Exception {
 
 		// there is no body to send
 		if (null == webResponse.getContent()) {
@@ -472,8 +480,7 @@ public class FrontCacheEngine {
 		return;
 	}
 	
-	private void addResponseHeaders() {
-		RequestContext context = RequestContext.getCurrentContext();
+	private void addResponseHeaders(RequestContext context) {
 		HttpServletResponse servletResponse = context.getResponse();
 		MultiValuedMap<String, String> originResponseHeaders = context.getOriginResponseHeaders();
 
@@ -482,7 +489,7 @@ public class FrontCacheEngine {
 		{
 			String originLocation = originResponseHeaders.remove("Location").iterator().next();
 			
-			String fcLocation = FCUtils.transformRedirectURL(originLocation);
+			String fcLocation = FCUtils.transformRedirectURL(originLocation, context);
 
 			originResponseHeaders.put("Location", fcLocation);
 		}
@@ -497,19 +504,18 @@ public class FrontCacheEngine {
 				}
 			}
 		}
-		RequestContext ctx = RequestContext.getCurrentContext();
-		Long contentLength = ctx.getOriginContentLength();
+
+		Long contentLength = context.getOriginContentLength();
 		// Only inserts Content-Length if origin provides it and origin response is not
 		// gzipped
 //		if (SET_CONTENT_LENGTH.get()) {
-			if (contentLength != null && !ctx.getResponseGZipped()) {
+			if (contentLength != null && !context.getResponseGZipped()) {
 				servletResponse.setContentLength(contentLength.intValue());
 			}
 //		}
 	}	
 
-	private void addResponseHeaders(WebResponse webResponse) {
-		RequestContext context = RequestContext.getCurrentContext();
+	private void addResponseHeaders(WebResponse webResponse, RequestContext context) {
 		HttpServletResponse servletResponse = context.getResponse();
 
 		servletResponse.setStatus(webResponse.getStatusCode());
