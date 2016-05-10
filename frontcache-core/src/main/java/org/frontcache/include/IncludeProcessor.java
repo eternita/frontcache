@@ -4,6 +4,7 @@ import java.util.Properties;
 
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 
 /**
@@ -23,6 +24,6 @@ public interface IncludeProcessor {
 
 	public boolean hasIncludes(WebResponse webResponse, int recursionLevel);
 
-	public WebResponse processIncludes(WebResponse parentWebResponse, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client);
+	public WebResponse processIncludes(WebResponse parentWebResponse, String appOriginBaseURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context);
 	
 }

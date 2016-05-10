@@ -8,6 +8,7 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.reqlog.RequestLogger;
 import org.slf4j.Logger;
@@ -18,18 +19,18 @@ public class NoCacheProcessor implements CacheProcessor {
 	private Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Override
-	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException {
+	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;
 		boolean isCached = false;
 		long lengthBytes = -1;
 		
-		WebResponse cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
+		WebResponse cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context);
 
 		lengthBytes = cachedWebResponse.getContentLenth();
 
-		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes);
+		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
 
 		return cachedWebResponse;
 	}

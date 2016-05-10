@@ -18,31 +18,25 @@ import org.frontcache.wrapper.HttpResponseWrapperImpl;
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixCommandProperties;
-import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 
 public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 
 
 	String url = "nothing";
-    public FC_ThroughCache_WebFilter() {
+	private final RequestContext context;
+    public FC_ThroughCache_WebFilter(RequestContext context) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache_WebFilter"))
-                .andCommandPropertiesDefaults(
-                        HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE))
-//                .andCommandPropertiesDefaults(
-//                        HystrixCommandProperties.Setter()
-//                                .withExecutionTimeoutInMilliseconds(2000))                
         		);
+        
+        this.context = context;
         
     }
 
     @Override
     protected WebResponse run() throws FrontCacheException {
-		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest httpRequest = context.getRequest();
 		url = FCUtils.getRequestURL(httpRequest);
 		HttpServletResponse httpResponse = context.getResponse();

@@ -27,27 +27,21 @@ import org.frontcache.core.RequestContext;
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixCommandProperties;
-import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 
 public class FC_BypassCache extends HystrixCommand<Object> {
 
 	private final HttpClient client;
+	private final RequestContext context;
 
-    public FC_BypassCache(HttpClient client) {
+    public FC_BypassCache(HttpClient client, RequestContext context) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("FC_BypassCache"))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("BypassFrontcache"))
-                .andCommandPropertiesDefaults(
-                        HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE))
-//                .andCommandPropertiesDefaults(
-//                        HystrixCommandProperties.Setter()
-//                                .withExecutionTimeoutInMilliseconds(2000))                
         		);
         
         this.client = client;
+        this.context = context;
     }
 
     @Override
@@ -61,7 +55,6 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     
 	private void forwardToOrigin() throws IOException, ServletException
 	{
-		RequestContext context = RequestContext.getCurrentContext();
 		HttpServletRequest request = context.getRequest();
 		
 		if (context.isFilterMode())
@@ -74,7 +67,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			// stand alone mode
 			
 			MultiValuedMap<String, String> headers = FCUtils.buildRequestHeaders(request);
-			MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request);
+			MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request, context);
 			String verb = FCUtils.getVerb(request);
 			InputStream requestEntity = getRequestBody(request);
 			String uri = context.getRequestURI();
@@ -99,7 +92,6 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 	
 	private void setResponse(HttpResponse response) throws IOException {
 		
-		RequestContext context = RequestContext.getCurrentContext();
 		context.setHttpClientResponse((CloseableHttpResponse) response);
 		
 		setResponse(response.getStatusLine().getStatusCode(),
@@ -109,7 +101,6 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 
 	
 	private void setResponse(int status, InputStream entity, MultiValuedMap<String, String> headers) throws IOException {
-		RequestContext context = RequestContext.getCurrentContext();
 		
 		context.setResponseStatusCode(status);
 		
@@ -153,7 +144,6 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 	private HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
 			MultiValuedMap<String, String> headers, MultiValuedMap<String, String> params, InputStream requestEntity)
 					throws Exception {
-		RequestContext context = RequestContext.getCurrentContext();
 
 		URL host = context.getOriginURL();
 		HttpHost httpHost = FCUtils.getHttpHost(host);

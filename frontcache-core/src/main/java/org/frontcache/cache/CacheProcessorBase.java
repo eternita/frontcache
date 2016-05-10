@@ -9,6 +9,7 @@ import org.apache.http.client.HttpClient;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.FC_ThroughCache;
 import org.frontcache.reqlog.RequestLogger;
@@ -20,7 +21,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	protected Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Override
-	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException {
+	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;
@@ -37,7 +38,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				//TODO: remove me after migration from FC filter in coinshome.net (or can be used for back compatibility)
 				requestHeaders.put(FCHeaders.X_AVOID_CHN_FRONTCACHE, "true");
 				
-				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client);
+				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context);
 				lengthBytes = cachedWebResponse.getContentLenth();
 
 				// save to cache
@@ -65,7 +66,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		}
 		
 		
-		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes);
+		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
 		
 		return cachedWebResponse;
 	}	

@@ -5,6 +5,7 @@ import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
@@ -25,7 +26,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 	 * @param hostURL
 	 * @return
 	 */
-	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
+	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context)
 	{
 		String content = new String(parentWebResponse.getContent());
 		StringBuffer outSb = new StringBuffer();
@@ -48,7 +49,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 					outSb.append(content.substring(scanIdx, startIdx));
 					
 					try {
-						WebResponse webResponse = callInclude(hostURL + includeURL, requestHeaders, client);
+						WebResponse webResponse = callInclude(hostURL + includeURL, requestHeaders, client, context);
 						if (FrontCacheEngine.debugComments)
 							outSb.append("<!-- start fc:include ").append(includeURL).append(" -->"); // for debugging
 						
