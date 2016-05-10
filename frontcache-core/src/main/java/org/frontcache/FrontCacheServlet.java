@@ -45,14 +45,10 @@ public class FrontCacheServlet extends HttpServlet {
 	@Override
 	public void service(ServletRequest servletRequest, ServletResponse servletResponse) throws ServletException, IOException {
         try {
-        	fcEngine.init((HttpServletRequest) servletRequest, (HttpServletResponse) servletResponse);
-        	
-            fcEngine.processRequest();
+            fcEngine.processRequest((HttpServletRequest) servletRequest, (HttpServletResponse) servletResponse, null);
         } catch (Throwable e) {
         	e.printStackTrace();
         	// TODO: handle error
-        } finally {
-            RequestContext.getCurrentContext().unset();
         }
 	}
 

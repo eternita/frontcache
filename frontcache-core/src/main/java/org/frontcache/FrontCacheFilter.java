@@ -44,14 +44,10 @@ public class FrontCacheFilter implements Filter {
 			throws IOException, ServletException {
 
         try {
-        	fcEngine.init((HttpServletRequest) servletRequest, (HttpServletResponse) servletResponse, chain);
-        	
-            fcEngine.processRequest();
+            fcEngine.processRequest((HttpServletRequest) servletRequest, (HttpServletResponse) servletResponse, chain);
         } catch (Throwable e) {
         	e.printStackTrace();
         	// TODO: handle error
-        } finally {
-            RequestContext.getCurrentContext().unset();
         }
 		
 		return;

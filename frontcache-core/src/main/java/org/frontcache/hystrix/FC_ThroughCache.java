@@ -7,27 +7,23 @@ import org.frontcache.core.WebResponse;
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixCommandProperties;
-import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 
 /**
  * 
- * All GET requests (cached & not)
+ * All GET requests which flows through cache (cached & not)
  *
  */
-public class ThroughFrontcache extends HystrixCommand<WebResponse> {
+public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 
 	private final String originUrlStr;
 	private final CacheProcessor cache;
 
-    public ThroughFrontcache(CacheProcessor cache, String originUrlStr) {
+    public FC_ThroughCache(CacheProcessor cache, String originUrlStr) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("ThroughFrontcache"))
-                .andCommandPropertiesDefaults(
-                        HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)));
+                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache"))
+        		);
         
         this.originUrlStr = originUrlStr;
         this.cache = cache;

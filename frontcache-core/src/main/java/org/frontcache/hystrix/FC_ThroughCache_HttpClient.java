@@ -14,32 +14,31 @@ import org.apache.http.client.methods.HttpGet;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixCommandProperties;
-import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 
-public class ThroughFrontcache_HttpClient extends HystrixCommand<WebResponse> {
+public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
 	private final String urlStr;
 	private final MultiValuedMap<String, String> requestHeaders;
 	private final HttpClient client;
+	private final RequestContext context;
 
-    public ThroughFrontcache_HttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) {
+    public FC_ThroughCache_HttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("ThroughFrontcache_HttpClient"))
-                .andCommandPropertiesDefaults(
-                        HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)));
+                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache_HttpClient"))
+        		);
         
         this.urlStr = urlStr;
         this.requestHeaders = requestHeaders;
         this.client = client;
+        this.context = context;
     }
 
     @Override
@@ -56,7 +55,7 @@ public class ThroughFrontcache_HttpClient extends HystrixCommand<WebResponse> {
 				httpRequest.addHeader(header);
 			
 			response = client.execute(httpHost, httpRequest);
-			WebResponse webResp = FCUtils.httpResponse2WebComponent(urlStr, response);
+			WebResponse webResp = FCUtils.httpResponse2WebComponent(urlStr, response, context);
 			return webResp;
 
 		} catch (IOException ioe) {
