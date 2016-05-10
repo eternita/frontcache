@@ -7,6 +7,7 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessorFilter;
 
@@ -30,7 +31,7 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 		super();
 	}
 
-	public WebResponse callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
+	public WebResponse callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
 	{
 		if (isBot(requestHeaders))
 		{
@@ -41,7 +42,7 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 				return webResponse;
 
 			// recursive call to FCServlet
-			webResponse = FCUtils.dynamicCallHttpClient(urlStr, requestHeaders, client);
+			webResponse = FCUtils.dynamicCallHttpClient(urlStr, requestHeaders, client, context);
 			
 			
 			// TODO: put to cache if response is not cacheable (otherwise it's cached by the 'main' cache)
@@ -52,7 +53,7 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 
 		} else {
 			// recursive call to FCServlet
-			WebResponse webResponse = FCUtils.dynamicCallHttpClient(urlStr, requestHeaders, client);
+			WebResponse webResponse = FCUtils.dynamicCallHttpClient(urlStr, requestHeaders, client, context);
 			return webResponse;
 		}
 		

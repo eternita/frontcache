@@ -74,21 +74,20 @@ public class FCUtils {
 	 * @param httpResponse
 	 * @return
 	 */
-	public static WebResponse dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
+	public static WebResponse dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
-		RequestContext context = RequestContext.getCurrentContext();
 		if (context.isFilterMode())
-			 return new FC_ThroughCache_WebFilter().execute();
+			 return new FC_ThroughCache_WebFilter(context).execute();
 		else
-			 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client).execute();
+			 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }
 
 	/**
 	 * for includes - they allways use httpClient
 	 */
-	public static WebResponse dynamicCallHttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client) throws FrontCacheException
+	public static WebResponse dynamicCallHttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
-		 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client).execute();
+		 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }
 	
 
@@ -142,7 +141,7 @@ public class FCUtils {
 		return webResponse;
 	}
 	
-	public static WebResponse httpResponse2WebComponent(String url, HttpResponse response) throws FrontCacheException, IOException
+	public static WebResponse httpResponse2WebComponent(String url, HttpResponse response, RequestContext context) throws FrontCacheException, IOException
 	{
 		
 		
@@ -163,7 +162,7 @@ public class FCUtils {
 		{
 			String originLocation = locationHeader.getValue();
 			
-			String fcLocation = transformRedirectURL(originLocation);
+			String fcLocation = transformRedirectURL(originLocation, context);
 				
 			headers.remove("Location");
 			headers.put("Location", fcLocation);
@@ -200,10 +199,9 @@ public class FCUtils {
 		return webResponse;
 	}
 	
-	public static String transformRedirectURL(String originLocation)
+	public static String transformRedirectURL(String originLocation, RequestContext context)
 	{
 		String fcLocation = null;
-		RequestContext context = RequestContext.getCurrentContext();
 		String protocol = getRequestProtocol(originLocation);
 		if ("https".equalsIgnoreCase(protocol))
 			fcLocation = "https://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
@@ -218,12 +216,12 @@ public class FCUtils {
      * returns query params as a Map with String keys and Lists of Strings as values
      * @return
      */
-    public static Map<String, List<String>> getQueryParams() {
+    public static Map<String, List<String>> getQueryParams(RequestContext context) {
 
-        Map<String, List<String>> qp = RequestContext.getCurrentContext().getRequestQueryParams();
+        Map<String, List<String>> qp = context.getRequestQueryParams();
         if (qp != null) return qp;
 
-        HttpServletRequest request = RequestContext.getCurrentContext().getRequest();
+        HttpServletRequest request = context.getRequest();
 
         qp = new HashMap<String, List<String>>();
 
@@ -275,7 +273,7 @@ public class FCUtils {
             }
         }
 
-        RequestContext.getCurrentContext().setRequestQueryParams(qp);
+        context.setRequestQueryParams(qp);
         return qp;
     }
 	
@@ -357,8 +355,8 @@ public class FCUtils {
         return requestURL;
 	}
 
-	public static String getQueryString(HttpServletRequest request) {
-		MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request);
+	public static String getQueryString(HttpServletRequest request, RequestContext context) {
+		MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request, context);
 		StringBuilder query=new StringBuilder();
 		
 		try {
@@ -593,8 +591,8 @@ public class FCUtils {
 		return httpHost;
 	}
 	
-	public static MultiValuedMap<String, String> builRequestQueryParams(HttpServletRequest request) {
-		Map<String, List<String>> map = FCUtils.getQueryParams();
+	public static MultiValuedMap<String, String> builRequestQueryParams(HttpServletRequest request, RequestContext context) {
+		Map<String, List<String>> map = FCUtils.getQueryParams(context);
 		MultiValuedMap<String, String> params = new ArrayListValuedHashMap<>();
 		if (map == null) {
 			return params;

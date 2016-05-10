@@ -53,3 +53,8 @@ http://localhost:8080/hystrix-dashboard/monitor/monitor.html?streams=%5B%7B%22na
 
 -Darchaius.configurationSource.additionalUrls=file:///Users/spa/git/frontcache/frontcache-coins/turbine/config.properties
 
+
+http://or.coinshome.net/hystrix-dashboard/monitor/monitor.html?streams=%5B%7B%22name%22%3A%22%22%2C%22stream%22%3A%22http%3A%2F%2Fsg.coinshome.net%2Fhystrix.stream%22%2C%22auth%22%3A%22%22%2C%22delay%22%3A%22%22%7D%2C%7B%22name%22%3A%22%22%2C%22stream%22%3A%22http%3A%2F%2For.coinshome.net%2Fhystrix.stream%22%2C%22auth%22%3A%22%22%2C%22delay%22%3A%22%22%7D%2C%7B%22name%22%3A%22%22%2C%22stream%22%3A%22http%3A%2F%2Fdirect.coinshome.net%2Fhystrix.stream%22%2C%22auth%22%3A%22%22%2C%22delay%22%3A%22%22%7D%5D
+
+
+

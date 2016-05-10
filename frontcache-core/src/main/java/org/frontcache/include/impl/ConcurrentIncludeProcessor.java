@@ -15,6 +15,7 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
@@ -69,10 +70,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param hostURL
 	 * @return
 	 */
-	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
+	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context)
 	{
 		String contentStr = new String(parentWebResponse.getContent());
-		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, requestHeaders, client);
+		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, requestHeaders, client, context);
 		
 		if (null == includes)
 			return parentWebResponse;
@@ -110,7 +111,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param hostURL
 	 * @return
 	 */
-	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client)
+	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context)
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
 		
@@ -131,7 +132,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 						includes = new ArrayList<IncludeResolutionPlaceholder>();
 					
 					// save placeholder
-					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, requestHeaders, client));
+					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, requestHeaders, client, context));
 					
 					scanIdx = endIdx;
 				} else {
@@ -194,21 +195,23 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		WebResponse webResponse;
 		MultiValuedMap<String, String> requestHeaders; 
 		HttpClient client;
+		RequestContext context;
 		
-		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, MultiValuedMap<String, String> requestHeaders, HttpClient client) {
+		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) {
 			super();
 			this.startIdx = startIdx;
 			this.endIdx = endIdx;
 			this.includeURL = includeURL;
 			this.requestHeaders = requestHeaders;
 			this.client = client;
+			this.context = context;
 		}
 
 	    @Override
 	    public IncludeResolutionPlaceholder call() throws Exception {
 	    	
 			try {
-				this.webResponse = callInclude(this.includeURL, this.requestHeaders, this.client);
+				this.webResponse = callInclude(this.includeURL, this.requestHeaders, this.client, this.context);
 
 			} catch (FrontCacheException e) {
 				logger.error("unexpected error processing include " + includeURL);

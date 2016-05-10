@@ -16,7 +16,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 
 
 /**
- * The Request Context holds request, response,  state information and data for ZuulFilters to access and share.
+ * The Request Context holds request, response,  state information and data to access and share.
  * The RequestContext lives for the duration of the request and is ThreadLocal.
  * extensions of RequestContext can be substituted by setting the contextClass.
  * Most methods here are convenience wrapper methods; the RequestContext is an extension of a ConcurrentHashMap
@@ -27,44 +27,11 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 
 //    private static final Logger LOG = LoggerFactory.getLogger(RequestContext.class);
 
-    protected static Class<? extends RequestContext> contextClass = RequestContext.class;
-
-
-    protected static final ThreadLocal<? extends RequestContext> threadLocal = new ThreadLocal<RequestContext>() {
-        @Override
-        protected RequestContext initialValue() {
-            try {
-                return contextClass.newInstance();
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }
-    };
-
 
     public RequestContext() {
         super();
     }
 
-    /**
-     * Override the default RequestContext
-     *
-     * @param clazz
-     */
-    public static void setContextClass(Class<? extends RequestContext> clazz) {
-        contextClass = clazz;
-    }
-
-
-    /**
-     * Get the current RequestContext
-     *
-     * @return the current RequestContext
-     */
-    public static RequestContext getCurrentContext() {
-        RequestContext context = threadLocal.get();
-        return context;
-    }
 
     /**
      * Convenience method to return a boolean value for a given key
@@ -405,14 +372,6 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         final String requestEncoding = this.getRequest().getHeader(FCHeaders.ACCEPT_ENCODING);
         return requestEncoding != null && requestEncoding.toLowerCase().contains("gzip");
     }
-
-    /**
-     * unsets the threadLocal context. Done at the end of the request.
-     */
-    public void unset() {
-        threadLocal.remove();
-    }
-
 
     /**
      * @return Map<String, List<String>>  of the request Query Parameters
