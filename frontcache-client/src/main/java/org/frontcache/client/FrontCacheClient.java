@@ -50,9 +50,8 @@ public class FrontCacheClient {
 			return requestFrontCache(urlParameters);
 		} catch (Exception e) {
 			e.printStackTrace();
+			return "ERROR " + e.getMessage(); 
 		}
-		
-		return null;
 	}
 	
 	/**
@@ -69,9 +68,8 @@ public class FrontCacheClient {
 			return requestFrontCache(urlParameters);
 		} catch (Exception e) {
 			e.printStackTrace();
+			return "ERROR " + e.getMessage(); 
 		}
-		
-		return null;
 	}
 
 	/**
@@ -87,9 +85,8 @@ public class FrontCacheClient {
 			return requestFrontCache(urlParameters);
 		} catch (Exception e) {
 			e.printStackTrace();
+			return "ERROR " + e.getMessage(); 
 		}
-		
-		return null;
 	}
 	
 	private String requestFrontCache(List<NameValuePair> urlParameters) throws IOException
