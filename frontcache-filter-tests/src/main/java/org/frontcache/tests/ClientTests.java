@@ -50,6 +50,26 @@ public class ClientTests extends CommonTestsBase {
 		Assert.assertNotEquals(-1, response.indexOf("cache status"));
 		logger.debug("response " + response);
 	}
+
+	@Test
+	public void getCachedKeysClient() throws Exception {
+		
+		frontcacheClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
+		
+		String response = frontcacheClient.getCachedKeys();
+		Assert.assertNotEquals(-1, response.indexOf("cached keys"));
+		logger.debug("response " + response);
+	}
+
+	@Test
+	public void getCachedKeysCluster() throws Exception {
+		
+		FrontCacheCluster fcCluster = new FrontCacheCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
+		
+		String response = fcCluster.getCachedKeys().get(FRONTCACHE_CLUSTER_NODE1);
+		Assert.assertNotEquals(-1, response.indexOf("cached keys"));
+		logger.debug("response " + response);
+	}
 	
 	@Test
 	public void invalidationByFilterTestClient() throws Exception {

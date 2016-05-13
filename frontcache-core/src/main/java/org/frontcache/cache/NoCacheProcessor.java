@@ -1,6 +1,8 @@
 package org.frontcache.cache;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -77,6 +79,11 @@ public class NoCacheProcessor implements CacheProcessor {
 		status.put("impl", this.getClass().getName());
 
 		return status;
+	}
+
+	@Override
+	public List<String> getCachedKeys() {
+		return new ArrayList<String>();
 	}
 
 }

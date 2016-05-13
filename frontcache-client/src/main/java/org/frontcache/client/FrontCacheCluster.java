@@ -157,4 +157,17 @@ public class FrontCacheCluster {
 		return response;
 	}
 	
+	/**
+	 * 
+	 * @return
+	 */
+	public Map<String, String> getCachedKeys()
+	{
+		Map<String, String> response = new ConcurrentHashMap<String, String>();
+		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.getCachedKeys()));
+
+		return response;
+	}
+
+	
 }
