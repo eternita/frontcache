@@ -1,5 +1,6 @@
 package org.frontcache.cache;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -31,4 +32,5 @@ public interface CacheProcessor {
 	
 	public Map<String, String> getCacheStatus();
 	
+	public List<String> getCachedKeys();
 }

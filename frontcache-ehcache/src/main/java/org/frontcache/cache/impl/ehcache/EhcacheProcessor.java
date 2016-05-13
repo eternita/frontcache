@@ -138,5 +138,14 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 		return status;
 	}
 	
+	@Override
+	public List<String> getCachedKeys() {
+		List<String> keys = new ArrayList<String>();
+		for (Object key : cache.getKeys())
+			keys.add(key.toString());
+
+		return keys;
+	}
+	
 }
 

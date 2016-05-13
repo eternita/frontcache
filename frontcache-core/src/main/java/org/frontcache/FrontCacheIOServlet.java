@@ -1,6 +1,7 @@
 package org.frontcache;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import javax.servlet.ServletConfig;
@@ -12,6 +13,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
+import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.DummyActionResponse;
 import org.frontcache.io.InvalidateActionResponse;
 import org.slf4j.Logger;
@@ -72,6 +74,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = getCacheStatus(req);
 			break;
 			
+		case "get-cached-keys":
+			aResponse = getCachedKeys(req);
+			break;
+			
 			default:
 				aResponse = new DummyActionResponse();
 			
@@ -112,6 +118,19 @@ public class FrontCacheIOServlet extends HttpServlet {
 	{
 		Map<String, String> state = CacheManager.getInstance().getCacheStatus();
 		ActionResponse aResponse = new CacheStatusActionResponse(state);
+			
+		return aResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getCachedKeys(HttpServletRequest req)
+	{
+		List<String> keys = CacheManager.getInstance().getCachedKeys();
+		ActionResponse aResponse = new CachedKeysActionResponse(keys);
 			
 		return aResponse;
 	}

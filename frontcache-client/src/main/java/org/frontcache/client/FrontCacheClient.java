@@ -141,6 +141,23 @@ public class FrontCacheClient {
 		}
 	}
 	
+	/**
+	 * 
+	 * @return
+	 */
+	public String getCachedKeys()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", "get-cached-keys"));
+		
+		try {
+			return requestFrontCache(urlParameters);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return "ERROR " + e.getMessage(); 
+		}
+	}
+	
 	private String requestFrontCache(List<NameValuePair> urlParameters) throws IOException
 	{
 		HttpPost post = new HttpPost(frontCacheURI);
