@@ -6,13 +6,26 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.http.HeaderElement;
+import org.apache.http.HeaderElementIterator;
+import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.ProtocolException;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.RedirectStrategy;
+import org.apache.http.client.config.CookieSpecs;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.conn.ConnectionKeepAliveStrategy;
+import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.protocol.HttpContext;
 
 public class FrontCacheClient {
 
@@ -25,7 +38,46 @@ public class FrontCacheClient {
 	private HttpClient client;
 
 	public FrontCacheClient(String frontcacheURL) {
-		client = HttpClientBuilder.create().build();
+		final RequestConfig requestConfig = RequestConfig.custom()
+				.setSocketTimeout(10000)
+				.setConnectTimeout(3000)
+				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
+				.build();
+		
+	    ConnectionKeepAliveStrategy keepAliveStrategy = new ConnectionKeepAliveStrategy() {
+	        @Override
+	        public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
+	            HeaderElementIterator it = new BasicHeaderElementIterator
+	                (response.headerIterator(HTTP.CONN_KEEP_ALIVE));
+	            while (it.hasNext()) {
+	                HeaderElement he = it.nextElement();
+	                String param = he.getName();
+	                String value = he.getValue();
+	                if (value != null && param.equalsIgnoreCase
+	                   ("timeout")) {
+	                    return Long.parseLong(value) * 1000;
+	                }
+	            }
+	            return 10 * 1000;
+	        }
+	    };
+	    
+	    client = HttpClients.custom()
+				.setDefaultRequestConfig(requestConfig)
+				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
+				.setKeepAliveStrategy(keepAliveStrategy)
+				.setRedirectStrategy(new RedirectStrategy() {
+					@Override
+					public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
+						return false;
+					}
+
+					@Override
+					public HttpUriRequest getRedirect(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
+						return null;
+					}
+				})
+				.build();
 		
 		this.frontCacheURL = frontcacheURL;
 		
