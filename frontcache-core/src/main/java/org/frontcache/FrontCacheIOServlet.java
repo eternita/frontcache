@@ -11,10 +11,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.cache.CacheManager;
+import org.frontcache.core.WebResponse;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.DummyActionResponse;
+import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.InvalidateActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +80,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = getCachedKeys(req);
 			break;
 			
+		case "get-from-cache":
+			aResponse = getFromCache(req);
+			break;
+			
 			default:
 				aResponse = new DummyActionResponse();
 			
@@ -133,6 +139,33 @@ public class FrontCacheIOServlet extends HttpServlet {
 		ActionResponse aResponse = new CachedKeysActionResponse(keys);
 			
 		return aResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getFromCache(HttpServletRequest req)
+	{
+		String key = req.getParameter("key");
+		if (null == key)
+			return new GetFromCacheActionResponse(key);
+		
+		WebResponse value = CacheManager.getInstance().getFromCache(key);
+		GetFromCacheActionResponse out = new GetFromCacheActionResponse(key, value);
+		
+		try {
+			byte[] b = jsonMapper.writeValueAsBytes(out);
+			
+			GetFromCacheActionResponse r = jsonMapper.readValue(b, GetFromCacheActionResponse.class);
+			
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return out;
 	}
 	
 	/**

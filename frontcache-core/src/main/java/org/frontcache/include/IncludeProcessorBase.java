@@ -1,8 +1,10 @@
 package org.frontcache.include;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -59,14 +61,20 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		
 	}
 	
-	protected void mergeIncludeResponseHeaders(MultiValuedMap<String, String> outHeaders, MultiValuedMap<String, String> includeResponseHeaders) 
+	protected void mergeIncludeResponseHeaders(Map<String, List<String>> outHeaders, Map<String, List<String>> includeResponseHeaders) 
 	{
-		// TODO: here is just copy headers from in to out
-		// ! make merge
 		synchronized (outHeaders) {
 			for (String name : includeResponseHeaders.keySet()) {
 				for (String value : includeResponseHeaders.get(name)) {
-					outHeaders.put(name, value);
+					
+					List<String> outHeadersValues = outHeaders.get(name);
+					if(null == outHeadersValues)
+					{
+						outHeadersValues = new ArrayList<String>();
+						outHeaders.put(name, outHeadersValues);
+					}
+					if (!outHeadersValues.contains(value))
+						outHeadersValues.add(value);
 				}
 			}
 		}
@@ -112,7 +120,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * @param client
 	 * @return
 	 */
-	protected WebResponse callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
+	protected WebResponse callInclude(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
 		
 		// recursive call to FCServlet (through bot filter / to cache sessionless requestsØ)

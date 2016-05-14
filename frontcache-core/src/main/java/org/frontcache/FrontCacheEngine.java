@@ -420,7 +420,7 @@ public class FrontCacheEngine {
 		
 		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method 
 		{
-			MultiValuedMap<String, String> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
+			Map<String, List<String>> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 
 			WebResponse webResponse = null;
 			try

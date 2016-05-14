@@ -2,6 +2,7 @@ package org.frontcache.include.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -11,7 +12,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FrontCacheException;
@@ -70,7 +70,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param hostURL
 	 * @return
 	 */
-	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context)
+	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
 	{
 		String contentStr = new String(parentWebResponse.getContent());
 		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, requestHeaders, client, context);
@@ -111,7 +111,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param hostURL
 	 * @return
 	 */
-	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context)
+	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
 		
@@ -193,11 +193,11 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		int endIdx;
 		String includeURL;
 		WebResponse webResponse;
-		MultiValuedMap<String, String> requestHeaders; 
+		Map<String, List<String>> requestHeaders; 
 		HttpClient client;
 		RequestContext context;
 		
-		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) {
+		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
 			super();
 			this.startIdx = startIdx;
 			this.endIdx = endIdx;
