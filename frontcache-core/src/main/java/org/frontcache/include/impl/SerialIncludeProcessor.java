@@ -1,7 +1,9 @@
 package org.frontcache.include.impl;
 
-import org.apache.commons.collections4.MultiValuedMap;
-import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FrontCacheException;
@@ -26,12 +28,13 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 	 * @param hostURL
 	 * @return
 	 */
-	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context)
+	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
 	{
 		String content = new String(parentWebResponse.getContent());
 		StringBuffer outSb = new StringBuffer();
 		
-		MultiValuedMap<String, String> outHeaders = new ArrayListValuedHashMap<String, String>();
+		Map<String, List<String>> outHeaders = new HashMap<String, List<String>>();
+		
 		int includeCounter = 0;
 		
 		int scanIdx = 0;

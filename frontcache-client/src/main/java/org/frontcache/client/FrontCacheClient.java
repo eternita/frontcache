@@ -26,6 +26,10 @@ import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
+import org.frontcache.core.WebResponse;
+import org.frontcache.io.GetFromCacheActionResponse;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class FrontCacheClient {
 
@@ -34,6 +38,8 @@ public class FrontCacheClient {
 	private String frontCacheURI;
 	
 	private final static String IO_URI = "frontcache-io";
+	
+	private ObjectMapper jsonMapper = new ObjectMapper();
 	
 	private HttpClient client;
 
@@ -157,7 +163,35 @@ public class FrontCacheClient {
 			return "ERROR " + e.getMessage(); 
 		}
 	}
+		
+	/**
+	 * 
+	 * @return
+	 */
+	public WebResponse getFromCache(String key)
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", "get-from-cache"));
+		urlParameters.add(new BasicNameValuePair("key", key));
+		
+		try {
+			String repStr = requestFrontCache(urlParameters);
+			GetFromCacheActionResponse r = jsonMapper.readValue(repStr.getBytes(), GetFromCacheActionResponse.class);
+			return r.getValue();
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
 	
+	/**
+	 * 
+	 * @param urlParameters
+	 * @return
+	 * @throws IOException
+	 */
 	private String requestFrontCache(List<NameValuePair> urlParameters) throws IOException
 	{
 		HttpPost post = new HttpPost(frontCacheURI);
