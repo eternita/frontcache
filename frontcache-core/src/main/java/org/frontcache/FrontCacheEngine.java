@@ -118,15 +118,6 @@ public class FrontCacheEngine {
 	    		} 
 	    	}
 			
-	    	Properties hystrixProperties = new Properties();
-	    	try {
-	    		hystrixProperties.load(FCConfig.getConfigInputStream("hystrix.properties"));
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-	    	System.getProperties().putAll(hystrixProperties);
-
-	    	
 			String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
 			if ("true".equalsIgnoreCase(debugCommentsStr))
 				debugComments = true;		
