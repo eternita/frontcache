@@ -27,6 +27,7 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.core.WebResponse;
+import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,24 +157,29 @@ public class FrontCacheClient {
 	 * 
 	 * @return
 	 */
-	public String getCachedKeys()
+	public CachedKeysActionResponse getCachedKeys()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", "get-cached-keys"));
 		
 		try {
-			return requestFrontCache(urlParameters);
+			String responseStr = requestFrontCache(urlParameters);
+			logger.debug("getFromCache() -> " + responseStr);
+			CachedKeysActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), CachedKeysActionResponse.class);
+			return actionResponse;
+			
 		} catch (Exception e) {
 			e.printStackTrace();
-			return "ERROR " + e.getMessage(); 
 		}
+		
+		return null;
 	}
 		
 	/**
 	 * 
 	 * @return
 	 */
-	public WebResponse getFromCache(String key)
+	public GetFromCacheActionResponse getFromCache(String key)
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", "get-from-cache"));
@@ -183,7 +189,7 @@ public class FrontCacheClient {
 			String responseStr = requestFrontCache(urlParameters);
 			logger.debug("getFromCache() -> " + responseStr);
 			GetFromCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFromCacheActionResponse.class);
-			return actionResponse.getValue();
+			return actionResponse;
 			
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.frontcache.io.CachedKeysActionResponse;
+
 public class FrontCacheCluster {
 
 	private Set<FrontCacheClient> fcCluster = new HashSet<FrontCacheClient>();
@@ -161,9 +163,9 @@ public class FrontCacheCluster {
 	 * 
 	 * @return
 	 */
-	public Map<String, String> getCachedKeys()
+	public Map<String, CachedKeysActionResponse> getCachedKeys()
 	{
-		Map<String, String> response = new ConcurrentHashMap<String, String>();
+		Map<String, CachedKeysActionResponse> response = new ConcurrentHashMap<String, CachedKeysActionResponse>();
 		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.getCachedKeys()));
 
 		return response;
