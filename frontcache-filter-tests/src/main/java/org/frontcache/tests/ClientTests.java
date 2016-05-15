@@ -5,6 +5,7 @@ import static org.junit.Assert.assertEquals;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.client.FrontCacheCluster;
 import org.frontcache.core.FCHeaders;
+import org.frontcache.io.CachedKeysActionResponse;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -56,8 +57,9 @@ public class ClientTests extends CommonTestsBase {
 		
 		frontcacheClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
 		
-		String response = frontcacheClient.getCachedKeys();
-		Assert.assertNotEquals(-1, response.indexOf("cached keys"));
+		CachedKeysActionResponse response = frontcacheClient.getCachedKeys();
+		Assert.assertNotNull(response);
+		Assert.assertEquals("cached keys", response.getAction());
 		logger.debug("response " + response);
 	}
 
@@ -66,8 +68,9 @@ public class ClientTests extends CommonTestsBase {
 		
 		FrontCacheCluster fcCluster = new FrontCacheCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
 		
-		String response = fcCluster.getCachedKeys().get(FRONTCACHE_CLUSTER_NODE1);
-		Assert.assertNotEquals(-1, response.indexOf("cached keys"));
+		CachedKeysActionResponse response = fcCluster.getCachedKeys().get(FRONTCACHE_CLUSTER_NODE1);
+		Assert.assertNotNull(response);
+		Assert.assertEquals("cached keys", response.getAction());
 		logger.debug("response " + response);
 	}
 	

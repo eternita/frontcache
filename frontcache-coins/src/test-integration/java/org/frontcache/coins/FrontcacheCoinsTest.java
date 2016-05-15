@@ -1,28 +1,13 @@
 package org.frontcache.coins;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URL;
-
-import org.apache.http.Header;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
-import org.frontcache.core.FCUtils;
-import org.frontcache.core.FrontCacheException;
+import org.frontcache.io.GetFromCacheActionResponse;
 import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,6 +136,45 @@ public class FrontcacheCoinsTest {
 		assertEquals("true", debugCached);
 		
 		printHeaders(webResponse);
+	}
+	
+	@Test
+	public void getFromCacheClientOR() throws Exception {
+
+		HtmlPage page = webClient.getPage("https://or.coinshome.net/fc/include-footer.htm?locale=zh");
+		
+		FrontCacheClient frontcacheClient = new FrontCacheClient("http://or.coinshome.net/");
+		
+		String key = "https://origin.coinshome.net:443/fc/include-footer.htm?locale=zh";
+
+		GetFromCacheActionResponse getFromCacheActionResponse = frontcacheClient.getFromCache(key);
+		org.frontcache.core.WebResponse response = getFromCacheActionResponse.getValue();
+		
+		assertEquals(key, getFromCacheActionResponse.getKey());
+		assertNotNull(getFromCacheActionResponse.getValue());
+//		System.out.println("!!! - URL " + response.getUrl());
+//		System.out.println("!!! - data " + new String(response.getContent()));
+		
+		return;
+	}
+	
+	@Test
+	public void getFromCacheClientOR2() throws Exception {
+		
+		HtmlPage page = webClient.getPage("http://or.coinshome.net/ru/coin_definition-500_%D0%A0%D0%B5%D0%B9%D1%81-%D0%97%D0%BE%D0%BB%D0%BE%D1%82%D0%BE-%D0%9F%D0%BE%D1%80%D1%82%D1%83%D0%B3%D0%B0%D0%BB%D0%B8%D1%8F_%D0%9A%D0%BE%D1%80%D0%BE%D0%BB%D0%B5%D0%B2%D1%81%D1%82%D0%B2%D0%BE_%D0%9F%D0%BE%D1%80%D1%82%D1%83%D0%B3%D0%B0%D0%BB%D0%B8%D1%8F_(1139_1910)-wMYK.GJA5KgAAAEtOOq374Fr.htm");
+		FrontCacheClient frontcacheClient = new FrontCacheClient("http://or.coinshome.net/");
+		
+		String key = "http://origin.coinshome.net:80/ru/coin_definition-500_%D0%A0%D0%B5%D0%B9%D1%81-%D0%97%D0%BE%D0%BB%D0%BE%D1%82%D0%BE-%D0%9F%D0%BE%D1%80%D1%82%D1%83%D0%B3%D0%B0%D0%BB%D0%B8%D1%8F_%D0%9A%D0%BE%D1%80%D0%BE%D0%BB%D0%B5%D0%B2%D1%81%D1%82%D0%B2%D0%BE_%D0%9F%D0%BE%D1%80%D1%82%D1%83%D0%B3%D0%B0%D0%BB%D0%B8%D1%8F_(1139_1910)-wMYK.GJA5KgAAAEtOOq374Fr.htm";
+		
+		GetFromCacheActionResponse getFromCacheActionResponse = frontcacheClient.getFromCache(key);
+		org.frontcache.core.WebResponse response = getFromCacheActionResponse.getValue();
+		
+		assertEquals(key, getFromCacheActionResponse.getKey());
+		assertNotNull(getFromCacheActionResponse.getValue());
+//		System.out.println("!!! - URL " + response.getUrl());
+//		System.out.println("!!! - data " + new String(response.getContent()));
+		
+		return;
 	}
 	
 	protected void printHeaders(WebResponse webResponse)

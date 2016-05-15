@@ -8,6 +8,9 @@ public class CachedKeysActionResponse extends ActionResponse {
 	
 	private List<String> cachedKeys;
 	
+	public CachedKeysActionResponse() { // for JSON mapper
+	}
+
 	public CachedKeysActionResponse(List<String> cachedKeys) {
 		setAction("cached keys");
 		setResponseStatus(RESPONSE_STATUS_OK);
