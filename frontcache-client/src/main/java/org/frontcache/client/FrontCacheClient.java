@@ -28,6 +28,8 @@ import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -42,6 +44,9 @@ public class FrontCacheClient {
 	private ObjectMapper jsonMapper = new ObjectMapper();
 	
 	private HttpClient client;
+	
+	private Logger logger = LoggerFactory.getLogger(FrontCacheClient.class);
+
 
 	public FrontCacheClient(String frontcacheURL) {
 		final RequestConfig requestConfig = RequestConfig.custom()
@@ -175,9 +180,10 @@ public class FrontCacheClient {
 		urlParameters.add(new BasicNameValuePair("key", key));
 		
 		try {
-			String repStr = requestFrontCache(urlParameters);
-			GetFromCacheActionResponse r = jsonMapper.readValue(repStr.getBytes(), GetFromCacheActionResponse.class);
-			return r.getValue();
+			String responseStr = requestFrontCache(urlParameters);
+			logger.debug("getFromCache() -> " + responseStr);
+			GetFromCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFromCacheActionResponse.class);
+			return actionResponse.getValue();
 			
 		} catch (Exception e) {
 			e.printStackTrace();

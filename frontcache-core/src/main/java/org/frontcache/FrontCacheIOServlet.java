@@ -142,7 +142,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 	
 	/**
-	 * 
+	 * TODO: improve me
 	 * @param req
 	 * @return
 	 */
@@ -152,20 +152,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 		if (null == key)
 			return new GetFromCacheActionResponse(key);
 		
-		WebResponse value = CacheManager.getInstance().getFromCache(key);
-		GetFromCacheActionResponse out = new GetFromCacheActionResponse(key, value);
+		WebResponse webResponse = CacheManager.getInstance().getFromCache(key);
+		GetFromCacheActionResponse actionResponse = new GetFromCacheActionResponse(key, webResponse);
 		
-		try {
-			byte[] b = jsonMapper.writeValueAsBytes(out);
-			
-			GetFromCacheActionResponse r = jsonMapper.readValue(b, GetFromCacheActionResponse.class);
-			
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		return out;
+		return actionResponse;
 	}
 	
 	/**
