@@ -74,7 +74,7 @@ public class ClientTests extends CommonTestsBase {
 	@Test
 	public void invalidationByFilterTestClient() throws Exception {
 		
-		final String TEST_URI = "common/cache-invalidation/a.jsp";
+		final String TEST_URI = "common/fc-agent/a.jsp";
 		
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
@@ -118,7 +118,7 @@ public class ClientTests extends CommonTestsBase {
 	public void invalidationByFilterTestCluster() throws Exception {
 		
 		FrontCacheCluster fcCluster = new FrontCacheCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
-		final String TEST_URI = "common/cache-invalidation/a.jsp";
+		final String TEST_URI = "common/fc-agent/a.jsp";
 		
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
@@ -160,8 +160,8 @@ public class ClientTests extends CommonTestsBase {
 	@Test
 	public void invalidationAllTestClient() throws Exception {
 		
-		final String TEST_URI_A = "common/cache-invalidation/a.jsp";
-		final String TEST_URI_B = "common/cache-invalidation/b.jsp";
+		final String TEST_URI_A = "common/fc-agent/a.jsp";
+		final String TEST_URI_B = "common/fc-agent/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 		frontcacheClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
 		
@@ -198,8 +198,8 @@ public class ClientTests extends CommonTestsBase {
 	@Test
 	public void invalidationAllTestCluster() throws Exception {
 		
-		final String TEST_URI_A = "common/cache-invalidation/a.jsp";
-		final String TEST_URI_B = "common/cache-invalidation/b.jsp";
+		final String TEST_URI_A = "common/fc-agent/a.jsp";
+		final String TEST_URI_B = "common/fc-agent/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 		FrontCacheCluster fcCluster = new FrontCacheCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
 		
@@ -232,4 +232,6 @@ public class ClientTests extends CommonTestsBase {
 		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
 		return;
 	}
+
+	
 }
