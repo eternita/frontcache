@@ -18,7 +18,7 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	
-    version = '0.7.1'
+    version = '0.7.4'
     group = 'org.frontcache'
 	
 	configurations {
@@ -238,6 +238,7 @@ project(':frontcache-coins') {
 
 	dependencies {
 		compile project(':frontcache-core')
+        compile project(':frontcache-client')
 		compile project(':frontcache-ehcache')
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
