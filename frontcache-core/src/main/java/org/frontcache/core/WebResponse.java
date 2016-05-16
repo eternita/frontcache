@@ -1,13 +1,17 @@
 package org.frontcache.core;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.collections4.MultiValuedMap;
-import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.frontcache.cache.CacheProcessor;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * 
@@ -15,6 +19,8 @@ import org.frontcache.cache.CacheProcessor;
  * 
  *
  */
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class WebResponse implements Serializable {
 
 
@@ -32,7 +38,7 @@ public class WebResponse implements Serializable {
 	/**
 	 * Some headers, such as Accept-Language can be sent by clients as several headers each with a different value rather than sending the header as a comma separated list
 	 */
-	private MultiValuedMap<String, String> headers;
+	private Map<String, List<String>> headers;
 	
 	private Set<String> tags;
 	
@@ -43,6 +49,9 @@ public class WebResponse implements Serializable {
 	// 123456789 expiration time in ms
 	private long expireTimeMillis = CacheProcessor.NO_CACHE;
 	
+	public WebResponse() { // for JSON converter
+		this("dummy", null, -1);
+	}
 	/**
 	 * some responses has no body (e.g. response for redirect)
 	 * 
@@ -59,7 +68,7 @@ public class WebResponse implements Serializable {
 	public WebResponse(String url, byte[] content, int cacheMaxAgeSec) {
 		super();
 		this.url = url;
-		this.headers = new ArrayListValuedHashMap<String, String>();
+		this.headers = new HashMap<String, List<String>>();
 		this.content = content;
 		setExpireTime(cacheMaxAgeSec);
 	}	
@@ -88,7 +97,7 @@ public class WebResponse implements Serializable {
 
 
 
-	public MultiValuedMap<String, String> getHeaders() {
+	public Map<String, List<String>> getHeaders() {
 		return headers;
 	}
 
@@ -115,7 +124,7 @@ public class WebResponse implements Serializable {
 	 * 
 	 * @param headers
 	 */
-	public void setHeaders(MultiValuedMap<String, String> headers) {
+	public void setHeaders(Map<String, List<String>> headers) {
 		this.headers = headers;
 		
 		return;
@@ -238,6 +247,17 @@ public class WebResponse implements Serializable {
 		
 		return -1;
 	}
+	
+	public void addHeader(String name, String value)
+	{
+		List<String> values = headers.get(name);
+		if(null == values)
+		{
+			values = new ArrayList<String>();
+			headers.put(name, values);
+		}
+		values.add(value);
+	}
 
     /**
      * 
@@ -257,11 +277,11 @@ public class WebResponse implements Serializable {
     	
     	if (null != headers)
     	{
-    		copy.headers = new ArrayListValuedHashMap<String, String>();
+    		copy.headers = new HashMap<String, List<String>>(); //ArrayListValuedHashMap<String, String>();
     		
     		for (String name : this.headers.keySet()) 
     			for (String value : headers.get(name)) 
-    				copy.headers.put(name, value);
+    				copy.addHeader(name, value);
     	}
     	
         return copy;

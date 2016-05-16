@@ -6,13 +6,35 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.http.HeaderElement;
+import org.apache.http.HeaderElementIterator;
+import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.ProtocolException;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.RedirectStrategy;
+import org.apache.http.client.config.CookieSpecs;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.conn.ConnectionKeepAliveStrategy;
+import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.protocol.HttpContext;
+import org.frontcache.core.WebResponse;
+import org.frontcache.io.CachedKeysActionResponse;
+import org.frontcache.io.GetFromCacheActionResponse;
+import org.frontcache.io.PutToCacheActionResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class FrontCacheClient {
 
@@ -22,10 +44,54 @@ public class FrontCacheClient {
 	
 	private final static String IO_URI = "frontcache-io";
 	
+	private ObjectMapper jsonMapper = new ObjectMapper();
+	
 	private HttpClient client;
+	
+	private Logger logger = LoggerFactory.getLogger(FrontCacheClient.class);
+
 
 	public FrontCacheClient(String frontcacheURL) {
-		client = HttpClientBuilder.create().build();
+		final RequestConfig requestConfig = RequestConfig.custom()
+				.setSocketTimeout(10000)
+				.setConnectTimeout(3000)
+				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
+				.build();
+		
+	    ConnectionKeepAliveStrategy keepAliveStrategy = new ConnectionKeepAliveStrategy() {
+	        @Override
+	        public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
+	            HeaderElementIterator it = new BasicHeaderElementIterator
+	                (response.headerIterator(HTTP.CONN_KEEP_ALIVE));
+	            while (it.hasNext()) {
+	                HeaderElement he = it.nextElement();
+	                String param = he.getName();
+	                String value = he.getValue();
+	                if (value != null && param.equalsIgnoreCase
+	                   ("timeout")) {
+	                    return Long.parseLong(value) * 1000;
+	                }
+	            }
+	            return 10 * 1000;
+	        }
+	    };
+	    
+	    client = HttpClients.custom()
+				.setDefaultRequestConfig(requestConfig)
+				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
+				.setKeepAliveStrategy(keepAliveStrategy)
+				.setRedirectStrategy(new RedirectStrategy() {
+					@Override
+					public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
+						return false;
+					}
+
+					@Override
+					public HttpUriRequest getRedirect(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
+						return null;
+					}
+				})
+				.build();
 		
 		this.frontCacheURL = frontcacheURL;
 		
@@ -89,6 +155,89 @@ public class FrontCacheClient {
 		}
 	}
 	
+	/**
+	 * 
+	 * @return
+	 */
+	public CachedKeysActionResponse getCachedKeys()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", "get-cached-keys"));
+		
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			logger.debug("getFromCache() -> " + responseStr);
+			CachedKeysActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), CachedKeysActionResponse.class);
+			return actionResponse;
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+		
+	/**
+	 * 
+	 * @return
+	 */
+	public GetFromCacheActionResponse getFromCache(String key)
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", "get-from-cache"));
+		urlParameters.add(new BasicNameValuePair("key", key));
+		
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			logger.debug("getFromCache() -> " + responseStr);
+			GetFromCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFromCacheActionResponse.class);
+			return actionResponse;
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * 
+	 * @return
+	 */
+	public PutToCacheActionResponse putToCache(WebResponse webResponse)
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", "put-to-cache"));
+		String webResponseJSON = null;
+		try {
+			webResponseJSON = jsonMapper.writeValueAsString(webResponse);
+		} catch (JsonProcessingException e1) {
+			e1.printStackTrace();
+			return null;
+		}
+
+		urlParameters.add(new BasicNameValuePair("webResponseJSON", webResponseJSON));
+		
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			logger.debug("putToCache() -> " + responseStr);
+			PutToCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), PutToCacheActionResponse.class);
+			return actionResponse;
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	
+	/**
+	 * 
+	 * @param urlParameters
+	 * @return
+	 * @throws IOException
+	 */
 	private String requestFrontCache(List<NameValuePair> urlParameters) throws IOException
 	{
 		HttpPost post = new HttpPost(frontCacheURI);

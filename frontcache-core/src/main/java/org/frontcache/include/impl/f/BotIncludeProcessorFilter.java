@@ -1,9 +1,9 @@
 package org.frontcache.include.impl.f;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
@@ -31,7 +31,7 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 		super();
 	}
 
-	public WebResponse callInclude(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
+	public WebResponse callInclude(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
 	{
 		if (isBot(requestHeaders))
 		{
@@ -59,7 +59,7 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 		
 	}
 	
-	private boolean isBot(MultiValuedMap<String, String> requestHeaders)
+	private boolean isBot(Map<String, List<String>> requestHeaders)
 	{		
 		if (null != requestHeaders.get("user-agent"))
 		{
@@ -78,5 +78,6 @@ public class BotIncludeProcessorFilter implements IncludeProcessorFilter
 			
 		return false;
 	}
+
 	
 }

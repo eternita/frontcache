@@ -1,10 +1,11 @@
 package org.frontcache.cache;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
@@ -21,7 +22,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	protected Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Override
-	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
+	public WebResponse processRequest(String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;
@@ -36,7 +37,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			try
 			{
 				//TODO: remove me after migration from FC filter in coinshome.net (or can be used for back compatibility)
-				requestHeaders.put(FCHeaders.X_AVOID_CHN_FRONTCACHE, "true");
+				List<String> hValues = new ArrayList<String>();
+				hValues.add("true");
+				requestHeaders.put(FCHeaders.X_AVOID_CHN_FRONTCACHE, hValues);
 				
 				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context);
 				lengthBytes = cachedWebResponse.getContentLenth();

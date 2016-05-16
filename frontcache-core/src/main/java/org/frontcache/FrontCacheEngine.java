@@ -11,9 +11,10 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -21,7 +22,6 @@ import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpRequest;
@@ -44,6 +44,7 @@ import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.Origin;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.FC_BypassCache;
@@ -60,9 +61,11 @@ public class FrontCacheEngine {
 	
 	private List <Pattern> uriIgnorePatterns = new ArrayList<Pattern>();
 
-	private String originHost = null;
-	private String originHttpPort = null;
-	private String originHttpsPort = null;
+//	private String originHost = null;
+//	private String originHttpPort = null;
+//	private String originHttpsPort = null;
+	
+	private Map<String, Origin> domainOriginMap = new ConcurrentHashMap<String, Origin>();
 	
 	private String frontcacheHttpPort = null;
 	private String frontcacheHttpsPort = null;
@@ -113,15 +116,6 @@ public class FrontCacheEngine {
 	    		} 
 	    	}
 			
-	    	Properties hystrixProperties = new Properties();
-	    	try {
-	    		hystrixProperties.load(FCConfig.getConfigInputStream("hystrix.properties"));
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-	    	System.getProperties().putAll(hystrixProperties);
-
-	    	
 			String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
 			if ("true".equalsIgnoreCase(debugCommentsStr))
 				debugComments = true;		
@@ -143,14 +137,68 @@ public class FrontCacheEngine {
 		initialize();
 	}
 	
+	private static final String DEFAULT_ORIGIN = "default";
+	
+	private void loadOrigins()
+	{
+		
+		String defaultOriginHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
+		String defaultOriginHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
+		String defaultOriginHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
+		
+		domainOriginMap.put(DEFAULT_ORIGIN, 
+				new Origin(defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
+		
+		String domainList = FCConfig.getProperty("front-cache.domains");
+		if (null != domainList)
+		{
+			for(String domain : domainList.split(","))
+			{
+				String originHost = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-host", defaultOriginHost);
+				String originHttpPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-http-port", defaultOriginHttpPort);
+				String originHttpsPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-https-port", defaultOriginHttpsPort);
+				
+				domainOriginMap.put(domain, 
+						new Origin(originHost, originHttpPort, originHttpsPort));
+			}
+		}
+		logger.info("Loaded following origin configurations: ");
+
+		for (String domain : domainOriginMap.keySet())
+			logger.info(" -- " + domainOriginMap.get(domain));
+			
+		return;
+	}
+	
+	/**
+	 * 
+	 * @param requestDomainName
+	 * @return
+	 */
+	private Origin getOrigin(String requestDomainName)
+	{
+		for (String domainSuffix : domainOriginMap.keySet())
+		{
+			if (requestDomainName.endsWith(domainSuffix))
+			{
+				if (requestDomainName.equals(domainSuffix))
+					return domainOriginMap.get(domainSuffix);
+				//case for abc.com & bc.com
+				if (requestDomainName.endsWith("." + domainSuffix))
+					return domainOriginMap.get(domainSuffix);
+			}
+		}
+		
+		// default
+		return domainOriginMap.get(DEFAULT_ORIGIN);
+	}
+	
 	private void initialize() {
 		
 		logger = LoggerFactory.getLogger(FrontCacheEngine.class);
 		
-		originHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
-		originHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
-		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
-
+		loadOrigins();
+		
 		frontcacheHttpPort = FCConfig.getProperty("front-cache.http-port", "80");
 		frontcacheHttpsPort = FCConfig.getProperty("front-cache.https-port", "443");
 		
@@ -187,18 +235,21 @@ public class FrontCacheEngine {
 		} else {
 			str.append("http");	
 		}
-		str.append("://").append(originHost).append(":");
+		
+		Origin origin = getOrigin(context.getRequest().getServerName());
+		
+		str.append("://").append(origin.getHost()).append(":");
 		if (isSecure) {
-			str.append(originHttpsPort);
+			str.append(origin.getHttpsPort());
 		} else {
-			str.append(originHttpPort);
+			str.append(origin.getHttpPort());
 		}
 
 		try {
 			URL routeUrl = new URL(str.toString());
 			return  routeUrl;
 		} catch (MalformedURLException e) {
-			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + originHost + ")", e);
+			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + origin.getHost() + ")", e);
 		}
 
 	}
@@ -303,26 +354,27 @@ public class FrontCacheEngine {
 	 */
     private RequestContext init(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) {
 
-        RequestContext ctx = new RequestContext();
-        ctx.setRequest(servletRequest);
-        ctx.setResponse(servletResponse);
+        RequestContext context = new RequestContext();
+        context.setRequest(servletRequest);
+        context.setResponse(servletResponse);
 		String uri = FCUtils.buildRequestURI(servletRequest);
-		ctx.setRequestURI(uri);
-		String queryString = FCUtils.getQueryString(servletRequest, ctx);
-		ctx.setRequestQueryString(queryString);
-		ctx.setFrontCacheHost(FCUtils.getHost(servletRequest));
-		ctx.setFrontCacheHttpPort(frontcacheHttpPort);
-		ctx.setFrontCacheHttpsPort(frontcacheHttpsPort);
+		context.setRequestURI(uri);
+		String queryString = FCUtils.getQueryString(servletRequest, context);
+		context.setRequestQueryString(queryString);
+		context.setFrontCacheHost(FCUtils.getHost(servletRequest));
+		context.setFrontCacheHttpPort(frontcacheHttpPort);
+		context.setFrontCacheHttpsPort(frontcacheHttpsPort);
 		
-		ctx.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
-        ctx.setOriginURL(getOriginUrl(ctx));
+		context.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
+        context.setOriginURL(getOriginUrl(context));
 
         if (null != filterChain)
         {
-            ctx.setFilterChain(filterChain);
-    		ctx.setFrontCacheHost(originHost); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
+            context.setFilterChain(filterChain);
+    		Origin origin = getOrigin(context.getRequest().getServerName());
+    		context.setFrontCacheHost(origin.getHost()); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
         }
-		return ctx;
+		return context;
     }
 
     
@@ -357,7 +409,7 @@ public class FrontCacheEngine {
 		
 		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method 
 		{
-			MultiValuedMap<String, String> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
+			Map<String, List<String>> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 
 			WebResponse webResponse = null;
 			try
@@ -482,16 +534,16 @@ public class FrontCacheEngine {
 	
 	private void addResponseHeaders(RequestContext context) {
 		HttpServletResponse servletResponse = context.getResponse();
-		MultiValuedMap<String, String> originResponseHeaders = context.getOriginResponseHeaders();
-
+		Map<String, List<String>> originResponseHeaders = context.getOriginResponseHeaders();
 		// process redirects
 		if (null != originResponseHeaders.get("Location") && 0 < originResponseHeaders.get("Location").size())
 		{
 			String originLocation = originResponseHeaders.remove("Location").iterator().next();
 			
 			String fcLocation = FCUtils.transformRedirectURL(originLocation, context);
-
-			originResponseHeaders.put("Location", fcLocation);
+			List hValues = new ArrayList<String>();
+			hValues.add(fcLocation);
+			originResponseHeaders.put("Location", hValues);
 		}
 		
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
