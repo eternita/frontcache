@@ -7,6 +7,8 @@ public class ActionResponse {
 	
 	private String responseStatus;
 	
+	private String errorDescription;
+	
 	private String action;
 	
 	public ActionResponse() {
@@ -28,6 +30,12 @@ public class ActionResponse {
 		this.responseStatus = responseStatus;
 	}
 
+	public String getErrorDescription() {
+		return errorDescription;
+	}
 
-	
+	public void setErrorDescription(String errorDescription) {
+		this.errorDescription = errorDescription;
+	}
+
 }

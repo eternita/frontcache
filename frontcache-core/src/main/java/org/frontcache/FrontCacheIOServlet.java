@@ -18,6 +18,7 @@ import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.DummyActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.InvalidateActionResponse;
+import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +85,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = getFromCache(req);
 			break;
 			
+		case "put-to-cache":
+			aResponse = putToCache(req);
+			break;
+			
 			default:
 				aResponse = new DummyActionResponse();
 			
@@ -142,7 +147,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 	
 	/**
-	 * TODO: improve me
 	 * @param req
 	 * @return
 	 */
@@ -154,6 +158,47 @@ public class FrontCacheIOServlet extends HttpServlet {
 		
 		WebResponse webResponse = CacheManager.getInstance().getFromCache(key);
 		GetFromCacheActionResponse actionResponse = new GetFromCacheActionResponse(key, webResponse);
+		
+		return actionResponse;
+	}
+	
+	/**
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse putToCache(HttpServletRequest req)
+	{
+		ActionResponse actionResponse = new PutToCacheActionResponse();
+		String webResponseJSONStr = req.getParameter("webResponseJSON");
+		if (null == webResponseJSONStr)
+		{
+			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			return actionResponse;
+		}
+		
+		WebResponse webResponse = null;
+		try {
+			webResponse = jsonMapper.readValue(webResponseJSONStr.getBytes(), WebResponse.class);
+		} catch (IOException e) {
+			e.printStackTrace();
+			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			actionResponse.setErrorDescription(e.getMessage());
+			return actionResponse;
+		}
+		if (null == webResponse)
+		{
+			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			return actionResponse;
+		}
+			
+		if (null == webResponse.getUrl())
+		{
+			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			actionResponse.setErrorDescription("null = webResponse.getUrl()");
+			return actionResponse;
+		}
+		
+		CacheManager.getInstance().putToCache(webResponse.getUrl(), webResponse);
 		
 		return actionResponse;
 	}
