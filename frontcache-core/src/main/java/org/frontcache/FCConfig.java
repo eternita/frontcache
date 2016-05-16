@@ -5,10 +5,17 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.netflix.config.ConcurrentMapConfiguration;
+import com.netflix.config.ConfigurationManager;
 
 
 public class FCConfig {
@@ -48,12 +55,21 @@ public class FCConfig {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+    	
+    	Map<String, Object> hystrixConfigMap = new HashMap<String, Object>();
+    	
 		logger.info("Hystrix.properties : ");
 		for (Object key : hystrixProperties.keySet())
+		{
 			logger.info("-- " + key + " - " + hystrixProperties.getProperty(key.toString()));
+			hystrixConfigMap.put(key.toString(), hystrixProperties.getProperty(key.toString()));
+		}
 			
+		// enable configuration from "hystrix.properties"
+		ConcurrentMapConfiguration systemProps = new ConcurrentMapConfiguration(hystrixConfigMap);
+    	ConfigurationManager.install(systemProps);
 
-    	System.getProperties().putAll(hystrixProperties);
+//    	System.getProperties().putAll(hystrixProperties);
     	
     	if (null == config)
     		throw new RuntimeException("Can't load " + FRONT_CACHE_CONFIG + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + " (environment variable)");
