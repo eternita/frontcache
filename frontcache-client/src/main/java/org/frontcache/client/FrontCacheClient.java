@@ -29,9 +29,11 @@ import org.apache.http.protocol.HttpContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
+import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class FrontCacheClient {
@@ -197,6 +199,38 @@ public class FrontCacheClient {
 		
 		return null;
 	}
+	
+	/**
+	 * 
+	 * @return
+	 */
+	public PutToCacheActionResponse putToCache(WebResponse webResponse)
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", "put-to-cache"));
+		String webResponseJSON = null;
+		try {
+			webResponseJSON = jsonMapper.writeValueAsString(webResponse);
+		} catch (JsonProcessingException e1) {
+			e1.printStackTrace();
+			return null;
+		}
+
+		urlParameters.add(new BasicNameValuePair("webResponseJSON", webResponseJSON));
+		
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			logger.debug("putToCache() -> " + responseStr);
+			PutToCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), PutToCacheActionResponse.class);
+			return actionResponse;
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
 	
 	/**
 	 * 
