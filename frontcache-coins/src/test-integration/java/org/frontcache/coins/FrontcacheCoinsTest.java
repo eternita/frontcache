@@ -1,11 +1,11 @@
 package org.frontcache.coins;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.io.GetFromCacheActionResponse;
+import org.frontcache.io.PutToCacheActionResponse;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -189,5 +189,34 @@ public class FrontcacheCoinsTest {
 		return;
 	}
 	
+/*	
+	@Test
+	public void putToCacheClientOR() throws Exception {
+
+		HtmlPage page = webClient.getPage("https://or.coinshome.net/fc/include-footer.htm?locale=zh");
+		
+		FrontCacheClient frontcacheClient = new FrontCacheClient("http://or.coinshome.net/");
+		
+		String key = "https://origin.coinshome.net:443/fc/include-footer.htm?locale=zh";
+
+		GetFromCacheActionResponse getFromCacheActionResponse = frontcacheClient.getFromCache(key);
+		org.frontcache.core.WebResponse response = getFromCacheActionResponse.getValue();
+		
+		assertEquals(key, getFromCacheActionResponse.getKey());
+		assertNotNull(getFromCacheActionResponse.getValue());
+		
+//		String str = new String(response.getContent()); // + " Hi Mister :)";
+//		str = str.substring(0, str.length() - " Hi Mister :)".length());
+//		response.setContent(str.getBytes());
+//		
+//		PutToCacheActionResponse actionResponse = frontcacheClient.putToCache(response);
+//		
+//		System.out.println(actionResponse);
+		
+//		fail("Stop");
+		
+		return;
+	}
+//*/	
 }
 
