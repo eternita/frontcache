@@ -137,9 +137,20 @@ project(':frontcache-client') {
 project(':frontcache-console-api') {
 	apply plugin: 'war'
 	
-    dependencies {
-        compile project(':frontcache-core')
-    }
+	dependencies {
+		compile project(':frontcache-core')
+		compile project(':frontcache-client')
+//		compile project(':frontcache-ehcache') - no persistence cache for tests
+		
+		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
+		compile 'jstl:jstl:1.2'
+		
+		provided 'junit:junit:4.12' // for common tests
+	}
+	
+	check {
+		dependsOn integrationTest
+	}
 }
 
 

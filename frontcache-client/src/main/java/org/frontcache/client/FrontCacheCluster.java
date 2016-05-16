@@ -4,18 +4,26 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.frontcache.core.WebResponse;
 import org.frontcache.io.CachedKeysActionResponse;
+import org.frontcache.io.GetFromCacheActionResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FrontCacheCluster {
 
 	private Set<FrontCacheClient> fcCluster = new HashSet<FrontCacheClient>();
 	
 	private final static String DEFAULT_CLUSTER_CONFIG_NAME = "frontcache-cluster.conf";
+	
+	private Logger logger = LoggerFactory.getLogger(FrontCacheCluster.class);
 	
 	public FrontCacheCluster(Set<String> fcURLSet) 
 	{
@@ -163,13 +171,92 @@ public class FrontCacheCluster {
 	 * 
 	 * @return
 	 */
-	public Map<String, CachedKeysActionResponse> getCachedKeys()
+	public Map<FrontCacheClient, CachedKeysActionResponse> getCachedKeys()
 	{
-		Map<String, CachedKeysActionResponse> response = new ConcurrentHashMap<String, CachedKeysActionResponse>();
-		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.getCachedKeys()));
+		Map<FrontCacheClient, CachedKeysActionResponse> response = new ConcurrentHashMap<FrontCacheClient, CachedKeysActionResponse>();
+		fcCluster.forEach(client -> response.put(client ,client.getCachedKeys()));
 
 		return response;
 	}
 
+	/**
+	 * 
+	 * Put all cached objects to all nodes in cluster.
+	 * Get all cached keys in cluster from all nodes - and re-populate difference for each node  
+	 * 
+	 * @return Map<FrontCacheClient, Long> - <fcClusterNode, amount of pushed updates to it>
+	 */
+	public Map<FrontCacheClient, Long> reDistriburteCache()
+	{
+		Map<FrontCacheClient, CachedKeysActionResponse> clusterCachedKeysActionResponseMap = getCachedKeys();
+		Map<String, FrontCacheClient> allKeys = new HashMap<String, FrontCacheClient>();
+		Map<FrontCacheClient, Long> updateCounterMap = new HashMap<FrontCacheClient, Long>();
+		
+		for (FrontCacheClient fcInstance : clusterCachedKeysActionResponseMap.keySet())
+		{
+			updateCounterMap.put(fcInstance, new Long(0)); // init counter
+			CachedKeysActionResponse resp = clusterCachedKeysActionResponseMap.get(fcInstance);
+			for (String key : resp.getCachedKeys())
+				allKeys.put(key, fcInstance);
+			
+			logger.debug(fcInstance + " - " + resp.getAmount() + " objects in cache");
+		}
+		logger.debug("total - " + allKeys.size() + " objects in all caches");
+		
+		for (String key : allKeys.keySet())
+		{
+			WebResponse webResponse = null;
+			for (FrontCacheClient fcInstance : clusterCachedKeysActionResponseMap.keySet())
+			{
+				CachedKeysActionResponse resp = clusterCachedKeysActionResponseMap.get(fcInstance);
+				List<String> fcCachedKeysList = resp.getCachedKeys();
+				if (!fcCachedKeysList.contains(key))
+				{
+					// FC instance doesn't have object with such key in it's cache
+					if (null == webResponse)
+					{
+						// get WebResponse from node which has it
+						FrontCacheClient fcWithCacheForKey = allKeys.get(key);
+						GetFromCacheActionResponse gfcResp = fcWithCacheForKey.getFromCache(key);
+						if (null != gfcResp && null != gfcResp.getValue())
+						{
+							webResponse = gfcResp.getValue();
+						}
+					}
+
+					if (null != webResponse)
+					{
+						fcInstance.putToCache(webResponse); // push WebResponse to cache on fcInstance 
+						incUpdateCounterMap(updateCounterMap, fcInstance);
+					} else {
+						logger.debug("Can't put " + key + " to " + fcInstance);
+					}
+					
+				} else {
+					// this fc has WebResponse with key='key' cached
+				}
+			}
+		}
+
+		logger.debug("Updates: ");
+		for (FrontCacheClient fcInstance : updateCounterMap.keySet())
+		{
+			logger.debug(fcInstance + " - " + updateCounterMap.get(fcInstance) + " updates posted");
+		}
+		
+		return updateCounterMap;
+	}
+	
+	private void incUpdateCounterMap(Map<FrontCacheClient, Long> updateCounterMap, FrontCacheClient fcInstance)
+	{
+		Long updateCounter = updateCounterMap.get(fcInstance);
+		if (null == updateCounter)
+		{
+			updateCounterMap.put(fcInstance, new Long(1));
+		} else {
+			updateCounterMap.put(fcInstance, new Long(1 + updateCounter.longValue()));
+		}
+		return;
+	}
 	
 }

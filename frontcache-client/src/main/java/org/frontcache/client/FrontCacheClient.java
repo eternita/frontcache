@@ -284,5 +284,11 @@ public class FrontCacheClient {
 			return false;
 		return true;
 	}
+
+	@Override
+	public String toString() {
+		return "FrontCacheClient [" + frontCacheURL + "]";
+	}
+	
 	
 }
