@@ -37,6 +37,12 @@ public class FrontCacheCluster {
 			fcCluster.add(new FrontCacheClient(url));
 	}
 
+	public FrontCacheCluster(FrontCacheClient ... fcClients) 
+	{
+		for (FrontCacheClient fcClient : fcClients)
+			fcCluster.add(fcClient);
+	}
+
 	public FrontCacheCluster() 
 	{
 		this(DEFAULT_CLUSTER_CONFIG_NAME);

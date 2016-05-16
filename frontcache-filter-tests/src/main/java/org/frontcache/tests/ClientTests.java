@@ -66,9 +66,11 @@ public class ClientTests extends CommonTestsBase {
 	@Test
 	public void getCachedKeysCluster() throws Exception {
 		
-		FrontCacheCluster fcCluster = new FrontCacheCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
+		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1);
+		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2);
+		FrontCacheCluster fcCluster = new FrontCacheCluster(frontCacheClient1, frontCacheClient2);
 		
-		CachedKeysActionResponse response = fcCluster.getCachedKeys().get(FRONTCACHE_CLUSTER_NODE1);
+		CachedKeysActionResponse response = fcCluster.getCachedKeys().get(frontCacheClient1);
 		Assert.assertNotNull(response);
 		Assert.assertEquals("cached keys", response.getAction());
 		logger.debug("response " + response);
