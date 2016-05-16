@@ -12,7 +12,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,7 +22,6 @@ import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpRequest;
@@ -536,16 +534,16 @@ public class FrontCacheEngine {
 	
 	private void addResponseHeaders(RequestContext context) {
 		HttpServletResponse servletResponse = context.getResponse();
-		MultiValuedMap<String, String> originResponseHeaders = context.getOriginResponseHeaders();
-
+		Map<String, List<String>> originResponseHeaders = context.getOriginResponseHeaders();
 		// process redirects
 		if (null != originResponseHeaders.get("Location") && 0 < originResponseHeaders.get("Location").size())
 		{
 			String originLocation = originResponseHeaders.remove("Location").iterator().next();
 			
 			String fcLocation = FCUtils.transformRedirectURL(originLocation, context);
-
-			originResponseHeaders.put("Location", fcLocation);
+			List hValues = new ArrayList<String>();
+			hValues.add(fcLocation);
+			originResponseHeaders.put("Location", hValues);
 		}
 		
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
