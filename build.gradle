@@ -134,7 +134,7 @@ project(':frontcache-client') {
 	build.dependsOn uploadArchives
 }
 
-project(':frontcache-web') {
+project(':frontcache-console-api') {
 	apply plugin: 'war'
 	
     dependencies {
@@ -214,7 +214,7 @@ project(':frontcache-standalone-tests') {
 	
 }
 
-project(':frontcache-coins') {
+project(':frontcache-prod-conf') {
 	apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
 
