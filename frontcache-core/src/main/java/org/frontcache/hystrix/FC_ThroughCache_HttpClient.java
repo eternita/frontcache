@@ -2,8 +2,9 @@ package org.frontcache.hystrix;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.List;
+import java.util.Map;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
@@ -24,11 +25,11 @@ import com.netflix.hystrix.HystrixCommandKey;
 public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
 	private final String urlStr;
-	private final MultiValuedMap<String, String> requestHeaders;
+	private final Map<String, List<String>> requestHeaders;
 	private final HttpClient client;
 	private final RequestContext context;
 
-    public FC_ThroughCache_HttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) {
+    public FC_ThroughCache_HttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
@@ -47,7 +48,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
 		try {
 			HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
-			HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(urlStr));//(verb, uri + context.getRequestQueryString());
+			HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(urlStr));
 
 			// translate headers
 			Header[] httpHeaders = FCUtils.convertHeaders(requestHeaders);

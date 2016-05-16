@@ -20,8 +20,6 @@ import java.util.StringTokenizer;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.collections4.MultiValuedMap;
-import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
@@ -74,7 +72,7 @@ public class FCUtils {
 	 * @param httpResponse
 	 * @return
 	 */
-	public static WebResponse dynamicCall(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
+	public static WebResponse dynamicCall(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
 		if (context.isFilterMode())
 			 return new FC_ThroughCache_WebFilter(context).execute();
@@ -85,7 +83,7 @@ public class FCUtils {
 	/**
 	 * for includes - they allways use httpClient
 	 */
-	public static WebResponse dynamicCallHttpClient(String urlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
+	public static WebResponse dynamicCallHttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
 		 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }
@@ -125,18 +123,25 @@ public class FCUtils {
 		webResponse.setStatusCode(originWrappedResponse.getStatus());
 
 		// get headers
-		MultiValuedMap<String, String> headers = new ArrayListValuedHashMap<String, String>();
+    	Map<String, List<String>> headers = new HashMap<String, List<String>>();
 		for (String headerName : originWrappedResponse.getHeaderNames())
-			if (isIncludedHeaderToResponse(headerName))
-				headers.put(headerName, originWrappedResponse.getHeader(headerName));
+		if (isIncludedHeaderToResponse(headerName))
+		{
+			List<String> hValues = headers.get(headerName);
+			if(null == hValues)
+			{
+				hValues = new ArrayList<String>();
+				headers.put(headerName, hValues);
+			}
+			hValues.add(originWrappedResponse.getHeader(headerName));
+		}
+		webResponse.setHeaders(headers);
 		
 		// filter may not set up content type yet -> check and setup 
 		if (null != dataStr && 0 == headers.get("Content-Type").size())
 		{
-			headers.put("Content-Type", contentType); 
+			webResponse.addHeader("Content-Type", contentType); 
 		}
-
-		webResponse.setHeaders(headers);
 		
 		return webResponse;
 	}
@@ -151,21 +156,6 @@ public class FCUtils {
 		{
 			// error
 //			throw new RuntimeException("Wrong response code " + httpResponseCode);
-		}
-
-		// get headers
-		MultiValuedMap<String, String> headers = revertHeaders(response.getAllHeaders());
-		
-		// process redirects
-		Header locationHeader = response.getFirstHeader("Location");
-		if (null != locationHeader)
-		{
-			String originLocation = locationHeader.getValue();
-			
-			String fcLocation = transformRedirectURL(originLocation, context);
-				
-			headers.remove("Location");
-			headers.put("Location", fcLocation);
 		}
 		
 		String contentType = "";
@@ -190,11 +180,22 @@ public class FCUtils {
 		}
 		respData = baos.toByteArray();
 		
-		
-		webResponse = parseWebComponent(url, respData, revertHeaders(response.getAllHeaders()), contentType);
+		Map<String, List<String>> headers = revertHeaders(response.getAllHeaders());
+		webResponse = parseWebComponent(url, respData, headers, contentType);
 
-		webResponse.setStatusCode(httpResponseCode);
 		webResponse.setHeaders(headers);
+		webResponse.setStatusCode(httpResponseCode);
+		
+		// process redirects
+		Header locationHeader = response.getFirstHeader("Location");
+		if (null != locationHeader)
+		{
+			String originLocation = locationHeader.getValue();
+			
+			String fcLocation = transformRedirectURL(originLocation, context);
+			webResponse.getHeaders().remove("Location");
+			webResponse.addHeader("Location", fcLocation);
+		}
 		
 		return webResponse;
 	}
@@ -225,7 +226,7 @@ public class FCUtils {
 
         qp = new HashMap<String, List<String>>();
 
-        if (request.getQueryString() == null) return null;
+        if (request.getQueryString() == null) return qp;
         StringTokenizer st = new StringTokenizer(request.getQueryString(), "&");
         int i;
 
@@ -283,23 +284,40 @@ public class FCUtils {
      * @param headers
      * @return
      */
-    public static MultiValuedMap<String, String> revertHeaders(Header[] headers) {
-		MultiValuedMap<String, String> map = new ArrayListValuedHashMap<String, String>();
+    public static Map<String, List<String>> revertHeaders(Header[] headers) {
+    	Map<String, List<String>> map = new HashMap<String, List<String>>();
 		for (Header header : headers) {
 			String name = header.getName();
 			
 			if (isIncludedHeaderToResponse(name))
-				map.put(name, header.getValue());
+			{
+				List<String> hValues = map.get(name);
+				if(null == hValues)
+				{
+					hValues = new ArrayList<String>();
+					map.put(name, hValues);
+				}
+				hValues.add(header.getValue());
+			}
 		}
 		return map;
 	}
 
-    public static MultiValuedMap<String, String> revertHeaders(HttpServletResponse response) {
-		MultiValuedMap<String, String> map = new ArrayListValuedHashMap<String, String>();
+    public static Map<String, List<String>> revertHeaders(HttpServletResponse response) {
+    	Map<String, List<String>> map = new HashMap<String, List<String>>();
 		for (String name : response.getHeaderNames())
+		{
 			if (isIncludedHeaderToResponse(name))
-				map.put(name, response.getHeader(name));
-		
+			{
+				List<String> hValues = map.get(name);
+				if(null == hValues)
+				{
+					hValues = new ArrayList<String>();
+					map.put(name, hValues);
+				}
+				hValues.add(response.getHeader(name));
+			}
+		}
 		return map;
 	}
     
@@ -315,7 +333,7 @@ public class FCUtils {
 		}
 	}
 
-	public static Header[] convertHeaders(MultiValuedMap<String, String> headers) {
+	public static Header[] convertHeaders(Map<String, List<String>> headers) {
 		List<Header> list = new ArrayList<>();
 		for (String name : headers.keySet()) {
 			for (String value : headers.get(name)) {
@@ -356,7 +374,7 @@ public class FCUtils {
 	}
 
 	public static String getQueryString(HttpServletRequest request, RequestContext context) {
-		MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request, context);
+		Map<String, List<String>> params = FCUtils.getQueryParams(context); 
 		StringBuilder query=new StringBuilder();
 		
 		try {
@@ -412,7 +430,7 @@ public class FCUtils {
 	 * @param contentStr
 	 * @return
 	 */
-	private static final WebResponse parseWebComponent (String urlStr, byte[] content, MultiValuedMap<String, String> headers, String contentType)
+	private static final WebResponse parseWebComponent (String urlStr, byte[] content, Map<String, List<String>> headers, String contentType)
 	{
 		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
 		byte[] outContentBody = content;
@@ -591,23 +609,9 @@ public class FCUtils {
 		return httpHost;
 	}
 	
-	public static MultiValuedMap<String, String> builRequestQueryParams(HttpServletRequest request, RequestContext context) {
-		Map<String, List<String>> map = FCUtils.getQueryParams(context);
-		MultiValuedMap<String, String> params = new ArrayListValuedHashMap<>();
-		if (map == null) {
-			return params;
-		}
-		for (String key : map.keySet()) {
-			for (String value : map.get(key)) {
-				params.put(key, value);
-			}
-		}
-		return params;
-	}	
+	public static Map<String, List<String>> buildRequestHeaders(HttpServletRequest request) {
 
-	public static MultiValuedMap<String, String> buildRequestHeaders(HttpServletRequest request) {
-
-		MultiValuedMap<String, String> headers = new ArrayListValuedHashMap<>();
+		Map<String, List<String>> headers = new HashMap<String, List<String>>();
 		Enumeration<String> headerNames = request.getHeaderNames();
 		if (headerNames != null) {
 			while (headerNames.hasMoreElements()) {
@@ -616,7 +620,14 @@ public class FCUtils {
 					Enumeration<String> values = request.getHeaders(name);
 					while (values.hasMoreElements()) {
 						String value = values.nextElement();
-						headers.put(name, value);
+						
+						List<String> hValues = headers.get(name);
+						if(null == hValues)
+						{
+							hValues = new ArrayList<String>();
+							headers.put(name, hValues);
+						}
+						hValues.add(value);
 					}
 				}
 			}

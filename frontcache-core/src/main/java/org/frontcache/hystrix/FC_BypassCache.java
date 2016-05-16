@@ -3,13 +3,14 @@ package org.frontcache.hystrix;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.List;
+import java.util.Map;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
@@ -66,8 +67,8 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			
 			// stand alone mode
 			
-			MultiValuedMap<String, String> headers = FCUtils.buildRequestHeaders(request);
-			MultiValuedMap<String, String> params = FCUtils.builRequestQueryParams(request, context);
+			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request);
+			Map<String, List<String>> params = FCUtils.getQueryParams(context);
 			String verb = FCUtils.getVerb(request);
 			InputStream requestEntity = getRequestBody(request);
 			String uri = context.getRequestURI();
@@ -100,7 +101,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 	}
 
 	
-	private void setResponse(int status, InputStream entity, MultiValuedMap<String, String> headers) throws IOException {
+	private void setResponse(int status, InputStream entity, Map<String, List<String>> headers) throws IOException {
 		
 		context.setResponseStatusCode(status);
 		
@@ -142,7 +143,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 	 * @throws Exception
 	 */
 	private HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
-			MultiValuedMap<String, String> headers, MultiValuedMap<String, String> params, InputStream requestEntity)
+			Map<String, List<String>> headers, Map<String, List<String>> params, InputStream requestEntity)
 					throws Exception {
 
 		URL host = context.getOriginURL();

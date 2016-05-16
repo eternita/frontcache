@@ -1,6 +1,7 @@
 package org.frontcache;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import javax.servlet.ServletConfig;
@@ -10,10 +11,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.cache.CacheManager;
+import org.frontcache.core.WebResponse;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
+import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.DummyActionResponse;
+import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.InvalidateActionResponse;
+import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +77,18 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = getCacheStatus(req);
 			break;
 			
+		case "get-cached-keys":
+			aResponse = getCachedKeys(req);
+			break;
+			
+		case "get-from-cache":
+			aResponse = getFromCache(req);
+			break;
+			
+		case "put-to-cache":
+			aResponse = putToCache(req);
+			break;
+			
 			default:
 				aResponse = new DummyActionResponse();
 			
@@ -114,6 +131,76 @@ public class FrontCacheIOServlet extends HttpServlet {
 		ActionResponse aResponse = new CacheStatusActionResponse(state);
 			
 		return aResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getCachedKeys(HttpServletRequest req)
+	{
+		List<String> keys = CacheManager.getInstance().getCachedKeys();
+		ActionResponse aResponse = new CachedKeysActionResponse(keys);
+			
+		return aResponse;
+	}
+	
+	/**
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getFromCache(HttpServletRequest req)
+	{
+		String key = req.getParameter("key");
+		if (null == key)
+			return new GetFromCacheActionResponse(key);
+		
+		WebResponse webResponse = CacheManager.getInstance().getFromCache(key);
+		GetFromCacheActionResponse actionResponse = new GetFromCacheActionResponse(key, webResponse);
+		
+		return actionResponse;
+	}
+	
+	/**
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse putToCache(HttpServletRequest req)
+	{
+		ActionResponse actionResponse = new PutToCacheActionResponse();
+		String webResponseJSONStr = req.getParameter("webResponseJSON");
+		if (null == webResponseJSONStr)
+		{
+			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			return actionResponse;
+		}
+		
+		WebResponse webResponse = null;
+		try {
+			webResponse = jsonMapper.readValue(webResponseJSONStr.getBytes(), WebResponse.class);
+		} catch (IOException e) {
+			e.printStackTrace();
+			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			actionResponse.setErrorDescription(e.getMessage());
+			return actionResponse;
+		}
+		if (null == webResponse)
+		{
+			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			return actionResponse;
+		}
+			
+		if (null == webResponse.getUrl())
+		{
+			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			actionResponse.setErrorDescription("null = webResponse.getUrl()");
+			return actionResponse;
+		}
+		
+		CacheManager.getInstance().putToCache(webResponse.getUrl(), webResponse);
+		
+		return actionResponse;
 	}
 	
 	/**

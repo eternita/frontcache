@@ -126,6 +126,13 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 		
 		return status;
 	}
+
+	@Override
+	public List<String> getCachedKeys() {
+		List<String> keys = new ArrayList<String>();
+		keys.addAll(cache.keySet());
+		return keys;
+	}
 	
 }
 

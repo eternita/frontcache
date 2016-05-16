@@ -18,7 +18,7 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	
-    version = '0.7.1'
+    version = '0.7.5'
     group = 'org.frontcache'
 	
 	configurations {
@@ -108,7 +108,6 @@ project(':frontcache-core') {
 		compile         'com.fasterxml.jackson.core:jackson-annotations:2.1.2'		
         compile         'org.apache.httpcomponents:httpclient:4.5.1'
         compile         'commons-io:commons-io:2.4'
-        compile         'org.apache.commons:commons-collections4:4.1'
         compile         'ch.qos.logback:logback-classic:1.1.3'
 		compile         'com.netflix.hystrix:hystrix-core:1.5.2'
 		compile         'com.netflix.hystrix:hystrix-metrics-event-stream:1.5.2'
@@ -238,6 +237,7 @@ project(':frontcache-coins') {
 
 	dependencies {
 		compile project(':frontcache-core')
+        compile project(':frontcache-client')
 		compile project(':frontcache-ehcache')
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'

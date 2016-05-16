@@ -1,10 +1,11 @@
 package org.frontcache.cache;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
@@ -19,7 +20,7 @@ public class NoCacheProcessor implements CacheProcessor {
 	private Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Override
-	public WebResponse processRequest(String originUrlStr, MultiValuedMap<String, String> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
+	public WebResponse processRequest(String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;
@@ -77,6 +78,11 @@ public class NoCacheProcessor implements CacheProcessor {
 		status.put("impl", this.getClass().getName());
 
 		return status;
+	}
+
+	@Override
+	public List<String> getCachedKeys() {
+		return new ArrayList<String>();
 	}
 
 }

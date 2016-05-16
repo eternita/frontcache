@@ -2,6 +2,8 @@ package org.frontcache.core;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,8 +12,6 @@ import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.collections4.MultiValuedMap;
-import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.http.client.methods.CloseableHttpResponse;
 
 
@@ -246,12 +246,12 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * @return the List<Pair<String, String>> of headers sent back from the origin
      */
     @SuppressWarnings("unchecked")
-	public MultiValuedMap<String, String> getOriginResponseHeaders() {
+	public Map<String, List<String>> getOriginResponseHeaders() {
         if (get("originResponseHeaders") == null) {
-        	MultiValuedMap<String, String> originResponseHeaders = new ArrayListValuedHashMap<>();
+        	Map<String, List<String>> originResponseHeaders = new HashMap<String, List<String>>();
             putIfAbsent("originResponseHeaders", originResponseHeaders);
         }
-        return (MultiValuedMap<String, String>) get("originResponseHeaders");
+        return (Map<String, List<String>>) get("originResponseHeaders");
     }
     
     /**
@@ -260,7 +260,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      */
     public boolean isCacheableResponse()
     {
-    	MultiValuedMap<String, String> originResponseHeaders = getOriginResponseHeaders();
+    	Map<String, List<String>> originResponseHeaders = getOriginResponseHeaders();
 		
 		for (String key : originResponseHeaders.keySet()) {
 			for (String value : originResponseHeaders.get(key)) {
@@ -295,7 +295,16 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * @param value
      */
     public void addOriginResponseHeader(String name, String value) {
-        getOriginResponseHeaders().put(name, value);
+    	
+    	Map<String, List<String>> originResponseHeaders = getOriginResponseHeaders();
+    	
+		List<String> hValues = originResponseHeaders.get(name);
+		if(null == hValues)
+		{
+			hValues = new ArrayList<String>();
+			originResponseHeaders.put(name, hValues);
+		}
+		hValues.add(value);
     }
 
     /**
