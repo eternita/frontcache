@@ -138,7 +138,7 @@ public class FCUtils {
 		webResponse.setHeaders(headers);
 		
 		// filter may not set up content type yet -> check and setup 
-		if (null != dataStr && 0 == headers.get("Content-Type").size())
+		if (null != dataStr && null == headers.get("Content-Type"))
 		{
 			webResponse.addHeader("Content-Type", contentType); 
 		}
