@@ -189,7 +189,7 @@ public class FrontCacheClient {
 		
 		try {
 			String responseStr = requestFrontCache(urlParameters);
-			logger.debug("getFromCache() -> " + responseStr);
+			logger.debug("getFromCache(" + this + ") -> " + responseStr);
 			GetFromCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFromCacheActionResponse.class);
 			return actionResponse;
 			
@@ -220,7 +220,7 @@ public class FrontCacheClient {
 		
 		try {
 			String responseStr = requestFrontCache(urlParameters);
-			logger.debug("putToCache() -> " + responseStr);
+			logger.debug("putToCache(" + this + ") -> " + responseStr);
 			PutToCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), PutToCacheActionResponse.class);
 			return actionResponse;
 			

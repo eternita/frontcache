@@ -195,40 +195,52 @@ public class FrontCacheCluster {
 	public Map<FrontCacheClient, Long> reDistriburteCache()
 	{
 		Map<FrontCacheClient, CachedKeysActionResponse> clusterCachedKeysActionResponseMap = getCachedKeys();
-		Map<String, FrontCacheClient> allKeys = new HashMap<String, FrontCacheClient>();
-		Map<FrontCacheClient, Long> updateCounterMap = new HashMap<FrontCacheClient, Long>();
-		
-		for (FrontCacheClient fcInstance : clusterCachedKeysActionResponseMap.keySet())
-		{
+		final Map<String, FrontCacheClient> allKeys = new HashMap<String, FrontCacheClient>();
+		Map<String, FrontCacheClient> missedKeys = new HashMap<String, FrontCacheClient>(); // keys missed in at least one node
+		Map<FrontCacheClient, Long> updateCounterMap = new ConcurrentHashMap<FrontCacheClient, Long>();
+
+		clusterCachedKeysActionResponseMap.forEach((fcInstance,resp)->{
 			updateCounterMap.put(fcInstance, new Long(0)); // init counter
-			CachedKeysActionResponse resp = clusterCachedKeysActionResponseMap.get(fcInstance);
 			for (String key : resp.getCachedKeys())
 				allKeys.put(key, fcInstance);
 			
 			logger.debug(fcInstance + " - " + resp.getAmount() + " objects in cache");
-		}
-		logger.debug("total - " + allKeys.size() + " objects in all caches");
+		});
 		
-		for (String key : allKeys.keySet())
-		{
-			WebResponse webResponse = null;
-			for (FrontCacheClient fcInstance : clusterCachedKeysActionResponseMap.keySet())
+		logger.debug("total - " + allKeys.size() + " objects in all caches");
+
+		allKeys.forEach((key, fcInstance)->{
+
+			for (CachedKeysActionResponse resp : clusterCachedKeysActionResponseMap.values())
 			{
-				CachedKeysActionResponse resp = clusterCachedKeysActionResponseMap.get(fcInstance);
 				List<String> fcCachedKeysList = resp.getCachedKeys();
 				if (!fcCachedKeysList.contains(key))
 				{
-					// FC instance doesn't have object with such key in it's cache
-					if (null == webResponse)
-					{
-						// get WebResponse from node which has it
-						FrontCacheClient fcWithCacheForKey = allKeys.get(key);
-						GetFromCacheActionResponse gfcResp = fcWithCacheForKey.getFromCache(key);
-						if (null != gfcResp && null != gfcResp.getValue())
-						{
-							webResponse = gfcResp.getValue();
-						}
-					}
+					missedKeys.put(key, fcInstance);
+					break;
+				}
+			}
+		});
+		
+		allKeys.clear();
+		logger.debug("total missed - " + missedKeys.size() + " objects are missed in some caches");
+
+		missedKeys.forEach((key, fcWithCacheForKey)->{
+			final WebResponse webResponse;
+			// FC instance doesn't have object with such key in it's cache
+			// get WebResponse from node which has it
+			GetFromCacheActionResponse gfcResp = fcWithCacheForKey.getFromCache(key);
+			if (null != gfcResp && null != gfcResp.getValue())
+			{
+				webResponse = gfcResp.getValue();
+			} else {
+				webResponse = null;
+			}
+			
+			clusterCachedKeysActionResponseMap.forEach((fcInstance,resp)->{
+				List<String> fcCachedKeysList = resp.getCachedKeys();
+				if (!fcCachedKeysList.contains(key))
+				{
 
 					if (null != webResponse)
 					{
@@ -241,8 +253,9 @@ public class FrontCacheCluster {
 				} else {
 					// this fc has WebResponse with key='key' cached
 				}
-			}
-		}
+			});
+			
+		});
 
 		logger.debug("Updates: ");
 		for (FrontCacheClient fcInstance : updateCounterMap.keySet())
