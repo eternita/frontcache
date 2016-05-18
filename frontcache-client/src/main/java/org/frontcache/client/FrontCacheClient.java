@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
@@ -189,7 +190,8 @@ public class FrontCacheClient {
 		
 		try {
 			String responseStr = requestFrontCache(urlParameters);
-			logger.debug("getFromCache(" + this + ") -> " + responseStr);
+//			logger.debug("getFromCache(" + this + ") -> " + responseStr);
+			logger.debug("getFromCache(" + this + ") -> done");
 			GetFromCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFromCacheActionResponse.class);
 			return actionResponse;
 			
@@ -204,10 +206,11 @@ public class FrontCacheClient {
 	 * 
 	 * @return
 	 */
-	public PutToCacheActionResponse putToCache(WebResponse webResponse)
+	public PutToCacheActionResponse putToCache(String key, WebResponse webResponse)
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", "put-to-cache"));
+		urlParameters.add(new BasicNameValuePair("key", key));
 		String webResponseJSON = null;
 		try {
 			webResponseJSON = jsonMapper.writeValueAsString(webResponse);
@@ -231,6 +234,24 @@ public class FrontCacheClient {
 		return null;
 	}
 	
+	public void putToCache(Map<String, WebResponse> webResponseList)
+	{
+		Runnable runable = new Runnable() {
+			
+			public void run() {
+				for (String key : webResponseList.keySet())
+				{
+					WebResponse webResponse = webResponseList.get(key);
+					putToCache(key, webResponse);
+				}
+			}
+		};
+		
+		Thread thread = new Thread(runable);
+		thread.start();
+		return;
+	}
+
 	
 	/**
 	 * 
@@ -289,6 +310,5 @@ public class FrontCacheClient {
 	public String toString() {
 		return "FrontCacheClient [" + frontCacheURL + "]";
 	}
-	
 	
 }

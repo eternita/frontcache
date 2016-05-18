@@ -225,37 +225,44 @@ public class FrontCacheCluster {
 		allKeys.clear();
 		logger.debug("total missed - " + missedKeys.size() + " objects are missed in some caches");
 
-		missedKeys.forEach((key, fcWithCacheForKey)->{
+		final Map<FrontCacheClient, Map<String, WebResponse>> fcClientBatchMap = new HashMap<FrontCacheClient, Map<String, WebResponse>>();
+		for (FrontCacheClient fcInstance : clusterCachedKeysActionResponseMap.keySet())
+			fcClientBatchMap.put(fcInstance, new HashMap<String, WebResponse>());
+		
+		
+		final int batchSize = 100;
+		
+		int counter = 0;
+		for (String key : missedKeys.keySet())
+		{
+			FrontCacheClient fcWithCacheForKey = missedKeys.get(key);
 			final WebResponse webResponse;
 			// FC instance doesn't have object with such key in it's cache
 			// get WebResponse from node which has it
 			GetFromCacheActionResponse gfcResp = fcWithCacheForKey.getFromCache(key);
 			if (null != gfcResp && null != gfcResp.getValue())
-			{
 				webResponse = gfcResp.getValue();
-			} else {
+			else
 				webResponse = null;
-			}
 			
 			clusterCachedKeysActionResponseMap.forEach((fcInstance,resp)->{
 				List<String> fcCachedKeysList = resp.getCachedKeys();
 				if (!fcCachedKeysList.contains(key))
 				{
-
 					if (null != webResponse)
-					{
-						fcInstance.putToCache(webResponse); // push WebResponse to cache on fcInstance 
-						incUpdateCounterMap(updateCounterMap, fcInstance);
-					} else {
-						logger.debug("Can't put " + key + " to " + fcInstance);
-					}
-					
-				} else {
-					// this fc has WebResponse with key='key' cached
+						fcClientBatchMap.get(fcInstance).put(key, webResponse);
 				}
 			});
-			
-		});
+
+			counter++;
+			if (counter > batchSize)
+			{
+				// flush
+				flushBatch(fcClientBatchMap, updateCounterMap);
+				counter = 0;
+			}
+		}
+
 
 		logger.debug("Updates: ");
 		for (FrontCacheClient fcInstance : updateCounterMap.keySet())
@@ -266,14 +273,31 @@ public class FrontCacheCluster {
 		return updateCounterMap;
 	}
 	
-	private void incUpdateCounterMap(Map<FrontCacheClient, Long> updateCounterMap, FrontCacheClient fcInstance)
+	private void flushBatch(Map<FrontCacheClient, Map<String, WebResponse>> fcClientBatchMap, Map<FrontCacheClient, Long> updateCounterMap)
+	{
+		fcClientBatchMap.forEach((fcInstance, webResponseMap)->{
+			if (webResponseMap.size() > 0)
+			{
+				// new list is created because fcInstance.putToCache(batchList) run multi threading
+				Map<String, WebResponse> batchMap = new HashMap<String, WebResponse>();
+				batchMap.putAll(webResponseMap);
+				fcInstance.putToCache(batchMap);
+			}
+			
+			incUpdateCounterMap(updateCounterMap, fcInstance, webResponseMap.size());
+			webResponseMap.clear();
+		});
+		
+	}
+	
+	private void incUpdateCounterMap(Map<FrontCacheClient, Long> updateCounterMap, FrontCacheClient fcInstance, int step)
 	{
 		Long updateCounter = updateCounterMap.get(fcInstance);
 		if (null == updateCounter)
 		{
 			updateCounterMap.put(fcInstance, new Long(1));
 		} else {
-			updateCounterMap.put(fcInstance, new Long(1 + updateCounter.longValue()));
+			updateCounterMap.put(fcInstance, new Long(step + updateCounter.longValue()));
 		}
 		return;
 	}

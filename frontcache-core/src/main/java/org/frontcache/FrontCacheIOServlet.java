@@ -169,10 +169,12 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse putToCache(HttpServletRequest req)
 	{
 		ActionResponse actionResponse = new PutToCacheActionResponse();
+		String key = req.getParameter("key");
 		String webResponseJSONStr = req.getParameter("webResponseJSON");
-		if (null == webResponseJSONStr)
+		if (null == webResponseJSONStr || null == key)
 		{
 			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			actionResponse.setErrorDescription("some parameters are null");
 			return actionResponse;
 		}
 		
@@ -198,7 +200,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			return actionResponse;
 		}
 		
-		CacheManager.getInstance().putToCache(webResponse.getUrl(), webResponse);
+		if (null != CacheManager.getInstance().getFromCache(key))
+			actionResponse.setErrorDescription("key is already in cache " + key);
+
+		CacheManager.getInstance().putToCache(key, webResponse);
 		
 		return actionResponse;
 	}
