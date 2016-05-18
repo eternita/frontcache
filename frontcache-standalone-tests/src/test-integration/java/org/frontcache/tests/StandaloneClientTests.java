@@ -109,17 +109,18 @@ public class StandaloneClientTests extends ClientTests {
 		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + TEST_URI_A);
 		assertEquals("a", page.getPage().asText());		
 
-		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache("http://localhost:8080/" + TEST_URI_A).getValue();
+		String cacheKey = "http://localhost:8080/" + TEST_URI_A;
+		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache(cacheKey).getValue();
 
 		assertEquals("a", new String(resp.getContent()));
 		
 		resp.setContent("b".getBytes());
 		
-		PutToCacheActionResponse actionResponse = frontcacheClient.putToCache(resp);
+		PutToCacheActionResponse actionResponse = frontcacheClient.putToCache(cacheKey, resp);
 		
 		assertNotNull(actionResponse);
 		
-		resp = frontcacheClient.getFromCache("http://localhost:8080/" + TEST_URI_A).getValue();
+		resp = frontcacheClient.getFromCache(cacheKey).getValue();
 
 		assertEquals("b", new String(resp.getContent()));
 		
