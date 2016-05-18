@@ -34,6 +34,12 @@ public class FrontcacheClusterTest {
 		webClient.close();
 	}
 	
+//	@Test
+//	public void invalidate() throws Exception {
+//		FrontCacheCluster fcCluster = new FrontCacheCluster("https://or.coinshome.net:443/", "https://sg.coinshome.net:443/", "https://origin.coinshome.net:443/");
+//		fcCluster.removeFromCache("http://www.coinshome");
+//		fcCluster.removeFromCache("https://www.coinshome");		
+//	}
 	
 	/**
 	 * test cache redistribution in cluster
@@ -42,8 +48,8 @@ public class FrontcacheClusterTest {
 //	@Test
 	public void distributeCacheAcrossCluster() throws Exception {
 		
-//		FrontCacheCluster fcCluster = new FrontCacheCluster("https://or.coinshome.net:443/", "https://sg.coinshome.net:443/");		
-		FrontCacheCluster fcCluster = new FrontCacheCluster("http://or.coinshome.net:80/", "http://sg.coinshome.net:80/");
+		FrontCacheCluster fcCluster = new FrontCacheCluster("https://or.coinshome.net:443/", "https://sg.coinshome.net:443/", "https://origin.coinshome.net:443/");		
+//		FrontCacheCluster fcCluster = new FrontCacheCluster("http://or.coinshome.net:80/", "http://sg.coinshome.net:80/");
 		
 		Map<FrontCacheClient, Long> updateCounterMap = fcCluster.reDistriburteCache();
 //		logger.debug("Updates: ");
