@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.http.client.HttpClient;
+import org.frontcache.cache.CacheManager;
+import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -123,15 +125,14 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	protected WebResponse callInclude(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
 		
-		// recursive call to FCServlet (through bot filter / to cache sessionless requestsØ)
+		CacheProcessor cacheProcessor = CacheManager.getInstance();
+
+		WebResponse webResponse = cacheProcessor.getFromCache(urlStr); 
+		if (null != webResponse)
+			return webResponse;
+		
+		// recursive call to FCServlet (through bot filter / to cache sessionless requests)
 		return incProcessorFilter.callInclude(urlStr, requestHeaders, client, context);
-		
-//		// recursive call to FCServlet
-//		WebResponse webResponse = FCUtils.dynamicCall(urlStr, requestHeaders, client);
-//		return webResponse.getContent();
-		
-//		WebResponse cachedWebComponent = cacheProcessor.processRequest(urlStr, requestHeaders, client);
-//		return cachedWebComponent.getContent();
     }
 
 	@Override
