@@ -18,6 +18,9 @@ mkdir /opt/frontcache
 
 chown ubuntu /opt/frontcache 
 
+add following line to catalina.sh
+-Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
+
 scp -i oregon_key.pem -r /Users/spa/git/frontcache/frontcache-prod-conf/FRONTCACHE_HOME/conf ubuntu@or.coinshome.net:/opt/frontcache
 
 scp -i oregon_key.pem -r /Users/spa/git/frontcache/frontcache-prod-conf/build/libs ubuntu@or.coinshome.net:/opt/frontcache

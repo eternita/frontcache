@@ -1,11 +1,10 @@
 package org.frontcache.coins;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
-import org.frontcache.io.GetFromCacheActionResponse;
-import org.frontcache.io.PutToCacheActionResponse;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -147,11 +146,9 @@ public class FrontcacheCoinsTest {
 		
 		String key = "https://origin.coinshome.net:443/fc/include-footer.htm?locale=zh";
 
-		GetFromCacheActionResponse getFromCacheActionResponse = frontcacheClient.getFromCache(key);
-		org.frontcache.core.WebResponse response = getFromCacheActionResponse.getValue();
+		org.frontcache.core.WebResponse response = frontcacheClient.getFromCache(key);
 		
-		assertEquals(key, getFromCacheActionResponse.getKey());
-		assertNotNull(getFromCacheActionResponse.getValue());
+		assertNotNull(response);
 //		System.out.println("!!! - URL " + response.getUrl());
 //		System.out.println("!!! - data " + new String(response.getContent()));
 		
@@ -166,11 +163,10 @@ public class FrontcacheCoinsTest {
 		
 		String key = "http://origin.coinshome.net:80/ru/coin_definition-500_%D0%A0%D0%B5%D0%B9%D1%81-%D0%97%D0%BE%D0%BB%D0%BE%D1%82%D0%BE-%D0%9F%D0%BE%D1%80%D1%82%D1%83%D0%B3%D0%B0%D0%BB%D0%B8%D1%8F_%D0%9A%D0%BE%D1%80%D0%BE%D0%BB%D0%B5%D0%B2%D1%81%D1%82%D0%B2%D0%BE_%D0%9F%D0%BE%D1%80%D1%82%D1%83%D0%B3%D0%B0%D0%BB%D0%B8%D1%8F_(1139_1910)-wMYK.GJA5KgAAAEtOOq374Fr.htm";
 		
-		GetFromCacheActionResponse getFromCacheActionResponse = frontcacheClient.getFromCache(key);
-		org.frontcache.core.WebResponse response = getFromCacheActionResponse.getValue();
+//		GetFromCacheActionResponse getFromCacheActionResponse = frontcacheClient.getFromCacheActionResponse(key);
+		org.frontcache.core.WebResponse response = frontcacheClient.getFromCache(key);
 		
-		assertEquals(key, getFromCacheActionResponse.getKey());
-		assertNotNull(getFromCacheActionResponse.getValue());
+		assertNotNull(response);
 //		System.out.println("!!! - URL " + response.getUrl());
 //		System.out.println("!!! - data " + new String(response.getContent()));
 		
