@@ -182,7 +182,7 @@ public class FrontCacheClient {
 	 * 
 	 * @return
 	 */
-	public GetFromCacheActionResponse getFromCache(String key)
+	public GetFromCacheActionResponse getFromCacheActionResponse(String key)
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", "get-from-cache"));
@@ -200,6 +200,16 @@ public class FrontCacheClient {
 		}
 		
 		return null;
+	}
+	
+	public WebResponse getFromCache(String key)
+	{
+		GetFromCacheActionResponse actionResponse = getFromCacheActionResponse(key);
+		
+		if (null == actionResponse)
+			return null;
+		
+		return actionResponse.getValue();
 	}
 	
 	/**

@@ -13,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.frontcache.core.WebResponse;
 import org.frontcache.io.CachedKeysActionResponse;
-import org.frontcache.io.GetFromCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,14 +235,9 @@ public class FrontCacheCluster {
 		for (String key : missedKeys.keySet())
 		{
 			FrontCacheClient fcWithCacheForKey = missedKeys.get(key);
-			final WebResponse webResponse;
 			// FC instance doesn't have object with such key in it's cache
 			// get WebResponse from node which has it
-			GetFromCacheActionResponse gfcResp = fcWithCacheForKey.getFromCache(key);
-			if (null != gfcResp && null != gfcResp.getValue())
-				webResponse = gfcResp.getValue();
-			else
-				webResponse = null;
+			final WebResponse webResponse = fcWithCacheForKey.getFromCache(key);
 			
 			clusterCachedKeysActionResponseMap.forEach((fcInstance,resp)->{
 				List<String> fcCachedKeysList = resp.getCachedKeys();
