@@ -94,27 +94,35 @@ public class FrontCacheEngine {
 	
 	private static FrontCacheEngine instance;
 	
-	private final static String LOG_CONFIG_FILE_KEY = "front-cache.request-logs-config";
+//	private final static String LOG_CONFIG_FILE_KEY = "front-cache.request-logs-config";
 	
 	public static FrontCacheEngine getFrontCache() {
 		if (null == instance) {
 			FCConfig.init();
 			
-	    	if (null != FCConfig.getProperty(LOG_CONFIG_FILE_KEY))
-	    	{
-	    		// override slf4j configuration
-	    		try
-	    		{
-		    		String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
-		    		File slf4jConfigFile = new File(new File(frontcacheHome), "conf/" + FCConfig.getProperty(LOG_CONFIG_FILE_KEY));
-		    		
-		    		if (slf4jConfigFile.exists())
-				    	System.setProperty("logback.configurationFile", slf4jConfigFile.getAbsolutePath());
-
-	    		} catch (Exception ex) {
-	    			ex.printStackTrace();
-	    		} 
-	    	}
+// config like this  !!! -Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
+//			
+//    		System.out.println("Start loading logging configs ...");
+//	    	if (null != FCConfig.getProperty(LOG_CONFIG_FILE_KEY))
+//	    	{
+//	    		// override slf4j configuration
+//	    		try
+//	    		{
+//		    		String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+//		    		File slf4jConfigFile = new File(new File(frontcacheHome), "conf/" + FCConfig.getProperty(LOG_CONFIG_FILE_KEY));
+//		    		System.out.println("Loading lodding configs from " + slf4jConfigFile.getAbsolutePath());
+//		    		
+//		    		if (slf4jConfigFile.exists())
+//		    		{
+//				    	System.setProperty("logback.configurationFile", slf4jConfigFile.getAbsolutePath());
+//			    		System.out.println("logback.configurationFile=" + slf4jConfigFile.getAbsolutePath());
+//		    		}
+//
+//	    		} catch (Exception ex) {
+//	    			ex.printStackTrace();
+//	    		} 
+//	    	}
+//    		System.out.println("Completed loading logging configs ...");
 			
 			String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
 			if ("true".equalsIgnoreCase(debugCommentsStr))
