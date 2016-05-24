@@ -1,13 +1,11 @@
 package org.frontcache.cache;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
 import org.apache.http.client.HttpClient;
-import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -36,11 +34,6 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		{
 			try
 			{
-				//TODO: remove me after migration from FC filter in coinshome.net (or can be used for back compatibility)
-				List<String> hValues = new ArrayList<String>();
-				hValues.add("true");
-				requestHeaders.put(FCHeaders.X_AVOID_CHN_FRONTCACHE, hValues);
-				
 				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context);
 				lengthBytes = cachedWebResponse.getContentLenth();
 
