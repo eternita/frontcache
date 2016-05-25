@@ -49,12 +49,12 @@ subprojects {
         mavenCentral()
     }
     
-//	tasks.withType(Test) {
-//		testLogging {
-//			showStandardStreams = true
-//			exceptionFormat 'full'
-//		}
-//	}
+	tasks.withType(Test) {
+		testLogging {
+			showStandardStreams = true
+			exceptionFormat 'full'
+		}
+	}
 	
 	test {
 		reports.html.destination = file("$reports.html.destination/unit")
