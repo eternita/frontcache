@@ -415,7 +415,7 @@ public class FrontCacheEngine {
 		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + ":" + httpRequest.getServerPort();
 		logger.debug("currentRequestBaseURL: " + currentRequestBaseURL);
 		
-		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method 
+		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method without jsessionid
 		{
 			Map<String, List<String>> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 
