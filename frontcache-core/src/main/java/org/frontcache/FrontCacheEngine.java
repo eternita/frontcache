@@ -585,7 +585,9 @@ public class FrontCacheEngine {
 		if (webResponse.getHeaders() != null) {
 			for (String name : webResponse.getHeaders().keySet()) {
 				for (String value : webResponse.getHeaders().get(name)) {
-					servletResponse.addHeader(name, value);
+					
+					if (null == servletResponse.getHeader(name)) // if header already exist (e.g. in case of WebFilter) - do not duplicate
+						servletResponse.addHeader(name, value);
 				}
 			}
 		}
