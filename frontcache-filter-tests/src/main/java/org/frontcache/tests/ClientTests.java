@@ -3,6 +3,11 @@ package org.frontcache.tests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.client.FrontCacheCluster;
@@ -16,6 +21,7 @@ import org.junit.Test;
 
 import com.gargoylesoftware.htmlunit.WebResponse;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.util.NameValuePair;
 
 public abstract class ClientTests extends CommonTestsBase {
 
@@ -37,7 +43,6 @@ public abstract class ClientTests extends CommonTestsBase {
 	
 	abstract String getCacheKeyBaseURL();
 
-	
 	@Test
 	public void getFromCacheClient() throws Exception {
 		
@@ -343,6 +348,27 @@ public abstract class ClientTests extends CommonTestsBase {
 		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
 		return;
 	}
-
+	
+	@Test
+	public void httpHeadersDuplication() throws Exception {
+		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/deep-include-cache/e.jsp");
+		assertEquals("ef", page.getPage().asText());
+		
+		List<NameValuePair> headers = page.getWebResponse().getResponseHeaders();
+		for (NameValuePair nv : headers)
+			System.out.println("HTTP HEADER " + nv.getName() + " -- " + nv.getValue());
+		
+		Set<String> names = new HashSet<String>();
+		for (NameValuePair nv : headers)
+		{
+			String name = nv.getName();
+			if (names.contains(name))
+				fail("HTTP header duplicate name - " + name);
+			
+			names.add(name);
+		}
+		return;
+	}
+	
 	
 }
