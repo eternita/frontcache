@@ -55,13 +55,13 @@ public class FrontcacheClusterTest {
 	
 //	@Test
 	public void exportURLs() throws Exception {
-		FrontCacheClient fcClient = new FrontCacheClient("https://or.coinshome.net:443/");
+		FrontCacheClient fcClient = new FrontCacheClient("https://origin.coinshome.net:443/");
 		
 		CachedKeysActionResponse cachedKeysActionResponse = fcClient.getCachedKeys();
 		
 		List<String> cachedKeys = cachedKeysActionResponse.getCachedKeys();
 		
-		String fileName = "/Users/spa/tmp1/_cached_keys_coinshome.net2.txt";
+		String fileName = "/Users/spa/tmp1/_cached_keys_coinshome.net_20160524.txt";
 		OutputStream fos = new FileOutputStream(fileName);
 		DataOutputStream dos = new DataOutputStream(fos);
 		
@@ -117,9 +117,9 @@ public class FrontcacheClusterTest {
 //	@Test
 	public void distributeCacheAcrossCluster() throws Exception {
 		
-		FrontCacheCluster fcCluster = new FrontCacheCluster("https://or.coinshome.net:443/", "https://sg.coinshome.net:443/", "https://origin.coinshome.net:443/");		
+//		FrontCacheCluster fcCluster = new FrontCacheCluster("https://or.coinshome.net:443/", "https://sg.coinshome.net:443/", "https://origin.coinshome.net:443/");		
 //		FrontCacheCluster fcCluster = new FrontCacheCluster("http://or.coinshome.net:80/", "http://sg.coinshome.net:80/", "https://origin.coinshome.net:443/");		
-//		FrontCacheCluster fcCluster = new FrontCacheCluster("https://sg.coinshome.net:443/", "https://origin.coinshome.net:443/");		
+		FrontCacheCluster fcCluster = new FrontCacheCluster("https://sg.coinshome.net:443/", "https://origin.coinshome.net:443/");		
 //		FrontCacheCluster fcCluster = new FrontCacheCluster("https://origin.coinshome.net:443/", "http://sg.coinshome.net:80/");
 		
 		Map<FrontCacheClient, Long> updateCounterMap = fcCluster.reDistriburteCache();
