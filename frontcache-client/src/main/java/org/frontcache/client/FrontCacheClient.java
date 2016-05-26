@@ -28,6 +28,7 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.core.WebResponse;
+import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
@@ -138,22 +139,37 @@ public class FrontCacheClient {
 			return "ERROR " + e.getMessage(); 
 		}
 	}
+	
+	public Map<String, String> getCacheState()
+	{
+		CacheStatusActionResponse actionResponse = getCacheStateActionResponse();
+		
+		if (null == actionResponse)
+			return null;
+		
+		return actionResponse.getCacheStatus();
+		
+	}
 
 	/**
 	 * 
 	 * @return
 	 */
-	public String getCacheState()
+	public CacheStatusActionResponse getCacheStateActionResponse()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", "get-cache-state"));
 		
 		try {
-			return requestFrontCache(urlParameters);
+			String responseStr = requestFrontCache(urlParameters);
+			CacheStatusActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), CacheStatusActionResponse.class);
+			return actionResponse;
+			
 		} catch (Exception e) {
 			e.printStackTrace();
-			return "ERROR " + e.getMessage(); 
 		}
+		
+		return null;
 	}
 	
 	/**
@@ -288,6 +304,12 @@ public class FrontCacheClient {
 	}
 
 	public String getFrontCacheURL() {
+		return frontCacheURL;
+	}
+	
+	public String getName() {
+		
+		// e.g. localhost:8080
 		return frontCacheURL;
 	}
 
