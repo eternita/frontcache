@@ -31,6 +31,8 @@ public class NodesController {
 		Map<String, String> cachedAmount = frontcacheService.getCachedAmount();
 		model.put("cachedAmount", cachedAmount);
 
+		model.put("hystrixMonitorURL", frontcacheService.getHystrixMonitorURL());
+		
 //		model.put("title", helloWorldService.getTitle(""));
 //		model.put("msg", helloWorldService.getDesc());
 		

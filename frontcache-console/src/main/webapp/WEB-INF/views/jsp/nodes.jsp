@@ -32,7 +32,7 @@
 			</c:forEach>
 		</div>
 	</div>
-
+    Real time monitoring :<a target="_blank" href="${hystrixMonitorURL}">Hystrix Dashboard</a>  
 
 	<hr>
 	<footer>
@@ -40,12 +40,12 @@
 	</footer>
 </div>
 
-<spring:url value="/resources/core/css/console.js" var="coreJs" />
-<spring:url value="/resources/core/css/bootstrap.min.js" var="bootstrapJs" />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+<spring:url value="/resources/core/js/console.js" var="coreJs" />
+<spring:url value="/resources/core/js/bootstrap.min.js" var="bootstrapJs" />
 
 <script src="${coreJs}"></script>
 <script src="${bootstrapJs}"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
 
 </body>
 </html>

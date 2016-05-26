@@ -307,10 +307,23 @@ public class FrontCacheClient {
 		return frontCacheURL;
 	}
 	
+	/**
+	 *  http://localhost:8080/ -> localhost:8080
+	 * @return
+	 */
 	public String getName() {
+		String name = frontCacheURL.trim();
+		
+		int idx = name.indexOf("//");
+		if (-1 < idx)
+			name = name.substring(idx + "//".length());
+		
+		idx = name.indexOf("/");
+		if (-1 < idx)
+			name = name.substring(0, idx);
 		
 		// e.g. localhost:8080
-		return frontCacheURL;
+		return name;
 	}
 
 	@Override

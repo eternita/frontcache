@@ -6,8 +6,19 @@
 	<display-name>Gradle + Spring MVC Hello World + XML</display-name>
 	<description>Spring MVC web application</description>
 
-	<!-- For web context -->
 	<servlet>
+		<description />
+		<display-name>ProxyStreamServlet</display-name>
+		<servlet-name>ProxyStreamServlet</servlet-name>
+		<servlet-class>com.netflix.hystrix.dashboard.stream.ProxyStreamServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>ProxyStreamServlet</servlet-name>
+		<url-pattern>resources/hystrix/proxy.stream</url-pattern>
+	</servlet-mapping>
+		
+	<!-- For web context -->
+ 	<servlet>
 		<servlet-name>hello-dispatcher</servlet-name>
 		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
 		<init-param>
@@ -21,9 +32,10 @@
 		<servlet-name>hello-dispatcher</servlet-name>
 		<url-pattern>/</url-pattern>
 	</servlet-mapping>
-
+	
+		
 	<!-- For root context -->
-	<listener>
+ 	<listener>
 		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
 	</listener>
 
