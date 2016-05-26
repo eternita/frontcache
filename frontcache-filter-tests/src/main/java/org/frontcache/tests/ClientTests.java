@@ -7,6 +7,7 @@ import static org.junit.Assert.fail;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.frontcache.client.FrontCacheClient;
@@ -148,18 +149,20 @@ public abstract class ClientTests extends CommonTestsBase {
 		
 		frontcacheClient = new FrontCacheClient(TestConfig.FRONTCACHE_TEST_BASE_URI);
 		
-		String response = frontcacheClient.getCacheState();
-		Assert.assertNotEquals(-1, response.indexOf("cache status"));
+		Map<String, String> response = frontcacheClient.getCacheState();
+		Assert.assertNotNull(response);
 		logger.debug("response " + response);
 	}
 
 	@Test
 	public void getCacheStatusCluster() throws Exception {
 		
-		FrontCacheCluster fcCluster = new FrontCacheCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
+		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1);
+		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2);
+		FrontCacheCluster fcCluster = new FrontCacheCluster(frontCacheClient1, frontCacheClient2);
 		
-		String response = fcCluster.getCacheState().get(FRONTCACHE_CLUSTER_NODE1);
-		Assert.assertNotEquals(-1, response.indexOf("cache status"));
+		Map<String, String> response = fcCluster.getCacheState().get(frontCacheClient1);
+		Assert.assertNotNull(response);
 		logger.debug("response " + response);
 	}
 
@@ -299,15 +302,21 @@ public abstract class ClientTests extends CommonTestsBase {
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("false", debugCached);
 		
-		response = frontcacheClient.getCacheState();
-		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"2\""));
+		Map<String, String> cacheState = frontcacheClient.getCacheState();
+		Assert.assertEquals("2", cacheState.get("cached entiries"));
+
+//		response = frontcacheClient.getCacheState();		
+//		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"2\""));
 		
 		// cache invalidation
 		response = frontcacheClient.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
-		response = frontcacheClient.getCacheState();
-		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
+		cacheState = frontcacheClient.getCacheState();
+		Assert.assertEquals("0", cacheState.get("cached entiries"));
+		
+//		response = frontcacheClient.getCacheState();
+//		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
 		return;
 	}
 	
@@ -337,15 +346,22 @@ public abstract class ClientTests extends CommonTestsBase {
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("false", debugCached);
 		
-		response = fcCluster.getCacheState().get(FRONTCACHE_CLUSTER_NODE1);
-		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"2\""));
+//		response = fcCluster.getCacheState().get(FRONTCACHE_CLUSTER_NODE1);
+//		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"2\""));
+
+		Map<String, String> cacheState = frontcacheClient.getCacheState();
+		Assert.assertEquals("2", cacheState.get("cached entiries"));
 		
 		// cache invalidation
 		response = fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
-		response = fcCluster.getCacheState().get(FRONTCACHE_CLUSTER_NODE1);
-		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
+//		response = fcCluster.getCacheState().get(FRONTCACHE_CLUSTER_NODE1);
+//		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
+		
+		cacheState = frontcacheClient.getCacheState();
+		Assert.assertEquals("0", cacheState.get("cached entiries"));
+		
 		return;
 	}
 	

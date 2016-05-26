@@ -128,13 +128,17 @@ public class FrontCacheCluster {
 	 * 
 	 * @return
 	 */
-	public Map<String, String> getCacheState()
+	public Map<FrontCacheClient, Map<String, String>> getCacheState()
 	{
-		Map<String, String> response = new ConcurrentHashMap<String, String>();
-		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.getCacheState()));
+		Map<FrontCacheClient, Map<String, String>> response = new ConcurrentHashMap<FrontCacheClient, Map<String, String>>();
+//		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.getCacheState()));
 
-//		for (FrontCacheClient client : fcCluster)
-//			response.put(client.getFrontCacheURL() ,client.getCacheState());
+		for (FrontCacheClient client : fcCluster)
+		{
+			Map<String, String> cacheStatus = client.getCacheState();
+			if (null != cacheStatus)
+				response.put(client, cacheStatus);
+		}
 
 		return response;
 	}

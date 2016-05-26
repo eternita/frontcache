@@ -282,8 +282,8 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     	if (!"GET".equals(FCUtils.getVerb(this.getRequest())))
     		return false;
     	
-    	if (-1 < this.getRequestURI().indexOf("jsessionid="))
-    		return false;
+//    	if (-1 < this.getRequestURI().indexOf("jsessionid="))
+//    		return false;
     	
     	return true;
     	//bot's send requests without header (accept=text/html) #36
