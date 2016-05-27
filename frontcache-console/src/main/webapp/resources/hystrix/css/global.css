@@ -12,12 +12,6 @@ img {
 	height: auto;
 }
 
-#header {
-	background: #FFFFFF url(../images/hystrix-logo-tagline-tiny.png) no-repeat scroll 99% 0%;
-	height: 65px;
-	margin-bottom: 5px;
-}
-
 #streamHeader {
   height: 65px;
   margin-bottom: 5px;
@@ -65,11 +59,6 @@ img {
 	#header .header_nav {
 		top:13px;
 		right:130px;
-	}
-
-	#header {
-		background: #FFFFFF url(../images/hystrix-logo-tagline-tiny.png) no-repeat scroll 99% 50%;
-		height: 65px;
 	}
 
 	#streamHeader {

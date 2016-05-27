@@ -57,7 +57,7 @@
 		var hystrixStreams = [];
 
 		function addStreams() {
-			var urlVars = getUrlVars();
+/* 			var urlVars = getUrlVars();
 
 			var streams = urlVars.streams ? JSON.parse(decodeURIComponent(urlVars.streams)) :
 				urlVars.stream ? [{
@@ -66,6 +66,9 @@
 					name: decodeURIComponent(urlVars.title),
 					auth: urlVars.authorization
 			}] : [];
+ */			
+ alert('Hi');
+			var streams = JSON.parse('[{"name":"My Super App","stream":"http://sg.coinshome.net/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.coinshome.net/hystrix.stream","auth":"","delay":"2000"}]');
 
 			_.map(streams, function(s, i) {
 				var dependenciesId = 'dependencies_' + i;
