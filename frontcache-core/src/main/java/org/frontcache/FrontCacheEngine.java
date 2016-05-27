@@ -366,6 +366,9 @@ public class FrontCacheEngine {
         context.setRequest(servletRequest);
         context.setResponse(servletResponse);
 		String uri = FCUtils.buildRequestURI(servletRequest);
+		if (-1 < uri.indexOf(";jsessionid=")) // remove JSESSIONID from URI
+			uri = uri.replaceAll(";jsessionid=.*?(?=\\?|$)", "");
+		
 		context.setRequestURI(uri);
 		String queryString = FCUtils.getQueryString(servletRequest, context);
 		context.setRequestQueryString(queryString);
