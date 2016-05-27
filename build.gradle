@@ -134,23 +134,30 @@ project(':frontcache-client') {
 	build.dependsOn uploadArchives
 }
 
-project(':frontcache-console-api') {
+project(':frontcache-console') {
 	apply plugin: 'war'
+	apply plugin: 'jetty'
 	
 	dependencies {
 		compile project(':frontcache-core')
 		compile project(':frontcache-client')
-//		compile project(':frontcache-ehcache') - no persistence cache for tests
+		
+        provided        'javax.servlet:javax.servlet-api:3.1.0'
+//		provided        'javax.servlet.jsp:jsp-api:2.0'
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		compile 'jstl:jstl:1.2'
-		
+
+//		compile 'ch.qos.logback:logback-classic:1.1.3'
+		compile 'org.springframework:spring-webmvc:4.1.6.RELEASE'
+//		compile 'javax.servlet:jstl:1.2'
+	
 		provided 'junit:junit:4.12' // for common tests
 	}
 	
-	check {
-		dependsOn integrationTest
-	}
+//	check {
+//		dependsOn integrationTest
+//	}
 }
 
 

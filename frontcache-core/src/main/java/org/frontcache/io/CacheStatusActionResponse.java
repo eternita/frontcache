@@ -6,6 +6,10 @@ public class CacheStatusActionResponse extends ActionResponse {
 
 	private Map<String, String> cacheStatus;
 	
+	public CacheStatusActionResponse() { // for JSON mapper
+		
+	}
+	
 	public CacheStatusActionResponse(Map<String, String> cacheStatus) {
 		setAction("cache status");
 		setResponseStatus(RESPONSE_STATUS_OK);
