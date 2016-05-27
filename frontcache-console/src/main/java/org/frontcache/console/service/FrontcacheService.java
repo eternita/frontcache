@@ -3,8 +3,6 @@ package org.frontcache.console.service;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +26,7 @@ public class FrontcacheService {
 
 		List<FrontCacheClient> fcClients = getFrontCacheClients();
 		Map<String, String> cachedAmount = new HashMap<String, String>();
+		// TODO: make requests to nodes concurrent
 		for (FrontCacheClient fcClient : fcClients)
 		{
 			cachedAmount.put(fcClient.getName(), fcClient.getCacheState().get("cached entiries"));
@@ -42,6 +41,9 @@ public class FrontcacheService {
 	{
 		List<FrontCacheClient> fcClients = new ArrayList<FrontCacheClient>();
 		try {
+			// data in frontcache-console.properties
+			//"https://or.coinshome.net:443/"
+			//"https://sg.coinshome.net:443/"
 			BufferedReader reader = new BufferedReader(new InputStreamReader(FrontcacheService.class.getClassLoader().getResourceAsStream("frontcache-console.properties")));
 			 
 			while (true) {
@@ -53,18 +55,14 @@ public class FrontcacheService {
 			}
 			reader.close();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			logger.error("Can't read frontcache-console.properties", e);
 			e.printStackTrace();
 		}
-//		
-//		
-//		fcClients.add(new FrontCacheClient("https://or.coinshome.net:443/"));
-//		fcClients.add(new FrontCacheClient("https://sg.coinshome.net:443/"));
 		
 		return fcClients;
 	}
 	
-	public String getHystrixMonitorURL()
+	public String getHystrixMonitorURLList()
 	{
 		// [{"name":"My Super App","stream":"http://sg.coinshome.net/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.coinshome.net/hystrix.stream","auth":"","delay":"2000"}]
 		
@@ -75,24 +73,15 @@ public class FrontcacheService {
 		for (FrontCacheClient fcClient : fcClients)
 			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcClient.getFrontCacheURL() + "hystrix.stream"));
 		
-		
-//		String urlStr = "[{\"name\":\"My Super App\",\"stream\":\"http://sg.coinshome.net/hystrix.stream\",\"auth\":\"\",\"delay\":\"2000\"}]"; 
-		String urlStr = "";
+		String urlListStr = "";
 		try {
-			urlStr = jsonMapper.writeValueAsString(hystrixConnections);
+			urlListStr = jsonMapper.writeValueAsString(hystrixConnections);
 		} catch (JsonProcessingException e1) {
-			// TODO Auto-generated catch block
-			urlStr = e1.getMessage();
+			logger.error("Can't serialize array of Hystrix connections", e1);
+			urlListStr = e1.getMessage();
 			e1.printStackTrace();
 		} 
-		try {
-			urlStr = URLEncoder.encode(urlStr, "UTF-8");
-		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return "resources/hystrix/monitor/monitor.html?streams=" + urlStr; 
-//		return "resources/hystrix/index.html";
+		return urlListStr; 
 	}
 
 }
