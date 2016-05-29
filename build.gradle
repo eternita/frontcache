@@ -18,7 +18,7 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	
-    version = '0.7.11'
+    version = '0.7.12'
     group = 'org.frontcache'
 	
 	configurations {
@@ -155,9 +155,9 @@ project(':frontcache-console') {
 		provided 'junit:junit:4.12' // for common tests
 	}
 	
-//	check {
-//		dependsOn integrationTest
-//	}
+	check {
+		dependsOn integrationTest
+	}
 }
 
 
@@ -170,9 +170,9 @@ project(':frontcache-filter-tests') {
 		contextPath = '/'
 		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
 		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
-		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME']
+		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
 		if (System.getProperty('DEBUG', 'false') == 'true') {
-			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME']
+			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
 		}
 	}
 	
@@ -212,7 +212,8 @@ project(':frontcache-standalone-tests') {
 	
 	integrationTest{
 		jvmArgs '-Dfrontcache.standalone.frontcache.web.dir=' + projectDir + '/src/test-integration/webapp',
-				'-Dfrontcache.home=' + projectDir + '/FRONTCACHE_HOME'
+				'-Dfrontcache.home=' + projectDir + '/FRONTCACHE_HOME',
+				'-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml'
 	}
 
 	dependencies {
@@ -245,7 +246,8 @@ project(':frontcache-prod-conf') {
 		if (System.getProperty('DEBUG', 'false') == 'true') {
 			jvmArgs '-Xdebug', 
 			        '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', 
-					'-Dfrontcache.home=' + projectDir + '/FRONTCACHE_HOME'
+					'-Dfrontcache.home=' + projectDir + '/FRONTCACHE_HOME',
+					'-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml'
 		}
 	}
 	

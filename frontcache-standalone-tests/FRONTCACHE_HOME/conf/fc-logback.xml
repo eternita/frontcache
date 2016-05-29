@@ -16,12 +16,12 @@ front-cache.request-logs-config=fc-logback.xml
 			<OnMismatch>DENY</OnMismatch>
 		</filter>
 
-		<File>${frontcache.home}/logs/frontcache-requests-overridden.log</File>
+		<File>${frontcache.home}/logs/frontcache-requests.log</File>
 		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-			<FileNamePattern>${frontcache.home}/logs/frontcache-requests-overridden-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+			<FileNamePattern>${frontcache.home}/logs/frontcache-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
 		</rollingPolicy>
 		<layout class="ch.qos.logback.classic.PatternLayout">
-			  <Pattern>%d{yyyy-MM-dd_HH:mm:ss.SSS} %msg%n</Pattern>
+			  <Pattern>%d{"yyyy-MM-dd'T'HH:mm:ss,SSSXXX"} %msg%n</Pattern>
 		</layout>
 	</appender>
 	
@@ -32,9 +32,9 @@ front-cache.request-logs-config=fc-logback.xml
 			<OnMismatch>DENY</OnMismatch>
 		</filter>
 
-		<File>${frontcache.home}/logs/error-overridden.log</File>
+		<File>${frontcache.home}/logs/error.log</File>
 		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-			<FileNamePattern>${frontcache.home}/logs/error-overridden-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+			<FileNamePattern>${frontcache.home}/logs/error-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
 		</rollingPolicy>
 		<layout class="ch.qos.logback.classic.PatternLayout">
 			  <Pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>
@@ -47,9 +47,9 @@ front-cache.request-logs-config=fc-logback.xml
 			<OnMatch>NEUTRAL</OnMatch>
 			<OnMismatch>DENY</OnMismatch>
 		</filter>
-		<File>${frontcache.home}/logs/info-overridden.log</File>
+		<File>${frontcache.home}/logs/info.log</File>
 		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-			<FileNamePattern>${frontcache.home}/logs/info-overridden-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+			<FileNamePattern>${frontcache.home}/logs/info-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
 		</rollingPolicy>
 		<layout class="ch.qos.logback.classic.PatternLayout">
              <Pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>

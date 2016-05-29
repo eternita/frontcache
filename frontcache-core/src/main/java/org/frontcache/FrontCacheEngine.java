@@ -363,6 +363,7 @@ public class FrontCacheEngine {
     private RequestContext init(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) {
 
         RequestContext context = new RequestContext();
+        context.setFrontCacheId(fcHostId);
         context.setRequest(servletRequest);
         context.setResponse(servletResponse);
 		String uri = FCUtils.buildRequestURI(servletRequest);

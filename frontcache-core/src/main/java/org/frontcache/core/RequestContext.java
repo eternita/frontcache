@@ -446,5 +446,23 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     	
     	return false;
     }
+    
+    /**
+     * 
+     * @param frontCacheId
+     */
+    public void setFrontCacheId(String frontCacheId) {
+        set("frontCacheId", frontCacheId);
+    }
+
+    /**
+     * 
+     * @return
+     */
+    public String getFrontCacheId() {
+        return (String) get("frontCacheId");
+    }
+
+    
         
 }
