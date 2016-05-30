@@ -21,6 +21,7 @@ chown ubuntu /opt/frontcache
 add following line to catalina.sh
 -Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
 
+
 scp -i oregon_key.pem -r /Users/spa/git/frontcache/frontcache-prod-conf/FRONTCACHE_HOME/conf ubuntu@or.coinshome.net:/opt/frontcache
 
 scp -i oregon_key.pem -r /Users/spa/git/frontcache/frontcache-prod-conf/build/libs ubuntu@or.coinshome.net:/opt/frontcache
@@ -52,16 +53,18 @@ http://localhost:8080/turbine-web/turbine.stream?cluster=fc_cluster
 http://or.coinshome.net/hystrix.stream
 http://sg.coinshome.net/hystrix.stream
 
-http://localhost:8080/hystrix-dashboard/monitor/monitor.html?streams=%5B%7B%22name%22%3A%22%22%2C%22stream%22%3A%22http%3A%2F%2For.coinshome.net%2Fhystrix.stream%22%2C%22auth%22%3A%22%22%2C%22delay%22%3A%22%22%7D%2C%7B%22name%22%3A%22%22%2C%22stream%22%3A%22http%3A%2F%2Fsg.coinshome.net%2Fhystrix.stream%22%2C%22auth%22%3A%22%22%2C%22delay%22%3A%22%22%7D%5D
 
--Darchaius.configurationSource.additionalUrls=file:///Users/spa/git/frontcache/frontcache-prod-conf/turbine/config.properties
-
-
-http://or.coinshome.net/hystrix-dashboard/monitor/monitor.html?streams=%5B%7B%22name%22%3A%22%22%2C%22stream%22%3A%22http%3A%2F%2Fsg.coinshome.net%2Fhystrix.stream%22%2C%22auth%22%3A%22%22%2C%22delay%22%3A%22%22%7D%2C%7B%22name%22%3A%22%22%2C%22stream%22%3A%22http%3A%2F%2For.coinshome.net%2Fhystrix.stream%22%2C%22auth%22%3A%22%22%2C%22delay%22%3A%22%22%7D%2C%7B%22name%22%3A%22%22%2C%22stream%22%3A%22http%3A%2F%2Fdirect.coinshome.net%2Fhystrix.stream%22%2C%22auth%22%3A%22%22%2C%22delay%22%3A%22%22%7D%5D
-
-
+# warmer
 scp -i singapore_key.pem -r /Users/spa/tmp1/_cached_keys_coinshome.net2.txt ubuntu@sg.coinshome.net:/opt/frontcache/warmer/_cached_keys_coinshome.net2.txt
 
+
+# frontcache console
+
+scp -i oregon_key.pem -r /Users/spa/git/frontcache/frontcache-console/build/libs ubuntu@or.coinshome.net:/opt/frontcache
+scp -i oregon_key.pem /Users/spa/git/frontcache/frontcache-prod-conf/FRONTCACHE_HOME/conf/frontcache-console.properties ubuntu@or.coinshome.net:/opt/frontcache/conf/frontcache-console.properties
+
+add following line to catalina.sh
+-Dorg.frontcache.console.config=/opt/frontcache/conf/frontcache-console.properties
 
 
 
