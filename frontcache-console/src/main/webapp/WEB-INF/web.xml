@@ -14,7 +14,7 @@
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>ProxyStreamServlet</servlet-name>
-		<url-pattern>resources/hystrix/proxy.stream</url-pattern>
+		<url-pattern>/resources/hystrix/proxy.stream</url-pattern>
 	</servlet-mapping>
 		
 	<!-- For web context -->
