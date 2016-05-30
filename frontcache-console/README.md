@@ -1,5 +1,5 @@
 
-# configure nodes for console (frontcache-console.properties)
+configure nodes for console (frontcache-console.properties)
 
 ```
 # format
@@ -13,5 +13,7 @@ https://origin.coinshome.net:443/
 
 
 add following line to catalina.sh
+```
 -Dorg.frontcache.console.config=/opt/frontcache/conf/frontcache-console.properties
+```
 
