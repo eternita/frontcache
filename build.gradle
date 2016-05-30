@@ -136,7 +136,11 @@ project(':frontcache-client') {
 
 project(':frontcache-console') {
 	apply plugin: 'war'
-	apply plugin: 'jetty'
+	apply plugin: 'org.akhikhl.gretty'
+	
+	gretty {
+		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.properties']
+	}
 	
 	dependencies {
 		compile project(':frontcache-core')
