@@ -15,7 +15,7 @@
 			<FileNamePattern>${frontcache.home}/logs/frontcache-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
 		</rollingPolicy>
 		<layout class="ch.qos.logback.classic.PatternLayout">
-			  <Pattern>%d{"yyyy-MM-dd'T'HH:mm:ss,SSSXXX"} %msg%n</Pattern>
+			  <Pattern>%msg%n</Pattern>
 		</layout>
 	</appender>
 	

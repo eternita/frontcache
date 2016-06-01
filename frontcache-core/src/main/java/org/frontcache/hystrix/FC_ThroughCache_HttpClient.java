@@ -17,6 +17,8 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
@@ -28,6 +30,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 	private final Map<String, List<String>> requestHeaders;
 	private final HttpClient client;
 	private final RequestContext context;
+	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache_HttpClient.class);
 
     public FC_ThroughCache_HttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
         
@@ -74,6 +77,8 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     
     @Override
     protected WebResponse getFallback() {
+		context.setHystrixError();
+		logger.error("FC - ORIGIN ERROR - " + this.urlStr);
         return fallbackForWebComponent(this.urlStr);
     }
     

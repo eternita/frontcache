@@ -24,6 +24,8 @@ import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.message.BasicHttpRequest;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
@@ -33,6 +35,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 
 	private final HttpClient client;
 	private final RequestContext context;
+	private Logger logger = LoggerFactory.getLogger(FC_BypassCache.class);
 
     public FC_BypassCache(HttpClient client, RequestContext context) {
         
@@ -52,7 +55,6 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     	
     	return null;
     }
-    
     
 	private void forwardToOrigin() throws IOException, ServletException
 	{
@@ -84,6 +86,10 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 				ex.printStackTrace();
 				context.set("error.status_code", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 				context.set("error.exception", ex);
+				
+				context.setHystrixError();
+				logger.error("FC - ORIGIN ERROR - " + uri);
+				
 			}
 		}
 		

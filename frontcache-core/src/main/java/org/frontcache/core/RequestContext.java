@@ -463,6 +463,12 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return (String) get("frontCacheId");
     }
 
-    
+    public void setHystrixError() {
+        set("hystrixError", true);
+    }
+
+    public boolean getHystrixError() {
+        return getBoolean("hystrixError", false);
+    }
         
 }

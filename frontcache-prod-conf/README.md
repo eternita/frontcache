@@ -55,7 +55,11 @@ http://sg.coinshome.net/hystrix.stream
 
 
 # warmer
-scp -i singapore_key.pem -r /Users/spa/tmp1/_cached_keys_coinshome.net2.txt ubuntu@sg.coinshome.net:/opt/frontcache/warmer/_cached_keys_coinshome.net2.txt
+scp -i singapore_key.pem -r /Users/spa/tmp1/_cached_keys_coinshome.net_20160530.txt ubuntu@sg.coinshome.net:/opt/frontcache/warmer/_cached_keys_coinshome.net_20160530.txt
+
+scp -i oregon_key.pem -r /Users/spa/git/frontcache/warmer ubuntu@or.coinshome.net:/opt/frontcache/
+
+scp -i oregon_key.pem /Users/spa/tmp1/_cached_keys_coinshome.net_20160529.txt ubuntu@or.coinshome.net:/opt/frontcache/warmer/_cached_keys_coinshome.net_20160529.txt
 
 
 # frontcache console
