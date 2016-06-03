@@ -18,6 +18,17 @@ import org.slf4j.LoggerFactory;
 public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
+	
+	public abstract WebResponse getFromCacheImpl(String url);
+
+	@Override
+	public final WebResponse getFromCache(String url)
+	{
+		WebResponse cachedWebResponse = new FC_ThroughCache(this, url).execute();
+		
+		return cachedWebResponse;
+	}
+
 
 	@Override
 	public WebResponse processRequest(String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {

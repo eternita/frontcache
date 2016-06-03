@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -379,6 +380,19 @@ public class FrontCacheEngine {
 		
 		context.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
         context.setOriginURL(getOriginUrl(context));
+        
+        String requestId = servletRequest.getHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID);
+        String requestType = FCHeaders.X_FRONTCACHE_COMPONENT_INCLUDE;
+        if (null == requestId)
+        {
+        	requestId = UUID.randomUUID().toString();
+        	requestType = FCHeaders.X_FRONTCACHE_COMPONENT_TOPLEVEL;
+        } else {
+            context.setRequestFromFrontcache();
+        }
+        
+        context.setRequestId(requestId);
+        context.setRequestType(requestType);
 
         if (null != filterChain)
         {
@@ -435,7 +449,8 @@ public class FrontCacheEngine {
 			if (null != webResponse)
 			{
 				// include processor
-				if (null != webResponse.getContent())
+				// don't process includes if request from Frontcache (e.g. Browser -> FC -> [FC] -> Origin)
+				if (!context.getRequestFromFrontcache() && null != webResponse.getContent())
 				{
 					// check process includes with recursion (resolve includes up to deepest level defined in includeProcessor)
 					int recursionLevel = 0;
@@ -559,6 +574,7 @@ public class FrontCacheEngine {
 		}
 		
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
+		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 		servletResponse.setStatus(context.getResponseStatusCode());
 		
 		if (originResponseHeaders != null) {
@@ -585,6 +601,7 @@ public class FrontCacheEngine {
 		servletResponse.setStatus(webResponse.getStatusCode());
 		
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
+		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 		
 		if (webResponse.getHeaders() != null) {
 			for (String name : webResponse.getHeaders().keySet()) {
