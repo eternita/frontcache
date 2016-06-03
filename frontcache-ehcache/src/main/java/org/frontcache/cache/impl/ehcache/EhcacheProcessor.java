@@ -90,7 +90,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	 * 
 	 */
 	@Override
-	public WebResponse getFromCache(String url) {
+	public WebResponse getFromCacheImpl(String url) {
 		logger.debug(url);
 		Element el = cache.get(url);
 		if (null == el)

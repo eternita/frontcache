@@ -22,7 +22,17 @@ import org.slf4j.LoggerFactory;
  *  cacheable_flag - true/1 if request is run through FrontCache engine (e.g. GET method, text data). false/0 - otherwise (request forwarded to origin)
  *  dynamic_flag{1|0} - true if origin has been requested. false/0 - otherwise (it's cacheable & cached). 
  *  
- *	log_timestamp cacheable_flag{1|0}  dynamic_flag{1|0}   runtime_millis    datalength_bytes   is_hystrix_error{1|0}   url  client_IP frontcache_ID
+ *	log-timestamp request-id   is-hystrix-error{success|error}   request-type {toplevel|include}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID
+ *  
+ *  EXAMPLE
+ *  2016-06-03T15:06:35,092-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 success toplevel cacheable from-cache 0 50874 "http://myfc.coinshome.net:8080/en/coin_definition-1_Thaler-Silver-Kingdom_of_Prussia_(1701_1918)-c_sK.GJAIx4AAAEvnTTi7NnT.htm" 0:0:0:0:0:0:0:1 front-cache-local-1
+ *  2016-06-03T15:06:35,100-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 success include cacheable from-cache 0 1581 "http://myfc.coinshome.net:8080/fc/include-footer.htm?locale=en" 127.0.0.1 front-cache-local-1
+ *  2016-06-03T15:06:35,105-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 success include cacheable from-cache 0 1411 "http://myfc.coinshome.net:8080/fc/external-ads.htm?locale=" 127.0.0.1 front-cache-local-1
+ *  2016-06-03T15:06:35,558-0600 e67a3f57-07f1-4fdb-91e1-e33313ba4185 success toplevel direct dynamic 5 -1 "http://myfc.coinshome.net:8080/follower?eid=c_sK.GJAIx4AAAEvnTTi7NnT&activity=COIN_GROUP_UPDATE&cmd=check" 0:0:0:0:0:0:0:1 front-cache-local-1
+ *  2016-06-03T15:06:35,565-0600 66223049-3269-4de2-8d0e-a467b83a8390 success toplevel cacheable dynamic 12 1676 "http://myfc.coinshome.net:8080/fc/include-header.htm?view=desktop&locale=en" 0:0:0:0:0:0:0:1 front-cache-local-1
+ *  2016-06-03T15:06:35,578-0600 cac3e17f-2084-4f18-b4f7-cb7ae6ee8a37 success toplevel direct dynamic 2 -1 "http://myfc.coinshome.net:8080/uinfo" 0:0:0:0:0:0:0:1 front-cache-local-1
+ *  2016-06-03T15:06:35,741-0600 55ba8287-cedd-43b6-ae47-357292664cb3 success toplevel cacheable dynamic 4 9662 "http://myfc.coinshome.net:8080/favicon.ico" 0:0:0:0:0:0:0:1 front-cache-local-1
+ *
  *
  */
 public class RequestLogger {
@@ -49,16 +59,20 @@ public class RequestLogger {
 		StringBuilder sb = new StringBuilder();
         HttpServletRequest request = context.getRequest();
         boolean isHystrixError = context.getHystrixError();
-//        String dateStr
 
 		// FORMAT
 		// dynamic_flag runtime_millis datalength_bytes url
 		sb.append(logTimeDateFormat.format(new Date()))
-		.append(SEPARATOR).append((isCacheable) ? 1 : 0)
-		.append(SEPARATOR).append((isCached) ? 1 : 0)
+		.append(SEPARATOR).append(context.getRequestId())
+//		.append(SEPARATOR).append((isHystrixError) ? 1 : 0)
+		.append(SEPARATOR).append((isHystrixError) ? "error" : "success")
+		.append(SEPARATOR).append(context.getRequestType()) // toplevel | include
+//		.append(SEPARATOR).append((isCacheable) ? 1 : 0)
+		.append(SEPARATOR).append((isCacheable) ? "cacheable" : "direct")
+//		.append(SEPARATOR).append((isCached) ? 1 : 0)
+		.append(SEPARATOR).append((isCached) ? "from-cache" : "dynamic")
 		.append(SEPARATOR).append(runtimeMillis)
 		.append(SEPARATOR).append(lengthBytes) 
-		.append(SEPARATOR).append((isHystrixError) ? 1 : 0)
 		.append(SEPARATOR).append("\"").append(url).append("\"")
 		.append(SEPARATOR).append(request.getRemoteAddr())
 		.append(SEPARATOR).append(context.getFrontCacheId());

@@ -1,6 +1,6 @@
 package org.frontcache.hystrix;
 
-import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.WebResponse;
 
@@ -16,9 +16,9 @@ import com.netflix.hystrix.HystrixCommandKey;
 public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 
 	private final String originUrlStr;
-	private final CacheProcessor cache;
+	private final CacheProcessorBase cacheProcessorBase;
 
-    public FC_ThroughCache(CacheProcessor cache, String originUrlStr) {
+    public FC_ThroughCache(CacheProcessorBase cacheProcessorBase, String originUrlStr) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
@@ -26,12 +26,12 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
         		);
         
         this.originUrlStr = originUrlStr;
-        this.cache = cache;
+        this.cacheProcessorBase = cacheProcessorBase;
     }
 
     @Override
     protected WebResponse run() throws FrontCacheException {
-    	return cache.getFromCache(originUrlStr);
+    	return cacheProcessorBase.getFromCacheImpl(originUrlStr);
     }
     
 }

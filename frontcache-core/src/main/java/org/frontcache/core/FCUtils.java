@@ -74,6 +74,9 @@ public class FCUtils {
 	 */
 	public static WebResponse dynamicCall(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
+		// add request-id header - to distinguish if sent by frontcache or not (for include processing) 
+		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
+		
 		if (context.isFilterMode())
 			 return new FC_ThroughCache_WebFilter(context).execute();
 		else
@@ -85,8 +88,27 @@ public class FCUtils {
 	 */
 	public static WebResponse dynamicCallHttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
-		 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
+		// add request-id header - to distinguish (toplevel vs include) 
+		// & distinguish if sent by frontcache or not (for include processing) 
+		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
+		
+		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }
+	
+	/**
+	 * Helper to work with Map<String, List<String>> 
+	 * 
+	 * @param requestHeaders
+	 * @param key
+	 * @param name
+	 */
+	private static void addHeader(Map<String, List<String>> requestHeaders, String key, String name)
+	{
+		List<String> valuesList = new ArrayList<String>();
+		valuesList.add(name);
+		requestHeaders.put(key, valuesList);
+		return;
+	}
 	
 
 	/**

@@ -14,5 +14,11 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_DEBUG_RESPONSE_SIZE = "X-frontcache.debug.response-size";
 
     public static final String X_FRONTCACHE_COMPONENT = "X-frontcache.component";
+
+    public static final String X_FRONTCACHE_COMPONENT_TOPLEVEL = "toplevel";
+    public static final String X_FRONTCACHE_COMPONENT_INCLUDE = "include";
+    
+    
     public static final String X_FRONTCACHE_COMPONENT_MAX_AGE = "X-frontcache.component.maxage";
+    public static final String X_FRONTCACHE_REQUEST_ID = "X-frontcache.request-id";
 }

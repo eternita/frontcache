@@ -8,10 +8,12 @@ import java.util.Properties;
 import org.apache.http.client.HttpClient;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.include.impl.f.BotIncludeProcessorFilter;
+import org.frontcache.reqlog.RequestLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,12 +126,32 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 */
 	protected WebResponse callInclude(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
+
+		// in case response is from cache -> log request
+		// otherwise (response is not cached) it will be logged in FrontcacheEngine
+		
+		long start = System.currentTimeMillis();
 		
 		CacheProcessor cacheProcessor = CacheManager.getInstance();
-
 		WebResponse webResponse = cacheProcessor.getFromCache(urlStr); 
 		if (null != webResponse)
+		{
+
+			{ // request logging
+				RequestContext contextCopy = new RequestContext();
+				contextCopy.putAll(context);
+				contextCopy.setRequestType(FCHeaders.X_FRONTCACHE_COMPONENT_INCLUDE);
+				
+				RequestLogger.logRequest(
+						urlStr, 
+						true, // isRequestCacheable 
+						true, // isCached 
+						System.currentTimeMillis() - start, 
+						webResponse.getContentLenth(), // lengthBytes 
+						contextCopy);
+			}
 			return webResponse;
+		}
 		
 		// recursive call to FCServlet (through bot filter / to cache sessionless requests)
 		return incProcessorFilter.callInclude(urlStr, requestHeaders, client, context);

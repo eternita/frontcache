@@ -9,8 +9,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +41,7 @@ public class FCConfig {
 			if (null != frontcacheHome)
 				System.setProperty(FRONT_CACHE_HOME_SYSTEM_KEY, frontcacheHome);
 		}
-		
+		System.out.println("FRONTCACHE_HOME is " + frontcacheHome);
 		logger.info("FRONTCACHE_HOME is " + frontcacheHome);
     	
     	config = loadProperties();
@@ -72,7 +70,7 @@ public class FCConfig {
 //    	System.getProperties().putAll(hystrixProperties);
     	
     	if (null == config)
-    		throw new RuntimeException("Can't load " + FRONT_CACHE_CONFIG + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + " (environment variable)");
+    		throw new RuntimeException("Can't load " + FRONT_CACHE_CONFIG + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + "=" + System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY) + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + "=" + System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY) + " (environment variable)");
     }
     
     public static String getProperty(String key, String defaultValue)
@@ -188,7 +186,7 @@ public class FCConfig {
 		
 		
     	if (null == is)
-    		throw new RuntimeException("Can't load " + name + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + " (environment variable)");
+    		throw new RuntimeException("Can't load " + FRONT_CACHE_CONFIG + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + "=" + System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY) + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + "=" + System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY) + " (environment variable)");
 		
 		return is;
 	}
