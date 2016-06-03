@@ -4,14 +4,14 @@
 	
     <diskStore path="/opt/frontcache/cache"/>
 	-->    
-    <diskStore path="/Users/spa/git/frontcache/frontcache-coins/FRONTCACHE_HOME/cache"/>
+    <diskStore path="/Users/spa/git/frontcache/frontcache-prod-conf/FRONTCACHE_HOME/cache"/>
               
                 
     <cache name="FRONT_CACHE"
        maxElementsInMemory="100"
        eternal="true"
        overflowToDisk="true"
-       diskPersistent="true" 
+       diskPersistent="false" 
        memoryStoreEvictionPolicy="LFU"
         />
         

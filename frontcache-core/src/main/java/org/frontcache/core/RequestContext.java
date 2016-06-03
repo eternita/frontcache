@@ -25,8 +25,8 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 @SuppressWarnings("serial")
 public class RequestContext extends ConcurrentHashMap<String, Object> {
 
-//    private static final Logger LOG = LoggerFactory.getLogger(RequestContext.class);
-
+    private static final String FRONTCACHE_REQUEST_TYPE = "frontcacheRequestType"; // { toplevel | include }
+    private static final String FRONTCACHE_REQUEST_ID = "frontcacheRequestID"; // 
 
     public RequestContext() {
         super();
@@ -470,5 +470,29 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public boolean getHystrixError() {
         return getBoolean("hystrixError", false);
     }
-        
+    
+    public void setRequestType(String frontcacheRequestType) {
+        set(FRONTCACHE_REQUEST_TYPE, frontcacheRequestType);
+    }
+
+    public String getRequestType() {
+        return (String) get(FRONTCACHE_REQUEST_TYPE);
+    }
+    
+    public void setRequestId(String frontcacheRequestId) {
+        set(FRONTCACHE_REQUEST_ID, frontcacheRequestId);
+    }
+
+    public String getRequestId() {
+        return (String) get(FRONTCACHE_REQUEST_ID);
+    }
+
+    public void setRequestFromFrontcache() {
+        set("RequestFromFrontcache", true);
+    }
+
+    public boolean getRequestFromFrontcache() {
+        return getBoolean("RequestFromFrontcache", false);
+    }
+    
 }
