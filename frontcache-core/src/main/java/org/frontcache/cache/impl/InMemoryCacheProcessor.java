@@ -68,7 +68,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}
 
 	@Override
-	public WebResponse getFromCache(String url) {
+	public WebResponse getFromCacheImpl(String url) {
 		
 		WebResponse comp = cache.get(url);
 		if (null == comp)
