@@ -64,11 +64,10 @@ scp -i oregon_key.pem /Users/spa/tmp1/_cached_keys_coinshome.net_20160529.txt ub
 
 # frontcache console
 
-scp -i oregon_key.pem -r /Users/spa/git/frontcache/frontcache-console/build/libs ubuntu@or.coinshome.net:/opt/frontcache
-scp -i oregon_key.pem /Users/spa/git/frontcache/frontcache-prod-conf/FRONTCACHE_HOME/conf/frontcache-console.properties ubuntu@or.coinshome.net:/opt/frontcache/conf/frontcache-console.properties
+scp -i asdfasdf.pem -r /Users/spa/git/frontcache/frontcache-console/build/libs ubuntu@origin.coinshome.net:/tmp
+scp -i asdfasdf.pem /Users/spa/git/frontcache/frontcache-prod-conf/FRONTCACHE_HOME/conf/frontcache-console.properties ubuntu@origin.coinshome.net:/tmp/frontcache-console.properties
 
 add following line to catalina.sh
--Dorg.frontcache.console.config=/opt/frontcache/conf/frontcache-console.properties
-
+-Dorg.frontcache.console.config=/usr/sites/frontcache/conf/frontcache-console.properties
 
 
