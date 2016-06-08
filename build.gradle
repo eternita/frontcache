@@ -237,31 +237,4 @@ project(':frontcache-standalone-tests') {
 	
 }
 
-project(':frontcache-prod-conf') {
-	apply plugin: 'war'
-	apply plugin: 'org.akhikhl.gretty'
-
-	gretty {
-		port = 9080
-		contextPath = '/'
-		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
-//		servletContainer = 'tomcat7' // jetty9 or tomcat7 or tomcat8
-		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
-//		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml', '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
-	}
-
-	
-	dependencies {
-		compile project(':frontcache-core')
-        compile project(':frontcache-client')
-		compile project(':frontcache-ehcache')
-		
-		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
-	}
-
-//	check {
-//		dependsOn integrationTest
-//	}
-	
-}
 
