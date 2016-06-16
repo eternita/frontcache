@@ -18,7 +18,7 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	
-    version = '0.7.13'
+    version = '0.7.14'
     group = 'org.frontcache'
 	
 	configurations {
@@ -132,6 +132,17 @@ project(':frontcache-client') {
 	}
 	
 	build.dependsOn uploadArchives
+}
+
+project(':frontcache-web') {
+	apply plugin: 'war'
+	
+	dependencies {
+		compile project(':frontcache-core')
+		compile project(':frontcache-ehcache')
+		
+//		provided        'javax.servlet:javax.servlet-api:3.1.0'
+	}
 }
 
 project(':frontcache-console') {
