@@ -22,7 +22,7 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Cache Hits"))
         		);
         
         this.originUrlStr = originUrlStr;

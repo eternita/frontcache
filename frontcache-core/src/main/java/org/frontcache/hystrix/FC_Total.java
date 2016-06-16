@@ -29,7 +29,7 @@ public class FC_Total extends HystrixCommand<Object> {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_Total"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Input Requests"))
                 );
         this.frontCacheEngine = frontCacheEngine;
         this.context = context;

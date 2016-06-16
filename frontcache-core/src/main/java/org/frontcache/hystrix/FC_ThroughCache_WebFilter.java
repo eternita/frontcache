@@ -32,7 +32,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache_WebFilter"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin Hits"))
         		);
         
         this.context = context;

@@ -36,7 +36,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("FC_ThroughCache_HttpClient"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin Hits"))
         		);
         
         this.urlStr = urlStr;
