@@ -3,8 +3,8 @@
 	http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
 	version="2.5">
 
-	<display-name>Gradle + Spring MVC Hello World + XML</display-name>
-	<description>Spring MVC web application</description>
+	<display-name>Frontcache Console</display-name>
+	<description>Frontcache Console</description>
 
 	<servlet>
 		<description />
