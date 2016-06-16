@@ -40,8 +40,8 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     public FC_BypassCache(HttpClient client, RequestContext context) {
         
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("FC_BypassCache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("BypassFrontcache"))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin Hits"))
         		);
         
         this.client = client;
