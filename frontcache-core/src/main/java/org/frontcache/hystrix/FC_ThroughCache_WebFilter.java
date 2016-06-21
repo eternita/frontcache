@@ -12,6 +12,7 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 import org.frontcache.wrapper.HttpResponseWrapperImpl;
 import org.slf4j.Logger;
@@ -66,22 +67,10 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
     protected WebResponse getFallback() {
 		context.setHystrixError();
 		logger.error("FC - ORIGIN ERROR - " + url);
-        return fallbackForWebComponent(this.url);
+		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(url);
+		
+		return webResponse;
     }
     
 	
-	private WebResponse fallbackForWebComponent(String urlStr)
-	{
-		byte[] outContentBody = ("Fallabck for " + urlStr).getBytes();
-
-		WebResponse webResponse = new WebResponse(urlStr, outContentBody, CacheProcessor.NO_CACHE);
-		String contentType = "text/html";
-		webResponse.setContentType(contentType);
-		
-		int httpResponseCode = 200;
-		webResponse.setStatusCode(httpResponseCode);
-
-		return webResponse;
-	}
-    
 }
