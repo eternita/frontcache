@@ -7,7 +7,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -33,7 +32,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin Hits"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
         		);
         
         this.context = context;
@@ -66,7 +65,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
     @Override
     protected WebResponse getFallback() {
 		context.setHystrixError();
-		logger.error("FC - ORIGIN ERROR - " + url);
+		logger.error("FC-Origin-Hits-Filter - ORIGIN ERROR - " + url);
 		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(url);
 		
 		return webResponse;

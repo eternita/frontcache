@@ -1,11 +1,13 @@
 package org.frontcache.tests;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.TextPage;
 import com.gargoylesoftware.htmlunit.WebResponse;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
@@ -26,18 +28,53 @@ public class HystrixTests extends CommonTestsBase {
 	@Test
 	public void customTimeoutTest() throws Exception {
 		// page timeout 1500ms. Hystrix timeout - 3000ms, what is more than default 1000ms
-		HtmlPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/hystrix/a.jsp");
+		Page page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/hystrix/a.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
-		assertEquals("Hi from Hystrix", page.getPage().asText());
+		assertEquals("Hi from Hystrix", webResponse.getContentAsString().trim());
 	}
 
 	@Test
 	public void timeoutFailTest() throws Exception {
 		// page timeout 4000ms. Hystrix timeout - 3000ms
-		TextPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/hystrix/b.jsp");
+		Page page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/hystrix/b.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
-		assertEquals("FC - ORIGIN ERROR - http://localhost:9080/common/hystrix/b.jsp", page.getContent());
+		
+		// "Default Fallabck for http://localhost:9080/common/hystrix/b.jsp"
+		// "Default Fallabck for http://localhost:8080/common/hystrix/b.jsp"
+		// difference in port number for Filter VS Standalone (9080 VS 8080)
+		String respStr = webResponse.getContentAsString();
+		assertNotEquals(-1, respStr.indexOf("Default Fallabck"));
+		assertNotEquals(-1, respStr.indexOf("/common/hystrix/b.jsp"));
+		
 	}
+
+	@Test
+	public void timeoutInsideIncludeTest() throws Exception {
+		// page timeout 4000ms. Hystrix timeout - 3000ms
+		Page page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/hystrix/top1.jsp");
+		WebResponse webResponse = page.getWebResponse(); 
+		printHeaders(webResponse);
+		
+		// difference in port number for Filter VS Standalone (9080 VS 8080)
+		String respStr = webResponse.getContentAsString();
+		assertNotEquals(-1, respStr.indexOf("top")); // from main page
+		assertNotEquals(-1, respStr.indexOf("inc11")); // successful include #1
+		assertNotEquals(-1, respStr.indexOf("Default Fallabck")); // default fallback for include #2
+		assertNotEquals(-1, respStr.indexOf("/common/hystrix/inc12.jsp")); // default fallback for include #2
+	}
+	
+//	@Test
+//	public void fallbackTest1() throws Exception {
+//		// page timeout 4000ms. Hystrix timeout - 3000ms
+//		// default fallback is
+//		//		assertEquals("FC - ORIGIN ERROR - http://localhost:9080/common/hystrix/b.jsp", page.getContent());
+//		// custom fallback from configs
+//
+//		TextPage page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/hystrix/fallback1.jsp");
+//		WebResponse webResponse = page.getWebResponse(); 
+//		printHeaders(webResponse);
+//		assertEquals("Hi from custom fallback", page.getContent());
+//	}
 }
