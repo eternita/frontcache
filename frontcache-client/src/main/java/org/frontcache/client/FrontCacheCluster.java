@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +38,12 @@ public class FrontCacheCluster {
 	}
 
 	public FrontCacheCluster(FrontCacheClient ... fcClients) 
+	{
+		for (FrontCacheClient fcClient : fcClients)
+			fcCluster.add(fcClient);
+	}
+
+	public FrontCacheCluster(Collection<FrontCacheClient> fcClients) 
 	{
 		for (FrontCacheClient fcClient : fcClients)
 			fcCluster.add(fcClient);
