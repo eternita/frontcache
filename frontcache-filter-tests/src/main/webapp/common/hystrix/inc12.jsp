@@ -7,5 +7,4 @@ try {
 	e.printStackTrace();
 }
 %>
-<c:set var="greetings" value="Hi"></c:set>
-<c:out value="${greetings}"></c:out> from Hystrix
+inc12

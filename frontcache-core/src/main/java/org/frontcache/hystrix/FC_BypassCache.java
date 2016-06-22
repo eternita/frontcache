@@ -43,7 +43,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin Hits"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
         		);
         
         this.client = client;
@@ -86,6 +86,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 		
 		if (context.isFilterMode())
 		{
+			logger.error("forwardToOrigin() - XXXXXXXXXXXXXXXXXXXXXXX " + context.getRequestURI());
 			HttpServletResponse response = context.getResponse();
 			FilterChain chain = context.getFilterChain();
 			chain.doFilter(request, response);
