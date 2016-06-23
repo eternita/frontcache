@@ -86,7 +86,6 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 		
 		if (context.isFilterMode())
 		{
-			logger.error("forwardToOrigin() - XXXXXXXXXXXXXXXXXXXXXXX " + context.getRequestURI());
 			HttpServletResponse response = context.getResponse();
 			FilterChain chain = context.getFilterChain();
 			chain.doFilter(request, response);

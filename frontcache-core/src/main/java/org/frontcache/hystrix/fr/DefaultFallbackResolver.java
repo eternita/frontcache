@@ -10,7 +10,7 @@ public class DefaultFallbackResolver implements FallbackResolver {
 	
 	public WebResponse getFallback(String urlStr)
 	{
-		byte[] outContentBody = ("Default Fallabck for " + urlStr).getBytes();
+		byte[] outContentBody = ("Default Fallback for " + urlStr).getBytes();
 
 		WebResponse webResponse = new WebResponse(urlStr, outContentBody, CacheProcessor.NO_CACHE);
 		String contentType = "text/html";
