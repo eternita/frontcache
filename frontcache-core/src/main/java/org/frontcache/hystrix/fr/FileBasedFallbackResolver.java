@@ -1,9 +1,13 @@
 package org.frontcache.hystrix.fr;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -11,6 +15,7 @@ import java.util.regex.PatternSyntaxException;
 
 import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.core.StringUtils;
 import org.frontcache.core.WebResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +44,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		{
 			Pattern p = uri2patternMap.get(fallbackPattern);
 			
-    		if (p.matcher(urlStr).find()) // TODO: URL or URI
+    		if (p.matcher(urlStr).find())
     		{
     			currentFallbackURLpattern = fallbackPattern;
     			break;
@@ -63,12 +68,75 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	}
 		
 
+	/**
+	 * 
+	 * @param urlStr
+	 * @param fileName
+	 * @return
+	 */
 	private WebResponse getFallbackFromFile(String urlStr, String fileName)
 	{
-		byte[] outContentBody = ("TODO: read from file " + fileName).getBytes();
-		WebResponse webResponse = new WebResponse(urlStr, outContentBody, CacheProcessor.NO_CACHE);
 		
-		String contentType = "text/html";
+		String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+		
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		File fcConfig = new File(new File(frontcacheHome), "fallbacks/" + fileName);
+		if (fcConfig.exists())
+		{
+			InputStream is = null;
+			
+			try {
+				is = new FileInputStream(fcConfig);
+				int bytesRead = 0;
+	            int bufferSize = 4000;
+		         byte[] byteBuffer = new byte[bufferSize];				
+		         while ((bytesRead = is.read(byteBuffer)) != -1) {
+		             baos.write(byteBuffer, 0, bytesRead);
+		         }
+			} catch (Exception e) {		
+				logger.error("Can't read fallback data from file " + fileName, e);
+			} finally {
+				if (null != is)
+					try {
+						is.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+			}
+		}
+		
+		byte[] byteArray = baos.toByteArray();
+		
+		String fallbackContent = null;
+		try {
+			fallbackContent = new String(byteArray, 0, byteArray.length, "UTF8");
+		} catch (UnsupportedEncodingException e) {
+			logger.error("Can't read fallback text from file " + fileName, e);
+		}		
+		
+		if (null == fallbackContent)
+			return null;
+		
+		String contentType = "text/html"; // default
+		String startStr = "Content-Type:";
+		String endStr = "\n";
+		
+/*		
+ 		Content-Type:text/html;charset=UTF-8
+		Hi from custom fallback
+		->
+		contentType = "text/html;charset=UTF-8"
+		fallbackContent = "Hi from custom fallback"
+*/		
+		if (fallbackContent.startsWith(startStr))
+		{
+			contentType = StringUtils.getStringBetween(fallbackContent, startStr, endStr);
+			int idx = fallbackContent.indexOf(endStr) + endStr.length();
+			fallbackContent = fallbackContent.substring(idx);
+		}
+		
+		WebResponse webResponse = new WebResponse(urlStr, fallbackContent.getBytes(), CacheProcessor.NO_CACHE);
+		
 		webResponse.setContentType(contentType);
 		
 		int httpResponseCode = 200;
@@ -76,11 +144,15 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 
 		return webResponse;
 	}
-	
-	
+
+	/**
+	 * 
+	 * @param urlStr
+	 * @return
+	 */
 	private WebResponse getDefalut(String urlStr)
 	{
-		byte[] outContentBody = ("Fallabck for " + urlStr).getBytes();
+		byte[] outContentBody = ("Default Fallback for " + urlStr).getBytes();
 
 		WebResponse webResponse = new WebResponse(urlStr, outContentBody, CacheProcessor.NO_CACHE);
 		String contentType = "text/html";
@@ -115,20 +187,21 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 			}
 
 			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String patternStr;
+			String fallbackStr;
 			int patternCounter = 0;
-			while ((patternStr = confReader.readLine()) != null) {
+			while ((fallbackStr = confReader.readLine()) != null) {
 				try {
-					if (patternStr.trim().startsWith("#")) // handle comments
+					if (fallbackStr.trim().startsWith("#")) // handle comments
 						continue;
 					
-					if (0 == patternStr.trim().length()) // skip empty
+					if (0 == fallbackStr.trim().length()) // skip empty
 						continue;
+
+					loadFallbackConfigStr(fallbackStr);
 					
-//					uriIgnorePatterns.add(Pattern.compile(patternStr));
 					patternCounter++;
 				} catch (PatternSyntaxException ex) {
-					logger.info("Fallback URI pattern - " + patternStr + " is not loaded");					
+					logger.info("Fallback URI pattern - " + fallbackStr + " is not loaded");					
 				}
 			}
 			logger.info("Successfully loaded " + patternCounter +  " callbacks");					
@@ -149,6 +222,32 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 				} catch (IOException e) { }
 			}
 		}
+		
+		return;
+	}
+	
+	private void loadFallbackConfigStr(String fallbackStr)
+	{
+		String fileName = null;
+		String fetchURL = null;
+		String fallbackURLPattern = null;
+		String[] arr = fallbackStr.split(" ");
+		if (arr.length == 2) {
+			fileName = arr[0];
+			fallbackURLPattern = arr[1];
+		} else if (arr.length == 3) {
+			fileName = arr[0];
+			fetchURL = arr[1];
+			fallbackURLPattern = arr[2];
+		} else {
+			logger.error("Can't parse fallback string (should be 2 or 3 words): " + fallbackStr);
+			return;
+		}
+
+		uri2patternMap.put(fallbackURLPattern, Pattern.compile(fallbackURLPattern));
+		uri2fileMap.put(fallbackURLPattern, fileName);
+
+		logger.debug("Fallback loaded: " + fallbackStr);
 		
 	}
 	
