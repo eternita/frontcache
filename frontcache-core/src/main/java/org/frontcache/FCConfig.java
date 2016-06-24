@@ -22,7 +22,7 @@ public class FCConfig {
 	
 	public static final String FRONT_CACHE_HOME_ENVIRONMENT_KEY = "FRONTCACHE_HOME";
 	
-	private static final String FRONT_CACHE_CONFIG = "front-cache.properties"; 
+	private static final String FRONT_CACHE_CONFIG = "frontcache.properties"; 
 
     private static Properties config;
     
@@ -132,9 +132,9 @@ public class FCConfig {
     
 	/**
 	 * 
-	 * 1. get input stream from inside jars (/front-cache.properties)
+	 * 1. get input stream from inside jars (/frontcache.properties)
 	 * 2. get input stream from system variable frontcache.home
-	 * 3. get input stream from environment variable FRONTCACHE_HOME/conf/front-cache.properties
+	 * 3. get input stream from environment variable FRONTCACHE_HOME/conf/frontcache.properties
 	 *
 	 * 
 	 * @param name
@@ -162,7 +162,7 @@ public class FCConfig {
 		if (null != is)
 			return is;
 		
-		// 2. get input stream from environment variable FRONTCACHE_HOME/conf/front-cache.properties
+		// 2. get input stream from environment variable FRONTCACHE_HOME/conf/frontcache.properties
 		frontcacheHome = System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY);
 		
 		if (null != frontcacheHome)
@@ -178,7 +178,7 @@ public class FCConfig {
 		if (null != is)
 			return is;
 		
-		// 3. get input stream from inside jars (/front-cache.properties)
+		// 3. get input stream from inside jars (/frontcache.properties)
 		try 
 		{
 			is = FCConfig.class.getClassLoader().getResourceAsStream(name);
