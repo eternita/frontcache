@@ -7,7 +7,7 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-public class StandaloneHystrixTests extends HystrixTests {
+public class StandaloneFallbackHystrixTests extends FallbackHystrixTests {
 
 	static Server server = null;
 	

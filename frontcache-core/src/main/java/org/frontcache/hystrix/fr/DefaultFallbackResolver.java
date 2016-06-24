@@ -1,5 +1,6 @@
 package org.frontcache.hystrix.fr;
 
+import org.apache.http.client.HttpClient;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
 
@@ -20,6 +21,10 @@ public class DefaultFallbackResolver implements FallbackResolver {
 		webResponse.setStatusCode(httpResponseCode);
 
 		return webResponse;
+	}
+
+	@Override
+	public void init(HttpClient client) {
 	}
 
 }

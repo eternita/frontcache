@@ -1,8 +1,8 @@
 package org.frontcache.hystrix.fr;
 
 
+import org.apache.http.client.HttpClient;
 import org.frontcache.FCConfig;
-import org.frontcache.include.impl.SerialIncludeProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,9 +15,10 @@ public class FallbackResolverFactory {
 	
 	private static FallbackResolver instance;
 
-	public static FallbackResolver getInstance(){
+	public static FallbackResolver getInstance(HttpClient client){
 		if (null == instance) {
 			instance = getFallbackResolver();
+			instance.init(client);
 		}
 		return instance;
 	}
@@ -36,9 +37,6 @@ public class FallbackResolverFactory {
 				logger.info("FallbackResolver implementation loaded: " + implStr);
 				FallbackResolver fallbackResolver = (FallbackResolver) obj;
 
-//				cacheProcessor.init(FCConfig.getProperties());
-//				logger.info("IncludeProcessor implementation initialized: " + implStr);
-				
 				return fallbackResolver;
 			}
 		} catch (Exception ex) {
