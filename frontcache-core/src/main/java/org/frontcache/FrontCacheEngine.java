@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 
 public class FrontCacheEngine {
 
-	private final static String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "cache-ignore-uris.conf";
+	private final static String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "direct-urls.conf";
 	
 	private List <Pattern> uriIgnorePatterns = new ArrayList<Pattern>();
 
