@@ -80,7 +80,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 		context.setHystrixError();
 		logger.error("FC-Origin-Hits-HttpClient - ORIGIN ERROR - " + this.urlStr);
 
-		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(urlStr);
+		WebResponse webResponse = FallbackResolverFactory.getInstance(client).getFallback(urlStr);
 		
 		return webResponse;
     }
