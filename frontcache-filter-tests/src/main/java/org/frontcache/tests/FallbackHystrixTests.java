@@ -100,4 +100,14 @@ public class FallbackHystrixTests extends CommonTestsBase {
 		assertEquals("Hi from custom fallback (loaded from URL)", webResponse.getContentAsString());
 	}
 	
+	@Test
+	public void customeFallbackTest3URLPattern() throws Exception {
+		// page timeout more than Hystrix timeout
+		Page page = webClient.getPage(TestConfig.FRONTCACHE_TEST_BASE_URI + "common/hystrix/fallback3-pattern.jsp");
+		WebResponse webResponse = page.getWebResponse(); 
+		printHeaders(webResponse);
+		
+		assertEquals("Hi from custom fallback", webResponse.getContentAsString());
+	}
+	
 }
