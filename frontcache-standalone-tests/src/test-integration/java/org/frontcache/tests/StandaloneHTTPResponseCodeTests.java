@@ -4,7 +4,7 @@ import org.eclipse.jetty.server.Server;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-public class StandaloneFallbackHystrixTests extends FallbackHystrixTests {
+public class StandaloneHTTPResponseCodeTests extends HTTPResponseCodeTests {
 
 	static Server server = null;
 	
