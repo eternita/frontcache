@@ -289,6 +289,8 @@ public class FrontCacheClient {
 	{
 		HttpPost post = new HttpPost(frontCacheURI);
 
+//    	post.addHeader("Accept-Encoding", "gzip");
+
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 
 		StringBuffer result = new StringBuffer();

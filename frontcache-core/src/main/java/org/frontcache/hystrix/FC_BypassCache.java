@@ -24,6 +24,8 @@ import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.message.BasicHttpRequest;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
+import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +43,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin Hits"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
         		);
         
         this.client = client;
@@ -55,6 +57,28 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     	
     	return null;
     }
+    
+    @Override
+    protected Object getFallback() {
+    	
+		try {
+			HttpServletRequest httpRequest = context.getRequest();
+			String url = FCUtils.getRequestURL(httpRequest);
+			HttpServletResponse httpResponse = context.getResponse();
+			
+			context.setHystrixError();
+			logger.error("FC - ORIGIN ERROR - " + url);
+			
+			WebResponse webResponse = FallbackResolverFactory.getInstance(client).getFallback(url);
+			
+			httpResponse.getOutputStream().write(webResponse.getContent());
+			httpResponse.setContentType(webResponse.getContentType());
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+        return null;
+    }
+    
     
 	private void forwardToOrigin() throws IOException, ServletException
 	{

@@ -4,14 +4,7 @@ import org.eclipse.jetty.server.Server;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-/**
- * 
- * start frontcache in embedded Jetty 
- * and run tests defined in CommonTests through it
- * 
- *
- */
-public class StandaloneCommonTests extends CommonTests {
+public class StandaloneFallbackHystrixTests extends FallbackHystrixTests {
 
 	static Server server = null;
 	
@@ -27,5 +20,5 @@ public class StandaloneCommonTests extends CommonTests {
 	public static void tearDownAfterClass() throws Exception {
 		server.stop();
 	}
-	
+
 }

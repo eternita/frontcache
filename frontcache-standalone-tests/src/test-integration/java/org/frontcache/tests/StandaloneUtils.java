@@ -4,17 +4,12 @@ import java.io.File;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 
-public class StandaloneHystrixTests extends HystrixTests {
+public class StandaloneUtils {
 
-	static Server server = null;
-	
-	@BeforeClass
-	public static void setUpBeforeClass() throws Exception {
+	public static Server startServerWithFrontcache() throws Exception {
 		
-        server = new Server(TestConfig.FRONTFACHE_PORT);
+		Server server = new Server(TestConfig.FRONTFACHE_PORT);
         
         WebAppContext webapp = new WebAppContext();
         webapp.setContextPath("/");
@@ -25,12 +20,7 @@ public class StandaloneHystrixTests extends HystrixTests {
         server.setHandler(webapp);
         server.start();		        
         
-        return;
-	}
-
-	@AfterClass
-	public static void tearDownAfterClass() throws Exception {
-		server.stop();
+        return server;
 	}
 
 }
