@@ -1,7 +1,6 @@
 package org.frontcache;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.DateFormat;
@@ -18,7 +17,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.cache.CacheManager;
 import org.frontcache.core.WebResponse;
-import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.CachedKeysActionResponse;
