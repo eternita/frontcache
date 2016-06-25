@@ -69,12 +69,22 @@ public class FCConfig {
 			
 		// enable configuration from "hystrix.properties"
 		ConcurrentMapConfiguration systemProps = new ConcurrentMapConfiguration(hystrixConfigMap);
-    	ConfigurationManager.install(systemProps);
+
+		// you can install hystrix config one time only
+		// in case of reloading Frontcache - previous hystrix config is keeping
+		if (!ConfigurationManager.isConfigurationInstalled()) 
+			ConfigurationManager.install(systemProps);
+		
 
 //    	System.getProperties().putAll(hystrixProperties);
     	
     	if (null == config)
     		throw new RuntimeException("Can't load " + FRONT_CACHE_CONFIG + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + "=" + System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY) + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + "=" + System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY) + " (environment variable)");
+    }
+    
+    public static void destroy()
+    {
+    	config = null;
     }
     
     public static String getProperty(String key, String defaultValue)
