@@ -23,7 +23,7 @@ import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.DummyActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.InvalidateActionResponse;
-import org.frontcache.io.KeysDumpActionResponse;
+import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.frontcache.io.ReloadActionResponse;
 import org.slf4j.Logger;
@@ -96,8 +96,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = putToCache(req);
 			break;
 			
-		case "keys-dump":
-			aResponse = startKeysDump(req);
+		case "dump-keys":
+			aResponse = startDumpKeys(req);
 			break;
 			
 		case "reload":
@@ -228,7 +228,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 * @param req
 	 * @return
 	 */
-	private ActionResponse startKeysDump(HttpServletRequest req)
+	private ActionResponse startDumpKeys(HttpServletRequest req)
 	{
 
 		Runnable r = new Runnable() {
@@ -264,7 +264,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		Thread t = new Thread(r);
 		t.start();				
 
-		ActionResponse aResponse = new KeysDumpActionResponse();
+		ActionResponse aResponse = new DumpKeysActionResponse();
 			
 		return aResponse;
 	}
