@@ -278,10 +278,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 */
 	private ActionResponse reload(HttpServletRequest req)
 	{
-		FallbackResolverFactory.reload();
+		FrontCacheEngine.reload();
 		
 		ActionResponse aResponse = new ReloadActionResponse();
-			
 		return aResponse;
 	}
 	

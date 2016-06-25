@@ -52,7 +52,7 @@ public class FallbackResolverFactory {
 		return null;
 	}
 
-	public static void reload()
+	public static void destroy()
 	{
 		instance = null;
 		return;

@@ -49,6 +49,7 @@ import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.FC_BypassCache;
 import org.frontcache.hystrix.FC_Total;
+import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.reqlog.RequestLogger;
@@ -94,35 +95,11 @@ public class FrontCacheEngine {
 	
 	private static FrontCacheEngine instance;
 	
-//	private final static String LOG_CONFIG_FILE_KEY = "front-cache.request-logs-config";
-	
 	public static FrontCacheEngine getFrontCache() {
 		if (null == instance) {
 			FCConfig.init();
 			
-// config like this  !!! -Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
-//			
-//    		System.out.println("Start loading logging configs ...");
-//	    	if (null != FCConfig.getProperty(LOG_CONFIG_FILE_KEY))
-//	    	{
-//	    		// override slf4j configuration
-//	    		try
-//	    		{
-//		    		String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
-//		    		File slf4jConfigFile = new File(new File(frontcacheHome), "conf/" + FCConfig.getProperty(LOG_CONFIG_FILE_KEY));
-//		    		System.out.println("Loading lodding configs from " + slf4jConfigFile.getAbsolutePath());
-//		    		
-//		    		if (slf4jConfigFile.exists())
-//		    		{
-//				    	System.setProperty("logback.configurationFile", slf4jConfigFile.getAbsolutePath());
-//			    		System.out.println("logback.configurationFile=" + slf4jConfigFile.getAbsolutePath());
-//		    		}
-//
-//	    		} catch (Exception ex) {
-//	    			ex.printStackTrace();
-//	    		} 
-//	    	}
-//    		System.out.println("Completed loading logging configs ...");
+			//Logs config ->  !!! -Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
 			
 			String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
 			if ("true".equalsIgnoreCase(debugCommentsStr))
@@ -133,11 +110,23 @@ public class FrontCacheEngine {
 		return instance;
 	}
 
-	public static void destroy(){
+	public static void destroy() {
 		if (null != instance) {
 			instance.stop();
 			instance = null;
 		}
+	}
+	
+	/**
+	 * 
+	 */
+	public static void reload() {
+
+		// reload hystrix fallbacks
+		FallbackResolverFactory.destroy();
+		FallbackResolverFactory.getInstance(instance.httpClient);
+		
+		return;
 	}
 	
 	private FrontCacheEngine() {
