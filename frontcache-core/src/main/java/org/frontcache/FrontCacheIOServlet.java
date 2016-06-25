@@ -17,6 +17,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.cache.CacheManager;
 import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.CachedKeysActionResponse;
@@ -26,6 +27,7 @@ import org.frontcache.io.InvalidateActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.frontcache.io.ReloadActionResponse;
+import org.frontcache.io.ReloadFallbacksActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +104,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			
 		case "reload":
 			aResponse = reload(req);
+			break;
+
+		case "reload-fallbacks":
+			aResponse = reloadFallbacks(req);
 			break;
 			
 			default:
@@ -279,6 +285,20 @@ public class FrontCacheIOServlet extends HttpServlet {
 		FrontCacheEngine.reload();
 		
 		ActionResponse aResponse = new ReloadActionResponse();
+		return aResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse reloadFallbacks(HttpServletRequest req)
+	{
+		FallbackResolverFactory.destroy();
+		FallbackResolverFactory.getInstance(FrontCacheEngine.getFrontCache().getHttpClient());
+		
+		ActionResponse aResponse = new ReloadFallbacksActionResponse();
 		return aResponse;
 	}
 	

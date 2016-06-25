@@ -27,6 +27,7 @@ import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.ProtocolException;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.RedirectStrategy;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
@@ -62,13 +63,10 @@ public class FrontCacheEngine {
 	
 	private List <Pattern> uriIgnorePatterns = new ArrayList<Pattern>();
 
-//	private String originHost = null;
-//	private String originHttpPort = null;
-//	private String originHttpsPort = null;
-	
 	private Map<String, Origin> domainOriginMap = new ConcurrentHashMap<String, Origin>();
 	
 	private String frontcacheHttpPort = null;
+
 	private String frontcacheHttpsPort = null;
 	
 	private String fcHostId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
@@ -106,6 +104,22 @@ public class FrontCacheEngine {
 				debugComments = true;		
 			
 			instance = new FrontCacheEngine();
+			
+//			// load hystrix fallbacks
+//			Thread t = new Thread(new Runnable() {
+//				public void run() {
+//					// need to wait some time
+//					// in filter mode servlet should be initialized first (to load fallbacks from URLs)
+//					try {
+//						Thread.sleep(5000); 
+//					} catch (InterruptedException e) {
+//						e.printStackTrace();
+//					}
+//					FallbackResolverFactory.getInstance(instance.httpClient);
+//				}
+//			});
+//			t.start();				
+			
 		}
 		return instance;
 	}
@@ -121,10 +135,10 @@ public class FrontCacheEngine {
 	 * 
 	 */
 	public static void reload() {
-
-		// reload hystrix fallbacks
-		FallbackResolverFactory.destroy();
-		FallbackResolverFactory.getInstance(instance.httpClient);
+		
+		destroy(); 
+		
+		getFrontCache(); // recreate
 		
 		return;
 	}
@@ -132,6 +146,11 @@ public class FrontCacheEngine {
 	private FrontCacheEngine() {
 		
 		initialize();
+	}
+	
+	HttpClient getHttpClient()
+	{
+		return httpClient;
 	}
 	
 	private static final String DEFAULT_ORIGIN = "default";
@@ -260,6 +279,11 @@ public class FrontCacheEngine {
 	}
 
 	private void stop() {
+		
+		FCConfig.destroy();
+		
+		FallbackResolverFactory.destroy();
+		
 		connectionManagerTimer.cancel();
 		
 		if (null != includeProcessor)
