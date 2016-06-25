@@ -2,7 +2,6 @@ package org.frontcache;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -211,7 +210,7 @@ public class FrontCacheEngine {
 		frontcacheHttpPort = FCConfig.getProperty("front-cache.http-port", "80");
 		frontcacheHttpsPort = FCConfig.getProperty("front-cache.https-port", "443");
 		
-		fcHostId = FCConfig.getProperty("front-cache.host-name");
+		fcHostId = FCConfig.getProperty(FCConfig.FRONTCACHE_ID_KEY);
 		if (null == fcHostId)
 			fcHostId = DEFAULT_FRONTCACHE_HOST_NAME_VALUE;
 			
@@ -573,7 +572,7 @@ public class FrontCacheEngine {
 			originResponseHeaders.put("Location", hValues);
 		}
 		
-		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
+		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_ID, fcHostId);
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 		servletResponse.setStatus(context.getResponseStatusCode());
 		
@@ -600,7 +599,7 @@ public class FrontCacheEngine {
 
 		servletResponse.setStatus(webResponse.getStatusCode());
 		
-		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_HOST, fcHostId);
+		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_ID, fcHostId);
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 		
 		if (webResponse.getHeaders() != null) {

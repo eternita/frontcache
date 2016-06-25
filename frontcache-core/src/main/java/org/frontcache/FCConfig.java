@@ -22,6 +22,10 @@ public class FCConfig {
 	
 	public static final String FRONT_CACHE_HOME_ENVIRONMENT_KEY = "FRONTCACHE_HOME";
 	
+	private static final String FRONT_CACHE_ID_CONFIG = "frontcache.id"; // file where id is stored
+	
+	public static final String FRONTCACHE_ID_KEY = "front-cache.id"; // key under which id is stored
+
 	private static final String FRONT_CACHE_CONFIG = "frontcache.properties"; 
 
     private static Properties config;
@@ -110,7 +114,6 @@ public class FCConfig {
     
 	private static Properties loadProperties()
 	{
-		
 		InputStream is = getConfigInputStream(FRONT_CACHE_CONFIG);
 		
 		if (null == is)
@@ -127,6 +130,32 @@ public class FCConfig {
 				is.close();
 			} catch (IOException e) { }
 		}
+		
+		
+		// load frontcache.id from different file - different file for deployment convenience
+		is = getConfigInputStream(FRONT_CACHE_ID_CONFIG); 
+		if (null != is)
+		{
+			Properties idConfig = new Properties();
+			try 
+			{
+				idConfig.load(is);
+			} catch (Exception e) {
+				return null;
+			} finally {
+				try {
+					is.close();
+				} catch (IOException e) { }
+			}
+			
+			Object id = idConfig.get(FRONTCACHE_ID_KEY);
+			config.put(FRONTCACHE_ID_KEY, id);
+		}
+		
+		if (null == config.getProperty(FRONTCACHE_ID_KEY))
+			config.put(FRONTCACHE_ID_KEY, "auto-gen-" + System.currentTimeMillis());
+			
+		
 		return config;
 	}
     
