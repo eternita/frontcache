@@ -1,6 +1,12 @@
 package org.frontcache;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -12,13 +18,16 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.cache.CacheManager;
 import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.DummyActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.InvalidateActionResponse;
+import org.frontcache.io.KeysDumpActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
+import org.frontcache.io.ReloadActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +96,14 @@ public class FrontCacheIOServlet extends HttpServlet {
 			
 		case "put-to-cache":
 			aResponse = putToCache(req);
+			break;
+			
+		case "keys-dump":
+			aResponse = startKeysDump(req);
+			break;
+			
+		case "reload":
+			aResponse = reload(req);
 			break;
 			
 			default:
@@ -206,6 +223,66 @@ public class FrontCacheIOServlet extends HttpServlet {
 		CacheManager.getInstance().putToCache(key, webResponse);
 		
 		return actionResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse startKeysDump(HttpServletRequest req)
+	{
+
+		Runnable r = new Runnable() {
+			
+			public void run() {
+				
+				final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
+				String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+				File outputDir = new File(frontcacheHome);
+				File keysDumpFile = new  File(outputDir, "warmer/keys_" + logTimeDateFormat.format(new Date()) + ".txt");
+				FileOutputStream fos = null;
+				try {
+					fos = new FileOutputStream(keysDumpFile);
+					for (String url : CacheManager.getInstance().getCachedKeys())
+					{
+						fos.write((url + "\n").getBytes());
+						fos.flush();
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+				} finally {
+					try {
+						if (null != fos)
+							fos.close(); 
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				
+			}
+		};
+		
+		Thread t = new Thread(r);
+		t.start();				
+
+		ActionResponse aResponse = new KeysDumpActionResponse();
+			
+		return aResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse reload(HttpServletRequest req)
+	{
+		FallbackResolverFactory.reload();
+		
+		ActionResponse aResponse = new ReloadActionResponse();
+			
+		return aResponse;
 	}
 	
 	/**
