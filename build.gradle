@@ -18,7 +18,7 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	
-    version = '0.8.0'
+    version = '0.8.1'
     group = 'org.frontcache'
 	
 	configurations {

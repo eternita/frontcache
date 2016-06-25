@@ -23,7 +23,10 @@ public class FallbackResolverFactory {
 		return instance;
 	}
 	
-	
+	/**
+	 * 
+	 * @return
+	 */
 	private static FallbackResolver getFallbackResolver()
 	{
 		String implStr = FCConfig.getProperty("front-cache.fallback-resolver.impl");
@@ -46,8 +49,12 @@ public class FallbackResolverFactory {
 			return new DefaultFallbackResolver();
 		}
 		
-		
 		return null;
 	}
 
+	public static void reload()
+	{
+		instance = null;
+		return;
+	}
 }
