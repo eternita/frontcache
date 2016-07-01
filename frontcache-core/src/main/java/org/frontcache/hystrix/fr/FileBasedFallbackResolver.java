@@ -75,12 +75,18 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		}
 		
 		if (null == currentFallbackURLpattern)
+		{
+			logger.info("Getting default fallback - no fallback URL patterns for " + urlStr);
 			return getDefalut(urlStr);
+		}
 		
 		String fileName = uri2fileMap.get(currentFallbackURLpattern);
 		
 		if (null == fileName)
+		{
+			logger.info("Getting default fallback - no file is configured for fallback patterns " + currentFallbackURLpattern);
 			return getDefalut(urlStr);
+		}
 
 		WebResponse webResponse = getFallbackFromFile(urlStr, fileName);
 		
