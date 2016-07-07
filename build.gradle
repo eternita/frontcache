@@ -1,5 +1,4 @@
 import org.akhikhl.gretty.AppBeforeIntegrationTestTask
-import org.gradle.api.plugins.jetty.JettyRun
 
 class ExecWait extends DefaultTask {
 	String command
@@ -94,23 +93,16 @@ subprojects {
 		}
 	}
 	
-//	task integrationTest(type: Test) {
-//		description = 'Runs the integration tests.'
-//		group = 'verification'
-//		maxParallelForks = 1 // run all tests sequentially (due to cache cleanup befor every test)
-//		forkEvery = 1 // run all tests sequentially (due to cache cleanup befor every test)
-//		testClassesDir = sourceSets.integrationTest.output.classesDir
-//		classpath = sourceSets.integrationTest.runtimeClasspath
-//		reports.html.destination = file("$reports.html.destination/integration")
-//		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
-//		
-//		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME']
-//	
-////		if (System.getProperty('DEBUG', 'false') == 'true') {
-////			jvmArgs '-Xdebug',
-////				'-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8002'
-////		}
-//	}
+	task integrationTest(type: Test) {
+		description = 'Runs the integration tests.'
+		group = 'verification'
+		maxParallelForks = 1 // run all tests sequentially (due to cache cleanup befor every test)
+		forkEvery = 1 // run all tests sequentially (due to cache cleanup befor every test)
+		testClassesDir = sourceSets.integrationTest.output.classesDir
+		classpath = sourceSets.integrationTest.runtimeClasspath
+		reports.html.destination = file("$reports.html.destination/integration")
+		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
+	}
 	
 	uploadArchives {
 		repositories {
@@ -171,7 +163,6 @@ project(':frontcache-web') {
 		compile project(':frontcache-core')
 		compile project(':frontcache-ehcache')
 		
-//		provided        'javax.servlet:javax.servlet-api:3.1.0'
 	}
 }
 
@@ -188,104 +179,28 @@ project(':frontcache-console') {
 		compile project(':frontcache-client')
 		
         provided        'javax.servlet:javax.servlet-api:3.1.0'
-//		provided        'javax.servlet.jsp:jsp-api:2.0'
 		
-		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		compile 'jstl:jstl:1.2'
-
-//		compile 'ch.qos.logback:logback-classic:1.1.3'
 		compile 'org.springframework:spring-webmvc:4.1.6.RELEASE'
-//		compile 'javax.servlet:jstl:1.2'
-	
-		provided 'junit:junit:4.12' // for common tests
 	}
 	
-//	check {
-//		dependsOn integrationTest
-//	}
+	check {
+		dependsOn integrationTest
+	}
 }
 
 
-project(':frontcache-filter-tests') {
-    apply plugin: 'war'
-	apply plugin: 'org.akhikhl.gretty'
 
-	gretty {
-		port = 9080		
-		contextPath = '/'
-		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
-//		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
-		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
-//		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
-		if (System.getProperty('DEBUG', 'false') == 'true') {
-			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
-		}
-	}
-	
-
-    dependencies {
-        compile project(':frontcache-core')
-        compile project(':frontcache-client')
-//		compile project(':frontcache-ehcache') - no persistence cache for tests
-		
-		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
-		compile 'jstl:jstl:1.2'
-		
-		provided 'junit:junit:4.12' // for common tests		
-    }
-	
-//	check {
-//		dependsOn integrationTest
-//	}
-	
-}
-
-//// run Frontcache in embedded Jetty (localhost:9080)
-//// run test web app using Gretty (localhost:8080)
-//// run integration test -> frontcache(:9080) -> webapp(:8080)
-//project(':frontcache-standalone-tests') {
-//	apply plugin: 'war'
-//	apply plugin: 'org.akhikhl.gretty'
-//
-//	gretty {
-//		port = 8080
-//		contextPath = '/'
-//		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
-//		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
-////		if (System.getProperty('DEBUG', 'false') == 'true') {
-////			jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
-////		}
-//	}
-//	
-//	integrationTest{
-//		jvmArgs '-Dfrontcache.standalone.frontcache.web.dir=' + projectDir + '/src/test-integration/webapp',
-//				'-Dfrontcache.home=' + projectDir + '/FRONTCACHE_HOME',
-//				'-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml'
-//	}
-//
-//	dependencies {
-//		compile project(':frontcache-core')
-//		compile project(':frontcache-filter-tests') // for common tests
-////		compile project(':frontcache-ehcache') - no persistence cache for tests
-//		
-//		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
-//		compile 'org.eclipse.jetty:jetty-server:9.3.6.v20151106'
-//		compile 'org.eclipse.jetty:jetty-webapp:9.3.6.v20151106'
-//		compile 'jstl:jstl:1.2'
-//	}
-//
-//	check {
-//		dependsOn integrationTest
-//	}
-//	
-//}
-
+// tests -> FC standalone (localhost:9080) -> FC webfilter (localhost:8080) -> web app (localhost:8080)
+// FC standalone is run in standalone Jetty in org.frontcache.tests.FrontcacheStandaloneServer
+// FC webfilter is run in Gretty
+// test & FC webfilter & web app   are share the same JVM process 
 project(':frontcache-tests') {
 	apply plugin: 'war'
-//	apply plugin: 'jetty'	
 	apply plugin: 'org.akhikhl.gretty'
 
 		
+	// gretty for FC filter and web app
 	gretty {
 		httpPort = 8080
 		servicePort = 8081
@@ -293,41 +208,32 @@ project(':frontcache-tests') {
   		contextPath = '/'
 		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
 		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
+		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
+//		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
 	}
 	
 
-	task standaloneJetty(type: JavaExec) {
-		main = 'org.frontcache.tests.StandaloneFrontcache'
+	// for FC standalone
+	task standaloneFrontcacheJetty(type: JavaExec) {
+		main = 'org.frontcache.tests.FrontcacheStandaloneServer'
 		classpath = sourceSets.main.runtimeClasspath
-//		args 'serega'
-//		systemProperty 'simple.message', 'Hello '
 		systemProperty 'frontcache.standalone.frontcache.web.dir', '' + projectDir + '/src/test-integration/webapp'
+		systemProperty 'frontcache.standalone.frontcache.port', '9080'
 		systemProperty 'frontcache.home', '' + projectDir + '/FRONTCACHE_HOME_STANDALONE'
 	}
 	
-	task standaloneJetty1(type: Exec) {
-		workingDir '.'
-		  //on linux
-		commandLine './standalone.sh'
-	}
-	
-	task runStandaloneFrontcache(type: ExecWait) {
-		command './gradlew clean :frontcache-tests:standaloneJetty'
-		ready 'StandaloneFrontcache started'
+	task startStandaloneFrontcache(type: ExecWait) {
+		command './gradlew clean :frontcache-tests:standaloneFrontcacheJetty'
+		ready 'Frontcache Standalone Server has been started successfully ...'
 		directory '.'
-		
-		
-//		finalizedBy 'integrationTest'
-
 	}
 		
-//	task hello {
-//		doLast {
-//			println 'Hello world!'
-//		}
-//	}
+	integrationTest {
+		jvmArgs '-Dfrontcache-tests.home=' + projectDir
+//		'-Dlogback.configurationFile=' !! logs (because of same process) here: projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml'
+	}
 	
-	task freeAllPorts << {
+	task stopStandaloneFrontcacheByPort << {
 		def ports = [9080]
 	 
 		ports.each { port ->
@@ -340,86 +246,23 @@ project(':frontcache-tests') {
 		}
 	}
 	
-	task integrationTest(type: Test) {
-		description = 'Runs the integration tests.'
-		group = 'verification'
-		maxParallelForks = 1 // run all tests sequentially (due to cache cleanup befor every test)
-		forkEvery = 1 // run all tests sequentially (due to cache cleanup befor every test)
-		testClassesDir = sourceSets.integrationTest.output.classesDir
-		classpath = sourceSets.integrationTest.runtimeClasspath
-		reports.html.destination = file("$reports.html.destination/integration")
-		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
-
-		jvmArgs '-Dfrontcache.home=' + projectDir + '/FRONTCACHE_HOME_FILTER',
-		'-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml'
-
-//		dependsOn runStandaloneFrontcache
+	task end2endTests {
+		dependsOn integrationTest
 	}
 	
 	dependencies {
 		compile project(':frontcache-core')
-		compile project(':frontcache-filter-tests') // for common tests
+		compile project(':frontcache-client')		
 //		compile project(':frontcache-ehcache') - no persistence cache for tests
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		compile 'org.eclipse.jetty:jetty-server:9.3.6.v20151106'
 		compile 'org.eclipse.jetty:jetty-webapp:9.3.6.v20151106'
 		compile 'jstl:jstl:1.2'
+		
+		provided 'junit:junit:4.12' 		
 	}
-
-
-//	assemble {
-//		finalizedBy runStandaloneFrontcache
-//	}
-	
-	check {
-//		dependsOn(jettyMultiRunTasks)
-
-//		dependsOn runSimple
-//		finalizedBy justAFTER
-//		dependsOn integrationTest
-//		dependsOn runStandaloneFrontcache
-//		finalizedBy freeAllPorts
-
-//		dependsOn runStandaloneFrontcache
 		
-	}
-	
-	task endTests {
-		//		dependsOn(jettyMultiRunTasks)
-		
-		//		dependsOn runSimple
-		//		finalizedBy justAFTER
-				dependsOn integrationTest
-		//		dependsOn runStandaloneFrontcache
-				finalizedBy freeAllPorts
-		
-		//		dependsOn runStandaloneFrontcache
-				
-			}
-		
-	
-//	task delombok(type: Exec) {
-//		commandLine 'java', '-jar', 'build-libs/lombok.jar', 'delombok', 'src', '-d', 'build/src-delomboked'
-//	}
-//	
-//	
-//	task stopTomcat(type:Exec) {
-//		workingDir '../tomcat/bin'
-//	  
-//		//on linux
-//		commandLine './stop.sh'
-////		commandLine 'ruby', '-v'
-//		
-//		//store the output instead of printing to the console:
-//		standardOutput = new ByteArrayOutputStream()
-//	  
-//		//extension method stopTomcat.output() can be used to obtain the output:
-//		ext.output = {
-//		  return standardOutput.toString()
-//		}
-//	  }
-//	integrationTest.dependsOn justBefore
-//	check.finalizedBy justAFTER
+
 }
 
