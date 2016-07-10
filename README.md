@@ -21,18 +21,7 @@ It's developed & tested with Java based Web apps but can be used with other lang
 ###Technical introduction
 
 It's implemented as Servlet Filter.
-Every page can have 
-```
-<fc:component /> tag which has chaching directives applied to the page:
-<fc:component maxage="0" /> - do not cache (defalut)
-<fc:component maxage="-1" /> - cache forever
-<fc:component maxage="forever" /> - cache forever
-<fc:component maxage="60" /> - cache for 60 seconds
-<fc:component maxage="60s" /> - cache for 60 seconds
-<fc:component maxage="15m" /> - cache for 15 minutes
-<fc:component maxage="24h" /> - cache for 24 hours
-```
-The same in case of using HTTP Headers:
+Every page/fragment can set HTTP Headers:
 ```
 X-frontcache.component.maxage = 0  - do not cache (defalut)
 X-frontcache.component.maxage = -1 - cache forever
@@ -57,7 +46,6 @@ All includes for the same page are run concurrently what allows to speed up a lo
 FrontCache supports couple caching implementations:
 - build-in in-memory cache 
 - ehCache adapter - see http://www.ehcache.org/ for details
-- Redis adapter - see http://redis.io/ for details
  
 
 ### Request log : (frontcache-requests.log)
@@ -85,22 +73,20 @@ X-frontcache.debug.response-size - response size (in bytes)
 
 and set there path to local maven repo - e.g.
 
+```
 mavenLocalRepo = file:///Users/spa/.m2/repository
-
-3. create simbol link for standalone tests (to run the same as filter tests)
-
 ```
-ln -s ${CHECKOUT_DIR}/frontcache/frontcache-filter-tests/src/main/webapp/common ${CHECKOUT_DIR}/frontcache/frontcache-standalone-tests/src/main/webapp
-on my laptop it looks like this:
-ln -s /Users/spa/git/frontcache/frontcache-filter-tests/src/main/webapp/common /Users/spa/git/frontcache/frontcache-standalone-tests/src/main/webapp
 
-```
-4. build
-
+3. build
 ```
 ./gradlew clean build
 ```
- 
+
+4. Run tests
+```
+./tests.sh
+```
+
  
 ### More / better descriotion is comming soon. 
 Dig in fc-mvc-demo project if you want it earlier. fc-mvc-demo project has the same page implemented using standard MVC approach and using FrontCache.
