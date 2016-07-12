@@ -17,14 +17,16 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.cache.CacheManager;
 import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.DummyActionResponse;
+import org.frontcache.io.DumpKeysActionResponse;
+import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.InvalidateActionResponse;
-import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.frontcache.io.ReloadActionResponse;
 import org.frontcache.io.ReloadFallbacksActionResponse;
@@ -108,6 +110,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case "reload-fallbacks":
 			aResponse = reloadFallbacks(req);
+			break;
+			
+		case "get-fallback-configs":
+			aResponse = getFallbackConfigs(req);
 			break;
 			
 			default:
@@ -301,6 +307,21 @@ public class FrontCacheIOServlet extends HttpServlet {
 		FallbackResolverFactory.getInstance(FrontCacheEngine.getFrontCache().getHttpClient());
 		
 		ActionResponse aResponse = new ReloadFallbacksActionResponse();
+		return aResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getFallbackConfigs(HttpServletRequest req)
+	{
+		List<FallbackConfigEntry> fallbackConfigs = FallbackResolverFactory.getInstance(FrontCacheEngine.getFrontCache().getHttpClient()).getFallbackConfigs();
+		
+		GetFallbackConfigActionResponse aResponse = new GetFallbackConfigActionResponse();
+		aResponse.setFallbackConfigs(fallbackConfigs);
+		
 		return aResponse;
 	}
 	

@@ -1,5 +1,8 @@
 package org.frontcache.hystrix.fr;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.http.client.HttpClient;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
@@ -25,6 +28,11 @@ public class DefaultFallbackResolver implements FallbackResolver {
 
 	@Override
 	public void init(HttpClient client) {
+	}
+
+	@Override
+	public List<FallbackConfigEntry> getFallbackConfigs() {
+		return new ArrayList<FallbackConfigEntry>();
 	}
 
 }
