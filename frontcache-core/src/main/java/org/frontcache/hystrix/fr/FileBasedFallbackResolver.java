@@ -67,7 +67,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		{
 			Pattern p = uri2patternMap.get(fallbackPattern);
 			
-    		if (p.matcher(urlStr).find())
+    		if (p.matcher(urlStr).matches())
     		{
     			currentFallbackURLpattern = fallbackPattern;
     			break;
