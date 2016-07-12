@@ -336,8 +336,8 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 			fallbackURLPattern = arr[1];
 		} else if (arr.length == 3) {
 			fileName = arr[0];
-			fetchURL = arr[1];
-			fallbackURLPattern = arr[2];
+			fallbackURLPattern = arr[1];
+			fetchURL = arr[2];
 			
 			file2fetchURLMap.put(fileName, fetchURL);
 		} else {
