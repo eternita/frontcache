@@ -237,14 +237,15 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse startDumpKeys(HttpServletRequest req)
 	{
 
+		final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
+		final String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+		final String filePath = "warmer/keys_" + logTimeDateFormat.format(new Date()) + ".txt";
 		Runnable r = new Runnable() {
 			
 			public void run() {
 				
-				final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
-				String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
 				File outputDir = new File(frontcacheHome);
-				File keysDumpFile = new  File(outputDir, "warmer/keys_" + logTimeDateFormat.format(new Date()) + ".txt");
+				File keysDumpFile = new  File(outputDir, filePath);
 				FileOutputStream fos = null;
 				try {
 					fos = new FileOutputStream(keysDumpFile);
@@ -270,7 +271,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 		Thread t = new Thread(r);
 		t.start();				
 
-		ActionResponse aResponse = new DumpKeysActionResponse();
+		DumpKeysActionResponse aResponse = new DumpKeysActionResponse();
+		aResponse.setOutputFile(filePath);
 			
 		return aResponse;
 	}
