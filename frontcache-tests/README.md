@@ -7,5 +7,5 @@ run tests
 ```
 start filter mode
 ```
-./gradlew :frontcache-tests:jettyRun
+./gradlew clean :frontcache-tests:jettyRun
 ```
