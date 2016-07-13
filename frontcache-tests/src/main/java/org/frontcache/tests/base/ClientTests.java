@@ -1,7 +1,6 @@
 package org.frontcache.tests.base;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
@@ -13,7 +12,6 @@ import java.util.Set;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.client.FrontCacheCluster;
 import org.frontcache.core.FCHeaders;
-import org.frontcache.io.PutToCacheActionResponse;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -122,40 +120,6 @@ public abstract class ClientTests extends TestsBase {
 		return;
 	}
 
-	@Test
-	public void putToCacheClient() throws Exception {
-		
-		final String TEST_URI_A = "common/fc-agent/a.jsp";
-
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
-		
-		// clean up
-		String response = frontcacheClient.removeFromCacheAll();
-		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
-
-		// the first request a - response should be cached
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_A);
-		assertEquals("a", page.getPage().asText());		
-		
-		String cacheKey = getCacheKeyBaseURL() + TEST_URI_A; 
-
-		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCacheActionResponse(cacheKey).getValue();
-
-		assertEquals("a", new String(resp.getContent()));
-		
-		resp.setContent("b".getBytes());
-		
-		PutToCacheActionResponse actionResponse = frontcacheClient.putToCache(cacheKey, resp);
-		
-		assertNotNull(actionResponse);
-		
-		resp = frontcacheClient.getFromCacheActionResponse(cacheKey).getValue();
-
-		assertEquals("b", new String(resp.getContent()));
-		
-		return;
-	}
 	
 	@Test
 	public void getCacheStatusClient() throws Exception {
