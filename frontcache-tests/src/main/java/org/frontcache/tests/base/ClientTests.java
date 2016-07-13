@@ -13,7 +13,6 @@ import java.util.Set;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.client.FrontCacheCluster;
 import org.frontcache.core.FCHeaders;
-import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.junit.After;
 import org.junit.Assert;
@@ -180,29 +179,29 @@ public abstract class ClientTests extends TestsBase {
 		logger.debug("response " + response);
 	}
 
-	@Test
-	public void getCachedKeysClient() throws Exception {
-		
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
-		
-		CachedKeysActionResponse response = frontcacheClient.getCachedKeys();
-		Assert.assertNotNull(response);
-		Assert.assertEquals("cached keys", response.getAction());
-		logger.debug("response " + response);
-	}
-
-	@Test
-	public void getCachedKeysCluster() throws Exception {
-		
-		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1);
-		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2);
-		FrontCacheCluster fcCluster = new FrontCacheCluster(frontCacheClient1, frontCacheClient2);
-		
-		CachedKeysActionResponse response = fcCluster.getCachedKeys().get(frontCacheClient1);
-		Assert.assertNotNull(response);
-		Assert.assertEquals("cached keys", response.getAction());
-		logger.debug("response " + response);
-	}
+//	@Test
+//	public void getCachedKeysClient() throws Exception {
+//		
+//		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
+//		
+//		CachedKeysActionResponse response = frontcacheClient.getCachedKeys();
+//		Assert.assertNotNull(response);
+//		Assert.assertEquals("cached keys", response.getAction());
+//		logger.debug("response " + response);
+//	}
+//
+//	@Test
+//	public void getCachedKeysCluster() throws Exception {
+//		
+//		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1);
+//		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2);
+//		FrontCacheCluster fcCluster = new FrontCacheCluster(frontCacheClient1, frontCacheClient2);
+//		
+//		CachedKeysActionResponse response = fcCluster.getCachedKeys().get(frontCacheClient1);
+//		Assert.assertNotNull(response);
+//		Assert.assertEquals("cached keys", response.getAction());
+//		logger.debug("response " + response);
+//	}
 	
 	@Test
 	public void invalidationByFilterTestClient() throws Exception {

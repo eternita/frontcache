@@ -3,6 +3,7 @@ package org.frontcache;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -21,7 +22,6 @@ import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
-import org.frontcache.io.CachedKeysActionResponse;
 import org.frontcache.io.DummyActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
@@ -89,8 +89,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 			break;
 			
 		case "get-cached-keys":
-			aResponse = getCachedKeys(req);
-			break;
+			getCachedKeys(req, resp);
+			return;
 			
 		case "get-from-cache":
 			aResponse = getFromCache(req);
@@ -165,12 +165,29 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 * @param req
 	 * @return
 	 */
-	private ActionResponse getCachedKeys(HttpServletRequest req)
+	private void getCachedKeys(HttpServletRequest req, HttpServletResponse resp)
 	{
-		List<String> keys = CacheManager.getInstance().getCachedKeys();
-		ActionResponse aResponse = new CachedKeysActionResponse(keys);
-			
-		return aResponse;
+		resp.setContentType("text");
+		OutputStream os = null;
+		try {
+			os = resp.getOutputStream();
+			for (String url : CacheManager.getInstance().getCachedKeys())
+			{
+				os.write((url + "\n").getBytes());
+			}
+			os.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (null != os)
+					os.close(); 
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		return;
 	}
 	
 	/**
