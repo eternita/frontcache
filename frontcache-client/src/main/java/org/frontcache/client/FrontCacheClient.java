@@ -321,11 +321,15 @@ public class FrontCacheClient {
 		if (-1 < idx)
 			name = name.substring(idx + "//".length());
 		
-		idx = name.indexOf("/");
+		idx = name.indexOf(":"); // localhost:8080 -> localhost
 		if (-1 < idx)
 			name = name.substring(0, idx);
 		
-		// e.g. localhost:8080
+//		idx = name.indexOf("/"); // 
+//		if (-1 < idx)
+//			name = name.substring(0, idx);
+		
+		// e.g. localhost
 		return name;
 	}
 
