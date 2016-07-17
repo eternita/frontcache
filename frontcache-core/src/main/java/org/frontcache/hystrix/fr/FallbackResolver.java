@@ -1,5 +1,7 @@
 package org.frontcache.hystrix.fr;
 
+import java.util.List;
+
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.WebResponse;
 
@@ -9,4 +11,5 @@ public interface FallbackResolver {
 
 	public WebResponse getFallback(String urlStr);
 
+	public List<FallbackConfigEntry> getFallbackConfigs();
 }

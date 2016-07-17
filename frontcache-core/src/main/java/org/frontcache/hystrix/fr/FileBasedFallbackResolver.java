@@ -11,7 +11,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -58,6 +60,27 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		populateFallbacksFromOrigin();
 	}
 
+	@Override
+	public List<FallbackConfigEntry> getFallbackConfigs() {
+		
+		List<FallbackConfigEntry> list = new ArrayList<FallbackConfigEntry>();
+		
+		for (String uri : uri2fileMap.keySet())
+		{
+			FallbackConfigEntry fce = new FallbackConfigEntry();
+			
+			fce.setUrlPattern(uri);
+			String fileName = uri2fileMap.get(uri);
+			fce.setFileName(fileName);
+			fce.setInitUrl(file2fetchURLMap.get(fileName));
+			
+			list.add(fce);
+		}
+		
+		
+		return list;
+	}
+	
 	@Override
 	public WebResponse getFallback(String urlStr)
 	{
@@ -336,8 +359,8 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 			fallbackURLPattern = arr[1];
 		} else if (arr.length == 3) {
 			fileName = arr[0];
-			fetchURL = arr[1];
-			fallbackURLPattern = arr[2];
+			fallbackURLPattern = arr[1];
+			fetchURL = arr[2];
 			
 			file2fetchURLMap.put(fileName, fetchURL);
 		} else {
