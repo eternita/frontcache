@@ -3,6 +3,7 @@ package org.frontcache;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -17,15 +18,15 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.cache.CacheManager;
 import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
-import org.frontcache.io.CachedKeysActionResponse;
-import org.frontcache.io.DummyActionResponse;
-import org.frontcache.io.GetFromCacheActionResponse;
-import org.frontcache.io.InvalidateActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
-import org.frontcache.io.PutToCacheActionResponse;
+import org.frontcache.io.GetFallbackConfigActionResponse;
+import org.frontcache.io.GetFromCacheActionResponse;
+import org.frontcache.io.HelpActionResponse;
+import org.frontcache.io.InvalidateActionResponse;
 import org.frontcache.io.ReloadActionResponse;
 import org.frontcache.io.ReloadFallbacksActionResponse;
 import org.slf4j.Logger;
@@ -69,6 +70,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 
+	
+
 	private void process(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException 
 	{
 		String action = req.getParameter("action");
@@ -78,27 +81,23 @@ public class FrontCacheIOServlet extends HttpServlet {
 		ActionResponse aResponse = null;
 		switch (action)
 		{
-		case "invalidate":
+		case FrontcacheAction.INVALIDATE:
 			aResponse = invalidate(req);
 			break;
 			
-		case "get-cache-state":
+		case FrontcacheAction.GET_CACHE_STATE:
 			aResponse = getCacheStatus(req);
 			break;
 			
-		case "get-cached-keys":
-			aResponse = getCachedKeys(req);
-			break;
+		case FrontcacheAction.GET_CACHED_KEYS:
+			getCachedKeys(req, resp);
+			return;
 			
-		case "get-from-cache":
+		case FrontcacheAction.GET_FROM_CACHE:
 			aResponse = getFromCache(req);
 			break;
 			
-		case "put-to-cache":
-			aResponse = putToCache(req);
-			break;
-			
-		case "dump-keys":
+		case FrontcacheAction.DUMP_KEYS:
 			aResponse = startDumpKeys(req);
 			break;
 			
@@ -106,12 +105,16 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = reload(req);
 			break;
 
-		case "reload-fallbacks":
+		case FrontcacheAction.RELOAD_FALLBACKS:
 			aResponse = reloadFallbacks(req);
 			break;
 			
+		case FrontcacheAction.GET_FALLBACK_CONFIGS:
+			aResponse = getFallbackConfigs(req);
+			break;
+			
 			default:
-				aResponse = new DummyActionResponse();
+				aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
 			
 		}
 		resp.getOutputStream().write(jsonMapper.writeValueAsBytes(aResponse));
@@ -159,12 +162,29 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 * @param req
 	 * @return
 	 */
-	private ActionResponse getCachedKeys(HttpServletRequest req)
+	private void getCachedKeys(HttpServletRequest req, HttpServletResponse resp)
 	{
-		List<String> keys = CacheManager.getInstance().getCachedKeys();
-		ActionResponse aResponse = new CachedKeysActionResponse(keys);
-			
-		return aResponse;
+		resp.setContentType("text");
+		OutputStream os = null;
+		try {
+			os = resp.getOutputStream();
+			for (String url : CacheManager.getInstance().getCachedKeys())
+			{
+				os.write((url + "\n").getBytes());
+			}
+			os.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (null != os)
+					os.close(); 
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		return;
 	}
 	
 	/**
@@ -182,53 +202,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		
 		return actionResponse;
 	}
-	
-	/**
-	 * @param req
-	 * @return
-	 */
-	private ActionResponse putToCache(HttpServletRequest req)
-	{
-		ActionResponse actionResponse = new PutToCacheActionResponse();
-		String key = req.getParameter("key");
-		String webResponseJSONStr = req.getParameter("webResponseJSON");
-		if (null == webResponseJSONStr || null == key)
-		{
-			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			actionResponse.setErrorDescription("some parameters are null");
-			return actionResponse;
-		}
 		
-		WebResponse webResponse = null;
-		try {
-			webResponse = jsonMapper.readValue(webResponseJSONStr.getBytes(), WebResponse.class);
-		} catch (IOException e) {
-			e.printStackTrace();
-			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			actionResponse.setErrorDescription(e.getMessage());
-			return actionResponse;
-		}
-		if (null == webResponse)
-		{
-			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			return actionResponse;
-		}
-			
-		if (null == webResponse.getUrl())
-		{
-			actionResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			actionResponse.setErrorDescription("null = webResponse.getUrl()");
-			return actionResponse;
-		}
-		
-		if (null != CacheManager.getInstance().getFromCache(key))
-			actionResponse.setErrorDescription("key is already in cache " + key);
-
-		CacheManager.getInstance().putToCache(key, webResponse);
-		
-		return actionResponse;
-	}
-	
 	/**
 	 * 
 	 * @param req
@@ -237,14 +211,15 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse startDumpKeys(HttpServletRequest req)
 	{
 
+		final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
+		final String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+		final String filePath = "warmer/keys_" + logTimeDateFormat.format(new Date()) + ".txt";
 		Runnable r = new Runnable() {
 			
 			public void run() {
 				
-				final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
-				String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
 				File outputDir = new File(frontcacheHome);
-				File keysDumpFile = new  File(outputDir, "warmer/keys_" + logTimeDateFormat.format(new Date()) + ".txt");
+				File keysDumpFile = new  File(outputDir, filePath);
 				FileOutputStream fos = null;
 				try {
 					fos = new FileOutputStream(keysDumpFile);
@@ -270,7 +245,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 		Thread t = new Thread(r);
 		t.start();				
 
-		ActionResponse aResponse = new DumpKeysActionResponse();
+		DumpKeysActionResponse aResponse = new DumpKeysActionResponse();
+		aResponse.setOutputFile(filePath);
 			
 		return aResponse;
 	}
@@ -299,6 +275,21 @@ public class FrontCacheIOServlet extends HttpServlet {
 		FallbackResolverFactory.getInstance(FrontCacheEngine.getFrontCache().getHttpClient());
 		
 		ActionResponse aResponse = new ReloadFallbacksActionResponse();
+		return aResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getFallbackConfigs(HttpServletRequest req)
+	{
+		List<FallbackConfigEntry> fallbackConfigs = FallbackResolverFactory.getInstance(FrontCacheEngine.getFrontCache().getHttpClient()).getFallbackConfigs();
+		
+		GetFallbackConfigActionResponse aResponse = new GetFallbackConfigActionResponse();
+		aResponse.setFallbackConfigs(fallbackConfigs);
+		
 		return aResponse;
 	}
 	

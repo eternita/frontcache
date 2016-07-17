@@ -2,7 +2,9 @@ package org.frontcache.client;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,15 +29,15 @@ import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
+import org.frontcache.FrontcacheAction;
 import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.io.CacheStatusActionResponse;
-import org.frontcache.io.CachedKeysActionResponse;
+import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
-import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class FrontCacheClient {
@@ -111,7 +113,7 @@ public class FrontCacheClient {
 	public String removeFromCache(String filter)
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", "invalidate"));
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.INVALIDATE));
 		urlParameters.add(new BasicNameValuePair("filter", filter));
 		
 		try {
@@ -129,7 +131,7 @@ public class FrontCacheClient {
 	public String removeFromCacheAll()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", "invalidate"));
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.INVALIDATE));
 		urlParameters.add(new BasicNameValuePair("filter", "*"));
 		
 		try {
@@ -158,7 +160,7 @@ public class FrontCacheClient {
 	public CacheStatusActionResponse getCacheStateActionResponse()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", "get-cache-state"));
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_CACHE_STATE));
 		
 		try {
 			String responseStr = requestFrontCache(urlParameters);
@@ -173,18 +175,59 @@ public class FrontCacheClient {
 	}
 	
 	/**
+	 * Writes keys to provided output stream
+	 * 
+	 * @param os
+	 * @return
+	 */
+	public boolean getCachedKeys(OutputStream os)
+	{
+		boolean success = true;
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_CACHED_KEYS));
+		
+		HttpPost post = new HttpPost(frontCacheURI);
+
+//    	post.addHeader("Accept-Encoding", "gzip");
+
+		InputStream is = null;
+		try {
+			post.setEntity(new UrlEncodedFormEntity(urlParameters));
+			HttpResponse response = client.execute(post);
+			is = response.getEntity().getContent();
+	        int bytesRead = 0;
+	        int bufferSize = 4000;
+	         byte[] byteBuffer = new byte[bufferSize];              
+	         while ((bytesRead = is.read(byteBuffer)) != -1) {
+	             os.write(byteBuffer, 0, bytesRead);
+	         }
+		} catch (Exception e) {
+			success = false;
+			e.printStackTrace();
+		} finally {
+			try {
+				if (null != is)
+					is.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		return success;
+	}
+	
+	/**
 	 * 
 	 * @return
 	 */
-	public CachedKeysActionResponse getCachedKeys()
+	public GetFallbackConfigActionResponse getFallbackConfigsActionResponse()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", "get-cached-keys"));
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_FALLBACK_CONFIGS));
 		
 		try {
 			String responseStr = requestFrontCache(urlParameters);
-			logger.debug("getFromCache() -> " + responseStr);
-			CachedKeysActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), CachedKeysActionResponse.class);
+			GetFallbackConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFallbackConfigActionResponse.class);
 			return actionResponse;
 			
 		} catch (Exception e) {
@@ -193,7 +236,17 @@ public class FrontCacheClient {
 		
 		return null;
 	}
+	
+	public List<FallbackConfigEntry> getFallbackConfigs()
+	{
+		GetFallbackConfigActionResponse actionResponse = getFallbackConfigsActionResponse();
 		
+		if (null == actionResponse)
+			return null;
+		
+		return actionResponse.getFallbackConfigs();
+	}
+	
 	/**
 	 * 
 	 * @return
@@ -201,12 +254,11 @@ public class FrontCacheClient {
 	public GetFromCacheActionResponse getFromCacheActionResponse(String key)
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", "get-from-cache"));
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_FROM_CACHE));
 		urlParameters.add(new BasicNameValuePair("key", key));
 		
 		try {
 			String responseStr = requestFrontCache(urlParameters);
-//			logger.debug("getFromCache(" + this + ") -> " + responseStr);
 			logger.debug("getFromCache(" + this + ") -> done");
 			GetFromCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFromCacheActionResponse.class);
 			return actionResponse;
@@ -227,57 +279,6 @@ public class FrontCacheClient {
 		
 		return actionResponse.getValue();
 	}
-	
-	/**
-	 * 
-	 * @return
-	 */
-	public PutToCacheActionResponse putToCache(String key, WebResponse webResponse)
-	{
-		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", "put-to-cache"));
-		urlParameters.add(new BasicNameValuePair("key", key));
-		String webResponseJSON = null;
-		try {
-			webResponseJSON = jsonMapper.writeValueAsString(webResponse);
-		} catch (JsonProcessingException e1) {
-			e1.printStackTrace();
-			return null;
-		}
-
-		urlParameters.add(new BasicNameValuePair("webResponseJSON", webResponseJSON));
-		
-		try {
-			String responseStr = requestFrontCache(urlParameters);
-			logger.debug("putToCache(" + this + ") -> " + responseStr);
-			PutToCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), PutToCacheActionResponse.class);
-			return actionResponse;
-			
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		return null;
-	}
-	
-	public void putToCache(Map<String, WebResponse> webResponseList)
-	{
-		Runnable runable = new Runnable() {
-			
-			public void run() {
-				for (String key : webResponseList.keySet())
-				{
-					WebResponse webResponse = webResponseList.get(key);
-					putToCache(key, webResponse);
-				}
-			}
-		};
-		
-		Thread thread = new Thread(runable);
-		thread.start();
-		return;
-	}
-
 	
 	/**
 	 * 
@@ -320,11 +321,15 @@ public class FrontCacheClient {
 		if (-1 < idx)
 			name = name.substring(idx + "//".length());
 		
-		idx = name.indexOf("/");
+		idx = name.indexOf(":"); // localhost:8080 -> localhost
 		if (-1 < idx)
 			name = name.substring(0, idx);
 		
-		// e.g. localhost:8080
+//		idx = name.indexOf("/"); // 
+//		if (-1 < idx)
+//			name = name.substring(0, idx);
+		
+		// e.g. localhost
 		return name;
 	}
 
