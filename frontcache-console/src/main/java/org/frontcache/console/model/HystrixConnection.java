@@ -1,4 +1,4 @@
-package org.frontcache.console.service;
+package org.frontcache.console.model;
 
 public class HystrixConnection {
 

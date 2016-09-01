@@ -1,0 +1,21 @@
+body {
+    font-family: sans;
+    font-size: 2em;
+}
+
+p.error {
+    font-weight: bold;
+    color: red;
+}
+
+div.logout {
+    float: right;
+}
+.navbar-label {
+    font-size: 16px;
+    line-height: 1;
+    font-weight: 500;
+    text-transform: uppercase;
+    cursor: pointer;
+    color: #333;
+}

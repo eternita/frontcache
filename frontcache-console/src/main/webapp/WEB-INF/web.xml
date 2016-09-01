@@ -1,11 +1,10 @@
-<web-app xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
-	http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
-	version="2.5">
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://java.sun.com/xml/ns/javaee" xmlns:web="http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
+         metadata-complete="false" version="3.0">
+  <display-name>frontcache.io</display-name>
 
-	<display-name>Frontcache Console</display-name>
-	<description>Frontcache Console</description>
-
+   <!-- hystrix streams -->
 	<servlet>
 		<description />
 		<display-name>ProxyStreamServlet</display-name>
@@ -16,14 +15,16 @@
 		<servlet-name>ProxyStreamServlet</servlet-name>
 		<url-pattern>/resources/hystrix/proxy.stream</url-pattern>
 	</servlet-mapping>
-		
+  
 	<!-- For web context -->
  	<servlet>
 		<servlet-name>hello-dispatcher</servlet-name>
 		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
 		<init-param>
 			<param-name>contextConfigLocation</param-name>
-			<param-value>/WEB-INF/spring-mvc-config.xml</param-value>
+			<param-value>
+			    classpath:/META-INF/spring-mvc-config.xml
+			</param-value>
 		</init-param>
 		<load-on-startup>1</load-on-startup>
 	</servlet>
@@ -41,7 +42,9 @@
 
 	<context-param>
 		<param-name>contextConfigLocation</param-name>
-		<param-value>/WEB-INF/spring-core-config.xml</param-value>
+		<param-value>
+		   classpath:/META-INF/spring-core-config.xml
+		</param-value>
 	</context-param>
-
+    
 </web-app>
