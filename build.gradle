@@ -170,6 +170,10 @@ project(':frontcache-console') {
 	apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
 	
+	ext {
+		springVersion = '4.2.6.RELEASE'
+	}
+	
 	gretty {
 		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.properties']
 	}
@@ -177,7 +181,12 @@ project(':frontcache-console') {
 	dependencies {
 		compile project(':frontcache-core')
 		compile project(':frontcache-client')
-		
+		compile "org.springframework:spring-context:${springVersion}"
+//		compile "org.springframework:spring-tx:${springVersion}"
+		compile "org.springframework:spring-webmvc:${springVersion}"
+//		compile "org.springframework.security:spring-security-config:${springSecurityVersion}"
+//		compile "org.springframework.security:spring-security-web:${springSecurityVersion}"
+
         provided        'javax.servlet:javax.servlet-api:3.1.0'
 		
 		compile 'jstl:jstl:1.2'
