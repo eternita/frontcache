@@ -1,23 +1,19 @@
-<%@ taglib prefix="spring" uri="http://www.springframework.org/tags"%>
+<%@ taglib uri="http://java.sun.com/jstl/core_rt" prefix="display"%>
+
+<%@ page language="java" contentType="text/html; charset=ISO-8859-1" pageEncoding="ISO-8859-1"%>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<title>Frontcache Console</title>
-
-<%-- <spring:url value="/resources/core/css/console.css" var="coreCss" />
-<spring:url value="/resources/core/css/bootstrap.min.css" var="bootstrapCss" />
-<link href="${bootstrapCss}" rel="stylesheet" />
-<link href="${coreCss}" rel="stylesheet" />
- --%>
-
-<%-- 
-<spring:url value="/resources/core/js/console.js" var="coreJs" />
-<script src="${coreJs}"></script>
-<spring:url value="/resources/core/js/bootstrap.min.js" var="bootstrapJs" />
-<script src="${bootstrapJs}"></script>
---%>
-
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<title>${currentDomain.url} Account page</title>
+<!-- 
+		<link href="<c:url value='/static/css/bootstrap.css' />"  rel="stylesheet"></link>
+		<script src="<c:url value='https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js' />"></script>
+		 <script src="<c:url value='/static/js/bootstrap.js' />"></script>
+		<link href="<c:url value='/static/css/app.css' />" rel="stylesheet"></link>
+		<link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/4.2.0/css/font-awesome.css" />
+ -->		
+		
 	<!-- Setup base for everything -->
 	<link rel="stylesheet" type="text/css" href="resources/hystrix/css/global.css" />
 	
@@ -27,8 +23,7 @@
 	<!-- d3 -->
 	<script type="text/javascript" src="resources/hystrix/js/d3.v2.min.js"></script>
 	
-	<!-- Javascript to monitor and display 
-	-->
+	<!-- Javascript to monitor and display 	-->
 	
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
 	<script type="text/javascript" src="resources/hystrix/js/jquery.tinysort.min.js"></script>
@@ -43,30 +38,38 @@
 	<!-- HystrixThreadPool -->
 	<script type="text/javascript" src="resources/hystrix/components/hystrixThreadPool/hystrixThreadPool.js"></script>
 	<link rel="stylesheet" type="text/css" href="resources/hystrix/components/hystrixThreadPool/hystrixThreadPool.css" />
+		
+	</head>
 
-</head>
+	<body>
+		<div id="mainWrapper">
+		<%@ include file="/WEB-INF/views/inc/menu.jsp"%>
+		<div class="container">
+		
+${currentDomain.url} - realtime monitor
 
-<div style="font-size: 22px; padding-left: 20px;">
-	Frontcache Console
-</div>
+
+
 
 <div class="container">
-
-	<hr>
-	<div class="">
-		<div style="padding-left: 20px;">
-		<p style="height: 10px">&nbsp;</p>
-		<h2 style="font-size: 22px;">Cached items on servers</h2>  
-		<br/>
-		
-			<c:forEach var="entry" items="${cachedAmount}">
-			  <c:out value="${entry.key}"/> - 
-			  <c:out value="${entry.value}"/> items <br/>
-			</c:forEach>
-		</div>
-	</div>
-       
-	<hr>
+    <div class="">
+        <div style="padding-left: 20px;">
+        <p style="height: 10px">&nbsp;</p>
+        <h2 style="font-size: 22px;">Edges status</h2>  
+        <br/>
+        
+        <div style="font-size: 18px;"> 
+            <c:forEach var="edge" items="${edges}">
+              <c:out value="${edge.name}"/> - ${edge.onlineStatus}
+              <c:if test="${edge.available}">
+              - <c:out value="${edge.cachedAmountString}"/> items cached
+              </c:if> 
+               <br/>
+            </c:forEach>
+        </div>          
+        </div>
+    </div>
+    <hr>
 
 	<div id="header"><h2 style="font-size: 22px; padding-left: 20px;">Real time performance monitoring</h2></div>
 	<div id="content"></div>
@@ -209,6 +212,7 @@
 	</footer>
 </div>
 
- 
-</body>
+		</div>
+		</div>
+	</body>
 </html>
