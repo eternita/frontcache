@@ -1,11 +1,6 @@
 <%@ taglib uri="http://java.sun.com/jstl/core_rt" prefix="display"%>
 <%@ include file="/WEB-INF/views/inc/header.jsp"%>
 
-
-| <a href="realtime">realtime monitor (hystrix)</a> | <a target="_blank" href="http://54.225.196.168:8082/app/kibana">log analytic (kibana)</a> 
-| <a href="fallbacks">fallback configs </a>
-| <a href="">TODO: cache cache view / invalidation</a> |
-
 <p/> 
 <p/> 
 

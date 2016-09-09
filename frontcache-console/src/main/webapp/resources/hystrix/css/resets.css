@@ -27,30 +27,30 @@ time, mark, audio, video {
     background:transparent;
 }
 
-body {
+#monitor body {
     line-height:1;
 }
 
-article,aside,details,figcaption,figure,
+#monitor article,aside,details,figcaption,figure,
 footer,header,hgroup,menu,nav,section { 
     display:block;
 }
 
-nav ul {
+#monitor nav ul {
     list-style:none;
 }
 
-blockquote, q {
+#monitor blockquote, q {
     quotes:none;
 }
 
-blockquote:before, blockquote:after,
+#monitor blockquote:before, blockquote:after,
 q:before, q:after {
     content:'';
     content:none;
 }
 
-a {
+#monitor a {
     margin:0;
     padding:0;
     font-size:100%;
@@ -59,36 +59,36 @@ a {
 }
 
 /* change colours to suit your needs */
-ins {
+#monitor ins {
     background-color:#ff9;
     color:#000;
     text-decoration:none;
 }
 
 /* change colours to suit your needs */
-mark {
+#monitor mark {
     background-color:#ff9;
     color:#000; 
     font-style:italic;
     font-weight:bold;
 }
 
-del {
+#monitor del {
     text-decoration: line-through;
 }
 
-abbr[title], dfn[title] {
+#monitor abbr[title], dfn[title] {
     border-bottom:1px dotted;
     cursor:help;
 }
 
-table {
+#monitor table {
     border-collapse:collapse;
     border-spacing:0;
 }
 
 /* change border colour to suit your needs */
-hr {
+#monitor hr {
     display:block;
     height:1px;
     border:0;   
@@ -97,6 +97,6 @@ hr {
     padding:0;
 }
 
-input, select {
+#monitor input, select {
     vertical-align:middle;
 }

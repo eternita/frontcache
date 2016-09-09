@@ -1,23 +1,23 @@
 @IMPORT url("resets.css");
 
-body {
+#monitor body {
 	font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
 }
 
-img, object, embed {
+#monitor img, object, embed {
 	max-width: 100%;
 }
 
-img {
+#monitor img {
 	height: auto;
 }
 
-#streamHeader {
+#monitor #streamHeader {
   height: 65px;
   margin-bottom: 5px;
 }
 
-#streamHeader  h2 {
+#monitor #streamHeader  h2 {
 	float:left;
 	color: black;
 	position:relative;
@@ -27,13 +27,13 @@ img {
 	font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
 }
 
-#header .header_nav {
+#monitor #header .header_nav {
 	position:absolute;
 	top:48px;
 	right:15px;
 }
 
-#header .header_links {
+#monitor #header .header_links {
 	float:left;
 	color: lightgray;
 	font-size: 18px;
@@ -42,11 +42,11 @@ img {
 	font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
 }
 
-#header .header_links a {
+#monitor #header .header_links a {
 	color: white;
 }
 
-#header .header_clusters {
+#monitor #header .header_clusters {
 	float:left;
 	position:relative;
 	padding-left: 10px;
@@ -56,12 +56,12 @@ img {
 
 @media screen and (min-width: 1500px) {
 
-	#header .header_nav {
+	#monitor #header .header_nav {
 		top:13px;
 		right:130px;
 	}
 
-	#streamHeader {
+	#monitor #streamHeader {
 		height: 65px;
 	}
 }

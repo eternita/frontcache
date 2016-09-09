@@ -6,14 +6,7 @@
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 		<title>${currentDomain.url} Account page</title>
-<!-- 
-		<link href="<c:url value='/static/css/bootstrap.css' />"  rel="stylesheet"></link>
-		<script src="<c:url value='https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js' />"></script>
-		 <script src="<c:url value='/static/js/bootstrap.js' />"></script>
-		<link href="<c:url value='/static/css/app.css' />" rel="stylesheet"></link>
-		<link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/4.2.0/css/font-awesome.css" />
- -->		
-		
+	
 	<!-- Setup base for everything -->
 	<link rel="stylesheet" type="text/css" href="resources/hystrix/css/global.css" />
 	
@@ -25,7 +18,7 @@
 	
 	<!-- Javascript to monitor and display 	-->
 	
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+	<script src="<c:url value='https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js' />"></script>
 	<script type="text/javascript" src="resources/hystrix/js/jquery.tinysort.min.js"></script>
 	
 	<script type="text/javascript" src="resources/hystrix/js/tmpl.js"></script>
@@ -37,19 +30,17 @@
 	
 	<!-- HystrixThreadPool -->
 	<script type="text/javascript" src="resources/hystrix/components/hystrixThreadPool/hystrixThreadPool.js"></script>
-	<link rel="stylesheet" type="text/css" href="resources/hystrix/components/hystrixThreadPool/hystrixThreadPool.css" />
-		
-	</head>
+		<link rel="stylesheet" type="text/css" href="resources/hystrix/components/hystrixThreadPool/hystrixThreadPool.css" />
+	
+	<script src="<c:url value='/static/js/bootstrap.js' />"></script>
+	<link href="<c:url value='/static/css/app.css' />" rel="stylesheet"></link>
+	<link href="<c:url value='/static/css/bootstrap.css' />" rel="stylesheet"></link>
+</head>
 
 	<body>
 		<div id="mainWrapper">
 		<%@ include file="/WEB-INF/views/inc/menu.jsp"%>
 		<div class="container">
-		
-${currentDomain.url} - realtime monitor
-
-
-
 
 <div class="container">
     <div class="">
