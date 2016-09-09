@@ -8,9 +8,6 @@ body, #mainWrapper {
 background: white;
 }
 
-body, #mainWrapper, .form-control{
-	font-size:12px!important;
-}
 
 #mainWrapper {
 	/*height: 720px; Without explicit px values, % in children's does not work*/
