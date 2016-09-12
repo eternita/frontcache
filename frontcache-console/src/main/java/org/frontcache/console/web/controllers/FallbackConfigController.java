@@ -34,7 +34,7 @@ public class FallbackConfigController {
 		model.put("pattern", "");
 		model.put("matchResult", "");
 
-        return "account/fallback_settings";
+        return "fallback_settings";
     }
     
     
@@ -66,7 +66,7 @@ public class FallbackConfigController {
 		model.put("url", url);
 		model.put("pattern", pattern);
 
-        return "account/fallback_settings";
+        return "fallback_settings";
     }
  
 
