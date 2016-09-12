@@ -5,7 +5,7 @@
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-		<title>${currentDomain.url} Account page</title>
+		<title>Frontcache console</title>
 	
 	<!-- Setup base for everything -->
 	<link rel="stylesheet" type="text/css" href="resources/hystrix/css/global.css" />

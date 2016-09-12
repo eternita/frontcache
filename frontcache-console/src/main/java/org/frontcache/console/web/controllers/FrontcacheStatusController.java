@@ -18,15 +18,20 @@ public class FrontcacheStatusController {
 	private FrontcacheService frontcacheService;
 	
 
-    @RequestMapping(value = "/", method = RequestMethod.GET)
-    public String domainOverview(ModelMap model) {
-    	
-    	Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
-		model.put("edges", clusterStatus.values());
-
-        return "status";
-    }
+//    @RequestMapping(value = "/", method = RequestMethod.GET)
+//    public String domainOverview(ModelMap model) {
+//    	
+//    	Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
+//		model.put("edges", clusterStatus.values());
+//
+//        return "status";
+//    }
     
+	  @RequestMapping(value = "/", method = RequestMethod.GET)
+	  public String domainOverview(ModelMap model) {
+	      return "redirect:realtime";
+	  }
+	  
     @RequestMapping(value = "/realtime", method = RequestMethod.GET)
     public String domainRealtimeMonitor(ModelMap model) {
     	
