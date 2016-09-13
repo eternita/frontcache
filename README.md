@@ -65,24 +65,8 @@ X-frontcache.debug.response-time - response time (in ms)
 X-frontcache.debug.response-size - response size (in bytes)
 ```
 
-### Development environment setup
+### Frontcache console - watch your cache realtime
+![Alt](doc/fc-console-screen.png "Frontcache console demo")
 
-* checkout
 
-* add/update gradle.properties to ${CHECKOUT_DIR}/frontcache
-
-and set there path to local maven repo - e.g.
-
-```
-mavenLocalRepo = file:///Users/spa/.m2/repository
-```
-
-* build
-```
-./gradlew clean build
-```
-
-* Run tests
-```
-./tests.sh
-```
+### Development environment setup - check wiki
