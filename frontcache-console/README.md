@@ -1,5 +1,5 @@
 
-configure nodes for console (frontcache-console.properties)
+* Configure nodes for console (frontcache-console.properties)
 
 ```
 # format
@@ -12,8 +12,13 @@ https://origin.coinshome.net:443/
 ```
 
 
-add following line to catalina.sh
+* Add following environment variable (e.g. to catalina.sh in case of Tomcat)
 ```
 -Dorg.frontcache.console.config=/opt/frontcache/conf/frontcache-console.properties
 ```
 
+
+* Run Frontcache console (in Jetty container)
+```
+./gradlew clean :frontcache-console:jettyRun
+```

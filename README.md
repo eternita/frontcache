@@ -67,9 +67,9 @@ X-frontcache.debug.response-size - response size (in bytes)
 
 ### Development environment setup
 
-1. checkout
+* checkout
 
-2. add/update gradle.properties to ${CHECKOUT_DIR}/frontcache
+* add/update gradle.properties to ${CHECKOUT_DIR}/frontcache
 
 and set there path to local maven repo - e.g.
 
@@ -77,16 +77,12 @@ and set there path to local maven repo - e.g.
 mavenLocalRepo = file:///Users/spa/.m2/repository
 ```
 
-3. build
+* build
 ```
 ./gradlew clean build
 ```
 
-4. Run tests
+* Run tests
 ```
 ./tests.sh
 ```
-
- 
-### More / better descriotion is comming soon. 
-Dig in fc-mvc-demo project if you want it earlier. fc-mvc-demo project has the same page implemented using standard MVC approach and using FrontCache.
