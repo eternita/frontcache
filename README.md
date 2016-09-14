@@ -28,4 +28,4 @@ It's developed & tested with Java based Web apps but can be used with other lang
 ![Alt](doc/fc-console-screen.png "Frontcache console demo")
 ==
 
-### Technical details - check wiki
+### Technical details - [link](https://github.com/eternita/frontcache/wiki "check Wiki")
