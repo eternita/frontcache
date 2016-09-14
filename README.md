@@ -17,8 +17,9 @@ It's developed & tested with Java based Web apps but can be used with other lang
    Standard caching of whole pages cache a lot of duplicated content (e.g. footer and header for every page).
    FrontCache utilizes component caching what allows to avoid caching duplicates. 
 
+4. Works as standalone web app and Servlet filter.
 
-### Frontcache console - watch your cache realtime
+### Frontcache console - realtime stats
 ==
 ![Alt](doc/fc-console-screen.png "Frontcache console demo")
 ==
