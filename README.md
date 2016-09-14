@@ -14,12 +14,12 @@
 4. Can be used with web apps written in any language
 
 ==
-![Alt](doc/how-it-works.png "Frontcache overview")
+![Alt](images/how-it-works.png "Frontcache overview")
 ==
 
 ### Frontcache console - realtime stats
 ==
-![Alt](doc/fc-console-screen.png "Frontcache console demo")
+![Alt](images/fc-console-screen.png "Frontcache console demo")
 ==
 
 Frontcache developed & tested with Java based Web apps but can be used with other languages/technologies as well. 
