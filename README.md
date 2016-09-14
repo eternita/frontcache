@@ -18,6 +18,7 @@ It's developed & tested with Java based Web apps but can be used with other lang
    FrontCache utilizes component caching what allows to avoid caching duplicates. 
 
 4. Works as standalone web app and Servlet filter.
+
 ==
 ![Alt](doc/how-it-works.png "Frontcache overview")
 ==
