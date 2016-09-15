@@ -5,13 +5,13 @@
 
 #### Features
 
-1. Allows to cache parts of dynamic pages.
+* Boost server response time for dynamic pages 
 
-2. Reduce backend load dozen times! 
+* Reduce backend load dozen times! 
    
-3. Faster execution even for pure dynamic pages.
+* Increase application's resilience
 
-4. Can be used with web apps written in any language
+* Can be used with web apps written in any language
 
 ==
 ![Alt](images/how-it-works.png "Frontcache overview")
