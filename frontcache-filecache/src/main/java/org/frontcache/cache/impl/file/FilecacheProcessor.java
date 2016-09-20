@@ -73,7 +73,7 @@ public class FilecacheProcessor extends CacheProcessorBase implements CacheProce
 	@Override
 	public WebResponse getFromCacheImpl(String url) {
 		logger.debug(url);
-		File cacheFile = getChacheFile(url);
+		File cacheFile = getCacheFile(url);
 		if (cacheFile.exists()) {
 			try {
 				WebResponse response = reader.readValue(cacheFile);
@@ -87,7 +87,7 @@ public class FilecacheProcessor extends CacheProcessorBase implements CacheProce
 
 	@Override
 	public void removeFromCache(String url) {
-		File cacheFile = getChacheFile(url);	
+		File cacheFile = getCacheFile(url);	
 		if (cacheFile.exists()) {
 			try{
 				cacheFile.delete();
@@ -123,7 +123,7 @@ public class FilecacheProcessor extends CacheProcessorBase implements CacheProce
 	
 	private String saveToFile(String url, WebResponse component) {
 
-		File cacheFile = getChacheFile(url);
+		File cacheFile = getCacheFile(url);
 
 		if (!cacheFile.exists()) {
 			try {
@@ -140,7 +140,7 @@ public class FilecacheProcessor extends CacheProcessorBase implements CacheProce
 
 	}
 	
-	static File getChacheFile(String url) {
+	static File getCacheFile(String url) {
 		String hash = getHash(url);
 
 		int counter = 0;
