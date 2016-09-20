@@ -147,6 +147,15 @@ project(':frontcache-ehcache') {
 	
 	build.dependsOn uploadArchives
 }
+project(':frontcache-filecache') {
+    dependencies {
+        compile project(':frontcache-core')
+        testCompile 'junit:junit:4.12'
+        testCompile 'com.squareup.okhttp:okhttp:2.5.0'
+    }
+	
+	build.dependsOn uploadArchives
+}
 
 project(':frontcache-client') {
 	dependencies {
@@ -161,8 +170,7 @@ project(':frontcache-web') {
 	
 	dependencies {
 		compile project(':frontcache-core')
-		compile project(':frontcache-ehcache')
-		
+		compile project(':frontcache-filecache')
 	}
 }
 
