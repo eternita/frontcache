@@ -80,13 +80,13 @@ public class WebResponseTests {
 		
 		pr.putToCache(url, response);
 		
-		File file = FilecacheProcessor.getChacheFile(url);
+		File file = FilecacheProcessor.getCacheFile(url);
 		
 		assertTrue(file.exists());
 		
 		pr.removeFromCache(url);
 		
-		file = FilecacheProcessor.getChacheFile(url);
+		file = FilecacheProcessor.getCacheFile(url);
 
 		assertFalse(file.exists());
 	}
