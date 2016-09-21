@@ -45,7 +45,7 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	
-    version = '0.8.6'
+    version = '0.8.7'
     group = 'org.frontcache'
 	
 	configurations {
@@ -171,6 +171,7 @@ project(':frontcache-client') {
 project(':frontcache-web') {
 	apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
+<<<<<<< Upstream, based on branch 'filebased-cacheprocessor' of https://dpavlikovskiy@github.com/eternita/frontcache.git
 
 
 // gretty for FC filter and web app
@@ -192,6 +193,20 @@ servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
 	jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003','-Dfrontcache.home=/Users/dmytro.pavlikovskiy/git/frontcache/frontcache-web/FRONTCACHE_HOME','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
 
 }
+=======
+	
+	// gretty for FC filter and web app
+	gretty {
+		httpPort = 9080
+		servicePort = 9081
+		statusPort = 9082
+		contextPath = '/'
+		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
+		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
+//		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
+	}
+
+>>>>>>> 262d19d initial commit
 	dependencies {
 		compile project(':frontcache-core')
 		compile project(':frontcache-lucene')
