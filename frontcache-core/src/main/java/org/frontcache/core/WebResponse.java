@@ -152,6 +152,7 @@ public class WebResponse implements Serializable {
 	 * 
 	 * @return
 	 */
+	@JsonIgnore
 	public byte[] getContent() {
 		return content;
 	}
@@ -160,6 +161,7 @@ public class WebResponse implements Serializable {
 	 * 
 	 * @param content
 	 */
+	@JsonIgnore
 	public void setContent(byte[] content) {
 		this.content = content;
 	}
