@@ -1,6 +1,9 @@
 package org.frontcache.cache.impl.ehcache;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitOption;
@@ -40,7 +43,9 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 	
 	private static final int MAX_FILE_NAME_LENGTH = 50;
 	
-	private static final String CACHE_FILE_EXTENSION = ".fc"; // need to avoid possible collision with last dir and file name (must contain '.')
+	private static final String CACHE_METADATA_FILE_EXTENSION = ".fc"; // need to avoid possible collision with last dir and file name (must contain '.')
+	
+	private static final String CACHE_DATA_FILE_EXTENSION_DIFF = "d"; 
 	
 	private CacheManager ehCacheMgr = null;
 	
@@ -242,11 +247,23 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 		
 		File cacheFile = new File (absoluteFilePath);
 
+		FileOutputStream fos = null;
+		
 		try {
-			writer.writeValue(cacheFile, component);
+			writer.writeValue(cacheFile, component); // serialize WebResponse without content
+			
+			fos = new FileOutputStream(absoluteFilePath + CACHE_DATA_FILE_EXTENSION_DIFF); // write content to another file
+			fos.write(component.getContent()); 
 		} catch (IOException e) {
 			success = false;
 			logger.error("can't save file for url " + url, e);
+		} finally {
+			if (null != fos)
+				try {
+					fos.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 		}
 		return success;		
 	}
@@ -257,11 +274,28 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 		File cacheFile = new File (absoluteFilePath);
 		
 		if (cacheFile.exists()) {
+			
+			
+			FileInputStream fis = null;
 			try {
-				WebResponse response = reader.readValue(cacheFile);
+				WebResponse response = reader.readValue(cacheFile); // read / de-serialize WebResponse without content
+
+				File contentFile = new File(absoluteFilePath + CACHE_DATA_FILE_EXTENSION_DIFF); // read content from another file
+				byte[] content = new byte[(int) contentFile.length()];
+				fis = new FileInputStream(contentFile);
+				fis.read(content);
+				response.setContent(content);
+				
 				return response;
-			} catch (IOException e) {
+			} catch (Exception e) {
 				logger.error("can't read file for url " + url, e);
+			} finally {
+				if (null != fis)
+					try {
+						fis.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 			}
 		}
 		return null;
@@ -288,19 +322,19 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 			if (0 < i && 2*i % MAX_FILE_NAME_LENGTH == 0)
 				hex.append("/");
 		}
-		hex.append(CACHE_FILE_EXTENSION);
+		hex.append(CACHE_METADATA_FILE_EXTENSION);
 		
 		return hex.toString(); // absolute File Path
 	}
 
 	private String filepath2url(String absolutePath) {
 		
-		if (!absolutePath.endsWith(CACHE_FILE_EXTENSION))
+		if (!absolutePath.endsWith(CACHE_METADATA_FILE_EXTENSION))
 			return null;
 		
 		String relativePath = absolutePath.substring(CACHE_BASE_DIR.length());
 		relativePath = relativePath.replace("/", ""); // remove /
-		relativePath = relativePath.replace(CACHE_FILE_EXTENSION, ""); // remove file extension
+		relativePath = relativePath.replace(CACHE_METADATA_FILE_EXTENSION, ""); // remove file extension
 		
 		String url = hex2string(relativePath); 
 		return url;
@@ -325,7 +359,11 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 	    	  
 	      } else {
 		      // it's a directory
-	    	  File[] files = f.listFiles();
+	    	  File[] files = f.listFiles(new FilenameFilter() {
+	    		    public boolean accept(File dir, String name) {
+	    		        return name.endsWith(CACHE_METADATA_FILE_EXTENSION);
+	    		    }
+	    		});
 	    	  if (null != files)
 			      for(File entry : files) 
 			    	  restoreFromFiles(entry);
