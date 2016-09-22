@@ -34,7 +34,9 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 	
 	private static final String FRONT_CACHE = "FRONT_CACHE"; // cache name inside config file (e.g. ehcache-config.xml)
 
-	private static String CACHE_BASE_DIR = "/Users/spa/git/frontcache/frontcache-web/FRONTCACHE_HOME/cache/fs/";
+	private static final String CACHE_RELATIVE_DIR = "cache/fs"; // sub-dir under FRONTCACHE_HOME
+	
+	private static String CACHE_BASE_DIR = "not initialized";
 	
 	private static final int MAX_FILE_NAME_LENGTH = 50;
 	
@@ -48,12 +50,25 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 	
 	private  ObjectWriter writer;
 	
+    long fileCounter = 0;
+    
 	@Override
 	public void init(Properties properties) {
 		
 		ObjectMapper mapper = new ObjectMapper();
 		reader = mapper.reader(WebResponse.class);
 		writer = mapper.writerWithType(WebResponse.class);
+		
+		
+		// 1. get input stream from system variable frontcache.home
+		String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+		File fsBaseDir = new File(new File(frontcacheHome), CACHE_RELATIVE_DIR);
+		
+		CACHE_BASE_DIR = fsBaseDir.getAbsolutePath();
+		if (!CACHE_BASE_DIR.endsWith("/"))
+			CACHE_BASE_DIR += "/";
+		
+		logger.info("Cache file storage: " + CACHE_BASE_DIR);
 		 
 		String ehCacheConfigFile = properties.getProperty(EHCACHE_CONFIG_FILE_KEY);
 		if (null == ehCacheConfigFile)
@@ -78,28 +93,32 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
             cache = ehCacheMgr.getCache(FRONT_CACHE);
         }
         
-        if(0 == cache.getKeys().size())
-        	restoreFromFiles();
+        
+        // restore from files
+        Runnable r = new Runnable () {
+
+			@Override
+			public void run() {
+		        long start = System.currentTimeMillis();
+		        
+		        restoreFromFiles(new File(CACHE_BASE_DIR));
+		        
+		        logger.info("Cache restored from " + CACHE_BASE_DIR);
+		        logger.info("Cache restore completed in " + (System.currentTimeMillis() - start)/1000L + " seconds " );
+		        logger.info("Checked " + fileCounter + " files" );
+			}
+        	
+        };
+        
+        Thread t = new Thread(r);
+        t.start();
+        
+//        if(0 == cache.getKeys().size())
+//        	restoreFromFiles(new File(CACHE_BASE_DIR));
         
         return;
 	}
 
-	/**
-	 * TODO:
-	 * 
-	 */
-	private void restoreFromFiles()
-	{
-		
-		// for all files - use jdk 1.8 - see deleteAllFiles()
-		// get path
-		// convert to URL - use filepath2url(String absolutePath)
-		
-		// put URL to ehCache
-//		cache.put(new Element(url, "X"));
-		
-	}
-	
 	@Override
 	public void destroy() {
 		
@@ -136,11 +155,6 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 	@Override
 	public WebResponse getFromCacheImpl(String url) {
 		logger.debug(url);
-//		Element el = cache.get(url);
-//		if (null == el)
-//			return null;
-//		
-//		WebResponse comp = (WebResponse) el.getObjectValue();
 		
 		WebResponse comp = getFromFile(url);
 
@@ -280,6 +294,10 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 	}
 
 	private String filepath2url(String absolutePath) {
+		
+		if (!absolutePath.endsWith(CACHE_FILE_EXTENSION))
+			return null;
+		
 		String relativePath = absolutePath.substring(CACHE_BASE_DIR.length());
 		relativePath = relativePath.replace("/", ""); // remove /
 		relativePath = relativePath.replace(CACHE_FILE_EXTENSION, ""); // remove file extension
@@ -288,6 +306,34 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 		return url;
 
 	}
+	
+	/**
+	 * recursively for all files
+	 * get path, convert to URL, put to cache
+	 * 
+	 * @param f could be a file or a directory
+	 */
+	private void restoreFromFiles(File f) {
+	      if(f.isFile()) {
+	    	  
+	    	  String url = filepath2url(f.getAbsolutePath());
+	    	  if (null != url)
+	    	  {
+	    		  cache.put(new Element(url, "X"));
+	    		  fileCounter++;
+	    	  }
+	    	  
+	      } else {
+		      // it's a directory
+	    	  File[] files = f.listFiles();
+	    	  if (null != files)
+			      for(File entry : files) 
+			    	  restoreFromFiles(entry);
+		      
+	      }
+	      
+	      return;
+	  }
 
 	private String hex2string(String hex){
 
