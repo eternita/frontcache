@@ -160,7 +160,7 @@ project(':frontcache-web') {
 	apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
 	
-	// gretty for FC filter and web app
+	// gretty for Frontcache (standalone)
 	gretty {
 		httpPort = 9080
 		servicePort = 9081
