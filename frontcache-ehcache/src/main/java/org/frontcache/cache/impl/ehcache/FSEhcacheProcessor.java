@@ -258,7 +258,10 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 		
 		try {
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			byte[] content = component.getContent();
+			component.setContent(null); // set to null to avoid serialization to JSON
 			writer.writeValue(baos, component); // serialize WebResponse without content
+			component.setContent(content);
 			byte[] metadataBytes = baos.toByteArray();
 			
 			int offset = metadataBytes.length + CONTENT_OFFSET_SIZE_IN_BYTES; 

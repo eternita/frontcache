@@ -11,7 +11,6 @@ import java.util.Set;
 
 import org.frontcache.cache.CacheProcessor;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
@@ -152,7 +151,6 @@ public class WebResponse implements Serializable {
 	 * 
 	 * @return
 	 */
-	@JsonIgnore
 	public byte[] getContent() {
 		return content;
 	}
@@ -161,7 +159,6 @@ public class WebResponse implements Serializable {
 	 * 
 	 * @param content
 	 */
-	@JsonIgnore
 	public void setContent(byte[] content) {
 		this.content = content;
 	}
