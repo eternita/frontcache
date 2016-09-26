@@ -20,6 +20,7 @@ import org.frontcache.cache.CacheManager;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
+import org.frontcache.io.AccessDeniedActionResponse;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
@@ -42,6 +43,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ObjectMapper jsonMapper = new ObjectMapper();
 	
 	FrontCacheEngine fcEngine = null;
+
+	private String managementScheme = null; // management scheme for security
+
 	
 	public FrontCacheIOServlet() {
 	}
@@ -51,6 +55,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 		super.init(config);
 		
 		fcEngine = FrontCacheEngine.getFrontCache();
+		
+		managementScheme = FCConfig.getProperty("front-cache.management-scheme");
+		if (null == managementScheme)
+			logger.warn("Connector Sheme is not configured for Frontcache Management URI. Management URI is accessible for all connectors");
 		
 		return;
 	}
@@ -70,10 +78,15 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 
-	
-
 	private void process(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException 
 	{
+		if (null != managementScheme && !req.getScheme().equals(managementScheme))
+		{
+			logger.info("Accessing Management URL with wrong scheme" + req.getScheme());
+			resp.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementScheme)));
+			return;
+		}
+		
 		String action = req.getParameter("action");
 		if (null == action)
 			action = "";
