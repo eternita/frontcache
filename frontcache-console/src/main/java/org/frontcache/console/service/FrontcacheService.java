@@ -1,6 +1,7 @@
 package org.frontcache.console.service;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -29,44 +30,38 @@ public class FrontcacheService {
 	private static final Logger logger = LoggerFactory.getLogger(FrontcacheService.class);
 	private ObjectMapper jsonMapper = new ObjectMapper();
 	
-	private Set<String> hosts = new HashSet<String>();
-	
-	private final static String FRONTCACHE_CONSOLE_CONFIG_FILE = "frontcache-console.conf";
+	private Set<String> frontcacheAgentURLs = new HashSet<String>();
 	
 	public FrontcacheService() {
 		loadConfigs();
 	}
 
-	
 	private void loadConfigs() {
+		String frontcacheConsoleConfPath = System.getProperty("org.frontcache.console.config");
+		
 		BufferedReader confReader = null;
 		InputStream is = null;
 		try 
 		{
-			is = FrontcacheService.class.getClassLoader().getResourceAsStream(FRONTCACHE_CONSOLE_CONFIG_FILE);
-			if (null == is)
-			{
-				logger.info("Console hosts are not loaded from " + FRONTCACHE_CONSOLE_CONFIG_FILE);
-				return;
-			}
-
+			is = new FileInputStream(frontcacheConsoleConfPath);
 			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String hostStr;
+			String frontcacheURLStr;
 			int hostCounter = 0;
-			while ((hostStr = confReader.readLine()) != null) {
-				if (hostStr.trim().startsWith("#")) // handle comments
+			while ((frontcacheURLStr = confReader.readLine()) != null) {
+				if (frontcacheURLStr.trim().startsWith("#")) // handle comments
 					continue;
 				
-				if (0 == hostStr.trim().length()) // skip empty
+				if (0 == frontcacheURLStr.trim().length()) // skip empty
 					continue;
 				
-				hosts.add(hostStr);
+				frontcacheAgentURLs.add(frontcacheURLStr);
 				hostCounter++;
 			}
-			logger.info("Successfully loaded " + hostCounter +  " hosts to frontcache console");					
+			logger.info("Successfully loaded " + hostCounter +  " frontcacheAgentURLs to frontcache console");					
 			
 		} catch (Exception e) {
-			logger.info("Console hosts are not loaded from " + FRONTCACHE_CONSOLE_CONFIG_FILE);
+			logger.error("Console frontcacheAgentURLs are not loaded from " + frontcacheConsoleConfPath);
+			throw new RuntimeException("Can't initialize Frontcache Console", e);
 		} finally {
 			if (null != confReader)
 			{
@@ -81,6 +76,7 @@ public class FrontcacheService {
 				} catch (IOException e) { }
 			}
 		}
+		
 		
 	}
 	
@@ -177,9 +173,10 @@ public class FrontcacheService {
 	private List<FrontCacheClient> getFrontCacheClients(boolean activeOnly)
 	{
 		List<FrontCacheClient> fcClients = new ArrayList<FrontCacheClient>();
-		for (String host : hosts)
+		for (String frontcacheURL : frontcacheAgentURLs)
 		{
-			FrontCacheClient fcClient = new FrontCacheClient("http://" + host + ":80/");
+//			FrontCacheClient fcClient = new FrontCacheClient("http://" + host + ":80/");
+			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL);
 			
 			if (activeOnly)
 			{
