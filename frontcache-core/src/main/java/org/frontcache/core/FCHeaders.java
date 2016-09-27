@@ -21,4 +21,5 @@ public class FCHeaders {
     
     public static final String X_FRONTCACHE_COMPONENT_MAX_AGE = "X-frontcache.component.maxage";
     public static final String X_FRONTCACHE_REQUEST_ID = "X-frontcache.request-id";
+    public static final String X_FRONTCACHE_CLIENT_IP = "X-frontcache.client-ip";
 }
