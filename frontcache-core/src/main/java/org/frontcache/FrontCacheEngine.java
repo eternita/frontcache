@@ -38,6 +38,7 @@ import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeaderElementIterator;
+import org.apache.http.pool.PoolStats;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
@@ -92,7 +93,7 @@ public class FrontCacheEngine {
 	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output 
 	
 	private static FrontCacheEngine instance;
-	
+		
 	public static FrontCacheEngine getFrontCache() {
 		if (null == instance) {
 			FCConfig.init();
@@ -104,22 +105,6 @@ public class FrontCacheEngine {
 				debugComments = true;		
 			
 			instance = new FrontCacheEngine();
-			
-//			// load hystrix fallbacks
-//			Thread t = new Thread(new Runnable() {
-//				public void run() {
-//					// need to wait some time
-//					// in filter mode servlet should be initialized first (to load fallbacks from URLs)
-//					try {
-//						Thread.sleep(5000); 
-//					} catch (InterruptedException e) {
-//						e.printStackTrace();
-//					}
-//					FallbackResolverFactory.getInstance(instance.httpClient);
-//				}
-//			});
-//			t.start();				
-			
 		}
 		return instance;
 	}
@@ -238,7 +223,21 @@ public class FrontCacheEngine {
 			}
 		}, 30000, 5000);
 		
+		// log connectionManager stats
+		connectionManagerTimer.schedule(new TimerTask() {
+			@Override
+			public void run() {
+				if (connectionManager == null) {
+					return;
+				}
+				PoolStats poolStats = connectionManager.getTotalStats();
+				logger.info("HTTP connection manager pool stats - " + poolStats);
+//				System.out.println("pool stats \n " + poolStats);
+			}
+		}, 1000, 60000);
+		
 		loadCacheIgnoreURIPatterns();
+		
 		return;
 	}
 
