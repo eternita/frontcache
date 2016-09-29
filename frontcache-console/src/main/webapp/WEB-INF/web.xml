@@ -48,9 +48,7 @@
 	</context-param>
 
 
-<!-- 
-    Uncommend following section to enable security for Frontcache console
-    Security Constraint  
+<!-- Security Constraint  -->
 
 	<security-constraint>
 		<web-resource-collection>
@@ -73,6 +71,5 @@
         </description>
 		<role-name>frontcache-console</role-name>
 	</security-role>
--->
 		
 </web-app>
