@@ -30,6 +30,7 @@ import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.StringUtils;
 import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.FallbackLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +42,8 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	
 	private static Logger logger = LoggerFactory.getLogger(FileBasedFallbackResolver.class);
 	
+	private static Logger fallbackLogger = LoggerFactory.getLogger(FallbackLogger.class);
+
 	private Map <String, Pattern> uri2patternMap = new LinkedHashMap<String, Pattern>();
 	
 	private Map<String, String> uri2fileMap = new LinkedHashMap<String, String>();
@@ -99,7 +102,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		
 		if (null == currentFallbackURLpattern)
 		{
-			logger.info("Getting default fallback - no fallback URL patterns for " + urlStr);
+			fallbackLogger.trace("default | URL doesn't match any pattern | " + urlStr);
 			return getDefalut(urlStr);
 		}
 		
@@ -107,15 +110,18 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		
 		if (null == fileName)
 		{
-			logger.info("Getting default fallback - no file is configured for fallback patterns " + currentFallbackURLpattern);
+			fallbackLogger.trace("default | no file for pattern " + currentFallbackURLpattern + " | " + urlStr);
 			return getDefalut(urlStr);
 		}
 
 		WebResponse webResponse = getFallbackFromFile(urlStr, fileName);
 		
-		if (null == webResponse)
+		if (null == webResponse){
+			fallbackLogger.trace("default | can't read from file " + fileName + " | " + urlStr);
 			return getDefalut(urlStr);
+		}
 		
+		fallbackLogger.trace("from file | " + fileName + " | " + urlStr);
 		return webResponse;
 	}
 		

@@ -63,6 +63,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 			return webResp;
 
 		} catch (IOException ioe) {
+			logger.error("Can't read from " + urlStr, ioe);
 			throw new FrontCacheException("Can't read from " + urlStr, ioe);
 		} finally {
 			if (null != response)
@@ -78,7 +79,6 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     @Override
     protected WebResponse getFallback() {
 		context.setHystrixError();
-		logger.error("FC-Origin-Hits-HttpClient - ORIGIN ERROR - " + this.urlStr);
 
 		WebResponse webResponse = FallbackResolverFactory.getInstance(client).getFallback(urlStr);
 		
