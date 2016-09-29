@@ -57,8 +57,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 			return webResponse;
 			
 		} catch (IOException | ServletException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			logger.error("Can't read from " + url, e);
 			throw new FrontCacheException("FilterChain exception", e);
 		} 
 		
@@ -67,7 +66,6 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
     @Override
     protected WebResponse getFallback() {
 		context.setHystrixError();
-		logger.error("FC-Origin-Hits-Filter - ORIGIN ERROR - " + url);
 		WebResponse webResponse = FallbackResolverFactory.getInstance(client).getFallback(url);
 		
 		return webResponse;

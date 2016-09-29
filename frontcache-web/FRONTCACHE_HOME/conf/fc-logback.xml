@@ -24,7 +24,25 @@ front-cache.request-logs-config=fc-logback.xml
 			  <Pattern>%msg%n</Pattern>
 		</layout>
 	</appender>
-	
+
+    <!-- FallbackLoggerFile for FALLBACK LOGS ONLY -->
+    <appender name="FallbackLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>TRACE</level>
+            <OnMatch>NEUTRAL</OnMatch>
+            <OnMismatch>DENY</OnMismatch>
+        </filter>
+
+        <File>${frontcache.home}/logs/fallback.log</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>${frontcache.home}/logs/fallback-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+        </rollingPolicy>
+        <layout class="ch.qos.logback.classic.PatternLayout">
+              <Pattern>%msg%n</Pattern>
+        </layout>
+    </appender>
+    
+			
 	<appender name="Error" class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<filter class="ch.qos.logback.classic.filter.LevelFilter">
 			<level>ERROR</level>
@@ -77,5 +95,10 @@ front-cache.request-logs-config=fc-logback.xml
 		<appender-ref ref="ReguestLoggerFile" />
 	</logger>
 	
-
+    <!-- for fallback logger -->
+    <logger name="org.frontcache.hystrix.FallbackLogger">
+        <level value="TRACE" />
+        <appender-ref ref="FallbackLoggerFile" />
+    </logger>
+	
 </configuration>
