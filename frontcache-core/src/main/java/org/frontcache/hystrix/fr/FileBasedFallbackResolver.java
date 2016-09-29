@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,7 +103,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		
 		if (null == currentFallbackURLpattern)
 		{
-			fallbackLogger.trace("default | URL doesn't match any pattern | " + urlStr);
+			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | URL doesn't match any pattern | " + urlStr);
 			return getDefalut(urlStr);
 		}
 		
@@ -110,18 +111,18 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		
 		if (null == fileName)
 		{
-			fallbackLogger.trace("default | no file for pattern " + currentFallbackURLpattern + " | " + urlStr);
+			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | no file for pattern " + currentFallbackURLpattern + " | " + urlStr);
 			return getDefalut(urlStr);
 		}
 
 		WebResponse webResponse = getFallbackFromFile(urlStr, fileName);
 		
 		if (null == webResponse){
-			fallbackLogger.trace("default | can't read from file " + fileName + " | " + urlStr);
+			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | can't read from file " + fileName + " | " + urlStr);
 			return getDefalut(urlStr);
 		}
 		
-		fallbackLogger.trace("from file | " + fileName + " | " + urlStr);
+		fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " from file | " + fileName + " | " + urlStr);
 		return webResponse;
 	}
 		

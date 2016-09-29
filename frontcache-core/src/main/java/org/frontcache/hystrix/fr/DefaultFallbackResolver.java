@@ -1,6 +1,7 @@
 package org.frontcache.hystrix.fr;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import org.apache.http.client.HttpClient;
@@ -19,7 +20,7 @@ public class DefaultFallbackResolver implements FallbackResolver {
 	
 	public WebResponse getFallback(String urlStr)
 	{
-		fallbackLogger.trace("default | turn on another FallbackResolver implementation to get better fallbacks | " + urlStr);
+		fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | turn on another FallbackResolver implementation to get better fallbacks | " + urlStr);
 		
 		byte[] outContentBody = ("Default Fallback for " + urlStr).getBytes();
 
