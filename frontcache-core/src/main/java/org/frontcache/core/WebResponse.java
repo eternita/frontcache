@@ -11,6 +11,7 @@ import java.util.Set;
 
 import org.frontcache.cache.CacheProcessor;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**

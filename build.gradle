@@ -150,6 +150,9 @@ project(':frontcache-ehcache') {
 project(':frontcache-filecache') {
     dependencies {
         compile project(':frontcache-core')
+        compile group: 'com.google.code.gson', name: 'gson', version: '2.5'
+        compile group: 'org.apache.lucene', name: 'lucene-core', version: '6.2.0'
+        compile group: 'org.apache.lucene', name: 'lucene-queryparser', version: '6.2.0'
         testCompile 'junit:junit:4.12'
         testCompile 'com.squareup.okhttp:okhttp:2.5.0'
     }

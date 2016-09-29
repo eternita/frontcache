@@ -2,62 +2,75 @@ package org.frontcache.cache.impl.file;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.FileUtils;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.WebResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.ObjectWriter;
+import static org.frontcache.cache.impl.file.IndexManager.*;
 
 
 public class FilecacheProcessor extends CacheProcessorBase implements CacheProcessor {
 
-	private  ObjectMapper mapper;
-	private  ObjectReader reader;
-	private  ObjectWriter writer;
-	
 	private static final Logger logger = LoggerFactory.getLogger(FilecacheProcessor.class);
 
+	private IndexManager indexManager;
+	
+	private static String INDEX_PATH_SUFFIX = "index/";
+	private static String FILES_PATH_SUFFIX = "files/";
+	
+	private ExecutorService service;
 	
 	private static final String PREFIX = "front-cache.file-processor.impl.";
 	
-	private static String CACHE_BASE_DIR = "/tmp/";
+	private static String CACHE_BASE_DIR = "/tmp/cache/";
 	
 	private static int CACHE_DIR_SIZE = 3;
 	private static String CACHE_FILE_EXT = ".ht";
 	
-	public FilecacheProcessor(){
+	private static String INDEX_PATH = "/tmp/index/";
+	private static String FILES_PATH = "/tmp/files/";
+	
 
+	
+	public FilecacheProcessor(){
+		service = Executors.newFixedThreadPool(1);
 	}
 
 	@Override
 	public void init(Properties properties) {
-		 mapper = new ObjectMapper();
-		 reader = mapper.reader(WebResponse.class);
-		 writer = mapper.writerWithType(WebResponse.class);
 		 
 		Objects.requireNonNull(properties, "Properties should not be null");
 		CACHE_BASE_DIR = Optional.ofNullable(properties.getProperty(PREFIX + "cache-dir")).orElse(CACHE_BASE_DIR);
 		CACHE_FILE_EXT = Optional.ofNullable(properties.getProperty(PREFIX + "file-ext")).orElse(CACHE_FILE_EXT);
 		CACHE_DIR_SIZE = Optional.ofNullable(properties.getProperty(PREFIX + "cache-dir-size")).map(size -> Integer.parseInt(size)).orElse(CACHE_DIR_SIZE);
-		
+		INDEX_PATH = CACHE_BASE_DIR + INDEX_PATH_SUFFIX;
+		FILES_PATH = CACHE_BASE_DIR + FILES_PATH_SUFFIX;
+		indexManager = new IndexManager(INDEX_PATH);
 	}
 	
 	@Override
 	public void destroy() {
-
-	}	
+		indexManager.close();
+	}
+	
+	public IndexManager getIndexManager(){
+		return indexManager;
+	}
 
 	/**
 	 * Saves web response to cache-file
@@ -73,34 +86,46 @@ public class FilecacheProcessor extends CacheProcessorBase implements CacheProce
 	@Override
 	public WebResponse getFromCacheImpl(String url) {
 		logger.debug(url);
-		File cacheFile = getCacheFile(url);
-		if (cacheFile.exists()) {
-			try {
-				WebResponse response = reader.readValue(cacheFile);
+		Path file = getCacheFile(url);
+		if (Files.exists(file)) {
+			//try {
+				WebResponse response = indexManager.getBaseResponse(url);
+				//response.setContent(Files.readAllBytes(file));
 				return response;
-			} catch (IOException e) {
-				logger.error("Exception during reading from cache file", e);
-			}
+//			} catch (IOException e) {
+//				logger.error("Exception during reading from cache file", e);
+//			}
 		}
 		return null;
 	}
+	
 
 	@Override
 	public void removeFromCache(String url) {
-		File cacheFile = getCacheFile(url);	
-		if (cacheFile.exists()) {
+		Path cacheFile = getCacheFile(url);	
+		if (Files.exists(cacheFile)) {
 			try{
-				cacheFile.delete();
+				Files.delete(cacheFile);
 			}catch(Exception ex){
 				logger.error("Error during removing file",ex);
 			}
-
 		}
+		
+		// TODO: remove from lucene
 	}
 
 	@Override
 	public void removeFromCacheAll() {
-
+		indexManager.truncate();
+		try {
+			File file = new File(FILES_PATH);
+			if (file.isDirectory()) {
+				logger.info("Removing cache dir: " + FILES_PATH);
+				FileUtils.cleanDirectory(file);
+			}
+		} catch (Exception e) {
+			logger.error("Error during removing all files in cache", e);
+		}
 	}
 	
 	@Override
@@ -117,21 +142,21 @@ public class FilecacheProcessor extends CacheProcessorBase implements CacheProce
 		return keys;
 	}
 	
-	static String getHash(String url){
-		return  DigestUtils.md5Hex(url);
-	}
-	
 	private String saveToFile(String url, WebResponse component) {
 
-		File cacheFile = getCacheFile(url);
+		Path cacheFile = getCacheFile(url);
 
-		if (!cacheFile.exists()) {
+		if (!Files.exists(cacheFile)) {
 			try {
-				cacheFile.getParentFile().mkdirs();
-				cacheFile.createNewFile();
-				logger.info(cacheFile.getAbsolutePath());
-				writer.writeValue(cacheFile, component);
+				Files.createDirectories(cacheFile.getParent());
+				Files.createFile(cacheFile);
+
+				logger.info(cacheFile.toString());
+
+				Files.write(cacheFile, component.getContent());
+				indexManager.indexDoc(component);
 			} catch (IOException e) {
+				// TODO: if error remove both files
 				logger.error("Error during creating cache-file", e);
 			}
 		}
@@ -140,14 +165,14 @@ public class FilecacheProcessor extends CacheProcessorBase implements CacheProce
 
 	}
 	
-	static File getCacheFile(String url) {
+	static Path getCacheFile(String url) {
 		String hash = getHash(url);
 
 		int counter = 0;
 		int deep = 2;
 
-		StringBuffer str = new StringBuffer(hash.length() + CACHE_BASE_DIR.length() + deep + CACHE_FILE_EXT.length());
-		str.append(CACHE_BASE_DIR);
+		StringBuffer str = new StringBuffer(hash.length() + FILES_PATH.length() + deep + CACHE_FILE_EXT.length());
+		str.append(FILES_PATH);
 		for (Character c : hash.toCharArray()) {
 			str.append(c);
 			counter++;
@@ -162,7 +187,7 @@ public class FilecacheProcessor extends CacheProcessorBase implements CacheProce
 
 		str.append(CACHE_FILE_EXT);
 
-		return new File(str.toString());
+		return Paths.get(str.toString());
 	}
 	
 }
