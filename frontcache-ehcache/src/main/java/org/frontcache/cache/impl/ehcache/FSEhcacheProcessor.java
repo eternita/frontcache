@@ -413,7 +413,7 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 		      // it's a directory
 	    	  File[] files = f.listFiles(new FilenameFilter() {
 	    		    public boolean accept(File dir, String name) {
-	    		        return name.endsWith(CACHE_FILE_EXTENSION);
+	    		        return (name.endsWith(CACHE_FILE_EXTENSION) || -1 == name.indexOf("."));
 	    		    }
 	    		});
 	    	  if (null != files)
