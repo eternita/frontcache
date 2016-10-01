@@ -218,6 +218,25 @@ public class WebResponse implements Serializable {
 		
 		return;
 	}
+
+	/**
+	 * for JSON serialization
+	 * 
+	 * @return
+	 */
+	public long getExpireTimeMillis() {
+		return expireTimeMillis;
+	}
+	
+	/**
+	 * for JSON serialization
+	 * 
+	 * @return
+	 */
+	public void setExpireTimeMillis(long expireTimeMillis) {
+		this.expireTimeMillis = expireTimeMillis;
+	}	
+	
 	
 	/**
 	 * Check with current time if expired 
@@ -285,5 +304,7 @@ public class WebResponse implements Serializable {
     	}
     	
         return copy;
-    }	
+    }
+    
+    
 }
