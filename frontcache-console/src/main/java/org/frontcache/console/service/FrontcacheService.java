@@ -7,7 +7,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,7 +30,7 @@ public class FrontcacheService {
 	private static final Logger logger = LoggerFactory.getLogger(FrontcacheService.class);
 	private ObjectMapper jsonMapper = new ObjectMapper();
 	
-	private Set<String> frontcacheAgentURLs = new HashSet<String>();
+	private Set<String> frontcacheAgentURLs = new LinkedHashSet<String>();
 	
 	public FrontcacheService() {
 		loadConfigs();
