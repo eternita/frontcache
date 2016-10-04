@@ -90,8 +90,8 @@
 					dependencyThreadPoolMonitor: dependencyThreadPoolMonitor
 				};
 
-				// sort by error+volume by default
-				hystrixMonitor.sortByErrorThenVolume();
+				// sort sortAlphabetically by default
+				hystrixMonitor.sortAlphabetically();
 				dependencyThreadPoolMonitor.sortByVolume();
 
 				var origin;
@@ -157,7 +157,7 @@
 										'Circuit' +
 									'</div>' +
 									'<div class="menu_actions">' +
-										'Sort: ' +
+/* 										'Sort: ' +
 										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByErrorThenVolume();">Error then Volume</a> |' +
 										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortAlphabetically();">Alphabetical</a> | ' +
 										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByVolume();">Volume</a> | ' +
@@ -167,7 +167,7 @@
 										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByLatency90();">90</a> | ' +
 										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByLatency99();">99</a> | ' +
 										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByLatency995();">99.5</a> ' +
-									'</div>' +
+ */									'</div>' +
 									'<div class="menu_legend">' +
 										'<span class="success">Success</span> | <span class="shortCircuited">Short-Circuited</span> | <span class="badRequest"> Bad Request</span> | <span class="timeout">Timeout</span> | <span class="rejected">Rejected</span> | <span class="failure">Failure</span> | <span class="errorPercentage">Error %</span>' +
 									'</div>' +
@@ -199,7 +199,7 @@
 
 	<hr>
 	<footer>
-		<p>&copy; frontcache.org</p>
+		<p><a href="http://www.frontcache.org" target="_blank">www.frontcache.org</a></p>
 	</footer>
 </div>
 
