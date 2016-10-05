@@ -176,10 +176,13 @@ public class FrontcacheService {
 	
 	public WebResponse getFromCache(String edgeURL, String key)
 	{
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL);
-		WebResponse wr = fcClient.getFromCache(key);
+		if (null == key)
+			return null;
 		
-		return wr;
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL);
+		WebResponse webResponse = fcClient.getFromCache(key.trim());
+		
+		return webResponse;
 	}
 	
 	
@@ -193,7 +196,6 @@ public class FrontcacheService {
 		List<FrontCacheClient> fcClients = new ArrayList<FrontCacheClient>();
 		for (String frontcacheURL : frontcacheAgentURLs)
 		{
-//			FrontCacheClient fcClient = new FrontCacheClient("http://" + host + ":80/");
 			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL);
 			
 			if (activeOnly)
