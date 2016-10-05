@@ -257,7 +257,6 @@ project(':frontcache-tests') {
 	}
 		
 	integrationTest {
-//		jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
 		jvmArgs '-Dfrontcache-tests.home=' + projectDir
 //		'-Dlogback.configurationFile=' !! logs (because of same process) here: projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml'
 	}

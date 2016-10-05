@@ -1,6 +1,3 @@
 rootProject.name = 'frontcache'
-<<<<<<< Upstream, based on branch 'filebased-cacheprocessor' of https://dpavlikovskiy@github.com/eternita/frontcache.git
 include 'frontcache-core', 'frontcache-web', 'frontcache-client', 'frontcache-ehcache','frontcache-lucene', 'frontcache-console', 'frontcache-tests'
-=======
-include 'frontcache-core', 'frontcache-web', 'frontcache-client', 'frontcache-ehcache','frontcache-filecache', 'frontcache-console', 'frontcache-tests'
->>>>>>> f7b2f4e added cache based on file
+
