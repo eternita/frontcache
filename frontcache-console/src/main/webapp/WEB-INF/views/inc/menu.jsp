@@ -17,6 +17,9 @@
         <li >
            <a href="fallbacks">fallback configs </a>
         </li>
+        <li >
+           <a href="cache-view">cache view </a>
+        </li>
       </ul>
     </div><!-- /.navbar-collapse -->
   </div><!-- /.container-fluid -->
