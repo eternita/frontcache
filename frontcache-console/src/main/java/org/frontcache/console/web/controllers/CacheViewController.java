@@ -35,11 +35,13 @@ public class CacheViewController {
 	public String submitForm(Model model, CacheViewForm cacheViewForm) {
 		model.addAttribute("cacheView", cacheViewForm);
 		
-		WebResponse wr = frontcacheService.getFromCache(cacheViewForm.getEdge(), cacheViewForm.getKey());
-		if (null != wr)
-			cacheViewForm.setWebResponseStr(new String(wr.getContent()));
-		else 
-			cacheViewForm.setWebResponseStr("Nothing found for " + cacheViewForm.getKey() + " in " + cacheViewForm.getEdge());
+		WebResponse webResponse = frontcacheService.getFromCache(cacheViewForm.getEdge(), cacheViewForm.getKey());
+		if (null != webResponse)
+		{
+			model.addAttribute("webResponse", webResponse);
+			model.addAttribute("webResponseStr", new String(webResponse.getContent()));
+			model.addAttribute("webResponseHeaders", webResponse.getHeaders());
+		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
