@@ -15,6 +15,7 @@ import java.util.Set;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.HystrixConnection;
+import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +87,7 @@ public class FrontcacheService {
 	 * @return
 	 */
 	public Map<String, FrontCacheStatus> getClusterStatus() {
-		List<FrontCacheClient> fcClients = getFrontCacheClients();
+		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		Map<String, FrontCacheStatus> clusterStatus = new HashMap<String, FrontCacheStatus>();
 		// TODO: make requests to nodes concurrent
@@ -124,7 +125,7 @@ public class FrontcacheService {
 	 * @return
 	 */
 	public Map<String, List<FallbackConfigEntry>> getFallbackConfigs() {
-		List<FrontCacheClient> fcClients = getFrontCacheClients();
+		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		Map<String, List<FallbackConfigEntry>> clusterStatus = new HashMap<String, List<FallbackConfigEntry>>();
 		// TODO: make requests to nodes concurrent
@@ -147,7 +148,7 @@ public class FrontcacheService {
 	{
 		// [{"name":"My Super App","stream":"http://sg.coinshome.net/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.coinshome.net/hystrix.stream","auth":"","delay":"2000"}]
 		
-		List<FrontCacheClient> fcClients = getFrontCacheClients();
+		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		List<HystrixConnection> hystrixConnections = new ArrayList<HystrixConnection>();
 		
@@ -165,12 +166,29 @@ public class FrontcacheService {
 		return urlListStr; 
 	}
 
-	private List<FrontCacheClient> getFrontCacheClients()
+	public Set<String> getFrontCacheAgentURLs()
 	{
-		return getFrontCacheClients(false);
+		Set<String> urls = new LinkedHashSet<String>();
+		urls.addAll(frontcacheAgentURLs);
+		
+		return urls;
 	}
 	
-	private List<FrontCacheClient> getFrontCacheClients(boolean activeOnly)
+	public WebResponse getFromCache(String edgeURL, String key)
+	{
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL);
+		WebResponse wr = fcClient.getFromCache(key);
+		
+		return wr;
+	}
+	
+	
+	private List<FrontCacheClient> getFrontCacheAgents()
+	{
+		return getFrontCacheAgents(false);
+	}
+
+	private List<FrontCacheClient> getFrontCacheAgents(boolean activeOnly)
 	{
 		List<FrontCacheClient> fcClients = new ArrayList<FrontCacheClient>();
 		for (String frontcacheURL : frontcacheAgentURLs)
