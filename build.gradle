@@ -147,7 +147,7 @@ project(':frontcache-ehcache') {
 	
 	build.dependsOn uploadArchives
 }
-project(':frontcache-filecache') {
+project(':frontcache-lucene') {
     dependencies {
         compile project(':frontcache-core')
         compile group: 'com.google.code.gson', name: 'gson', version: '2.5'
@@ -170,10 +170,31 @@ project(':frontcache-client') {
 
 project(':frontcache-web') {
 	apply plugin: 'war'
-	
+	apply plugin: 'org.akhikhl.gretty'
+
+
+// gretty for FC filter and web app
+
+gretty {
+
+httpPort = 9080
+
+servicePort = 9081
+
+statusPort = 9082
+
+contextPath = '/'
+
+servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
+
+//jvmArgs = ['-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
+
+	jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003','-Dfrontcache.home=/Users/dmytro.pavlikovskiy/git/frontcache/frontcache-web/FRONTCACHE_HOME','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
+
+}
 	dependencies {
 		compile project(':frontcache-core')
-		compile project(':frontcache-filecache')
+		compile project(':frontcache-lucene')
 	}
 }
 
