@@ -204,7 +204,7 @@ public class FSEhcacheProcessor extends CacheProcessorBase implements CacheProce
 		
 		status.put("impl", this.getClass().getName());
 
-		status.put("cached entiries", "" + cache.getKeys().size());
+		status.put(CacheProcessor.CACHED_ENTRIES, "" + cache.getKeys().size());
 		
 		return status;
 	}

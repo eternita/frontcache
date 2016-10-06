@@ -133,7 +133,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 		
 		status.put("impl", this.getClass().getName());
 
-		status.put("cached entiries", "" + cache.getKeys().size());
+		status.put(CacheProcessor.CACHED_ENTRIES, "" + cache.getKeys().size());
 		
 		return status;
 	}
