@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.client.FrontCacheCluster;
 import org.frontcache.core.FCHeaders;
@@ -281,20 +282,14 @@ public abstract class ClientTests extends TestsBase {
 		assertEquals("false", debugCached);
 		
 		Map<String, String> cacheState = frontcacheClient.getCacheState();
-		Assert.assertEquals("2", cacheState.get("cached entiries"));
+		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 
-//		response = frontcacheClient.getCacheState();		
-//		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"2\""));
-		
 		// cache invalidation
 		response = frontcacheClient.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		cacheState = frontcacheClient.getCacheState();
-		Assert.assertEquals("0", cacheState.get("cached entiries"));
-		
-//		response = frontcacheClient.getCacheState();
-//		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
+		Assert.assertEquals("0", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 		return;
 	}
 	
@@ -324,21 +319,15 @@ public abstract class ClientTests extends TestsBase {
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("false", debugCached);
 		
-//		response = fcCluster.getCacheState().get(FRONTCACHE_CLUSTER_NODE1);
-//		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"2\""));
-
 		Map<String, String> cacheState = frontcacheClient.getCacheState();
-		Assert.assertEquals("2", cacheState.get("cached entiries"));
+		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 		
 		// cache invalidation
 		response = fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
-//		response = fcCluster.getCacheState().get(FRONTCACHE_CLUSTER_NODE1);
-//		Assert.assertNotEquals(-1, response.indexOf("\"cached entiries\":\"0\""));
-		
 		cacheState = frontcacheClient.getCacheState();
-		Assert.assertEquals("0", cacheState.get("cached entiries"));
+		Assert.assertEquals("0", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 		
 		return;
 	}

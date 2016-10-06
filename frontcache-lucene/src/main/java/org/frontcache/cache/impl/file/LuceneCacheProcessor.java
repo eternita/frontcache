@@ -90,7 +90,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	public Map<String, String> getCacheStatus() {
 		Map<String, String> status = super.getCacheStatus();
 		status.put("impl", this.getClass().getName());
-		status.put("current size", "" + indexManager.getIndexSize());
+		status.put(CacheProcessor.CACHED_ENTRIES, "" + indexManager.getIndexSize());
 		return status;
 	}
 	

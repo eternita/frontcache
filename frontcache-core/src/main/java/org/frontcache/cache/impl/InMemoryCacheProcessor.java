@@ -118,7 +118,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 		
 		status.put("impl", this.getClass().getName());
 
-		status.put("cached entiries", "" + cache.keySet().size());
+		status.put(CacheProcessor.CACHED_ENTRIES, "" + cache.keySet().size());
 		
 		status.put("current size", "" + currentSize);
 		

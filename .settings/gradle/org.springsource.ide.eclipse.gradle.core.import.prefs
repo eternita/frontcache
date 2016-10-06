@@ -1,9 +1,9 @@
 #org.springsource.ide.eclipse.gradle.core.preferences.GradleImportPreferences
-#Fri Sep 02 23:45:18 MDT 2016
+#Thu Oct 06 11:09:32 MDT 2016
 addResourceFilters=true
 afterTasks=afterEclipseImport;
 beforeTasks=cleanEclipse;eclipse;
 enableAfterTasks=true
 enableBeforeTasks=true
 enableDependendencyManagement=true
-projects=frontcache-console;frontcache-tests;frontcache-web;
+projects=;frontcache-client;frontcache-console;frontcache-core;frontcache-ehcache;frontcache-lucene;frontcache-tests;frontcache-web;

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.HystrixConnection;
@@ -107,9 +108,24 @@ public class FrontcacheService {
 			{
 				Map<String, String> cacheState = fcClient.getCacheState();
 				if (null != cacheState)
-					cachedAmount = Long.parseLong(cacheState.get("cached entiries"));
-				else
+				{
+					String cacheAmountStr = cacheState.get(CacheProcessor.CACHED_ENTRIES);
+
+					// TODO: temp fix - remove me 
+					if (null == cacheAmountStr) cacheAmountStr = cacheState.get("cached entiries");
+					// TODO: temp fix - remove me 
+					if (null == cacheAmountStr) cacheAmountStr = cacheState.get("current size");
+					
+					if (null != cacheAmountStr)
+					{
+						try
+						{
+							cachedAmount = Long.parseLong(cacheAmountStr);							
+						} catch (Exception e) {e.printStackTrace();}
+					}
+				} else {
 					available = false;
+				}
 			} catch (Exception ex) {
 				available = false;
 				ex.printStackTrace();
