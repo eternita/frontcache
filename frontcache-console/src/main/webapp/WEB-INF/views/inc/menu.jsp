@@ -12,13 +12,16 @@
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
       <ul class="nav navbar-nav">
         <li >
-            <a href="realtime">realtime monitor </a>
+            <a href="realtime">Realtime monitor </a>
         </li>
         <li >
-           <a href="fallbacks">fallback configs </a>
+           <a href="fallbacks">Fallback configs </a>
         </li>
         <li >
-           <a href="cache-view">cache view </a>
+           <a href="cache-view">Cache view </a>
+        </li>
+        <li >
+           <a href="edges">Edges </a>
         </li>
       </ul>
     </div><!-- /.navbar-collapse -->

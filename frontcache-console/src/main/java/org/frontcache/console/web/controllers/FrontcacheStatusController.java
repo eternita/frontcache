@@ -18,9 +18,16 @@ public class FrontcacheStatusController {
 
 	@RequestMapping(value = "/", method = RequestMethod.GET)
 	public String domainOverview() {
-		return "redirect:realtime";
+		
+		if (frontcacheService.getEdgesAmount() > 0)
+			return "redirect:realtime";
+		else
+			return "no_edges";
+		
 	}
 
+	
+	
 	@RequestMapping(value = "/realtime", method = RequestMethod.GET)
 	public String domainRealtimeMonitor(ModelMap model) {
 
