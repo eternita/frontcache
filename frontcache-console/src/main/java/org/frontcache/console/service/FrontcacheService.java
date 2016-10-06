@@ -40,6 +40,12 @@ public class FrontcacheService {
 	private void loadConfigs() {
 		String frontcacheConsoleConfPath = System.getProperty("org.frontcache.console.config");
 		
+		if (null == frontcacheConsoleConfPath)
+		{
+			logger.info("System property 'org.frontcache.console.config' is not defined");					
+			return;
+		}
+		
 		BufferedReader confReader = null;
 		InputStream is = null;
 		try 
@@ -111,6 +117,7 @@ public class FrontcacheService {
 			
 			fcStatus.setAvailable(available);
 			fcStatus.setCachedAmount(cachedAmount);
+			fcStatus.setUrl(fcClient.getFrontCacheURL());
 			
 			clusterStatus.put(fcClient.getName(), fcStatus);
 		}
@@ -153,7 +160,12 @@ public class FrontcacheService {
 		List<HystrixConnection> hystrixConnections = new ArrayList<HystrixConnection>();
 		
 		for (FrontCacheClient fcClient : fcClients)
-			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcClient.getFrontCacheURL() + "hystrix.stream"));
+		{
+			String fcURL = fcClient.getFrontCacheURL();
+			if (!fcURL.endsWith("/"))
+				fcURL += "/";
+			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcURL + "hystrix.stream"));
+		}
 		
 		String urlListStr = "";
 		try {
@@ -209,5 +221,18 @@ public class FrontcacheService {
 
 		return fcClients;
 	}
+
+	public int getEdgesAmount() {
+		return frontcacheAgentURLs.size();
+	}
 	
+	public void addEdge(String edge) {
+		if (null != edge)
+			frontcacheAgentURLs.add(edge);
+	}
+	
+	public void removeEdge(String edge) {
+		if (null != edge)
+			frontcacheAgentURLs.remove(edge);
+	}
 }
