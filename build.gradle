@@ -152,7 +152,17 @@ project(':frontcache-ehcache') {
 	
 	build.dependsOn uploadArchives
 }
-
+project(':frontcache-lucene') {
+    dependencies {
+        compile project(':frontcache-core')
+        compile group: 'com.google.code.gson', name: 'gson', version: '2.5'
+        compile group: 'org.apache.lucene', name: 'lucene-core', version: '6.2.0'
+        compile group: 'org.apache.lucene', name: 'lucene-queryparser', version: '6.2.0'
+        testCompile 'junit:junit:4.12'
+        testCompile 'com.squareup.okhttp:okhttp:2.5.0'
+    }
+ build.dependsOn uploadArchives
+}
 project(':frontcache-client') {
 	dependencies {
 		compile project(':frontcache-core')
@@ -178,7 +188,7 @@ project(':frontcache-web') {
 
 	dependencies {
 		compile project(':frontcache-core')
-		compile project(':frontcache-ehcache')
+		compile project(':frontcache-lucene')
 		
 	}
 }
