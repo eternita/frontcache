@@ -1,3 +1,8 @@
+//Remeber to configure 'mavenLocalRepo' in gradle.properties
+// e.g.  
+// mavenLocalRepo = file:///Users/spa/.m2/repository
+//
+
 import org.akhikhl.gretty.AppBeforeIntegrationTestTask
 
 class ExecWait extends DefaultTask {
@@ -190,7 +195,7 @@ project(':frontcache-console') {
 		httpPort = 7080
 		servicePort = 7081
 		statusPort = 7082
-		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.properties']
+//		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.properties']
 	}
 	
 	dependencies {

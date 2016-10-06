@@ -5,6 +5,7 @@ import java.text.DecimalFormat;
 public class FrontCacheStatus {
 
 	private String name;
+	private String url;
 	private long cachedAmount;
 	private boolean available;
 	
@@ -49,5 +50,14 @@ public class FrontCacheStatus {
 		return formater.format(cachedAmount);
 	}
 
+
+	public String getUrl() {
+		return url;
+	}
+
+
+	public void setUrl(String url) {
+		this.url = url;
+	}
 	
 }

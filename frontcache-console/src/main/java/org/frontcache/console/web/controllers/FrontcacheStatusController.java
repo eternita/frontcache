@@ -10,38 +10,33 @@ import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
-
 @Controller
 public class FrontcacheStatusController {
-	
+
 	@Autowired
 	private FrontcacheService frontcacheService;
-	
 
-//    @RequestMapping(value = "/", method = RequestMethod.GET)
-//    public String domainOverview(ModelMap model) {
-//    	
-//    	Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
-//		model.put("edges", clusterStatus.values());
-//
-//        return "status";
-//    }
-    
-	  @RequestMapping(value = "/", method = RequestMethod.GET)
-	  public String domainOverview(ModelMap model) {
-	      return "redirect:realtime";
-	  }
-	  
-    @RequestMapping(value = "/realtime", method = RequestMethod.GET)
-    public String domainRealtimeMonitor(ModelMap model) {
-    	
-    	Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
-		model.put("edges", clusterStatus.values());
+	@RequestMapping(value = "/", method = RequestMethod.GET)
+	public String domainOverview() {
 		
+		if (frontcacheService.getEdgesAmount() > 0)
+			return "redirect:realtime";
+		else
+			return "no_edges";
+		
+	}
+
+	
+	
+	@RequestMapping(value = "/realtime", method = RequestMethod.GET)
+	public String domainRealtimeMonitor(ModelMap model) {
+
+		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
+		model.put("edges", clusterStatus.values());
+
 		model.put("hystrixMonitorURLList", frontcacheService.getHystrixMonitorURLList());
 
-        return "realtime";
-    }
-    
- 
+		return "realtime";
+	}
+
 }

@@ -15,6 +15,7 @@ import java.util.Set;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.HystrixConnection;
+import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +39,12 @@ public class FrontcacheService {
 
 	private void loadConfigs() {
 		String frontcacheConsoleConfPath = System.getProperty("org.frontcache.console.config");
+		
+		if (null == frontcacheConsoleConfPath)
+		{
+			logger.info("System property 'org.frontcache.console.config' is not defined");					
+			return;
+		}
 		
 		BufferedReader confReader = null;
 		InputStream is = null;
@@ -86,7 +93,7 @@ public class FrontcacheService {
 	 * @return
 	 */
 	public Map<String, FrontCacheStatus> getClusterStatus() {
-		List<FrontCacheClient> fcClients = getFrontCacheClients();
+		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		Map<String, FrontCacheStatus> clusterStatus = new HashMap<String, FrontCacheStatus>();
 		// TODO: make requests to nodes concurrent
@@ -110,6 +117,7 @@ public class FrontcacheService {
 			
 			fcStatus.setAvailable(available);
 			fcStatus.setCachedAmount(cachedAmount);
+			fcStatus.setUrl(fcClient.getFrontCacheURL());
 			
 			clusterStatus.put(fcClient.getName(), fcStatus);
 		}
@@ -124,7 +132,7 @@ public class FrontcacheService {
 	 * @return
 	 */
 	public Map<String, List<FallbackConfigEntry>> getFallbackConfigs() {
-		List<FrontCacheClient> fcClients = getFrontCacheClients();
+		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		Map<String, List<FallbackConfigEntry>> clusterStatus = new HashMap<String, List<FallbackConfigEntry>>();
 		// TODO: make requests to nodes concurrent
@@ -147,12 +155,17 @@ public class FrontcacheService {
 	{
 		// [{"name":"My Super App","stream":"http://sg.coinshome.net/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.coinshome.net/hystrix.stream","auth":"","delay":"2000"}]
 		
-		List<FrontCacheClient> fcClients = getFrontCacheClients();
+		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		List<HystrixConnection> hystrixConnections = new ArrayList<HystrixConnection>();
 		
 		for (FrontCacheClient fcClient : fcClients)
-			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcClient.getFrontCacheURL() + "hystrix.stream"));
+		{
+			String fcURL = fcClient.getFrontCacheURL();
+			if (!fcURL.endsWith("/"))
+				fcURL += "/";
+			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcURL + "hystrix.stream"));
+		}
 		
 		String urlListStr = "";
 		try {
@@ -165,17 +178,36 @@ public class FrontcacheService {
 		return urlListStr; 
 	}
 
-	private List<FrontCacheClient> getFrontCacheClients()
+	public Set<String> getFrontCacheAgentURLs()
 	{
-		return getFrontCacheClients(false);
+		Set<String> urls = new LinkedHashSet<String>();
+		urls.addAll(frontcacheAgentURLs);
+		
+		return urls;
 	}
 	
-	private List<FrontCacheClient> getFrontCacheClients(boolean activeOnly)
+	public WebResponse getFromCache(String edgeURL, String key)
+	{
+		if (null == key)
+			return null;
+		
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL);
+		WebResponse webResponse = fcClient.getFromCache(key.trim());
+		
+		return webResponse;
+	}
+	
+	
+	private List<FrontCacheClient> getFrontCacheAgents()
+	{
+		return getFrontCacheAgents(false);
+	}
+
+	private List<FrontCacheClient> getFrontCacheAgents(boolean activeOnly)
 	{
 		List<FrontCacheClient> fcClients = new ArrayList<FrontCacheClient>();
 		for (String frontcacheURL : frontcacheAgentURLs)
 		{
-//			FrontCacheClient fcClient = new FrontCacheClient("http://" + host + ":80/");
 			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL);
 			
 			if (activeOnly)
@@ -189,5 +221,18 @@ public class FrontcacheService {
 
 		return fcClients;
 	}
+
+	public int getEdgesAmount() {
+		return frontcacheAgentURLs.size();
+	}
 	
+	public void addEdge(String edge) {
+		if (null != edge)
+			frontcacheAgentURLs.add(edge);
+	}
+	
+	public void removeEdge(String edge) {
+		if (null != edge)
+			frontcacheAgentURLs.remove(edge);
+	}
 }
