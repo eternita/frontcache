@@ -1,6 +1,9 @@
 package org.frontcache.console.web.controllers;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.core.WebResponse;
@@ -40,7 +43,9 @@ public class CacheViewController {
 		{
 			model.addAttribute("webResponse", webResponse);
 			model.addAttribute("webResponseStr", new String(webResponse.getContent()));
-			model.addAttribute("webResponseHeaders", webResponse.getHeaders());
+			Map<String, List<String>> webRespHeaders = new TreeMap<String, List<String>>();
+			webRespHeaders.putAll(webResponse.getHeaders());
+			model.addAttribute("webResponseHeaders", webRespHeaders);
 		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
