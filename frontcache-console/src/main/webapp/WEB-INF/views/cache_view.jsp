@@ -27,6 +27,17 @@ Enter URL (origin URL with port number) to view cached content
     </tr>
     <c:choose>
 	    <c:when test="${null != webResponse}">
+            <tr>
+                   <td> 
+                        <p/><p/>         
+                        <b>Expiration date:</b>
+                   </td>
+                   <td>
+                        <p/><p/>         
+                        ${expirationDateStr} 
+                   </td>
+            </tr>
+            
 		    <tr>
 		        <td colspan="2">
 		            <p/><p/>         
@@ -46,7 +57,7 @@ Enter URL (origin URL with port number) to view cached content
 		           </td>
 		        </tr>
 		    </c:forEach>
-		    
+
 		    <tr>
 		        <td colspan="2">
 		            <p/><p/>         
