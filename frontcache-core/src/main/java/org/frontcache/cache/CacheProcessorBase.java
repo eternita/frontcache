@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.http.client.HttpClient;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -18,6 +19,20 @@ import org.slf4j.LoggerFactory;
 public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
+	
+	
+	private static final String NON_PERSISTENT_HEADERS_STR = "Set-Cookie Date" + 
+			" " + FCHeaders.X_FRONTCACHE_ID +
+			" " + FCHeaders.X_FRONTCACHE_COMPONENT +
+			" " + FCHeaders.X_FRONTCACHE_REQUEST_ID +
+			" " + FCHeaders.X_FRONTCACHE_CLIENT_IP +
+			" " + FCHeaders.X_FRONTCACHE_DEBUG +
+			" " + FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE +
+			" " + FCHeaders.X_FRONTCACHE_DEBUG_CACHED +
+			" " + FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME +
+			" " + FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE;
+	
+	private static final String[] NON_PERSISTENT_HEADERS = NON_PERSISTENT_HEADERS_STR.split(" ");
 	
 	public abstract WebResponse getFromCacheImpl(String url);
 
@@ -52,9 +67,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				if (cachedWebResponse.isCacheable())
 				{
 					WebResponse copy4cache = cachedWebResponse.copy();
-					
-					copy4cache.getHeaders().remove("Set-Cookie");
-					copy4cache.getHeaders().remove("Date");
+					Map<String, List<String>> copyHeaders = copy4cache.getHeaders(); 
+					for (String removeKey : NON_PERSISTENT_HEADERS)
+						copyHeaders.remove(removeKey);
 					
 					putToCache(originUrlStr, copy4cache); // put to cache copy
 				}

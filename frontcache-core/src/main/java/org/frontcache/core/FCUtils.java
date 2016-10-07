@@ -25,7 +25,6 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.message.BasicHeader;
-import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.hystrix.FC_ThroughCache_HttpClient;
 import org.frontcache.hystrix.FC_ThroughCache_WebFilter;
@@ -486,7 +485,6 @@ public class FCUtils {
 		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
 		byte[] outContentBody = content;
 		
-		// TODO: check headers for component's maxage
 		if (null != headers.get(FCHeaders.X_FRONTCACHE_COMPONENT))
 		{
 			Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
@@ -499,13 +497,13 @@ public class FCUtils {
 					
 				} catch (Exception ex) {}
 			}
-
-			WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSec);
-			component.setContentType(contentType);
-			return component;
 		}
 		
-
+		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSec);
+		component.setContentType(contentType);
+		return component;
+		
+/*
 		//  for back compatibility - markup inside text
 		
 		if (null != contentType && -1 < contentType.indexOf("text") && null != content)
@@ -546,13 +544,9 @@ public class FCUtils {
 		} else {
 			// it's binary data
 		}
+//*/			
 		
 
-		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSec);
-		component.setContentType(contentType);
-
-		
-		return component;
 	}
 	
 	/**
