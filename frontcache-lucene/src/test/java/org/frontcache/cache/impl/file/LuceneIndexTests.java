@@ -13,6 +13,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 
+import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.junit.After;
 import org.junit.Before;
@@ -59,7 +60,7 @@ public class LuceneIndexTests {
 		assertEquals(size, pr.getIndexManager().getIndexSize());
 		pr.getIndexManager().deleteByTag("apple");
 		assertEquals(size - 1, pr.getIndexManager().getIndexSize());
-		assertEquals(size - 1 + "", pr.getCacheStatus().get("current size"));
+		assertEquals(size - 1 + "", pr.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES));
 
 	}
 
@@ -96,7 +97,7 @@ public class LuceneIndexTests {
 		assertEquals(size, pr.getIndexManager().getIndexSize());
 		pr.getIndexManager().deleteByTag("apple");
 		assertEquals(size - 1, pr.getIndexManager().getIndexSize());
-		assertEquals(size - 1 + "", pr.getCacheStatus().get("current size"));
+		assertEquals(size - 1 + "", pr.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES));
 
 	}
 
@@ -166,6 +167,41 @@ public class LuceneIndexTests {
 		assertNull(fromFile);
 		
 	}
+	
+	@Test
+	public void fileEmptyByteTest() throws Exception {
+
+			String url = UUID.randomUUID().toString();
+			pr.removeFromCache(url);
+
+			WebResponse response = new WebResponse(url, null);
+			List<String> list = new ArrayList<>();
+			list.add(UUID.randomUUID().toString());
+			response.getHeaders().put("Accept", list);
+			Set<String> set = new HashSet<>();
+			set.add("banana");
+			response.setTags(set);
+			response.setContentType(UUID.randomUUID().toString());
+			response.setStatusCode(55);
+			pr.putToCache(url, response);
+
+			WebResponse fromFile = pr.getFromCacheImpl(url);
+			assertNull(fromFile);
+			
+			response.setContent(new byte[0]);
+			pr.putToCache(url, response);
+			
+			fromFile = pr.getFromCacheImpl(url);
+			assertNull(fromFile);
+			
+			response.setContent(new byte[]{'a'});
+			pr.putToCache(url, response);
+			
+			fromFile = pr.getFromCacheImpl(url);
+			assertNotNull(fromFile);
+			
+	}
+
 
 	@Before
 	public void setUp() {

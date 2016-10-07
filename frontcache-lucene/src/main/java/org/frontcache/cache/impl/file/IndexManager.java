@@ -198,7 +198,7 @@ public class IndexManager {
 	}
 	
 	private static boolean isValidForSaving(WebResponse response){
-		if (response != null && response.getContent() != null){
+		if (response != null && response.getContent() != null && response.getContent().length > 0){
 			return true;
 		}
 		return false;
@@ -303,7 +303,8 @@ public class IndexManager {
 
 		try {
 			Query query = parser.parse(tag);
-			indexWriter.deleteDocuments(query);
+			long count = indexWriter.deleteDocuments(query);
+			logger.debug("Removed  {} documents for {}.", count, tag);
 		} catch (IOException | ParseException e) {
 			logger.error(e.getMessage(), e);
 		} finally {
@@ -329,6 +330,11 @@ public class IndexManager {
 				response = gson.fromJson(doc.get(JSON_FIELD), WebResponse.class);
 				BytesRef bin1ref = doc.getBinaryValue(BIN_FIELD);
 				response.setContent(bin1ref.bytes);
+				if(!isValidForSaving(response)){
+					logger.warn("Got wrong request from index for url {}.", url);
+					deleteByHash(hash);
+				    return null;     
+				}
 			}
 
 			return response;
