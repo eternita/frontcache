@@ -46,7 +46,7 @@
 		    </div>
 		    <hr>
 		<div>
-		To load edges on startup you can
+		Steps to load edges on startup:
  <p/>		 
 		<br/>1. create a file with list of edges.
 		E.g. frontcache-console.properties 
