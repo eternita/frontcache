@@ -1,5 +1,8 @@
 package org.frontcache.console.web.controllers;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,6 +24,8 @@ public class CacheViewController {
 	@Autowired
 	private FrontcacheService frontcacheService;
 	
+	private static final DateFormat YYYY_MM_dd_HH_mm_ss_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
 
 	@RequestMapping(method = RequestMethod.GET)
 	public String initForm(Model model) {
@@ -46,6 +51,18 @@ public class CacheViewController {
 			Map<String, List<String>> webRespHeaders = new TreeMap<String, List<String>>();
 			webRespHeaders.putAll(webResponse.getHeaders());
 			model.addAttribute("webResponseHeaders", webRespHeaders);
+			
+			long expirationDate = webResponse.getExpireTimeMillis();
+			String expirationDateStr = "UNDEFINED";
+			if (-1 == expirationDate)
+				expirationDateStr = "DOES NOT EXPIRE";
+			else if (0 == expirationDate)
+				expirationDateStr = "DYNAMIC"; // never cached (should never happened)
+			else 
+				expirationDateStr = YYYY_MM_dd_HH_mm_ss_DF.format(new Date(expirationDate));
+
+			model.addAttribute("expirationDateStr", expirationDateStr);
+				
 		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
