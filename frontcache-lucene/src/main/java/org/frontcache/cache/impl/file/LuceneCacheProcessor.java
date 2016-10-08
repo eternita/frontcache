@@ -75,9 +75,9 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	
 
 	@Override
-	public void removeFromCache(String url) {
-		logger.debug("Removing from cache {}", url);
-		indexManager.deleteByUrl(url);
+	public void removeFromCache(String filter) {
+		logger.debug("Removing from cache {}", filter);
+		indexManager.deleteByTag(filter);
 	}
 
 	@Override
