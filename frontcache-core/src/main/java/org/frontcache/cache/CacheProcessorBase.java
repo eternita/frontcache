@@ -20,19 +20,21 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
 	
-	
-	private static final String NON_PERSISTENT_HEADERS_STR = "Set-Cookie Date" + 
-			" " + FCHeaders.X_FRONTCACHE_ID +
-			" " + FCHeaders.X_FRONTCACHE_COMPONENT +
-			" " + FCHeaders.X_FRONTCACHE_REQUEST_ID +
-			" " + FCHeaders.X_FRONTCACHE_CLIENT_IP +
-			" " + FCHeaders.X_FRONTCACHE_DEBUG +
-			" " + FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE +
-			" " + FCHeaders.X_FRONTCACHE_DEBUG_CACHED +
-			" " + FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME +
-			" " + FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE;
-	
-	private static final String[] NON_PERSISTENT_HEADERS = NON_PERSISTENT_HEADERS_STR.split(" ");
+	private static final String[] NON_PERSISTENT_HEADERS = new String[]{
+			"Set-Cookie", 
+			"Date",
+			FCHeaders.X_FRONTCACHE_ID,
+			FCHeaders.X_FRONTCACHE_COMPONENT,
+			FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE,
+			FCHeaders.X_FRONTCACHE_COMPONENT_TAGS,
+			FCHeaders.X_FRONTCACHE_REQUEST_ID,
+			FCHeaders.X_FRONTCACHE_CLIENT_IP,
+			FCHeaders.X_FRONTCACHE_DEBUG,
+			FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE,
+			FCHeaders.X_FRONTCACHE_DEBUG_CACHED,
+			FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME,
+			FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE
+		};
 	
 	public abstract WebResponse getFromCacheImpl(String url);
 

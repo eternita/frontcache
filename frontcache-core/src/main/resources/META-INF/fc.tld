@@ -32,52 +32,16 @@
     </description> 
     <name>component</name>
     <tag-class>org.frontcache.tags.WebComponentTag</tag-class>
-    <body-content>scriptless</body-content>
+    <body-content>JSP</body-content>
     <attribute>
        <name>maxage</name>
         <required>true</required>
     </attribute>
+    <attribute>
+       <name>tags</name>
+        <required>false</required>
+        <rtexprvalue>true</rtexprvalue>
+    </attribute>
   </tag>
   
-<!--
-
-
-
-  <tag>
-    <description>
-        Like &lt;%= ... &gt;, but for expressions.
-    </description> 
-    <name>out</name>
-    <tag-class>org.frontcache.tags.OutTag</tag-class>
-    <body-content>JSP</body-content>
-    <attribute>
-        <description>
-Expression to be evaluated.
-        </description>
-        <name>value</name>
-        <required>true</required>
-        <rtexprvalue>true</rtexprvalue>
-    </attribute>
-    <attribute>
-        <description>
-Default value if the resulting value is null.
-        </description>
-        <name>default</name>
-        <required>false</required>
-        <rtexprvalue>true</rtexprvalue>
-    </attribute>
-    <attribute>
-        <description>
-Determines whether characters &lt;,&gt;,&amp;,'," in the
-resulting string should be converted to their
-corresponding character entity codes. Default value is
-true.
-        </description>
-        <name>escapeXml</name>
-        <required>false</required>
-        <rtexprvalue>true</rtexprvalue>
-    </attribute>
-  </tag>  
- 
- -->
 </taglib>

@@ -6,4 +6,8 @@ public class WebComponentTag extends WebComponentSupport {
 		super.maxage = maxage;
 	}
 
+	public void setTags(String tags) {
+		super.tags = tags;
+	}
+	
 }
