@@ -9,6 +9,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -500,85 +501,16 @@ public class FCUtils {
 		}
 		
 		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSec);
+		// set invalidation tags
+		Collection<String> tagsList = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS);
+		if (null != tagsList)
+			for (String tagsStr : tagsList)
+				component.addTags(Arrays.asList(tagsStr.split(FCHeaders.COMPONENT_TAGS_SEPARATOR)));
+		
+		
 		component.setContentType(contentType);
 		return component;
-		
-/*
-		//  for back compatibility - markup inside text
-		
-		if (null != contentType && -1 < contentType.indexOf("text") && null != content)
-		{
-			// it's text
-
-			String contentStr = new String(content);
-			String outStr = null;
-			final String START_MARKER = "<fc:component";
-			final String END_MARKER = "/>";
-			
-			int startIdx = contentStr.indexOf(START_MARKER);
-			if (-1 < startIdx)
-			{
-				int endIdx = contentStr.indexOf(END_MARKER, startIdx);
-				if (-1 < endIdx)
-				{
-					String includeTagStr = contentStr.substring(startIdx, endIdx + END_MARKER.length());
-					cacheMaxAgeSec = getCacheMaxAge(includeTagStr);
-					
-					// exclude tag from content
-					StringBuffer outSb = new StringBuffer();
-					outSb.append(contentStr.substring(0, startIdx));
-					if (FrontCacheEngine.debugComments)
-						outSb.append("<!-- fc:component ttl=").append(cacheMaxAgeSec).append("sec -->"); // comment out tag (leave it for debugging purpose)
-					outSb.append(contentStr.substring(endIdx + END_MARKER.length(), contentStr.length()));
-					outStr = outSb.toString();
-				} else {
-					// can't find closing 
-					outStr = contentStr;
-				}
-				
-			} else {
-				outStr = contentStr;
-			}
-			
-			outContentBody = outStr.getBytes();
-		} else {
-			// it's binary data
-		}
-//*/			
-		
-
 	}
-	
-	/**
-	 * 
-	 * @param content
-	 * @return time to live in cache in seconds
-	 */
-	private static int getCacheMaxAge(String content)
-	{
-		final String START_MARKER = "maxage=\"";
-		int startIdx = content.indexOf(START_MARKER);
-		if (-1 < startIdx)
-		{
-			int endIdx = content.indexOf("\"", startIdx + START_MARKER.length());
-			if (-1 < endIdx)
-			{
-				String maxAgeStr = content.substring(startIdx + START_MARKER.length(), endIdx);
-				return maxAgeStr2Int(maxAgeStr);				
-			} else {
-				logger.info("no closing tag for - " + content);
-				// can't find closing 
-				return CacheProcessor.NO_CACHE;
-			}
-			
-			
-		} else {
-			// no maxage attribute
-			logger.info("no maxage attribute for - " + content);
-			return CacheProcessor.NO_CACHE;
-		}
-
-	}	
 	
 	private static int maxAgeStr2Int(String maxAgeStr)
 	{

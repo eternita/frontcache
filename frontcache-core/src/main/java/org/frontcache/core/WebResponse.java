@@ -149,6 +149,14 @@ public class WebResponse implements Serializable {
 
 	/**
 	 * 
+	 * @param tags
+	 */
+	public void addTags(Collection<String> tags) {
+		this.tags.addAll(tags);
+	}
+	
+	/**
+	 * 
 	 * @return
 	 */
 	public byte[] getContent() {

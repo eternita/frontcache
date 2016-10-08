@@ -13,16 +13,9 @@ import org.frontcache.core.FCHeaders;
 public class WebComponentSupport extends BodyTagSupport {
 
 
-	// *********************************************************************
-	// Internal state
-
-//	protected Object value; // tag attribute
 	protected String maxage;
+	protected String tags;
 
-
-
-	// *********************************************************************
-	// Construction and initialization
 
 	/**
 	 * Constructs a new handler. As with TagSupport, subclasses should not
@@ -34,8 +27,9 @@ public class WebComponentSupport extends BodyTagSupport {
 		init();
 	}
 
-	// resets local state
 	private void init() {
+		this.maxage = null;
+		this.tags = null;
 	}
 
 	// Releases any resources we may have (or inherit)
@@ -44,26 +38,24 @@ public class WebComponentSupport extends BodyTagSupport {
 		init();
 	}
 
-	// *********************************************************************
-	// Tag logic
 
-	// evaluates 'value' 
 	public int doStartTag() throws JspException {
 
-		this.bodyContent = null; // clean-up body (just in case container is
-									// pooling tag handlers)
+		this.bodyContent = null; // clean-up body (just in case container is pooling tag handlers)
 
 		try {
 			HttpServletResponse response = (HttpServletResponse) pageContext.getResponse();
+
 			response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT, "true");
 			
-			// print maxage if available; otherwise, try 'default'
-			if (maxage != null) {
-				out(pageContext, maxage);
-				return SKIP_BODY;
-			}
+			if (null != maxage)
+				response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE, maxage);
+			
+			if (null != tags)
+				response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS, tags);
+			
 			return SKIP_BODY;
-		} catch (IOException ex) {
+		} catch (Exception ex) {
 			throw new JspException(ex.toString(), ex);
 		}
 	}
@@ -73,12 +65,4 @@ public class WebComponentSupport extends BodyTagSupport {
 		return EVAL_PAGE; // nothing more to do
 	}
 
-	// *********************************************************************
-	// Public utility methods
-
-	public static void out(PageContext pageContext, String maxage) throws IOException {
-		HttpServletResponse response = (HttpServletResponse) pageContext.getResponse();
-		response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE, maxage);
-		
-	}
 }
