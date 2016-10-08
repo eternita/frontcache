@@ -40,7 +40,7 @@ public class WebResponse implements Serializable {
 	 */
 	private Map<String, List<String>> headers;
 	
-	private Set<String> tags;
+	private final Set<String> tags = new HashSet<String>();
 	
 	private String contentType;
 	
@@ -144,7 +144,7 @@ public class WebResponse implements Serializable {
 	 * @param tags
 	 */
 	public void setTags(Set<String> tags) {
-		this.tags = tags;
+		this.tags.addAll(tags);
 	}
 
 	/**
@@ -288,11 +288,7 @@ public class WebResponse implements Serializable {
     	copy.expireTimeMillis = this.expireTimeMillis;
     	copy.statusCode = this.statusCode;
     	
-    	if (null != this.tags)
-    	{
-    		copy.tags = new HashSet<String>();
-    		copy.tags.addAll(this.tags);
-    	}
+		copy.tags.addAll(this.tags);
     	
     	if (null != headers)
     	{

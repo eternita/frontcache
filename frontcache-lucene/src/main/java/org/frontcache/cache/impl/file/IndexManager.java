@@ -6,9 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -53,25 +50,26 @@ public class IndexManager {
 	private static final Logger logger = LoggerFactory.getLogger(IndexManager.class);
 
 	private static String INDEX_PATH;
-	public static final String JSON_FIELD = "json";
-	public static final String TAGS_FIELD = "tags";
-	public static final String BIN_FIELD = "bin";
-	public static final String HASH_FIELD = "hash";
 	
-	public static String  DELIMITERS = "\\/|-|\\.|=|&";
+	public static final String JSON_FIELD = "json";
+	public static final String BIN_FIELD = "bin";
 
+	// searchable fields
+	public static final String TAGS_FIELD = "tags"; 
+	public static final String HASH_FIELD = "hash"; 
+	
 	private IndexWriter indexWriter = null;
 	
 	private final StandardAnalyzer analyzer = new StandardAnalyzer();
 
-	  public final static FieldType TYPE;
-	  static {
+	public final static FieldType TYPE;
+	static {
 	    TYPE = new FieldType();
 	    TYPE.setStored(true);
 	    TYPE.setIndexOptions(IndexOptions.NONE);
 	    TYPE.setTokenized(false);
 	    TYPE.freeze();
-	  }
+	}
 	
 	/**
 	 *  
@@ -110,12 +108,11 @@ public class IndexManager {
 			}
 		} else {
 			try {
-				indexWriter = getIndexWriter(false);
+				indexWriter = getIndexWriter();
 			} catch (IOException e) {
 				logger.error("Error during creating indexWriter", e);
 			}
 		}
-
 	}
 
 	static String getHash(String url) {
@@ -128,7 +125,7 @@ public class IndexManager {
 	 * @return
 	 * @throws IOException
 	 */
-	private IndexWriter getIndexWriter(boolean create) throws IOException {
+	private IndexWriter getIndexWriter() throws IOException {
 		if (indexWriter == null) {
 			synchronized (IndexWriter.class) {
 
@@ -136,11 +133,7 @@ public class IndexManager {
 				Analyzer analyzer = new StandardAnalyzer();
 				IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
 
-				if (create) {
-					iwc.setOpenMode(OpenMode.CREATE);
-				} else {
-					iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
-				}
+				iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
 				iwc.setRAMBufferSizeMB(250.0);
 				indexWriter = new IndexWriter(dir, iwc);
 			}
@@ -156,27 +149,16 @@ public class IndexManager {
 	 */
 	void indexDoc(WebResponse response) throws IOException {
 
-		if (!isValidForSaving(response)){
-			return;
-		}
-		
-		IndexWriter iWriter = getIndexWriter(false);
+		IndexWriter iWriter = getIndexWriter();
 
 		Document doc = new Document();
 
 		String hash = getHash(response.getUrl());
 
-		Field hashField = new StringField(HASH_FIELD, hash, Field.Store.YES);
-		doc.add(hashField);
-
+		doc.add(new StringField(HASH_FIELD, hash, Field.Store.YES));
 		doc.add(new StoredField(BIN_FIELD, response.getContent()));
-
 		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), TYPE));
-		
-		Set<String> tags = Optional.ofNullable(response.getTags()).orElse(new HashSet<>(2));
-		tags.add(response.getUrl());
-		tags.addAll(Arrays.asList(response.getUrl().split(DELIMITERS)));
-		doc.add(new TextField(TAGS_FIELD, new StringReader(Arrays.toString(tags.toArray()))));
+		doc.add(new TextField(TAGS_FIELD, new StringReader(Arrays.toString(response.getTags().toArray()))));
 
 		try {
 			if (iWriter.getConfig().getOpenMode() == OpenMode.CREATE) {
@@ -197,13 +179,6 @@ public class IndexManager {
 
 	}
 	
-	private static boolean isValidForSaving(WebResponse response){
-		if (response != null && response.getContent() != null && response.getContent().length > 0){
-			return true;
-		}
-		return false;
-	}
-
 	public void close() {
 		if (indexWriter != null && indexWriter.isOpen()) {
 			try {
@@ -330,7 +305,7 @@ public class IndexManager {
 				response = gson.fromJson(doc.get(JSON_FIELD), WebResponse.class);
 				BytesRef bin1ref = doc.getBinaryValue(BIN_FIELD);
 				response.setContent(bin1ref.bytes);
-				if(!isValidForSaving(response)){
+				if(!response.isCacheable()){
 					logger.warn("Got wrong request from index for url {}.", url);
 					deleteByHash(hash);
 				    return null;     
