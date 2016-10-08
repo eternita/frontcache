@@ -10,21 +10,21 @@
 
 Enter URL (origin URL with port number) to view cached content
 
-
-<form:form method="POST" commandName="cacheView">
-   <table>
-    <tr>
-        <td>Edge: 
-            <form:select path="edge">
+<form:form method="POST" class="form-inline" commandName="cacheView">
+  <div class="form-group">
+    <label for="edge">Edge: </label>
+            <form:select class="form-control" path="edge">
                <form:options items="${edgeList}" />
-            </form:select>        
-        </td>
-        <td>
-            &nbsp;&nbsp; URL&nbsp;
-            <form:input path="key" style="width: 500px;" /> 
-            <input type="submit" value="Submit"/>
-        </td>
-    </tr>
+            </form:select>      
+  </div>
+  <div class="form-group">
+    <label for="URL">URL</label>
+    <form:input class="form-control" placeholder="http://your.site.com" path="key" style="width: 500px;" />
+  </div>   
+  <button type="submit" class="btn btn-success">Submit</button>
+  </form:form>
+  <table>
+  <tbody>
     <c:choose>
 	    <c:when test="${null != webResponse}">
             <tr>
@@ -78,11 +78,8 @@ Enter URL (origin URL with port number) to view cached content
             </tr>
 	    </c:otherwise>
     </c:choose>
-
-    
-    
+  </tbody>  
    </table>
-</form:form>
 
     
 <p/> 
