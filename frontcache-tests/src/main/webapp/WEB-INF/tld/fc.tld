@@ -32,11 +32,16 @@
     </description> 
     <name>component</name>
     <tag-class>org.frontcache.tags.WebComponentTag</tag-class>
-    <body-content>scriptless</body-content>
+    <body-content>JSP</body-content>
     <attribute>
        <name>maxage</name>
         <required>true</required>
     </attribute>
+    <attribute>
+       <name>tags</name>
+        <required>false</required>
+        <rtexprvalue>true</rtexprvalue>
+    </attribute>    
   </tag>
   
 </taglib>

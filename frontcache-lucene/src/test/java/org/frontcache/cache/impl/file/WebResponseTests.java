@@ -130,20 +130,6 @@ public class WebResponseTests {
 		assertEquals("data", new String(response.getContent()));
 	}
 
-	@Test
-	public void splitTest() {
-		assertEquals(2, split("asdf/asdf"));
-		assertEquals(3, split("asdf/asdf-asdf"));
-		assertEquals(4, split("asdf/asdf-asdf-ert"));
-		assertEquals(4, split("asdf/asdf-asdf.ert"));
-		assertEquals(4, split("asdf/asdf-asdf=ert"));
-		assertEquals(4, split("asdf/asdf-asdf&ert"));
-	}
-
-	private int split(String url) {
-		return url.split(IndexManager.DELIMITERS).length;
-	}
-
 	@Before
 	public void setUp() {
 		pr = new LuceneCacheProcessor();
