@@ -153,7 +153,7 @@ project(':frontcache-core') {
 
 project(':frontcache-client') {
 	dependencies {
-		compile project(':frontcache-core')
+        compile         'org.apache.httpcomponents:httpclient:4.5.1'
 	}
 	
 	build.dependsOn uploadArchives
@@ -196,7 +196,6 @@ project(':frontcache-console') {
 	
 	dependencies {
 		compile project(':frontcache-core')
-		compile project(':frontcache-client')
 		compile "org.springframework:spring-context:${springVersion}"
 		compile "org.springframework:spring-webmvc:${springVersion}"
 		compile 'jstl:jstl:1.2'
