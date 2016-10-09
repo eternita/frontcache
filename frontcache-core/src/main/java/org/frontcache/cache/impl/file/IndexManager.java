@@ -156,16 +156,13 @@ public class IndexManager {
 		String hash = getHash(response.getUrl());
 
 		doc.add(new StringField(HASH_FIELD, hash, Field.Store.YES));
-		doc.add(new StoredField(BIN_FIELD, response.getContent()));
+		if (null != response.getContent())
+			doc.add(new StoredField(BIN_FIELD, response.getContent()));
 		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), TYPE));
 		doc.add(new TextField(TAGS_FIELD, new StringReader(Arrays.toString(response.getTags().toArray()))));
 
 		try {
-			if (iWriter.getConfig().getOpenMode() == OpenMode.CREATE) {
-				iWriter.addDocument(doc);
-			} else {
-				iWriter.updateDocument(new Term(HASH_FIELD, hash), doc);
-			}
+			iWriter.updateDocument(new Term(HASH_FIELD, hash), doc);
 		} catch (IOException e) {
 			logger.error("Error while in Lucene index operation: {}", e.getMessage(), e);
 
@@ -304,12 +301,8 @@ public class IndexManager {
 			if (doc != null) {
 				response = gson.fromJson(doc.get(JSON_FIELD), WebResponse.class);
 				BytesRef bin1ref = doc.getBinaryValue(BIN_FIELD);
-				response.setContent(bin1ref.bytes);
-				if(!response.isCacheable()){
-					logger.warn("Got wrong request from index for url {}.", url);
-					deleteByHash(hash);
-				    return null;     
-				}
+				if (null != bin1ref)
+					response.setContent(bin1ref.bytes);
 			}
 
 			return response;

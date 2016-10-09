@@ -52,6 +52,7 @@ public class WebResponseTests {
 		Response okResponse = client.newCall(request).execute();
 		ResponseBody body = okResponse.body();
 		byte[] data = body.bytes();
+		assertNotNull(data);
 
 		pr.removeFromCache(url);
 
@@ -119,7 +120,7 @@ public class WebResponseTests {
 
 		pr.getIndexManager().indexDoc(response);
 		response = pr.getFromCache("https://google.com/some/url");
-		assertNull(response);
+		assertNotNull(response);
 
 		response = new WebResponse("https://google.com/some/url", "data".getBytes());
 
