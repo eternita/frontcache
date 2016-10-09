@@ -151,9 +151,9 @@ project(':frontcache-core') {
 }
 
 
-project(':frontcache-client') {
+project(':frontcache-agent') {
 	dependencies {
-		compile project(':frontcache-core')
+        compile         'org.apache.httpcomponents:httpclient:4.5.1'
 	}
 	
 	build.dependsOn uploadArchives
@@ -196,7 +196,6 @@ project(':frontcache-console') {
 	
 	dependencies {
 		compile project(':frontcache-core')
-		compile project(':frontcache-client')
 		compile "org.springframework:spring-context:${springVersion}"
 		compile "org.springframework:spring-webmvc:${springVersion}"
 		compile 'jstl:jstl:1.2'
@@ -272,7 +271,7 @@ project(':frontcache-tests') {
 	
 	dependencies {
 		compile project(':frontcache-core')
-		compile project(':frontcache-client')		
+		compile project(':frontcache-agent')		
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		compile 'org.eclipse.jetty:jetty-server:9.3.6.v20151106'
