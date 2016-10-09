@@ -59,7 +59,7 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void getFromCacheClient() throws Exception {
 		
-		final String TEST_URI_A = "common/fc-agent/a.jsp";
+		final String TEST_URI_A = "common/fc-client/a.jsp";
 
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
@@ -107,7 +107,7 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void getFromCacheClientNull() throws Exception {
 		
-		final String TEST_URI_A = "common/fc-agent/a.jsp";
+		final String TEST_URI_A = "common/fc-client/a.jsp";
 
 		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
 		
@@ -171,7 +171,7 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void invalidationByFilterTestClient() throws Exception {
 		
-		final String TEST_URI = "common/fc-agent/a.jsp";
+		final String TEST_URI = "common/fc-client/a.jsp";
 		
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
@@ -216,7 +216,7 @@ public abstract class ClientTests extends TestsBase {
 	public void invalidationByFilterTestCluster() throws Exception {
 		
 		FrontCacheCluster fcCluster = new FrontCacheCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
-		final String TEST_URI = "common/fc-agent/a.jsp";
+		final String TEST_URI = "common/fc-client/a.jsp";
 		
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
@@ -258,8 +258,8 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void invalidationAllTestClient() throws Exception {
 		
-		final String TEST_URI_A = "common/fc-agent/a.jsp";
-		final String TEST_URI_B = "common/fc-agent/b.jsp";
+		final String TEST_URI_A = "common/fc-client/a.jsp";
+		final String TEST_URI_B = "common/fc-client/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
 		
@@ -296,8 +296,8 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void invalidationAllTestCluster() throws Exception {
 		
-		final String TEST_URI_A = "common/fc-agent/a.jsp";
-		final String TEST_URI_B = "common/fc-agent/b.jsp";
+		final String TEST_URI_A = "common/fc-client/a.jsp";
+		final String TEST_URI_B = "common/fc-client/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 		FrontCacheCluster fcCluster = new FrontCacheCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
 		
