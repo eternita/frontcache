@@ -151,7 +151,7 @@ project(':frontcache-core') {
 }
 
 
-project(':frontcache-client') {
+project(':frontcache-agent') {
 	dependencies {
         compile         'org.apache.httpcomponents:httpclient:4.5.1'
 	}
@@ -271,7 +271,7 @@ project(':frontcache-tests') {
 	
 	dependencies {
 		compile project(':frontcache-core')
-		compile project(':frontcache-client')		
+		compile project(':frontcache-agent')		
 		
 		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
 		compile 'org.eclipse.jetty:jetty-server:9.3.6.v20151106'
