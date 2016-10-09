@@ -1,5 +1,5 @@
 #org.springsource.ide.eclipse.gradle.core.preferences.GradleProjectPreferences
-#Sat Oct 08 11:28:31 MDT 2016
-build.family.org.gradle.tooling.model.eclipse.HierarchicalEclipseProject=;frontcache-client;frontcache-console;frontcache-core;frontcache-tests;frontcache-web;
+#Sat Oct 08 21:34:38 MDT 2016
+build.family.org.gradle.tooling.model.eclipse.HierarchicalEclipseProject=;frontcache-agent;frontcache-console;frontcache-core;frontcache-tests;frontcache-web;
 org.springsource.ide.eclipse.gradle.linkedresources=
 org.springsource.ide.eclipse.gradle.rootprojectloc=
