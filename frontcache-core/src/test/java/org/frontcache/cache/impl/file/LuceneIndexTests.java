@@ -5,6 +5,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,7 +55,7 @@ public class LuceneIndexTests {
 			assertEquals(response.getContentType(), fromFile.getContentType());
 			assertEquals(response.getContentLenth(), fromFile.getContentLenth());
 			assertEquals(fromFile.getStatusCode(), response.getStatusCode());
-			assertEquals(null, fromFile.getTags());
+			assertEquals(new HashSet<>(), fromFile.getTags()); // tags not restorable from index
 		}
 
 		assertEquals(size, pr.getIndexManager().getIndexSize());
@@ -139,7 +140,7 @@ public class LuceneIndexTests {
 			WebResponse fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
 			assertEquals(urls.get(url), new String(fromFile.getContent()));
-			pr.getIndexManager().deleteByTag(url);
+			pr.getIndexManager().deleteByUrl(url);
 			fromFile = pr.getFromCacheImpl(url);
 			assertNull(fromFile);
 		}
@@ -154,6 +155,7 @@ public class LuceneIndexTests {
 		pr.removeFromCache(url);
 		
 		WebResponse response = new WebResponse(url, "data".getBytes());
+		response.addTags(Arrays.asList(new String[]{"E9AKbzbiOBIAAAFG0vnZjkvL"}));
 		
 		pr.putToCache(url, response);
 		
@@ -186,13 +188,13 @@ public class LuceneIndexTests {
 			pr.putToCache(url, response);
 
 			WebResponse fromFile = pr.getFromCacheImpl(url);
-			assertNull(fromFile);
+			assertNotNull(fromFile);
 			
 			response.setContent(new byte[0]);
 			pr.putToCache(url, response);
 			
 			fromFile = pr.getFromCacheImpl(url);
-			assertNull(fromFile);
+			assertNotNull(fromFile);
 			
 			response.setContent(new byte[]{'a'});
 			pr.putToCache(url, response);
