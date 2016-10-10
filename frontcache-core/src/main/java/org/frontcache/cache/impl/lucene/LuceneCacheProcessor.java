@@ -23,24 +23,24 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 
 	private static final Logger logger = LoggerFactory.getLogger(LuceneCacheProcessor.class);
 
-	private IndexManager indexManager;
+	private LuceneIndexManager indexManager;
 	
-	private static String INDEX_PATH_SUFFIX = "index/";
+	private static String CACHE_BASE_DIR_DEFAULT = "/tmp/cache/";
 	
-	private static final String PREFIX = "front-cache.file-processor.impl.";
+	private static final String CACHE_BASE_DIR_KEY = "front-cache.cache-processor.impl.cache-dir"; // to override path in configs
 	
-	private static String CACHE_BASE_DIR = "/tmp/cache/";
+	private static String INDEX_PATH_SUFFIX = "lucene-index/";
 	
-	private static String INDEX_PATH = "/tmp/index/";
+	private static String INDEX_PATH = CACHE_BASE_DIR_DEFAULT + INDEX_PATH_SUFFIX;
 
 
 	@Override
 	public void init(Properties properties) {
 		 
 		Objects.requireNonNull(properties, "Properties should not be null");
-		CACHE_BASE_DIR = Optional.ofNullable(properties.getProperty(PREFIX + "cache-dir")).orElse(CACHE_BASE_DIR);
-		INDEX_PATH = CACHE_BASE_DIR + INDEX_PATH_SUFFIX;
-		indexManager = new IndexManager(INDEX_PATH);
+		CACHE_BASE_DIR_DEFAULT = Optional.ofNullable(properties.getProperty(CACHE_BASE_DIR_KEY)).orElse(CACHE_BASE_DIR_DEFAULT);
+		INDEX_PATH = CACHE_BASE_DIR_DEFAULT + INDEX_PATH_SUFFIX;
+		indexManager = new LuceneIndexManager(INDEX_PATH);
 	}
 	
 	@Override
@@ -48,7 +48,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 		indexManager.close();
 	}
 	
-	public IndexManager getIndexManager(){
+	public LuceneIndexManager getIndexManager(){
 		return indexManager;
 	}
 
@@ -77,8 +77,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	@Override
 	public void removeFromCache(String filter) {
 		logger.debug("Removing from cache {}", filter);
-		indexManager.deleteByUrl(filter);
-		indexManager.deleteByTag(filter);
+		indexManager.delete(filter);
 	}
 
 	@Override

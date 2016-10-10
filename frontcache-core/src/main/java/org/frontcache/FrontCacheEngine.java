@@ -453,6 +453,7 @@ public class FrontCacheEngine {
 
 		String currentRequestURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + portStr + context.getRequestURI() + context.getRequestQueryString();
 		context.setCurrentRequestURL(currentRequestURL);
+		logger.debug("currentRequestURL: " + currentRequestURL);
 		
 		return;
 	}

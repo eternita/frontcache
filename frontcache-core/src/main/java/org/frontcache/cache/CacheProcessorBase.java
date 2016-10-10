@@ -76,6 +76,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					for (String removeKey : NON_PERSISTENT_HEADERS)
 						copyHeaders.remove(removeKey);
 					
+					copy4cache.setUrl(currentRequestURL);
 					putToCache(currentRequestURL, copy4cache); // put to cache copy
 				}
 
