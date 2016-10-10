@@ -1,6 +1,6 @@
-package org.frontcache.cache.impl.file;
+package org.frontcache.cache.impl.lucene;
 
-import static org.frontcache.cache.impl.file.IndexManager.getHash;
+import static org.frontcache.cache.impl.lucene.IndexManager.getHash;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -8,6 +8,7 @@ import static org.junit.Assert.fail;
 
 import java.util.Properties;
 
+import org.frontcache.cache.impl.lucene.LuceneCacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.junit.After;
 import org.junit.Before;

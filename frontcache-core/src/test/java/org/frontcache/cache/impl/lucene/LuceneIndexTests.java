@@ -1,4 +1,4 @@
-package org.frontcache.cache.impl.file;
+package org.frontcache.cache.impl.lucene;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.impl.lucene.LuceneCacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.junit.After;
 import org.junit.Before;

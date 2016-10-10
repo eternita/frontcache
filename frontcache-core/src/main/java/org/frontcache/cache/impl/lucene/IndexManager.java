@@ -1,4 +1,4 @@
-package org.frontcache.cache.impl.file;
+package org.frontcache.cache.impl.lucene;
 
 import java.io.IOException;
 import java.io.StringReader;
