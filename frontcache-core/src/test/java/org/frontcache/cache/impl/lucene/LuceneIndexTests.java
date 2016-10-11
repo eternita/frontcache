@@ -60,7 +60,7 @@ public class LuceneIndexTests {
 		}
 
 		assertEquals(size, pr.getIndexManager().getIndexSize());
-		pr.getIndexManager().deleteByTag("apple");
+		pr.getIndexManager().delete("apple");
 		assertEquals(size - 1, pr.getIndexManager().getIndexSize());
 		assertEquals(size - 1 + "", pr.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES));
 
@@ -97,7 +97,7 @@ public class LuceneIndexTests {
 		}
 
 		assertEquals(size, pr.getIndexManager().getIndexSize());
-		pr.getIndexManager().deleteByTag("apple");
+		pr.getIndexManager().delete("apple");
 		assertEquals(size - 1, pr.getIndexManager().getIndexSize());
 		assertEquals(size - 1 + "", pr.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES));
 
@@ -141,7 +141,7 @@ public class LuceneIndexTests {
 			WebResponse fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
 			assertEquals(urls.get(url), new String(fromFile.getContent()));
-			pr.getIndexManager().deleteByUrl(url);
+			pr.getIndexManager().delete(url);
 			fromFile = pr.getFromCacheImpl(url);
 			assertNull(fromFile);
 		}
@@ -149,7 +149,7 @@ public class LuceneIndexTests {
 	}
 	
 	@Test
-	public void fileRemoveById() throws Exception {
+	public void fileRemoveByTag() throws Exception {
 
 		String url = "https://www.coinshome.net/en/coin_definition-1_Escudo-Gold-Centralist_Republic_of_Mexico_(1835_1846)-E9AKbzbiOBIAAAFG0vnZjkvL.htm";
 
@@ -164,7 +164,7 @@ public class LuceneIndexTests {
 		assertEquals(url, fromFile.getUrl());
 		assertEquals(new String("data".getBytes()), new String(fromFile.getContent()));
 		
-		pr.getIndexManager().deleteByTag("E9AKbzbiOBIAAAFG0vnZjkvL");
+		pr.getIndexManager().delete("E9AKbzbiOBIAAAFG0vnZjkvL");
 		
 		fromFile = pr.getFromCache(url);
 		assertNull(fromFile);
@@ -210,7 +210,7 @@ public class LuceneIndexTests {
 	public void setUp() {
 		pr = new LuceneCacheProcessor();
 		Properties prop = new Properties();
-		prop.put("front-cache.file-processor.impl.cache-dir", "/private/tmp/cache/");
+		prop.put("front-cache.cache-processor.impl.cache-dir", "/private/tmp/cache/");
 		pr.init(prop);
 	}
 

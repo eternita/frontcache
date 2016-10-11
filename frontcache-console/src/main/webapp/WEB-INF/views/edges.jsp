@@ -39,7 +39,7 @@
 		        
 		        <form class="form-inline" action="add-edge">
                   <div class="form-group">
-                     <label for="edges"> Add new edge(s) to console:: </label>
+                     <label for="edges"> Add new edge(s) to console: </label>
                   <input type="text" name="edges" class="form-control"  size="50"/>
                   </div>
                   <input  type="submit" class="btn btn-success" value="Add"/> multiple space separated edges are acceptable 

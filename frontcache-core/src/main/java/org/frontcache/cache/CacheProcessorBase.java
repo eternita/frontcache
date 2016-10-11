@@ -55,7 +55,10 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		boolean isCached = false;
 		
 		long lengthBytes = -1;
-		WebResponse cachedWebResponse = new FC_ThroughCache(this, originUrlStr).execute();
+		
+		String currentRequestURL = context.getCurrentRequestURL();
+		
+		WebResponse cachedWebResponse = new FC_ThroughCache(this, currentRequestURL).execute();
 
 		
 		if (null == cachedWebResponse)
@@ -73,7 +76,8 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					for (String removeKey : NON_PERSISTENT_HEADERS)
 						copyHeaders.remove(removeKey);
 					
-					putToCache(originUrlStr, copy4cache); // put to cache copy
+					copy4cache.setUrl(currentRequestURL);
+					putToCache(currentRequestURL, copy4cache); // put to cache copy
 				}
 
 			} catch (FrontCacheException ex) {
@@ -90,7 +94,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		}
 		
 		
-		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
+		RequestLogger.logRequest(currentRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
 		
 		return cachedWebResponse;
 	}	

@@ -432,6 +432,31 @@ public class FrontCacheEngine {
 //		processRequestInternal();
 		return;
 	}
+	
+	/**
+	 * do it outside init() because it's for cacheable requests only
+	 * 
+	 * @param context
+	 * @return
+	 */
+	private void getCurrentRequestURL2Context(RequestContext context)
+	{
+		HttpServletRequest httpRequest = context.getRequest();
+		String portStr = "";
+		int port = httpRequest.getServerPort();
+		if (80 == port && "http".equals(context.getFrontCacheProtocol()))
+			portStr = "";
+		else if (443 == port && "https".equals(context.getFrontCacheProtocol()))
+			portStr = "";
+		else
+			portStr = ":" + port;
+
+		String currentRequestURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + portStr + context.getRequestURI() + context.getRequestQueryString();
+		context.setCurrentRequestURL(currentRequestURL);
+		logger.debug("currentRequestURL: " + currentRequestURL);
+		
+		return;
+	}
     /**
      * 
      * @throws Exception
@@ -447,6 +472,7 @@ public class FrontCacheEngine {
 		if (context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method without jsessionid
 		{
 			Map<String, List<String>> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
+			getCurrentRequestURL2Context(context);
 
 			WebResponse webResponse = null;
 			try

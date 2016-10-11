@@ -494,5 +494,16 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public boolean getRequestFromFrontcache() {
         return getBoolean("RequestFromFrontcache", false);
     }
+
+
+	public String getCurrentRequestURL() {
+		return (String) get("currentRequestURL");
+	}
+
+
+	public void setCurrentRequestURL(String currentRequestURL) {
+        set("currentRequestURL", currentRequestURL);
+	}
+
     
 }

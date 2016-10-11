@@ -1,13 +1,13 @@
 package org.frontcache.cache.impl.lucene;
 
+import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Properties;
 
+import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.WebResponse;
@@ -23,24 +23,38 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 
 	private static final Logger logger = LoggerFactory.getLogger(LuceneCacheProcessor.class);
 
-	private IndexManager indexManager;
+	private LuceneIndexManager indexManager;
 	
-	private static String INDEX_PATH_SUFFIX = "index/";
+	private static String CACHE_BASE_DIR_DEFAULT = "/tmp/cache/";
 	
-	private static final String PREFIX = "front-cache.file-processor.impl.";
+	private static final String CACHE_BASE_DIR_KEY = "front-cache.cache-processor.impl.cache-dir"; // to override path in configs
 	
-	private static String CACHE_BASE_DIR = "/tmp/cache/";
+	private static String CACHE_RELATIVE_DIR = "cache/lucene-index/";
 	
-	private static String INDEX_PATH = "/tmp/index/";
+	private static String INDEX_BASE_DIR = CACHE_BASE_DIR_DEFAULT + CACHE_RELATIVE_DIR;
 
 
 	@Override
 	public void init(Properties properties) {
 		 
 		Objects.requireNonNull(properties, "Properties should not be null");
-		CACHE_BASE_DIR = Optional.ofNullable(properties.getProperty(PREFIX + "cache-dir")).orElse(CACHE_BASE_DIR);
-		INDEX_PATH = CACHE_BASE_DIR + INDEX_PATH_SUFFIX;
-		indexManager = new IndexManager(INDEX_PATH);
+		
+		if (null != properties.getProperty(CACHE_BASE_DIR_KEY))
+		{
+			CACHE_BASE_DIR_DEFAULT = properties.getProperty(CACHE_BASE_DIR_KEY);
+			INDEX_BASE_DIR = CACHE_BASE_DIR_DEFAULT + CACHE_RELATIVE_DIR;
+		} else {
+			// get from FRONTCACHE_HOME
+			String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+			File fsBaseDir = new File(new File(frontcacheHome), CACHE_RELATIVE_DIR);
+			
+			INDEX_BASE_DIR = fsBaseDir.getAbsolutePath();
+			if (!INDEX_BASE_DIR.endsWith("/"))
+				INDEX_BASE_DIR += "/";
+			
+		}
+		
+		indexManager = new LuceneIndexManager(INDEX_BASE_DIR);
 	}
 	
 	@Override
@@ -48,7 +62,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 		indexManager.close();
 	}
 	
-	public IndexManager getIndexManager(){
+	public LuceneIndexManager getIndexManager(){
 		return indexManager;
 	}
 
@@ -77,8 +91,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	@Override
 	public void removeFromCache(String filter) {
 		logger.debug("Removing from cache {}", filter);
-		indexManager.deleteByUrl(filter);
-		indexManager.deleteByTag(filter);
+		indexManager.delete(filter);
 	}
 
 	@Override
@@ -97,9 +110,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	
 	@Override
 	public List<String> getCachedKeys() {
-		List<String> keys = new ArrayList<String>();
-		//TODO: not implemented
-		return keys;
+		return indexManager.getKeys();
 	}
 	
 }
