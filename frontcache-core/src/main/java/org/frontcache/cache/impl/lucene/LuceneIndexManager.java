@@ -150,6 +150,12 @@ public class LuceneIndexManager {
 		Document doc = new Document();
 
 		String url = response.getUrl();
+		
+		if (null == url)
+		{
+			logger.error("URL can't be null during index time for " + response);
+			return;
+		}
 
 		doc.add(new StringField(URL_FIELD, url, Field.Store.YES));
 		if (null != response.getContent())
@@ -279,16 +285,18 @@ public class LuceneIndexManager {
 		IndexReader reader = null;
 		try {
 			reader = DirectoryReader.open(indexWriter);
-			IndexSearcher searcher = new IndexSearcher(reader);
-			Query query = new TermQuery(new Term(URL_FIELD, "*"));
-			TopDocs results = searcher.search(query, Integer.MAX_VALUE);
+			
+			for (int i=0; i<reader.maxDoc(); i++) {
+			    Document doc = reader.document(i);
+			    if (null != doc)
+			    {
+				    if (null != doc.get(URL_FIELD))
+				    	keys.add(doc.get(URL_FIELD));
+				    else
+				    	logger.error("URL is null for doc (probably corrupted after/during index time) " + doc);
+			    }
+			    
 
-			if (results.scoreDocs != null) {
-				for (int i=0; i<results.scoreDocs.length; i++)
-				{
-					Document doc = searcher.doc(results.scoreDocs[i].doc);
-					keys.add(doc.get(URL_FIELD));
-				}
 			}
 		} catch (Exception e) {
 			logger.error("Error during loading urls/keys from index", e);
