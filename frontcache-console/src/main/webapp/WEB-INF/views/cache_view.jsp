@@ -1,4 +1,5 @@
 <%@taglib uri="http://www.springframework.org/tags/form" prefix="form"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 <%@ include file="/WEB-INF/views/inc/header.jsp"%>
 
 <%
@@ -8,22 +9,21 @@
 <p/> 
 <p/> 
 
-Enter URL (origin URL with port number) to view cached content
-
 <form:form method="POST" class="form-inline" commandName="cacheView">
+  <div class="form-group">
+    <label for="URL">URL</label>
+    <form:input class="form-control" placeholder="http://your.site.com" path="key" style="width: 500px;" />
+  </div>   
   <div class="form-group">
     <label for="edge">Edge: </label>
             <form:select class="form-control" path="edge">
                <form:options items="${edgeList}" />
             </form:select>      
   </div>
-  <div class="form-group">
-    <label for="URL">URL</label>
-    <form:input class="form-control" placeholder="http://your.site.com" path="key" style="width: 500px;" />
-  </div>   
-  <button type="submit" class="btn btn-success">Submit</button>
+  <button type="submit" class="btn btn-success">View cache</button>
   </form:form>
-  <table>
+  
+  <table style="width: 100%;">
   <tbody>
     <c:choose>
 	    <c:when test="${null != webResponse}">
