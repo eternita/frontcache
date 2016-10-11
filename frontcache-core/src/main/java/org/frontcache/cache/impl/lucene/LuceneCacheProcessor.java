@@ -2,7 +2,6 @@ package org.frontcache.cache.impl.lucene;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -111,9 +110,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	
 	@Override
 	public List<String> getCachedKeys() {
-		List<String> keys = new ArrayList<String>();
-		//TODO: not implemented
-		return keys;
+		return indexManager.getKeys();
 	}
 	
 }
