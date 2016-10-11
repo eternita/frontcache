@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -199,7 +201,7 @@ public class LuceneIndexManager {
 	/**
 	 * Returns document based on url
 	 */
-	public Document getDocByURL(String url) throws IOException, ParseException {
+	private Document getDocByURL(String url) throws IOException, ParseException {
 
 		Document doc = null;
 		IndexReader reader = null;
@@ -258,6 +260,42 @@ public class LuceneIndexManager {
 		}
 	}
 
+	/**
+	 * 
+	 * @return
+	 */
+	public List<String> getKeys() 
+	{
+		List<String> keys = new ArrayList<String>();
+
+		IndexReader reader = null;
+		try {
+			reader = DirectoryReader.open(indexWriter);
+			IndexSearcher searcher = new IndexSearcher(reader);
+			Query query = new TermQuery(new Term(URL_FIELD, "*"));
+			TopDocs results = searcher.search(query, Integer.MAX_VALUE);
+
+			if (results.scoreDocs != null) {
+				for (int i=0; i<results.scoreDocs.length; i++)
+				{
+					Document doc = searcher.doc(results.scoreDocs[i].doc);
+					keys.add(doc.get(URL_FIELD));
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Error during loading urls/keys from index", e);
+		} finally {
+			if (reader != null) {
+				try {
+					reader.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		return keys;
+	}
 
 	/**
 	 * Gets response from index
