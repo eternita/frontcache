@@ -1,22 +1,21 @@
 package org.frontcache.cache.impl.lucene;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
+import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
-import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
@@ -25,9 +24,11 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -45,9 +46,9 @@ import com.google.gson.GsonBuilder;
  * Provides access to lucene index.
  *
  */
-public class IndexManager {
+public class LuceneIndexManager {
 
-	private static final Logger logger = LoggerFactory.getLogger(IndexManager.class);
+	private static final Logger logger = LoggerFactory.getLogger(LuceneIndexManager.class);
 
 	private static String INDEX_PATH;
 	
@@ -55,20 +56,19 @@ public class IndexManager {
 	public static final String BIN_FIELD = "bin";
 
 	// searchable fields
-	public static final String TAGS_FIELD = "tags"; 
-	public static final String HASH_FIELD = "hash"; 
+	public static final String TAGS_FIELD = "tags"; // for invalidation
+	public static final String URL_FIELD = "url"; 
+	public static final String EXPIRE_DATE_FIELD = "expire_date"; 
 	
 	private IndexWriter indexWriter = null;
 	
-	private final StandardAnalyzer analyzer = new StandardAnalyzer();
-
-	public final static FieldType TYPE;
+	public final static FieldType JSON_TYPE;
 	static {
-	    TYPE = new FieldType();
-	    TYPE.setStored(true);
-	    TYPE.setIndexOptions(IndexOptions.NONE);
-	    TYPE.setTokenized(false);
-	    TYPE.freeze();
+	    JSON_TYPE = new FieldType();
+	    JSON_TYPE.setStored(true);
+	    JSON_TYPE.setIndexOptions(IndexOptions.NONE);
+	    JSON_TYPE.setTokenized(false);
+	    JSON_TYPE.freeze();
 	}
 	
 	/**
@@ -95,7 +95,7 @@ public class IndexManager {
 	 * Constructor
 	 * @param indexPath
 	 */
-	public IndexManager(String indexPath) {
+	public LuceneIndexManager(String indexPath) {
 		INDEX_PATH = indexPath;
 		Path path = Paths.get(INDEX_PATH);
 		if (!Files.exists(path)) {
@@ -113,10 +113,6 @@ public class IndexManager {
 				logger.error("Error during creating indexWriter", e);
 			}
 		}
-	}
-
-	static String getHash(String url) {
-		return DigestUtils.md5Hex(url);
 	}
 
 	/**
@@ -153,16 +149,27 @@ public class IndexManager {
 
 		Document doc = new Document();
 
-		String hash = getHash(response.getUrl());
+		String url = response.getUrl();
+		
+		if (null == url)
+		{
+			logger.error("URL can't be null during index time for " + response);
+			return;
+		}
 
-		doc.add(new StringField(HASH_FIELD, hash, Field.Store.YES));
+		doc.add(new StringField(URL_FIELD, url, Field.Store.YES));
 		if (null != response.getContent())
 			doc.add(new StoredField(BIN_FIELD, response.getContent()));
-		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), TYPE));
-		doc.add(new TextField(TAGS_FIELD, new StringReader(Arrays.toString(response.getTags().toArray()))));
-
+		
+		doc.add(new NumericDocValuesField(EXPIRE_DATE_FIELD, response.getExpireTimeMillis()));
+		
+		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), JSON_TYPE));
+		
+		for (String tag : response.getTags())
+			doc.add(new StringField(TAGS_FIELD, tag, Field.Store.NO)); // tag is StringField to exact match
+			
 		try {
-			iWriter.updateDocument(new Term(HASH_FIELD, hash), doc);
+			iWriter.updateDocument(new Term(URL_FIELD, url), doc);
 		} catch (IOException e) {
 			logger.error("Error while in Lucene index operation: {}", e.getMessage(), e);
 
@@ -202,30 +209,25 @@ public class IndexManager {
 	}
 
 	/**
-	 * Returns document based on url's hash
-	 * @param hash md5 hash
-	 * @return Lucene document
-	 * @throws IOException
-	 * @throws ParseException
+	 * Returns document based on url
 	 */
-	public Document getDocByHash(String hash) throws IOException, ParseException {
+	private Document getDocByURL(String url) throws IOException, ParseException {
 
 		Document doc = null;
-
-		QueryParser parser = new QueryParser(HASH_FIELD, analyzer);
 		IndexReader reader = null;
 		try {
 			reader = DirectoryReader.open(indexWriter);
 
 			IndexSearcher searcher = new IndexSearcher(reader);
 
-			Query query = parser.parse(hash);
-
+			Term term = new Term(URL_FIELD, url);
+			Query query = new TermQuery(term);
+			
 			TopDocs results = searcher.search(query, 2);
 
 			if (results.scoreDocs != null) {
 				if (results.scoreDocs.length == 2) {
-					deleteByHash(hash);
+					delete(url);
 					return null;
 				} else if (results.scoreDocs.length == 1) {
 					doc = searcher.doc(results.scoreDocs[0].doc);
@@ -241,43 +243,23 @@ public class IndexManager {
 	}
 
 	/**
-	 * Removes document by url
-	 * @param url
+	 * Removes documents by url or tags
+	 * @param urlOrTag
 	 */
-	public void deleteByUrl(String url) {
-		deleteBy(HASH_FIELD, getHash(url));
-	}
-
-	/**
-	 * Removes documents with given hash
-	 * @param hash
-	 */
-	private void deleteByHash(String hash) {
-		deleteBy(HASH_FIELD, hash);
-	}
-
-	/**
-	 * Removes documents by tag
-	 * @param tag
-	 */
-	public void deleteByTag(String tag) {
-		deleteBy(TAGS_FIELD, tag);
-	}
-
-	/**
-	 * Removes documents by field
-	 * @param field
-	 * @param tag
-	 */
-	private void deleteBy(String field, String tag) {
-
-		QueryParser parser = new QueryParser(field, analyzer);
-
+	public void delete(String urlOrTag) {
+		
 		try {
-			Query query = parser.parse(tag);
-			long count = indexWriter.deleteDocuments(query);
-			logger.debug("Removed  {} documents for {}.", count, tag);
-		} catch (IOException | ParseException e) {
+			Query query1 = new TermQuery(new Term(URL_FIELD, urlOrTag));
+			Query query2 = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
+			
+			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
+			
+			booleanQuery.add(query1, Occur.SHOULD);
+			booleanQuery.add(query2, Occur.SHOULD);
+			
+			long count = indexWriter.deleteDocuments(booleanQuery.build());
+			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
+		} catch (IOException e) {
 			logger.error(e.getMessage(), e);
 		} finally {
 			try {
@@ -288,16 +270,58 @@ public class IndexManager {
 		}
 	}
 
+	public void deleteExpired() {
+		// TODO: implement me : query EXPIRE_DATE_FIELD and delete
+	}
+	
+	/**
+	 * 
+	 * @return
+	 */
+	public List<String> getKeys() 
+	{
+		List<String> keys = new ArrayList<String>();
+
+		IndexReader reader = null;
+		try {
+			reader = DirectoryReader.open(indexWriter);
+			
+			for (int i=0; i<reader.maxDoc(); i++) {
+			    Document doc = reader.document(i);
+			    if (null != doc)
+			    {
+				    if (null != doc.get(URL_FIELD))
+				    	keys.add(doc.get(URL_FIELD));
+				    else
+				    	logger.error("URL is null for doc (probably corrupted after/during index time) " + doc);
+			    }
+			    
+
+			}
+		} catch (Exception e) {
+			logger.error("Error during loading urls/keys from index", e);
+		} finally {
+			if (reader != null) {
+				try {
+					reader.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		return keys;
+	}
+
 	/**
 	 * Gets response from index
 	 * @param url request url
 	 * @return WebResponse from index
 	 */
 	public WebResponse getResponse(String url) {
-		String hash = getHash(url);
 		WebResponse response = null;
 		try {
-			Document doc = getDocByHash(hash);
+			Document doc = getDocByURL(url);
 			if (doc != null) {
 				response = gson.fromJson(doc.get(JSON_FIELD), WebResponse.class);
 				BytesRef bin1ref = doc.getBinaryValue(BIN_FIELD);

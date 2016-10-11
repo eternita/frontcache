@@ -51,7 +51,10 @@ public abstract class ClientTests extends TestsBase {
 	// in case of standalone mode getCacheKeyBaseURL() has port 8080
 	// and getFrontCacheBaseURL() has port 9080
 	// in filter mode getCacheKeyBaseURL() and getFrontCacheBaseURL() are the same
-	public abstract String getCacheKeyBaseURL();  
+	public final String getCacheKeyBaseURL()
+	{
+		return getFrontCacheBaseURL();
+	}
 	
 	public abstract String getFrontCacheBaseURL(); 
 
@@ -72,7 +75,7 @@ public abstract class ClientTests extends TestsBase {
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_A);
 		assertEquals("a", page.getPage().asText());		
 
-		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache(getCacheKeyBaseURL() + TEST_URI_A);
+		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache(getFrontCacheBaseURL() + TEST_URI_A);
 
 		assertEquals("a", new String(resp.getContent()));	
 		return;

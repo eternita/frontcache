@@ -1,6 +1,5 @@
 package org.frontcache.cache.impl.lucene;
 
-import static org.frontcache.cache.impl.lucene.IndexManager.getHash;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -102,19 +101,6 @@ public class WebResponseTests {
 	}
 
 	@Test
-	public void testHash() throws Exception {
-
-		String url = "https://google.com/some/url";
-
-		String firsthash = getHash(url);
-
-		for (int i = 0; i < 10; i++) {
-			String hash = getHash(url);
-			assertEquals(firsthash, hash);
-		}
-	}
-
-	@Test
 	public void testNotValidResponse() throws Exception {
 
 		WebResponse response = new WebResponse("https://google.com/some/url", null);
@@ -136,7 +122,7 @@ public class WebResponseTests {
 	public void setUp() {
 		pr = new LuceneCacheProcessor();
 		Properties prop = new Properties();
-		prop.put("front-cache.file-processor.impl.cache-dir", "/private/tmp/cache/");
+		prop.put("front-cache.cache-processor.impl.cache-dir", "/private/tmp/cache/");
 		pr.init(prop);
 	}
 
