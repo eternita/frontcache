@@ -15,7 +15,14 @@ public class FallbackResolverFactory {
 	
 	private static FallbackResolver instance;
 
-	public static FallbackResolver getInstance(HttpClient client){
+	public static FallbackResolver getInstance(){
+		if (null == instance) {
+			throw new RuntimeException("FallbackResolver is not initialized.");
+		}
+		return instance;
+	}
+	
+	public static FallbackResolver init(HttpClient client){
 		if (null == instance) {
 			instance = getFallbackResolver();
 			instance.init(client);

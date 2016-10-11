@@ -3,6 +3,7 @@ package org.frontcache.tests.base;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
+import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -77,6 +78,15 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	@Test
 	public void customeFallbackTest2LoadFromURL() throws Exception {
 		// cleanup is in @BeforeClass
+		// wait while server is started and fallbacks are loaded from URLs (they are loaded in separate thread during startup)
+		// so, it's possible state (server is started but fallback configs are not loaded yet)
+		
+		// this wait time should be more than 
+		// before
+		// FallbackResolverFactory.init(httpClient);
+		// in FrontCacheEngine
+		
+		Thread.sleep(5000); 
 
 		// page timeout more than Hystrix timeout
 		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/fallback2.jsp");

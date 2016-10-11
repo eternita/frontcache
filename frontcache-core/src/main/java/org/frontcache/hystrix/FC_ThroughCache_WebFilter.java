@@ -7,7 +7,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.http.client.HttpClient;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -27,10 +26,9 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 
 	String url = "nothing";
 	private final RequestContext context;
-	private HttpClient client;
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache_WebFilter.class);
 	
-    public FC_ThroughCache_WebFilter(RequestContext context, HttpClient client) {
+    public FC_ThroughCache_WebFilter(RequestContext context) {
         
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
@@ -38,7 +36,6 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
         		);
         
         this.context = context;
-        this.client = client;
     }
 
     @Override
@@ -66,7 +63,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
     @Override
     protected WebResponse getFallback() {
 		context.setHystrixError();
-		WebResponse webResponse = FallbackResolverFactory.getInstance(client).getFallback(url);
+		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(url);
 		
 		return webResponse;
     }

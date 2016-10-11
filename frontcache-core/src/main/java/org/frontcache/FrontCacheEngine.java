@@ -238,6 +238,21 @@ public class FrontCacheEngine {
 		
 		loadCacheIgnoreURIPatterns();
 		
+
+		Thread t = new Thread(new Runnable() {
+
+			public void run() {
+				try {
+					Thread.sleep(3000); // wait server is started to load fallbacks from URLs
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+				FallbackResolverFactory.init(httpClient);
+			}
+		});
+		t.start();
+		
 		return;
 	}
 

@@ -1,10 +1,13 @@
 package org.frontcache.hystrix;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
+import org.frontcache.core.WebResponse;
+import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,24 +47,22 @@ public class FC_Total extends HystrixCommand<Object> {
     @Override
     protected Object getFallback() {
 		HttpServletRequest httpRequest = context.getRequest();
+		HttpServletResponse httpResponse = context.getResponse();
 		String url = FCUtils.getRequestURL(httpRequest);
-    	logger.error("FC-Total - ERROR - " + url);
-    	context.setHystrixError();
-    	// !!! Do nothing inside here
     	
-//		try {
-//			HttpServletRequest httpRequest = context.getRequest();
-//			String url = FCUtils.getRequestURL(httpRequest);
-//			HttpServletResponse httpResponse = context.getResponse();
-//			
-//			context.setHystrixError();
-//			logger.error("FC-Total - ORIGIN ERROR - " + url);
-//			
-//			httpResponse.getWriter().write("FC-Input-Requests - ORIGIN ERROR - " + url);
-//			httpResponse.setContentType("text/plain");
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//		}
+		try {
+			context.setHystrixError();
+			logger.error("FC-Total - ERROR FOR - " + url);
+			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(url);
+			if (null != webResponse)
+			{
+				httpResponse.getOutputStream().write(webResponse.getContent());
+				httpResponse.setContentType(webResponse.getContentType());
+			}
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
         return null;
     }
 }
