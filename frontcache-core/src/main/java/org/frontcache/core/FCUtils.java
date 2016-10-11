@@ -94,7 +94,7 @@ public class FCUtils {
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 		
 		if (context.isFilterMode())
-			 return new FC_ThroughCache_WebFilter(context, client).execute();
+			 return new FC_ThroughCache_WebFilter(context).execute();
 		else
 			 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }

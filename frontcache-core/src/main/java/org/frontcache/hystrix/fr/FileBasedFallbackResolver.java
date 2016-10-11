@@ -262,7 +262,6 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 				}
 				
 				// save response to file
-				
 				InputStream is = response.getEntity().getContent();
 				try {
 					int bytesRead = 0;

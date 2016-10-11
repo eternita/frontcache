@@ -285,7 +285,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse reloadFallbacks(HttpServletRequest req)
 	{
 		FallbackResolverFactory.destroy();
-		FallbackResolverFactory.getInstance(FrontCacheEngine.getFrontCache().getHttpClient());
+		FallbackResolverFactory.init(FrontCacheEngine.getFrontCache().getHttpClient());
 		
 		ActionResponse aResponse = new ReloadFallbacksActionResponse();
 		return aResponse;
@@ -298,7 +298,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 */
 	private ActionResponse getFallbackConfigs(HttpServletRequest req)
 	{
-		List<FallbackConfigEntry> fallbackConfigs = FallbackResolverFactory.getInstance(FrontCacheEngine.getFrontCache().getHttpClient()).getFallbackConfigs();
+		FallbackResolverFactory.init(FrontCacheEngine.getFrontCache().getHttpClient());
+		List<FallbackConfigEntry> fallbackConfigs = FallbackResolverFactory.getInstance().getFallbackConfigs();
 		
 		GetFallbackConfigActionResponse aResponse = new GetFallbackConfigActionResponse();
 		aResponse.setFallbackConfigs(fallbackConfigs);
