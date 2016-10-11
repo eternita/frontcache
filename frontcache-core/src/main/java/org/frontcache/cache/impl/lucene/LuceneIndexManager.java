@@ -13,6 +13,7 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
+import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.DirectoryReader;
@@ -57,16 +58,17 @@ public class LuceneIndexManager {
 	// searchable fields
 	public static final String TAGS_FIELD = "tags"; // for invalidation
 	public static final String URL_FIELD = "url"; 
+	public static final String EXPIRE_DATE_FIELD = "expire_date"; 
 	
 	private IndexWriter indexWriter = null;
 	
-	public final static FieldType TYPE;
+	public final static FieldType JSON_TYPE;
 	static {
-	    TYPE = new FieldType();
-	    TYPE.setStored(true);
-	    TYPE.setIndexOptions(IndexOptions.NONE);
-	    TYPE.setTokenized(false);
-	    TYPE.freeze();
+	    JSON_TYPE = new FieldType();
+	    JSON_TYPE.setStored(true);
+	    JSON_TYPE.setIndexOptions(IndexOptions.NONE);
+	    JSON_TYPE.setTokenized(false);
+	    JSON_TYPE.freeze();
 	}
 	
 	/**
@@ -153,7 +155,9 @@ public class LuceneIndexManager {
 		if (null != response.getContent())
 			doc.add(new StoredField(BIN_FIELD, response.getContent()));
 		
-		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), TYPE));
+		doc.add(new NumericDocValuesField(EXPIRE_DATE_FIELD, response.getExpireTimeMillis()));
+		
+		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), JSON_TYPE));
 		
 		for (String tag : response.getTags())
 			doc.add(new StringField(TAGS_FIELD, tag, Field.Store.NO)); // tag is StringField to exact match
@@ -260,6 +264,10 @@ public class LuceneIndexManager {
 		}
 	}
 
+	public void deleteExpired() {
+		// TODO: implement me : query EXPIRE_DATE_FIELD and delete
+	}
+	
 	/**
 	 * 
 	 * @return
