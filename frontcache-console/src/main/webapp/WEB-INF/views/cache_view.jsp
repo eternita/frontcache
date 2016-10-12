@@ -38,6 +38,20 @@
                    </td>
             </tr>
             
+            <tr>
+                   <td> 
+                        <p/><p/>         
+                        <b>Invalidation tags:</b>
+                   </td>
+                   <td>
+                        <p/><p/>
+                        <c:forEach var="tag" items="${invalidationTags}">
+                            &nbsp;&nbsp;${tag}
+                        </c:forEach>         
+                   </td>
+            </tr>
+
+
 		    <tr>
 		        <td colspan="2">
 		            <p/><p/>         
