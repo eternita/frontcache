@@ -436,8 +436,8 @@ public class FCUtils {
 				{
 					query.append("&");
 					query.append(key);
-					query.append("=");
-					query.append(URLEncoder.encode(value, "UTF-8"));
+					if (null != value && value.length() > 0)
+						query.append("=").append(URLEncoder.encode(value, "UTF-8"));
 				}
 				
 			}		

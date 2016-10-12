@@ -270,9 +270,11 @@ public class FrontCacheEngine {
 		
 		str.append("://").append(origin.getHost()).append(":");
 		if (isSecure) {
-			str.append(origin.getHttpsPort());
+			if (!"443".equals(origin.getHttpsPort()))
+				str.append(origin.getHttpsPort());
 		} else {
-			str.append(origin.getHttpPort());
+			if (!"80".equals(origin.getHttpPort()))
+				str.append(origin.getHttpPort());
 		}
 
 		try {

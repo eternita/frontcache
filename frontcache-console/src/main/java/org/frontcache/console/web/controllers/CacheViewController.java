@@ -52,6 +52,8 @@ public class CacheViewController {
 			webRespHeaders.putAll(webResponse.getHeaders());
 			model.addAttribute("webResponseHeaders", webRespHeaders);
 			
+			model.addAttribute("invalidationTags", webResponse.getTags());
+			
 			long expirationDate = webResponse.getExpireTimeMillis();
 			String expirationDateStr = "UNDEFINED";
 			if (-1 == expirationDate)

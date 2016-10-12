@@ -24,6 +24,6 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_REQUEST_ID = "X-frontcache.request-id";
     public static final String X_FRONTCACHE_CLIENT_IP = "X-frontcache.client-ip";
     
-    public static final String COMPONENT_TAGS_SEPARATOR = "|"; // to split invalidation tags e.g. apple|banana|orange 
+    public static final String COMPONENT_TAGS_SEPARATOR = "\\|"; // to split invalidation tags e.g. apple|banana|orange 
 
 }
