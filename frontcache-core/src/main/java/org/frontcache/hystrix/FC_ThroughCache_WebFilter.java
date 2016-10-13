@@ -24,7 +24,7 @@ import com.netflix.hystrix.HystrixCommandKey;
 public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 
 
-	String url = "nothing";
+	String url = "open-circuit-default-key"; // when circuit is open - the value is not overriden during run() call
 	private final RequestContext context;
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache_WebFilter.class);
 	

@@ -26,7 +26,7 @@ import com.netflix.hystrix.HystrixCommandKey;
 
 public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
-	private final String urlStr;
+	private String urlStr = "open-circuit-default-key"; // when circuit is open - the value is not overriden during run() call
 	private final Map<String, List<String>> requestHeaders;
 	private final HttpClient client;
 	private final RequestContext context;
