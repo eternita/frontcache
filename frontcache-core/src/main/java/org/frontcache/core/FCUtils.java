@@ -486,18 +486,15 @@ public class FCUtils {
 		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
 		byte[] outContentBody = content;
 		
-		if (null != headers.get(FCHeaders.X_FRONTCACHE_COMPONENT))
+		Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		if (null != collStr && !collStr.isEmpty())
 		{
-			Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
-			if (null != collStr && !collStr.isEmpty())
+			String cacheMaxAgeSecStr = collStr.iterator().next();
+			try
 			{
-				String cacheMaxAgeSecStr = collStr.iterator().next();
-				try
-				{
-					cacheMaxAgeSec = maxAgeStr2Int(cacheMaxAgeSecStr);				
-					
-				} catch (Exception ex) {}
-			}
+				cacheMaxAgeSec = maxAgeStr2Int(cacheMaxAgeSecStr);				
+				
+			} catch (Exception ex) {}
 		}
 		
 		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSec);
