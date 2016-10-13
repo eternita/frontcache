@@ -25,8 +25,8 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			"Date",
 			FCHeaders.X_FRONTCACHE_ID,
 			FCHeaders.X_FRONTCACHE_COMPONENT,
-			FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE,
-			FCHeaders.X_FRONTCACHE_COMPONENT_TAGS,
+//			FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE,
+//			FCHeaders.X_FRONTCACHE_COMPONENT_TAGS, //  tags should not be filtered by FC (e.g. client -> fc2 (standalone) -> fc1 (filter) -> origin)
 			FCHeaders.X_FRONTCACHE_REQUEST_ID,
 			FCHeaders.X_FRONTCACHE_CLIENT_IP,
 			FCHeaders.X_FRONTCACHE_DEBUG,
