@@ -16,7 +16,7 @@ import com.netflix.hystrix.contrib.metrics.eventstream.HystrixMetricsStreamServl
 @SuppressWarnings("serial")
 public class HystrixStreamSecurityWrapperServlet extends HystrixMetricsStreamServlet {
 
-	private String managementScheme = null; // management scheme for security
+	private int managementPort = -1; // management port for security
 
 	private Logger logger = LoggerFactory.getLogger(getClass());
 	
@@ -28,9 +28,18 @@ public class HystrixStreamSecurityWrapperServlet extends HystrixMetricsStreamSer
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
 		
-		managementScheme = FCConfig.getProperty("front-cache.management-scheme");
-		if (null == managementScheme)
-			logger.warn("Connector Sheme is not configured for Hystrix Stream. Hystrix Stream is accessible for all connectors");
+		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
+		if (null == managementPortStr || managementPortStr.trim().length() == 0)
+			logger.warn("Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
+		else {
+			try
+			{
+				managementPort = Integer.parseInt(managementPortStr);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
+			}
+		}
 		
 		return;
 	}
@@ -39,9 +48,9 @@ public class HystrixStreamSecurityWrapperServlet extends HystrixMetricsStreamSer
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 
-		if (null != managementScheme && !request.getScheme().equals(managementScheme))
+		if (-1 < managementPort && managementPort != request.getServerPort())
 		{
-			String msg = "Accessing Management URL with wrong scheme" + request.getScheme();
+			String msg = "Accessing Management URL with wrong port " + request.getServerPort();
 			logger.info(msg);
 			response.getOutputStream().write(msg.getBytes());
 			return;
