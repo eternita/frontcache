@@ -44,7 +44,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	
 	FrontCacheEngine fcEngine = null;
 
-	private String managementScheme = null; // management scheme for security
+	private int managementPort = -1; // management port for security
 
 	
 	public FrontCacheIOServlet() {
@@ -56,9 +56,18 @@ public class FrontCacheIOServlet extends HttpServlet {
 		
 		fcEngine = FrontCacheEngine.getFrontCache();
 		
-		managementScheme = FCConfig.getProperty("front-cache.management-scheme");
-		if (null == managementScheme)
-			logger.warn("Connector Sheme is not configured for Frontcache Management URI. Management URI is accessible for all connectors");
+		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
+		if (null == managementPortStr || managementPortStr.trim().length() == 0)
+			logger.warn("Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
+		else {
+			try
+			{
+				managementPort = Integer.parseInt(managementPortStr);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
+			}
+		}
 		
 		return;
 	}
@@ -78,16 +87,16 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 
-	private void process(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException 
+	private void process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
 	{
-		if (null != managementScheme && !req.getScheme().equals(managementScheme))
+		
+		if (-1 < managementPort && managementPort != request.getServerPort())
 		{
-			logger.info("Accessing Management URL with wrong scheme" + req.getScheme());
-			resp.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementScheme)));
+			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
 			return;
 		}
 		
-		String action = req.getParameter("action");
+		String action = request.getParameter("action");
 		if (null == action)
 			action = "";
 		
@@ -95,42 +104,42 @@ public class FrontCacheIOServlet extends HttpServlet {
 		switch (action)
 		{
 		case FrontcacheAction.INVALIDATE:
-			aResponse = invalidate(req);
+			aResponse = invalidate(request);
 			break;
 			
 		case FrontcacheAction.GET_CACHE_STATE:
-			aResponse = getCacheStatus(req);
+			aResponse = getCacheStatus(request);
 			break;
 			
 		case FrontcacheAction.GET_CACHED_KEYS:
-			getCachedKeys(req, resp);
+			getCachedKeys(request, response);
 			return;
 			
 		case FrontcacheAction.GET_FROM_CACHE:
-			aResponse = getFromCache(req);
+			aResponse = getFromCache(request);
 			break;
 			
 		case FrontcacheAction.DUMP_KEYS:
-			aResponse = startDumpKeys(req);
+			aResponse = startDumpKeys(request);
 			break;
 			
 		case "reload":
-			aResponse = reload(req);
+			aResponse = reload(request);
 			break;
 
 		case FrontcacheAction.RELOAD_FALLBACKS:
-			aResponse = reloadFallbacks(req);
+			aResponse = reloadFallbacks(request);
 			break;
 			
 		case FrontcacheAction.GET_FALLBACK_CONFIGS:
-			aResponse = getFallbackConfigs(req);
+			aResponse = getFallbackConfigs(request);
 			break;
 			
 			default:
 				aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
 			
 		}
-		resp.getOutputStream().write(jsonMapper.writeValueAsBytes(aResponse));
+		response.getOutputStream().write(jsonMapper.writeValueAsBytes(aResponse));
 	}
 
 	/**

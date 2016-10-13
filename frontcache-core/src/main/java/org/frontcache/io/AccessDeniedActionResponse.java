@@ -7,8 +7,8 @@ public class AccessDeniedActionResponse extends ActionResponse {
 		setErrorDescription("Access denied to Management URI on this port.");
 	}
 	
-	public AccessDeniedActionResponse(String scheme) {
+	public AccessDeniedActionResponse(int port) {
 		setResponseStatus(RESPONSE_STATUS_ERROR);
-		setErrorDescription("Access denied to Management URI on this port. Use port defined in connector with scheme=" + scheme);
+		setErrorDescription("Access denied to Management URI on this port. Use following port: " + port);
 	}
 }
