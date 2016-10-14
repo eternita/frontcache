@@ -84,6 +84,7 @@ front-cache.request-logs-config=fc-logback.xml
 
 
 	<root>
+        <level value="INFO" />
 		<appender-ref ref="Error" />
 		<appender-ref ref="Info" />	
 		<appender-ref ref="STDOUT" />
