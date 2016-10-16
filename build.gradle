@@ -50,8 +50,19 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	
-    version = '0.9.0'
+    version = '0.9.1'
     group = 'org.frontcache'
+	
+//	upload binaries to Maven repository.  $mavenLocalRepo (defined in gradle.properties)
+//  mavenLocalRepo = file:///Users/spa/.m2/repository
+//
+//	uploadArchives {
+//		repositories {
+//			mavenDeployer {
+//				repository(url: mavenLocalRepo)
+//			}
+//		}
+//	}
 	
 	configurations {
 		provided
@@ -108,14 +119,6 @@ subprojects {
 		reports.html.destination = file("$reports.html.destination/integration")
 		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
 	}
-	
-	uploadArchives {
-		repositories {
-			mavenDeployer {
-				repository(url: mavenLocalRepo)
-			}
-		}
-	}
 
 }
 
@@ -159,7 +162,7 @@ project(':frontcache-agent') {
 	build.dependsOn uploadArchives
 }
 
-project(':frontcache-web') {
+project(':frontcache-server') {
 	apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
 	
@@ -177,7 +180,7 @@ project(':frontcache-web') {
 	}
 
 	farm {
-		webapp ':frontcache-web'
+		webapp ':frontcache-server'
 		webapp ':frontcache-console'
 	  }
 	
