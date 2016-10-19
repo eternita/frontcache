@@ -88,6 +88,15 @@ public class FrontcacheService {
 		
 	}
 	
+	public boolean isFrontCacheEdgeAvailable(String frontcacheURL)
+	{
+		boolean available = false;
+		FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL);
+		if (null != fcClient.getCacheState()) // if get state work -> FC is active
+			available = true;
+		
+		return available;
+	}
 
 	/**
 	 * 
@@ -110,11 +119,6 @@ public class FrontcacheService {
 				if (null != cacheState)
 				{
 					String cacheAmountStr = cacheState.get(CacheProcessor.CACHED_ENTRIES);
-
-					// TODO: temp fix - remove me 
-					if (null == cacheAmountStr) cacheAmountStr = cacheState.get("cached entiries");
-					// TODO: temp fix - remove me 
-					if (null == cacheAmountStr) cacheAmountStr = cacheState.get("current size");
 					
 					if (null != cacheAmountStr)
 					{
