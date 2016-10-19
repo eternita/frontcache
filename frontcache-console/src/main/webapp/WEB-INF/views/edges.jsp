@@ -32,7 +32,7 @@
 		              <c:if test="${edge.available}">
 		              - <c:out value="${edge.cachedAmountString}"/> items cached  
 		              </c:if> 
-		              | <a href="remove-edge?edge=${edge.url}">remove</a>
+		              - <a class="btn btn-warning" href="remove-edge?edge=${edge.url}">remove</a>
 		               <br/>
 		            </c:forEach>
 		        </div> 
