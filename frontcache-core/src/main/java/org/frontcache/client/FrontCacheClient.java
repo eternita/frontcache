@@ -161,14 +161,14 @@ public class FrontCacheClient {
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_CACHE_STATE));
-		
+		String responseStr = null;
 		try {
-			String responseStr = requestFrontCache(urlParameters);
+			responseStr = requestFrontCache(urlParameters);
 			CacheStatusActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), CacheStatusActionResponse.class);
 			return actionResponse;
 			
 		} catch (Exception e) {
-			e.printStackTrace();
+			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
 		}
 		
 		return null;
