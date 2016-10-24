@@ -78,9 +78,6 @@ public class LuceneIndexManager {
 
 		@Override
 		public boolean shouldSkipField(FieldAttributes att) {
-			if (att.getName().equalsIgnoreCase(TAGS_FIELD)) {
-				return true;
-			}
 			return false;
 		}
 
