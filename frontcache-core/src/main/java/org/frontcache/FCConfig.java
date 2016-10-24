@@ -25,6 +25,8 @@ public class FCConfig {
 	private static final String FRONT_CACHE_ID_CONFIG = "frontcache.id"; // file where id is stored
 	
 	public static final String FRONTCACHE_ID_KEY = "front-cache.id"; // key under which id is stored
+	
+	public static final String DEFAULT_FRONTCACHE_ID = "default.frontcache.id"; // default frontcache id
 
 	private static final String FRONT_CACHE_CONFIG = "frontcache.properties"; 
 
@@ -141,30 +143,31 @@ public class FCConfig {
 			} catch (IOException e) { }
 		}
 		
+		try
+		{
+			// load frontcache.id from different file - different file for deployment convenience
+			is = getConfigInputStream(FRONT_CACHE_ID_CONFIG); 
+		} catch (Throwable ex) {/*ignored*/}
 		
-		// load frontcache.id from different file - different file for deployment convenience
-		is = getConfigInputStream(FRONT_CACHE_ID_CONFIG); 
 		if (null != is)
 		{
 			Properties idConfig = new Properties();
 			try 
 			{
 				idConfig.load(is);
+				Object id = idConfig.get(FRONTCACHE_ID_KEY);
+				config.put(FRONTCACHE_ID_KEY, id);
 			} catch (Exception e) {
-				return null;
+				/*ignored*/
 			} finally {
 				try {
 					is.close();
 				} catch (IOException e) { }
 			}
-			
-			Object id = idConfig.get(FRONTCACHE_ID_KEY);
-			config.put(FRONTCACHE_ID_KEY, id);
 		}
 		
 		if (null == config.getProperty(FRONTCACHE_ID_KEY))
-			config.put(FRONTCACHE_ID_KEY, "auto-gen-" + System.currentTimeMillis());
-			
+			config.put(FRONTCACHE_ID_KEY, DEFAULT_FRONTCACHE_ID);
 		
 		return config;
 	}
