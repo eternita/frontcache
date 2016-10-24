@@ -268,13 +268,13 @@ public class FrontCacheEngine {
 		
 		Origin origin = getOrigin(context.getRequest().getServerName());
 		
-		str.append("://").append(origin.getHost()).append(":");
+		str.append("://").append(origin.getHost());
 		if (isSecure) {
 			if (!"443".equals(origin.getHttpsPort()))
-				str.append(origin.getHttpsPort());
+				str.append(":").append(origin.getHttpsPort());
 		} else {
 			if (!"80".equals(origin.getHttpPort()))
-				str.append(origin.getHttpPort());
+				str.append(":").append(origin.getHttpPort());
 		}
 
 		try {

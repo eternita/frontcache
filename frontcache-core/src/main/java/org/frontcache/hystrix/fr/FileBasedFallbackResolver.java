@@ -86,7 +86,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	}
 	
 	@Override
-	public WebResponse getFallback(String urlStr)
+	public WebResponse getFallback(String fallbackSource, String urlStr)
 	{
 		
 		String currentFallbackURLpattern = null;
@@ -104,7 +104,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		if (null == currentFallbackURLpattern)
 		{
 			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | URL doesn't match any pattern | " + urlStr);
-			return getDefalut(urlStr);
+			return getDefalut(fallbackSource, urlStr);
 		}
 		
 		String fileName = uri2fileMap.get(currentFallbackURLpattern);
@@ -112,14 +112,14 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		if (null == fileName)
 		{
 			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | no file for pattern " + currentFallbackURLpattern + " | " + urlStr);
-			return getDefalut(urlStr);
+			return getDefalut(fallbackSource, urlStr);
 		}
 
 		WebResponse webResponse = getFallbackFromFile(urlStr, fileName);
 		
 		if (null == webResponse){
 			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | can't read from file " + fileName + " | " + urlStr);
-			return getDefalut(urlStr);
+			return getDefalut(fallbackSource, urlStr);
 		}
 		
 		fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " from file | " + fileName + " | " + urlStr);
@@ -208,9 +208,9 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	 * @param urlStr
 	 * @return
 	 */
-	private WebResponse getDefalut(String urlStr)
+	private WebResponse getDefalut(String fallbackSource, String urlStr)
 	{
-		byte[] outContentBody = ("Default Fallback for " + urlStr).getBytes();
+		byte[] outContentBody = (fallbackSource + ": Default Fallback for " + urlStr).getBytes();
 
 		WebResponse webResponse = new WebResponse(urlStr, outContentBody, CacheProcessor.NO_CACHE);
 		String contentType = CONTENT_TYPE_DEFAULT;

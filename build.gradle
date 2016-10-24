@@ -50,7 +50,7 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	
-    version = '0.9.1'
+    version = '0.9.2'
     group = 'org.frontcache'
 	
 //	upload binaries to Maven repository.  $mavenLocalRepo (defined in gradle.properties)

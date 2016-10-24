@@ -9,7 +9,7 @@ public interface FallbackResolver {
 	
 	public void init(HttpClient client);
 
-	public WebResponse getFallback(String urlStr);
+	public WebResponse getFallback(String fallbackSource, String urlStr);
 
 	public List<FallbackConfigEntry> getFallbackConfigs();
 }
