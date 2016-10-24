@@ -53,7 +53,7 @@ public class FC_Total extends HystrixCommand<Object> {
 		try {
 			context.setHystrixError();
 			logger.error("FC-Total - ERROR FOR - " + url);
-			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(url);
+			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
 			if (null != webResponse)
 			{
 				httpResponse.getOutputStream().write(webResponse.getContent());

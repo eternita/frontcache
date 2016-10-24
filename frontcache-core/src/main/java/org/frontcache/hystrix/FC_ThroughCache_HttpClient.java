@@ -80,7 +80,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     protected WebResponse getFallback() {
 		context.setHystrixError();
 
-		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(urlStr);
+		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), urlStr);
 		
 		return webResponse;
     }
