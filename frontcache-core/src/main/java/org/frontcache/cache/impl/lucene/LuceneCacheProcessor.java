@@ -84,7 +84,14 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	@Override
 	public WebResponse getFromCacheImpl(String url) {
 		logger.debug("Getting from cache {}", url);
-		return indexManager.getResponse(url);
+		WebResponse webResponse = indexManager.getResponse(url);
+		if (webResponse.isExpired())
+		{
+			removeFromCache(url);
+			return null;
+		}
+		
+		return webResponse;
 	}
 	
 
