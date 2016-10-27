@@ -41,9 +41,9 @@ public class LuceneIndexTests {
 			List<String> list = new ArrayList<>();
 			list.add(UUID.randomUUID().toString());
 			response.getHeaders().put("Accept", list);
-			Set<String> set = new HashSet<>();
-			set.add(tags[i]);
-			response.setTags(set);
+			Set<String> tagSet = new HashSet<>();
+			tagSet.add(tags[i]);
+			response.setTags(tagSet);
 			response.setContentType(UUID.randomUUID().toString());
 			response.setStatusCode(55);
 			pr.putToCache(url, response);
@@ -56,7 +56,7 @@ public class LuceneIndexTests {
 			assertEquals(response.getContentType(), fromFile.getContentType());
 			assertEquals(response.getContentLenth(), fromFile.getContentLenth());
 			assertEquals(fromFile.getStatusCode(), response.getStatusCode());
-			assertEquals(new HashSet<>(), fromFile.getTags()); // tags not restorable from index
+			assertEquals(tagSet, fromFile.getTags()); // tags are restorable from index
 		}
 
 		assertEquals(size, pr.getIndexManager().getIndexSize());
