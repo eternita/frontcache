@@ -39,7 +39,7 @@ public class FallbackConfigController {
     
     
     
-    @RequestMapping(value = "/fallbacks/urltest", method = RequestMethod.GET)
+    @RequestMapping(value = "/fallbacks-urltest", method = RequestMethod.GET)
     public String urlTest(ModelMap model,
     		@RequestParam("url") String url, 
     		@RequestParam("pattern") String pattern) {

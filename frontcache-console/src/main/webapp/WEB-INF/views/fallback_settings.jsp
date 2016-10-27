@@ -5,24 +5,22 @@
 <p/> 
 
 <h3 align="center">Fallback URL pattern match test tool</h3>
-<form action="/fallbacks/urltest">
+<form action="fallbacks-urltest">
   <div class="form-group">
     <label for="url">Url:</label>
-    <input type="text" class="form-control" value="${url}" id="url" placeholder="Url" style="width: 800px;">
+    <input type="text" name="url" class="form-control" value="${url}" id="url" placeholder="Url" style="width: 100%">
   </div>
   <div class="form-group">
     <label for="pattern">Pattern:</label>
-    <input type="text" class="form-control" id="pattern" placeholder="Pattern" value="${pattern}" style="width: 800px;">
+    <input type="text" name="pattern" class="form-control" id="pattern" placeholder="Pattern" value="${pattern}" style="width: 100%">
   </div>
   <input type="submit" value="Submit" class="btn btn-success"/>
 </form>
 
-   <table class="table table-striped">
+   <table class="table table-striped" style="width: 100%">
     <tbody>
     <tr>
         <td colspan="2">
-        <p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p>
-
          ${matchResult}
          <br/>${url}
          <br/>${pattern}
