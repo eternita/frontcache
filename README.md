@@ -1,3 +1,4 @@
+[![Build Status](https://secure.travis-ci.org/eternita/frontcache.png?branch=master)](https://travis-ci.org/eternita/frontcache)
 
 ## Frontcache - utility to increase Web App performance.
 
