@@ -210,7 +210,7 @@ public class LuceneIndexTests {
 	public void setUp() {
 		pr = new LuceneCacheProcessor();
 		Properties prop = new Properties();
-		prop.put("front-cache.cache-processor.impl.cache-dir", "/private/tmp/cache/");
+		prop.put("front-cache.cache-processor.impl.cache-dir", "/tmp/cache/");
 		pr.init(prop);
 	}
 
