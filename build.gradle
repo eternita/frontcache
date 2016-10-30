@@ -1,7 +1,3 @@
-//Remeber to configure 'mavenLocalRepo' in gradle.properties
-// e.g.  
-// mavenLocalRepo = file:///Users/spa/.m2/repository
-//
 
 import org.akhikhl.gretty.AppBeforeIntegrationTestTask
 
@@ -43,14 +39,12 @@ buildscript {
 	}
   }
   
-//ext {
-//}
-
 subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
+	apply plugin: 'jacoco'
 	
-    version = '0.9.2'
+    version = '0.9.3-SNAPSHOT'
     group = 'org.frontcache'
 	
 //	upload binaries to Maven repository.  $mavenLocalRepo (defined in gradle.properties)
@@ -74,15 +68,10 @@ subprojects {
 			test.compileClasspath += configurations.provided
 			test.runtimeClasspath += configurations.provided
 		}
-
-		integrationTest {
-			java.srcDir file('src/test-integration/java')
-			resources.srcDir file('src/test-integration/resources')
-			compileClasspath = sourceSets.main.output + configurations.testRuntime
-			runtimeClasspath = output + compileClasspath
-		}
 	}
-	
+
+	jacoco.toolVersion = '0.7.7.201606060606'
+		
     dependencies {
 		testCompile 'junit:junit:4.12'
     }
@@ -107,25 +96,21 @@ subprojects {
 			jvmArgs '-Xdebug',
 				'-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8001'
 		}
+        jacoco {
+            append = true
+            destinationFile = file("$buildDir/jacoco/test.exec")
+            classDumpFile = file("$buildDir/classes/test")
+        }
 	}
 	
-	task integrationTest(type: Test) {
-		description = 'Runs the integration tests.'
-		group = 'verification'
-		maxParallelForks = 1 // run all tests sequentially (due to cache cleanup befor every test)
-		forkEvery = 1 // run all tests sequentially (due to cache cleanup befor every test)
-		testClassesDir = sourceSets.integrationTest.output.classesDir
-		classpath = sourceSets.integrationTest.runtimeClasspath
-		reports.html.destination = file("$reports.html.destination/integration")
-		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
-	}
-
+	check.dependsOn jacocoTestReport
 }
 
 
 task wrapper(type: Wrapper) {
     gradleVersion = '2.12'
 }
+
 
 
 project(':frontcache-core') {
@@ -150,7 +135,7 @@ project(':frontcache-core') {
         testCompile     'com.squareup.okhttp:okhttp:2.5.0'
     }
 	
-	build.dependsOn uploadArchives	
+//	build.dependsOn uploadArchives	
 }
 
 
@@ -158,9 +143,9 @@ project(':frontcache-agent') {
 	dependencies {
         compile         'org.apache.httpcomponents:httpclient:4.5.1'
 	}
-	
-	build.dependsOn uploadArchives
 }
+
+
 
 project(':frontcache-server') {
 	apply plugin: 'war'
@@ -189,6 +174,7 @@ project(':frontcache-server') {
 	}
 }
 
+
 project(':frontcache-console') {
 	apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
@@ -212,10 +198,6 @@ project(':frontcache-console') {
 		compile "org.springframework:spring-webmvc:${springVersion}"
 		compile 'jstl:jstl:1.2'
         provided 'javax.servlet:javax.servlet-api:3.1.0'
-	}
-	
-	check {
-		dependsOn integrationTest
 	}
 }
 
@@ -242,6 +224,30 @@ project(':frontcache-tests') {
 //		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
 	}
 	
+	sourceSets {
+		integrationTest {
+			java.srcDir file('src/test-integration/java')
+			resources.srcDir file('src/test-integration/resources')
+			compileClasspath = sourceSets.main.output + configurations.testRuntime
+			runtimeClasspath = output + compileClasspath
+		}
+	}
+
+	task integrationTest(type: Test) {
+		description = 'Runs the integration tests.'
+		group = 'verification'
+		maxParallelForks = 1 // run all tests sequentially (due to cache cleanup befor every test)
+		forkEvery = 1 // run all tests sequentially (due to cache cleanup befor every test)
+		testClassesDir = sourceSets.integrationTest.output.classesDir
+		classpath = sourceSets.integrationTest.runtimeClasspath
+		reports.html.destination = file("$reports.html.destination/integration")
+		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
+		
+		//		jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
+		jvmArgs '-Dfrontcache-tests.home=' + projectDir
+		//		'-Dlogback.configurationFile=' !! logs (because of same process) here: projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml'
+
+	}
 
 	// for FC standalone
 	task standaloneFrontcacheJetty(type: JavaExec) {
@@ -258,12 +264,6 @@ project(':frontcache-tests') {
 		directory '.'
 	}
 		
-	integrationTest {
-//		jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
-		jvmArgs '-Dfrontcache-tests.home=' + projectDir
-//		'-Dlogback.configurationFile=' !! logs (because of same process) here: projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml'
-	}
-	
 	task stopStandaloneFrontcacheByPort << {
 		def ports = [9080]
 	 
