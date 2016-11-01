@@ -83,6 +83,13 @@ subprojects {
         mavenCentral()
     }
     
+    jacocoTestReport {
+        reports {
+            html.enabled = true
+            xml.enabled = true
+            csv.enabled = false
+        }
+    }
 	tasks.withType(Test) {
 		testLogging {
 			showStandardStreams = true
