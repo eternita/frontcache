@@ -36,7 +36,7 @@ buildscript {
   
 	dependencies {
 	  classpath 'org.akhikhl.gretty:gretty:+' // use gretty to run Jetty9 (servlet 3.1.0 container)
-	  classpath 'org.kt3k.gradle.plugin:coveralls-gradle-plugin:1.0.2'
+	  classpath 'org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.5.0'
 	}
   }
   
