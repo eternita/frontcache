@@ -36,6 +36,7 @@ buildscript {
   
 	dependencies {
 	  classpath 'org.akhikhl.gretty:gretty:+' // use gretty to run Jetty9 (servlet 3.1.0 container)
+	  classpath 'org.kt3k.gradle.plugin:coveralls-gradle-plugin:1.0.2'
 	}
   }
   
@@ -43,6 +44,7 @@ subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	apply plugin: 'jacoco'
+	apply plugin: 'com.github.kt3k.coveralls'
 	
     version = '0.9.3-SNAPSHOT'
     group = 'org.frontcache'
