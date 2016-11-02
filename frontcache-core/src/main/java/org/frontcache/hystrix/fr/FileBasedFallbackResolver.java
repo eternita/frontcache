@@ -103,7 +103,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		
 		if (null == currentFallbackURLpattern)
 		{
-			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | URL doesn't match any pattern | " + urlStr);
+			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + "| default | URL doesn't match any pattern | " + urlStr);
 			return getDefalut(fallbackSource, urlStr);
 		}
 		
@@ -111,18 +111,18 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		
 		if (null == fileName)
 		{
-			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | no file for pattern " + currentFallbackURLpattern + " | " + urlStr);
+			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + "| default | no file for pattern " + currentFallbackURLpattern + " | " + urlStr);
 			return getDefalut(fallbackSource, urlStr);
 		}
 
 		WebResponse webResponse = getFallbackFromFile(urlStr, fileName);
 		
 		if (null == webResponse){
-			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " default | can't read from file " + fileName + " | " + urlStr);
+			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + "| default | can't read from file " + fileName + " | " + urlStr);
 			return getDefalut(fallbackSource, urlStr);
 		}
 		
-		fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " from file | " + fileName + " | " + urlStr);
+		fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + "| from file | " + fileName + " | " + urlStr);
 		return webResponse;
 	}
 		
