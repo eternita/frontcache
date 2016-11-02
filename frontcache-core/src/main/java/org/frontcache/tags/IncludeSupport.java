@@ -15,7 +15,8 @@ public class IncludeSupport extends BodyTagSupport {
 	// *********************************************************************
 	// Internal state
 
-	protected Object value; // tag attribute
+	protected Object ulr; // tag attribute
+	protected Object includeType; // tag attribute
 
 	// *********************************************************************
 	// Construction and initialization
@@ -51,8 +52,8 @@ public class IncludeSupport extends BodyTagSupport {
 
 		try {
 			// print value if available; otherwise, try 'default'
-			if (value != null) {
-				out(pageContext, value);
+			if (ulr != null) {
+				out(pageContext, ulr, includeType);
 				return SKIP_BODY;
 			}
 			return SKIP_BODY;
@@ -69,21 +70,41 @@ public class IncludeSupport extends BodyTagSupport {
 	// *********************************************************************
 	// Public utility methods
 
-	public static void out(PageContext pageContext, Object obj) throws IOException {
+	public static void out(PageContext pageContext, Object url, Object includeType) throws IOException {
 		JspWriter w = pageContext.getOut();
 		
 		w.write("<fc:include url=\"");
 		// write chars as is
-		if (obj instanceof Reader) {
-			Reader reader = (Reader) obj;
+		if (url instanceof Reader) {
+			Reader reader = (Reader) url;
 			char[] buf = new char[4096];
 			int count;
 			while ((count = reader.read(buf, 0, 4096)) != -1) {
 				w.write(buf, 0, count);
 			}
 		} else {
-			w.write(obj.toString());
+			w.write(url.toString());
 		}
-		w.write("\" />");
+		
+		w.write("\"");
+		
+		if (null != includeType)
+		{
+			w.write(" type=\"");
+			if (includeType instanceof Reader) {
+				Reader reader = (Reader) includeType;
+				char[] buf = new char[4096];
+				int count;
+				while ((count = reader.read(buf, 0, 4096)) != -1) {
+					w.write(buf, 0, count);
+				}
+			} else {
+				w.write(includeType.toString());
+			}
+			
+			w.write("\"");
+		}
+			
+		w.write(" />");
 	}
 }

@@ -29,6 +29,9 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	
 	protected static final String START_MARKER = "<fc:include";
 	protected static final String END_MARKER = "/>";
+
+	protected static final String INCLUDE_TYPE_SYNC = "sync"; // default
+	protected static final String INCLUDE_TYPE_ASYNC = "async";
 	
 	private IncludeProcessorFilter incProcessorFilter = new BotIncludeProcessorFilter();
 	
@@ -117,6 +120,40 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 
 	}
 
+	/**
+	 * 
+	 * @param content
+	 * @return
+	 */
+	protected String getIncludeType(String content)
+	{
+		logger.debug("include tag - " + content);
+		final String START_MARKER = "type=\"";
+		int startIdx = content.indexOf(START_MARKER);
+		if (-1 < startIdx)
+		{
+			int endIdx = content.indexOf("\"", startIdx + START_MARKER.length());
+			if (-1 < endIdx)
+			{
+				String typeValue = content.substring(startIdx + START_MARKER.length(), endIdx);
+				
+				if (INCLUDE_TYPE_ASYNC.equalsIgnoreCase(typeValue))
+				{
+					logger.debug("include type - " + INCLUDE_TYPE_ASYNC);
+					return INCLUDE_TYPE_ASYNC;
+				}
+					
+			} else {
+				// can't find closing 
+			}
+		} else {
+			// no type attribute
+		}
+		
+		logger.debug("include type - " + INCLUDE_TYPE_SYNC);
+		return INCLUDE_TYPE_SYNC; // default
+	}
+	
 	/**
 	 * 
 	 * @param urlStr

@@ -314,7 +314,7 @@ public class FrontCacheEngine {
 	private CloseableHttpClient newClient() {
 		final RequestConfig requestConfig = RequestConfig.custom()
 				.setSocketTimeout(10000)
-				.setConnectTimeout(3000)
+				.setConnectTimeout(5500) // should be slightly more then hystrix timeout for http client
 				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
 				.build();
 
