@@ -42,8 +42,6 @@ public class WebResponse implements Serializable {
 	
 	private final Set<String> tags = new HashSet<String>();
 	
-	private String contentType;
-	
 	// -1 cache forever
 	// 0 never cache
 	// 123456789 expiration time in ms
@@ -113,7 +111,7 @@ public class WebResponse implements Serializable {
 	
 	public boolean isText()
 	{
-		String contentType = getContentType();
+		String contentType = getHeader(FCHeaders.CONTENT_TYPE);
 		if (null != contentType && -1 < contentType.indexOf("text"))
 			return true;
 		
@@ -172,22 +170,6 @@ public class WebResponse implements Serializable {
 	}
 	
 	/**
-	 * 
-	 * @return
-	 */
-	public String getContentType() {
-		return contentType;
-	}
-
-	/**
-	 * 
-	 * @param contentType
-	 */
-	public void setContentType(String contentType) {
-		this.contentType = contentType;
-	}
-
-	/**
 	 * Check if response is cacheable 
 	 * 
 	 * @return
@@ -203,6 +185,7 @@ public class WebResponse implements Serializable {
 		if (null == content) 
 			return false;  // no data
 		
+		String contentType = getHeader(FCHeaders.CONTENT_TYPE);
 		if (null == contentType || -1 == contentType.indexOf("text")) 
 			return false;  // response data is not text
 		
@@ -292,7 +275,6 @@ public class WebResponse implements Serializable {
      */
     public WebResponse copy() {
     	WebResponse copy = new WebResponse(this.url, this.content);
-    	copy.contentType = this.contentType;
     	copy.expireTimeMillis = this.expireTimeMillis;
     	copy.statusCode = this.statusCode;
     	

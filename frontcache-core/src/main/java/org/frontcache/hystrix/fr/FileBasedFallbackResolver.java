@@ -28,6 +28,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.StringUtils;
 import org.frontcache.core.WebResponse;
@@ -176,7 +177,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		if (null == fallbackContent)
 			return null;
 		String contentType = CONTENT_TYPE_DEFAULT;
-		String startStr = "Content-Type:";
+		String startStr = FCHeaders.CONTENT_TYPE + ":";
 		String endStr = "\n";
 		
 /*		
@@ -195,8 +196,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		
 		WebResponse webResponse = new WebResponse(urlStr, fallbackContent.getBytes(), CacheProcessor.NO_CACHE);
 		
-		webResponse.setContentType(contentType);
-		
+		webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType); 
 		int httpResponseCode = 200;
 		webResponse.setStatusCode(httpResponseCode);
 
@@ -213,8 +213,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		byte[] outContentBody = (fallbackSource + ": Default Fallback for " + urlStr).getBytes();
 
 		WebResponse webResponse = new WebResponse(urlStr, outContentBody, CacheProcessor.NO_CACHE);
-		String contentType = CONTENT_TYPE_DEFAULT;
-		webResponse.setContentType(contentType);
+		webResponse.addHeader(FCHeaders.CONTENT_TYPE, CONTENT_TYPE_DEFAULT); 
 		
 		int httpResponseCode = 200;
 		webResponse.setStatusCode(httpResponseCode);
@@ -254,11 +253,11 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 				
 				OutputStream fos = new FileOutputStream(fallbackDataFile);
 				
-				Header contentTypeHeader = response.getFirstHeader("Content-Type");
+				Header contentTypeHeader = response.getFirstHeader(FCHeaders.CONTENT_TYPE);
 				if (null != contentTypeHeader)
 				{
 					String contentType = contentTypeHeader.getValue();
-					fos.write(("Content-Type:" + contentType + "\n").getBytes());
+					fos.write((FCHeaders.CONTENT_TYPE + ":" + contentType + "\n").getBytes());
 				}
 				
 				// save response to file

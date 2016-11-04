@@ -81,7 +81,6 @@ public class WebResponseTests {
 		assertEquals(url, fromCache.getUrl());
 		assertEquals(new String(response.getContent()), new String(fromCache.getContent()));
 		assertEquals(response.getHeaders(), fromCache.getHeaders());
-		assertEquals(response.getContentType(), fromCache.getContentType());
 		assertEquals(response.getContentLenth(), fromCache.getContentLenth());
 		assertEquals(response.getStatusCode(), fromCache.getStatusCode());
 

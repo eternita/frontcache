@@ -22,6 +22,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.message.BasicHttpRequest;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -72,7 +73,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
 			
 			httpResponse.getOutputStream().write(webResponse.getContent());
-			httpResponse.setContentType(webResponse.getContentType());
+			httpResponse.setContentType(webResponse.getHeader(FCHeaders.CONTENT_TYPE));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

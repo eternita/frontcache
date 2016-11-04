@@ -167,9 +167,7 @@ public class FCUtils {
 			contentType = "text"; // 
 		}
 		
-		webResponse = parseWebComponent(url, data, FCUtils.revertHeaders(originWrappedResponse), contentType);
-
-
+		webResponse = parseWebComponent(url, data, FCUtils.revertHeaders(originWrappedResponse));
 
 		webResponse.setStatusCode(originWrappedResponse.getStatus());
 
@@ -189,9 +187,9 @@ public class FCUtils {
 		webResponse.setHeaders(headers);
 		
 		// filter may not set up content type yet -> check and setup 
-		if (null != dataStr && null == headers.get("Content-Type"))
+		if (null != dataStr && null == headers.get(FCHeaders.CONTENT_TYPE))
 		{
-			webResponse.addHeader("Content-Type", contentType); 
+			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType); 
 		}
 		
 		return webResponse;
@@ -210,7 +208,7 @@ public class FCUtils {
 		}
 		
 		String contentType = "";
-		Header contentTypeHeader = response.getFirstHeader("Content-Type");
+		Header contentTypeHeader = response.getFirstHeader(FCHeaders.CONTENT_TYPE);
 		if (null != contentTypeHeader)
 			contentType = contentTypeHeader.getValue();
 		
@@ -232,10 +230,12 @@ public class FCUtils {
 		respData = baos.toByteArray();
 		
 		Map<String, List<String>> headers = revertHeaders(response.getAllHeaders());
-		webResponse = parseWebComponent(url, respData, headers, contentType);
+		webResponse = parseWebComponent(url, respData, headers);
 
 		webResponse.setHeaders(headers);
 		webResponse.setStatusCode(httpResponseCode);
+		if (null == headers.get(FCHeaders.CONTENT_TYPE))
+			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType); 
 		
 		// process redirects
 		Header locationHeader = response.getFirstHeader("Location");
@@ -481,7 +481,7 @@ public class FCUtils {
 	 * @param contentStr
 	 * @return
 	 */
-	private static final WebResponse parseWebComponent (String urlStr, byte[] content, Map<String, List<String>> headers, String contentType)
+	private static final WebResponse parseWebComponent (String urlStr, byte[] content, Map<String, List<String>> headers) // , String contentType
 	{
 		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
 		byte[] outContentBody = content;
@@ -504,8 +504,7 @@ public class FCUtils {
 			for (String tagsStr : tagsList)
 				component.addTags(Arrays.asList(tagsStr.split(FCHeaders.COMPONENT_TAGS_SEPARATOR)));
 		
-		
-		component.setContentType(contentType);
+//		component.addHeader(FCHeaders.CONTENT_TYPE, contentType);
 		return component;
 	}
 	

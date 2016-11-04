@@ -44,7 +44,6 @@ public class LuceneIndexTests {
 			Set<String> tagSet = new HashSet<>();
 			tagSet.add(tags[i]);
 			response.setTags(tagSet);
-			response.setContentType(UUID.randomUUID().toString());
 			response.setStatusCode(55);
 			pr.putToCache(url, response);
 
@@ -53,7 +52,6 @@ public class LuceneIndexTests {
 			assertEquals(url, fromFile.getUrl());
 			assertEquals(content, new String(fromFile.getContent()));
 			assertEquals(response.getHeaders(), fromFile.getHeaders());
-			assertEquals(response.getContentType(), fromFile.getContentType());
 			assertEquals(response.getContentLenth(), fromFile.getContentLenth());
 			assertEquals(fromFile.getStatusCode(), response.getStatusCode());
 			assertEquals(tagSet, fromFile.getTags()); // tags are restorable from index
@@ -82,7 +80,6 @@ public class LuceneIndexTests {
 			Set<String> set = new HashSet<>();
 			set.add(tags[i]);
 			response.setTags(set);
-			response.setContentType(UUID.randomUUID().toString());
 			response.setStatusCode(55);
 			pr.putToCache(url, response);
 
@@ -91,7 +88,6 @@ public class LuceneIndexTests {
 			assertEquals(url, fromFile.getUrl());
 			assertEquals(content, new String(fromFile.getContent()));
 			assertEquals(response.getHeaders(), fromFile.getHeaders());
-			assertEquals(response.getContentType(), fromFile.getContentType());
 			assertEquals(response.getContentLenth(), fromFile.getContentLenth());
 			assertEquals(fromFile.getStatusCode(), response.getStatusCode());
 		}
@@ -123,7 +119,6 @@ public class LuceneIndexTests {
 			Set<String> set = new HashSet<>();
 			set.add(tags[i]);
 			response.setTags(set);
-			response.setContentType(UUID.randomUUID().toString());
 			response.setStatusCode(55);
 			pr.putToCache(url, response);
 
@@ -132,7 +127,6 @@ public class LuceneIndexTests {
 			assertEquals(url, fromFile.getUrl());
 			assertEquals(content, new String(fromFile.getContent()));
 			assertEquals(response.getHeaders(), fromFile.getHeaders());
-			assertEquals(response.getContentType(), fromFile.getContentType());
 			assertEquals(response.getContentLenth(), fromFile.getContentLenth());
 			assertEquals(fromFile.getStatusCode(), response.getStatusCode());
 		}
@@ -184,7 +178,6 @@ public class LuceneIndexTests {
 			Set<String> set = new HashSet<>();
 			set.add("banana");
 			response.setTags(set);
-			response.setContentType(UUID.randomUUID().toString());
 			response.setStatusCode(55);
 			pr.putToCache(url, response);
 

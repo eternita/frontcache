@@ -26,7 +26,8 @@ import com.netflix.hystrix.HystrixCommandKey;
 
 public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
-	private String urlStr = "open-circuit-default-key"; // when circuit is open - the value is not overriden during run() call
+	private String currentRequestURL = "open-circuit-default-key"; // when circuit is open
+	private String originRequestURL = null;
 	private final Map<String, List<String>> requestHeaders;
 	private final HttpClient client;
 	private final RequestContext context;
@@ -39,7 +40,8 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
         		);
         
-        this.urlStr = urlStr;
+        this.originRequestURL = urlStr;
+        this.currentRequestURL = context.getCurrentRequestURL();
         this.requestHeaders = requestHeaders;
         this.client = client;
         this.context = context;
@@ -50,8 +52,9 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 		HttpResponse response = null;
 
 		try {
-			HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
-			HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(urlStr));
+			logger.debug("calling " + originRequestURL);
+			HttpHost httpHost = FCUtils.getHttpHost(new URL(originRequestURL));
+			HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(originRequestURL));
 
 			// translate headers
 			Header[] httpHeaders = FCUtils.convertHeaders(requestHeaders);
@@ -59,12 +62,12 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 				httpRequest.addHeader(header);
 			
 			response = client.execute(httpHost, httpRequest);
-			WebResponse webResp = FCUtils.httpResponse2WebComponent(urlStr, response, context);
+			WebResponse webResp = FCUtils.httpResponse2WebComponent(originRequestURL, response, context);
 			return webResp;
 
 		} catch (IOException ioe) {
-			logger.error("Can't read from " + urlStr, ioe);
-			throw new FrontCacheException("Can't read from " + urlStr, ioe);
+			logger.error("Can't read from " + originRequestURL, ioe);
+			throw new FrontCacheException("Can't read from " + originRequestURL, ioe);
 		} finally {
 			if (null != response)
 				try {
@@ -80,9 +83,46 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     protected WebResponse getFallback() {
 		context.setHystrixError();
 
-		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), urlStr);
+		String includeCurrentURL = getIncludeCurrentURL(currentRequestURL, originRequestURL);
+		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), includeCurrentURL);
 		
 		return webResponse;
+    }
+
+    /**
+     * 
+     * @param currentRequestURL
+     * @param originRequestURL
+     * @return
+     */
+    private String getIncludeCurrentURL(String currentRequestURL, String originRequestURL)
+    {
+    	// host from current http://www.coinshome.net/common/hystrix/top1.jsp
+    	// uri from original http://origin.coinshome.net:1234/common/hystrix/inc12.jsp
+    	// ->
+    	// includeCurrentURL http://www.coinshome.net/common/hystrix/inc12.jsp
+    	
+    	String includeCurrentURL = null;
+    			
+		int idx1 = currentRequestURL.indexOf("//");
+		int idx2 = originRequestURL.indexOf("//");
+		
+		if (-1 < idx1 && -1 < idx2)
+		{
+			int idx11 = currentRequestURL.indexOf("/", idx1 + "//".length()); 
+			int idx21 = originRequestURL.indexOf("/", idx2 + "//".length());
+			
+			if (-1 < idx11 && -1 < idx21)
+			{
+				includeCurrentURL = currentRequestURL.substring(0, idx11) + originRequestURL.substring(idx21);
+			}
+		}
+		if (null == includeCurrentURL)
+			includeCurrentURL = "can't get includeCurrentURL from " + currentRequestURL + " and " + originRequestURL;
+			
+		logger.debug("fallback includeCurrentURL " + includeCurrentURL + " based on currentRequestURL " + currentRequestURL + " and originRequestURL " + originRequestURL);
+		
+    	return includeCurrentURL;
     }
     
 }
