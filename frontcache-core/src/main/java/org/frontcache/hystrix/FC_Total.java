@@ -4,6 +4,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.FrontCacheEngine;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -57,7 +58,7 @@ public class FC_Total extends HystrixCommand<Object> {
 			if (null != webResponse)
 			{
 				httpResponse.getOutputStream().write(webResponse.getContent());
-				httpResponse.setContentType(webResponse.getContentType());
+				httpResponse.setContentType(webResponse.getHeader(FCHeaders.CONTENT_TYPE));
 			}
 			
 		} catch (Exception e) {

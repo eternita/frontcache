@@ -264,7 +264,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 		
 		for (String key : originResponseHeaders.keySet()) {
 			for (String value : originResponseHeaders.get(key)) {
-				if ("Content-Type".equals(key) 
+				if (FCHeaders.CONTENT_TYPE.equals(key) 
 						&& -1 < value.indexOf("text"))
 					return true;
 			}

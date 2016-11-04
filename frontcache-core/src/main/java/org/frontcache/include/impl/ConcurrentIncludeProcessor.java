@@ -122,7 +122,6 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
         // replace placeholders with content
 		WebResponse agregatedWebResponse = replaceIncludePlaceholders(contentStr, includes);
 
-        logger.debug("response with resolved includes " + new String(agregatedWebResponse.getContent()));
 		return agregatedWebResponse;
 	}	
 
