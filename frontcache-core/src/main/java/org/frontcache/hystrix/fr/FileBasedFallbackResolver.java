@@ -194,7 +194,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 			fallbackContent = fallbackContent.substring(idx);
 		}
 		
-		WebResponse webResponse = new WebResponse(urlStr, fallbackContent.getBytes(), CacheProcessor.NO_CACHE);
+		WebResponse webResponse = new WebResponse(urlStr, fallbackContent.getBytes());
 		
 		webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType); 
 		int httpResponseCode = 200;
@@ -212,7 +212,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	{
 		byte[] outContentBody = (fallbackSource + ": Default Fallback for " + urlStr).getBytes();
 
-		WebResponse webResponse = new WebResponse(urlStr, outContentBody, CacheProcessor.NO_CACHE);
+		WebResponse webResponse = new WebResponse(urlStr, outContentBody);
 		webResponse.addHeader(FCHeaders.CONTENT_TYPE, CONTENT_TYPE_DEFAULT); 
 		
 		int httpResponseCode = 200;

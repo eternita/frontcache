@@ -74,12 +74,6 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 		if (null == comp)
 			return null;
 		
-		if (comp.isExpired())
-		{
-			cache.remove(url);
-			return null;
-		}
-		
 		return comp;
 	}
 

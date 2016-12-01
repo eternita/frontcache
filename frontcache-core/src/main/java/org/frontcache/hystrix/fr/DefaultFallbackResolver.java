@@ -5,7 +5,6 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.http.client.HttpClient;
-import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.FallbackLogger;
@@ -25,7 +24,7 @@ public class DefaultFallbackResolver implements FallbackResolver {
 		
 		byte[] outContentBody = ("Default Fallback for " + urlStr).getBytes();
 
-		WebResponse webResponse = new WebResponse(urlStr, outContentBody, CacheProcessor.NO_CACHE);
+		WebResponse webResponse = new WebResponse(urlStr, outContentBody);
 		webResponse.addHeader(FCHeaders.CONTENT_TYPE, "text/html");
 		
 		int httpResponseCode = 200;
