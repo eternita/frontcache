@@ -97,12 +97,6 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 			return null;
 		
 		WebResponse comp = (WebResponse) el.getObjectValue();
-
-		if (comp.isExpired())
-		{
-			cache.remove(url);
-			return null;
-		}
 		
 		return comp;
 	}

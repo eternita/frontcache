@@ -2,6 +2,7 @@ package org.frontcache.tests.base;
 
 import static org.junit.Assert.assertEquals;
 
+import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
 import org.junit.After;
 import org.junit.Assert;
@@ -18,11 +19,16 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
  */
 public abstract class CommonTests extends TestsBase {
 
-
-
+	public abstract String getFrontCacheBaseURL(); 
+	
+	protected FrontCacheClient frontcacheClient = null;
+	
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
+		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
+		frontcacheClient.removeFromCacheAll(); // clean up		
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
 	}
@@ -32,8 +38,6 @@ public abstract class CommonTests extends TestsBase {
 		super.tearDown();
 	}
 	
-	public abstract String getFrontCacheBaseURL(); 
-
 
 	@Test
 	public void jsp() throws Exception {
@@ -140,6 +144,114 @@ public abstract class CommonTests extends TestsBase {
 		String maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("-1", maxage);
 		
+	}
+	
+	/**
+	 * for single page maxage="bot:60"
+	 * 
+	 * call with User-Agent GoogleBot -> dynamic
+	 * call with User-Agent GoogleBot -> cached
+	 * 
+	 * call with User-Agent chrome -> dynamic
+	 * call with User-Agent chrome -> dynamic
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void clientTypeSpecificCache() throws Exception {
+		// single page maxage="bot:60"
+		
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+
+		// call with User-Agent GoogleBot -> dynamic
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/a.jsp");
+		assertEquals("a", page.getPage().asText());
+		WebResponse webResponse = page.getWebResponse(); 
+		String maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("bot:60", maxage);
+		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("false", debugCached);
+
+		// call with User-Agent GoogleBot -> cached
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/a.jsp");
+		assertEquals("a", page.getPage().asText());
+		webResponse = page.getWebResponse(); 
+		maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("bot:60", maxage);
+		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("true", debugCached);
+		
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		
+		// multiple times
+		// call with User-Agent chrome -> dynamic
+		for (int i = 0; i<3; i++)
+		{
+			page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/a.jsp");
+			assertEquals("a", page.getPage().asText());
+			webResponse = page.getWebResponse(); 
+			maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+			assertEquals("bot:60", maxage);
+			debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+			assertEquals("false", debugCached);
+		}
+		
+		return;
+	}
+	
+	/**
+	 * 
+	 * call with User-Agent Chrome -> include is in cache
+	 * call with User-Agent Chrome to include -> it's dynamic
+	 * 
+	 * call with User-Agent GoogleBot -> include is in cache
+	 * call with User-Agent GoogleBot to include -> it's from cache
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void clientTypeSpecificIncludes() throws Exception {
+		
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+
+		// call with User-Agent Chrome -> include is in cache
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/a1.jsp");
+		assertEquals("ab", page.getPage().asText());
+		org.frontcache.core.WebResponse webResponse = frontcacheClient.getFromCache( getFrontCacheBaseURL() + "common/client-bot-browser/b1.jsp");
+		assertEquals("b", new String(webResponse.getContent()));
+		String maxage = webResponse.getHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("bot:60", maxage);
+
+		// call with User-Agent Chrome to include -> it's dynamic
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/b1.jsp");
+		assertEquals("b", page.getPage().asText());
+		com.gargoylesoftware.htmlunit.WebResponse pageWebResponse = page.getWebResponse(); 
+		maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("bot:60", maxage);
+		String debugCached = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("false", debugCached);
+		
+		
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		
+		// call with User-Agent GoogleBot -> include is in cache
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/a1.jsp");
+		assertEquals("ab", page.getPage().asText());
+		webResponse = frontcacheClient.getFromCache( getFrontCacheBaseURL() + "common/client-bot-browser/b1.jsp");
+		assertEquals("b", new String(webResponse.getContent()));
+		maxage = webResponse.getHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("bot:60", maxage);
+		
+		// call with User-Agent GoogleBot to include -> it's from cache
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/b1.jsp");
+		assertEquals("b", page.getPage().asText());
+		pageWebResponse = page.getWebResponse(); 
+		maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("bot:60", maxage);
+		debugCached = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("true", debugCached);
 	}
 	
 }

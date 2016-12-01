@@ -9,10 +9,10 @@ import org.apache.http.client.HttpClient;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
-import org.frontcache.include.impl.f.BotIncludeProcessorFilter;
 import org.frontcache.reqlog.RequestLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +33,6 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	protected static final String INCLUDE_TYPE_SYNC = "sync"; // default
 	protected static final String INCLUDE_TYPE_ASYNC = "async";
 	
-	private IncludeProcessorFilter incProcessorFilter = new BotIncludeProcessorFilter();
 	
 	public IncludeProcessorBase() {
 	}
@@ -190,8 +189,8 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			return webResponse;
 		}
 		
-		// recursive call to FCServlet (through bot filter / to cache sessionless requests)
-		return incProcessorFilter.callInclude(urlStr, requestHeaders, client, context);
+		// recursive call to FCServlet
+		return FCUtils.dynamicCallHttpClient(urlStr, requestHeaders, client, context);
     }
 
 	@Override

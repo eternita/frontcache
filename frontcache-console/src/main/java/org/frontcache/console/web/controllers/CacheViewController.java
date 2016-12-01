@@ -54,16 +54,26 @@ public class CacheViewController {
 			
 			model.addAttribute("invalidationTags", webResponse.getTags());
 			
-			long expirationDate = webResponse.getExpireTimeMillis();
-			String expirationDateStr = "UNDEFINED";
-			if (-1 == expirationDate)
-				expirationDateStr = "DOES NOT EXPIRE";
-			else if (0 == expirationDate)
-				expirationDateStr = "DYNAMIC"; // never cached (should never happened)
-			else 
-				expirationDateStr = YYYY_MM_dd_HH_mm_ss_DF.format(new Date(expirationDate));
-
-			model.addAttribute("expirationDateStr", expirationDateStr);
+			Map<String, Long> expireTimeMap = webResponse.getExpireTimeMap();
+			StringBuffer expirationDateSb = new StringBuffer();
+			
+			for (String clientType : expireTimeMap.keySet())
+			{
+				long expirationDate = expireTimeMap.get(clientType);
+				
+				String expirationDateStr = "UNDEFINED";
+				if (-1 == expirationDate)
+					expirationDateStr = "DOES NOT EXPIRE";
+				else if (0 == expirationDate)
+					expirationDateStr = "DYNAMIC"; // never cached (should never happened)
+				else 
+					expirationDateStr = YYYY_MM_dd_HH_mm_ss_DF.format(new Date(expirationDate));
+				
+				expirationDateSb.append(expirationDateStr).append(" ");
+				
+			}
+			
+			model.addAttribute("expirationDateStr", expirationDateSb.toString());
 				
 		}
 
