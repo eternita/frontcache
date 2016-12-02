@@ -3,6 +3,7 @@ package org.frontcache.cache.impl;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -20,6 +21,9 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	
 	@Override
 	public void init(Properties properties) {
+		Objects.requireNonNull(properties, "Properties should not be null");
+		super.init(properties);
+		
 		try
 		{
 			String maxSizeStr = properties.getProperty("front-cache.cache-processor.impl.in-memory.maxsize");
