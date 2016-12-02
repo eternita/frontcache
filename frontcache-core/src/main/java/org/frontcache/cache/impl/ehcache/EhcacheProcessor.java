@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 
 import org.frontcache.FCConfig;
@@ -30,7 +31,9 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	
 
 	@Override
-	public void init(Properties properties) {
+	public void init(Properties properties) {		
+		Objects.requireNonNull(properties, "Properties should not be null");
+		super.init(properties);
 		
 		String ehCacheConfigFile = properties.getProperty(EHCACHE_CONFIG_FILE_KEY);
 		if (null == ehCacheConfigFile)
@@ -97,12 +100,6 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 			return null;
 		
 		WebResponse comp = (WebResponse) el.getObjectValue();
-
-		if (comp.isExpired())
-		{
-			cache.remove(url);
-			return null;
-		}
 		
 		return comp;
 	}

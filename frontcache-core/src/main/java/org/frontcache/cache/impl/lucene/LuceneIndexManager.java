@@ -13,7 +13,6 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
-import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.DirectoryReader;
@@ -158,7 +157,7 @@ public class LuceneIndexManager {
 		if (null != response.getContent())
 			doc.add(new StoredField(BIN_FIELD, response.getContent()));
 		
-		doc.add(new NumericDocValuesField(EXPIRE_DATE_FIELD, response.getExpireTimeMillis()));
+//		doc.add(new NumericDocValuesField(EXPIRE_DATE_FIELD, response.getExpireTimeMillis())); // TODO: store map ?
 		
 		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), JSON_TYPE));
 		
