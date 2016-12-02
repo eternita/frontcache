@@ -38,6 +38,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	public void init(Properties properties) {
 		 
 		Objects.requireNonNull(properties, "Properties should not be null");
+		super.init(properties);
 		
 		if (null != properties.getProperty(CACHE_BASE_DIR_KEY))
 		{
@@ -85,11 +86,6 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	public WebResponse getFromCacheImpl(String url) {
 		logger.debug("Getting from cache {}", url);
 		WebResponse webResponse = indexManager.getResponse(url);
-		if (null != webResponse && webResponse.isExpired())
-		{
-			removeFromCache(url);
-			return null;
-		}
 		
 		return webResponse;
 	}

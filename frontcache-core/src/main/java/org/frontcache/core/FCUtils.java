@@ -483,32 +483,24 @@ public class FCUtils {
 	 */
 	private static final WebResponse parseWebComponent (String urlStr, byte[] content, Map<String, List<String>> headers) // , String contentType
 	{
-		int cacheMaxAgeSec = CacheProcessor.NO_CACHE;
+		String cacheMaxAgeSecStr = null;
 		byte[] outContentBody = content;
 		
 		Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		if (null != collStr && !collStr.isEmpty())
-		{
-			String cacheMaxAgeSecStr = collStr.iterator().next();
-			try
-			{
-				cacheMaxAgeSec = maxAgeStr2Int(cacheMaxAgeSecStr);				
-				
-			} catch (Exception ex) {}
-		}
+			cacheMaxAgeSecStr = collStr.iterator().next();
 		
-		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSec);
+		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSecStr);
 		// set invalidation tags
 		Collection<String> tagsList = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS);
 		if (null != tagsList)
 			for (String tagsStr : tagsList)
 				component.addTags(Arrays.asList(tagsStr.split(FCHeaders.COMPONENT_TAGS_SEPARATOR)));
 		
-//		component.addHeader(FCHeaders.CONTENT_TYPE, contentType);
 		return component;
 	}
 	
-	private static int maxAgeStr2Int(String maxAgeStr)
+	public static int maxAgeStr2Int(String maxAgeStr)
 	{
 		try
 		{

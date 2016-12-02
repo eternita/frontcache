@@ -27,7 +27,7 @@ public class WebResponse implements Serializable {
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 4L; // v0.4 -> 4, v1.0 -> 10
+	private static final long serialVersionUID = 5L; // v0.4 -> 4, v1.0 -> 10
 
 	private int statusCode = -1; // for redirects
 	
@@ -45,30 +45,41 @@ public class WebResponse implements Serializable {
 	// -1 cache forever
 	// 0 never cache
 	// 123456789 expiration time in ms
-	private long expireTimeMillis = CacheProcessor.NO_CACHE;
+	
+	// empty map -> never cache
+	private Map<String, Long> expireTimeMap = new HashMap<String, Long>();
 	
 	public WebResponse() { // for JSON converter
-		this("dummy", null, -1);
+		this("dummy", null, null);
 	}
 	/**
 	 * some responses has no body (e.g. response for redirect)
 	 * 
+	 * maxAgeStr = null so, content is not subject to cache (maxAge = 0/no_cache)
+	 * 
 	 * @param url
 	 */
 	public WebResponse(String url) {
-		this(url, null, -1);
+		this(url, null, null);
 	}
 	
+	/**
+	 * 
+	 * maxAgeStr = null so, content is not subject to cache (maxAge = 0/no_cache)
+	 * 
+	 * @param url
+	 * @param content
+	 */
 	public WebResponse(String url, byte[] content) {
-		this(url, content, -1);
+		this(url, content, null);
 	}
 	
-	public WebResponse(String url, byte[] content, int cacheMaxAgeSec) {
+	public WebResponse(String url, byte[] content, String maxAgeStr) {
 		super();
 		this.url = url;
 		this.headers = new HashMap<String, List<String>>();
 		this.content = content;
-		setExpireTime(cacheMaxAgeSec);
+		setExpireTime(maxAgeStr);
 	}	
 	
 	public int getStatusCode() {
@@ -176,7 +187,7 @@ public class WebResponse implements Serializable {
 	 */
 	public boolean isCacheable()
 	{
-		if (expireTimeMillis == CacheProcessor.NO_CACHE) 
+		if (expireTimeMap.isEmpty()) 
 			return false; // do not cache marker
 		
 		if (null == headers)  
@@ -194,56 +205,64 @@ public class WebResponse implements Serializable {
 
 	/**
 	 * 
-	 * @param cacheMaxAgeSec time to live in seconds or CacheProcessor.CACHE_FOREVER
+	 * 
+	 * @param expiteTimeStr - maxAge="[bot|browser:]30d"
 	 */
-	public void setExpireTime(long cacheMaxAgeSec) {
+	private void setExpireTime(String maxAgeStr) {
+	
+		String maxAgeClientType = null; // bot and browser
+		String maxAgeTime = "0"; // default no cache
 		
-		if (CacheProcessor.CACHE_FOREVER == cacheMaxAgeSec)
-			this.expireTimeMillis = CacheProcessor.CACHE_FOREVER;
+		if (null != maxAgeStr)
+		{
+			if (-1 < maxAgeStr.indexOf(":"))
+			{
+				maxAgeClientType = maxAgeStr.substring(0, maxAgeStr.indexOf(":"));
+				maxAgeTime = maxAgeStr.substring(maxAgeStr.indexOf(":") + 1);
+				
+				if ("".equals(maxAgeTime))
+					maxAgeTime = "0";
+				
+			} else {
+				maxAgeTime = maxAgeStr;
+			}
+		}
+
 		
-		else if (CacheProcessor.NO_CACHE == cacheMaxAgeSec)
-			this.expireTimeMillis = CacheProcessor.NO_CACHE;
 		
+		long cacheMaxAgeSecLong = 0; // default - no cache
+		try
+		{
+			cacheMaxAgeSecLong = FCUtils.maxAgeStr2Int(maxAgeTime);				
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		
+
+		if (CacheProcessor.CACHE_FOREVER == cacheMaxAgeSecLong)
+			cacheMaxAgeSecLong = CacheProcessor.CACHE_FOREVER;
+		else if (CacheProcessor.NO_CACHE == cacheMaxAgeSecLong)
+			cacheMaxAgeSecLong = CacheProcessor.NO_CACHE;
 		else 
-			this.expireTimeMillis = System.currentTimeMillis() + 1000 * cacheMaxAgeSec;
+			cacheMaxAgeSecLong = System.currentTimeMillis() + 1000 * cacheMaxAgeSecLong;
 		
+		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType))
+		{
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
+			
+		} else if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType)) {
+			
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, cacheMaxAgeSecLong);
+		} else {
+			// default
+			// TODO: something wrong - log it 
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, cacheMaxAgeSecLong);
+		}
+			
 		return;
 	}
 
-	/**
-	 * for JSON serialization
-	 * 
-	 * @return
-	 */
-	public long getExpireTimeMillis() {
-		return expireTimeMillis;
-	}
-	
-	/**
-	 * for JSON serialization
-	 * 
-	 * @return
-	 */
-	public void setExpireTimeMillis(long expireTimeMillis) {
-		this.expireTimeMillis = expireTimeMillis;
-	}	
-	
-	
-	/**
-	 * Check with current time if expired 
-	 * 
-	 * @return
-	 */
-	public boolean isExpired()
-	{
-		if (CacheProcessor.CACHE_FOREVER == expireTimeMillis)
-			return false;
-		
-		if (System.currentTimeMillis() > expireTimeMillis)
-			return true;
-		
-		return false;
-	}
 
 	/**
 	 * content length in bytes
@@ -275,7 +294,7 @@ public class WebResponse implements Serializable {
      */
     public WebResponse copy() {
     	WebResponse copy = new WebResponse(this.url, this.content);
-    	copy.expireTimeMillis = this.expireTimeMillis;
+    	copy.expireTimeMap.putAll(this.getExpireTimeMap());
     	copy.statusCode = this.statusCode;
     	
 		copy.tags.addAll(this.tags);
@@ -291,6 +310,14 @@ public class WebResponse implements Serializable {
     	
         return copy;
     }
+    
+	public Map<String, Long> getExpireTimeMap() {
+		return expireTimeMap;
+	}
+	
+	public void setExpireTimeMap(Map<String, Long> expireTimeMap) {
+		this.expireTimeMap = expireTimeMap;
+	}
     
     
 }

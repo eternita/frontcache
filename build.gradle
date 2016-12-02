@@ -258,6 +258,11 @@ project(':frontcache-tests') {
 
 	}
 
+	farm {
+		webapp ':frontcache-tests'
+		webapp ':frontcache-console'
+	  }
+
 	// for FC standalone
 	task standaloneFrontcacheJetty(type: JavaExec) {
 		main = 'org.frontcache.tests.FrontcacheStandaloneServer'

@@ -6,6 +6,8 @@ public class FCHeaders {
     public static final String ACCEPT = "Accept";
     public static final String CONTENT_TYPE = "Content-Type";
     
+    public static final String REQUEST_CLIENT_TYPE_BOT = "bot";
+    public static final String REQUEST_CLIENT_TYPE_BROWSER = "browser";
     
     public static final String X_FRONTCACHE_ID = "X-frontcache.id";
     
