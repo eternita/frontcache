@@ -1,11 +1,19 @@
 package org.frontcache.cache;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 
 import org.apache.http.client.HttpClient;
+import org.frontcache.FCConfig;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
@@ -20,11 +28,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
 	
+	private static final String BOT_CONIF_FILE = "bots.conf";
 	
-	// TODO: move to config file
-	private String[] botUserAgentKeywords = new String[] {
-			"Googlebot", "msnbot", "bingbot", "YandexBot", "YandexDirect", "Baiduspider", "Yahoo! Slurp",
-			"majestic12", "Mail.RU_Bot", "EasouSpider", "voilabot", "AhrefsBot", "orangebot", "SemrushBot"};
+	private Set<String> botUserAgentKeywords = new LinkedHashSet<String>();
 	
 	private static final String[] NON_PERSISTENT_HEADERS = new String[]{
 			"Set-Cookie", 
@@ -213,8 +219,55 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 
 	@Override
-	public void init(Properties properties) {
+	public void init(Properties properties) {		
+		Objects.requireNonNull(properties, "Properties should not be null");
 		
-	}	
+		logger.info("Loading list of bots from " + BOT_CONIF_FILE);
+		BufferedReader confReader = null;
+		InputStream is = null;
+				
+		try 
+		{
+			is = FCConfig.getConfigInputStream(BOT_CONIF_FILE);
+			if (null == is)
+			{
+				logger.info("List of bots is not loaded from " + BOT_CONIF_FILE);
+				return;
+			}
+
+			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+			String botStr;
+			int botConfigCounter = 0;
+			while ((botStr = confReader.readLine()) != null) {
+				if (botStr.trim().startsWith("#")) // handle comments
+					continue;
+				
+				if (0 == botStr.trim().length()) // skip empty
+					continue;
+				
+				botUserAgentKeywords.add(botStr);
+				botConfigCounter++;
+			}
+			logger.info("Successfully loaded " + botConfigCounter +  " User-Agent keywords for bots");					
+			
+		} catch (Exception e) {
+			logger.info("List of bots is not loaded from " + BOT_CONIF_FILE, e);
+		} finally {
+			if (null != confReader)
+			{
+				try {
+					confReader.close();
+				} catch (IOException e) { }
+			}
+			if (null != is)
+			{
+				try {
+					is.close();
+				} catch (IOException e) { }
+			}
+		}
+		
+		return;
+	}
 
 }

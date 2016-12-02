@@ -38,6 +38,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	public void init(Properties properties) {
 		 
 		Objects.requireNonNull(properties, "Properties should not be null");
+		super.init(properties);
 		
 		if (null != properties.getProperty(CACHE_BASE_DIR_KEY))
 		{
