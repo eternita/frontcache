@@ -7,7 +7,7 @@
 
 #### Features
 
-* Boost server response time for dynamic pages 
+* Reduce server response time for dynamic pages 
 
 * Reduce backend load dozen times! 
    
