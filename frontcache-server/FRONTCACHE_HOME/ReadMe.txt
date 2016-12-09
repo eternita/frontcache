@@ -16,5 +16,13 @@ copy binaries to Tomcat
                     
 start tomcat
 
+It's ready:
+  Point browser to http://localhost:9080/
+    You can see some content from www.coinshome.net (or other site you pointed in 'front-cache.origin-host' variable) 
+  Point browser to http://localhost:9080/frontcache-console/
+    You can see Frontcache Console with real-time data and configs 
+     
+
+
 
 more info: http://www.frontcache.org/get-started
