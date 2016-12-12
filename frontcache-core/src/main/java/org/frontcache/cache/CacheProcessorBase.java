@@ -1,19 +1,12 @@
 package org.frontcache.cache;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.Set;
 
 import org.apache.http.client.HttpClient;
-import org.frontcache.FCConfig;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
@@ -27,10 +20,6 @@ import org.slf4j.LoggerFactory;
 public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
-	
-	private static final String BOT_CONIF_FILE = "bots.conf";
-	
-	private Set<String> botUserAgentKeywords = new LinkedHashSet<String>();
 	
 	private static final String[] NON_PERSISTENT_HEADERS = new String[]{
 			"Set-Cookie", 
@@ -79,7 +68,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		
 		if (null != cachedWebResponse)
 		{
-			String clientType = getClientType(requestHeaders); // bot | browser
+			String clientType = context.getClientType(); // bot | browser
 			Map<String, Long> expireTimeMap = cachedWebResponse.getExpireTimeMap();
 		
 			isCacheableForClientType = isWebComponentCacheableForClientType(expireTimeMap, clientType);
@@ -98,7 +87,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			{
 				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context); // it can be pure dynamic include -> check if we need to save to cache 
 				
-				String clientType = getClientType(requestHeaders); // bot | browser
+				String clientType = context.getClientType(); // bot | browser
 				Map<String, Long> expireTimeMap = cachedWebResponse.getExpireTimeMap();
 				
 				boolean isFreshDataCacheableForClientType = isWebComponentCacheableForClientType(expireTimeMap, clientType);
@@ -192,28 +181,6 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		return true;
 	}
 	
-	
-	private String getClientType(Map<String, List<String>> requestHeaders)
-	{		
-		
-		if (null != requestHeaders.get("User-Agent"))
-		{
-			for (String userAgent : requestHeaders.get("User-Agent"))
-				if (isBot(userAgent))
-					return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
-		}
-		return FCHeaders.REQUEST_CLIENT_TYPE_BROWSER;
-	}
-	
-	private boolean isBot(String userAgent)
-	{
-		for (String botKeyword : botUserAgentKeywords)
-			if (userAgent.contains(botKeyword))
-				return true;
-			
-		return false;
-	}
-	
 	@Override
 	public Map<String, String> getCacheStatus() {
 		Map<String, String> status = new HashMap<String, String>();
@@ -222,58 +189,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		return status;
 	}
 	
-
-
 	@Override
 	public void init(Properties properties) {		
 		Objects.requireNonNull(properties, "Properties should not be null");
-		
-		logger.info("Loading list of bots from " + BOT_CONIF_FILE);
-		BufferedReader confReader = null;
-		InputStream is = null;
-				
-		try 
-		{
-			is = FCConfig.getConfigInputStream(BOT_CONIF_FILE);
-			if (null == is)
-			{
-				logger.info("List of bots is not loaded from " + BOT_CONIF_FILE);
-				return;
-			}
-
-			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String botStr;
-			int botConfigCounter = 0;
-			while ((botStr = confReader.readLine()) != null) {
-				if (botStr.trim().startsWith("#")) // handle comments
-					continue;
-				
-				if (0 == botStr.trim().length()) // skip empty
-					continue;
-				
-				botUserAgentKeywords.add(botStr);
-				botConfigCounter++;
-			}
-			logger.info("Successfully loaded " + botConfigCounter +  " User-Agent keywords for bots");					
-			
-		} catch (Exception e) {
-			logger.info("List of bots is not loaded from " + BOT_CONIF_FILE, e);
-		} finally {
-			if (null != confReader)
-			{
-				try {
-					confReader.close();
-				} catch (IOException e) { }
-			}
-			if (null != is)
-			{
-				try {
-					is.close();
-				} catch (IOException e) { }
-			}
-		}
-		
-		return;
 	}
 
 }
