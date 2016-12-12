@@ -220,15 +220,15 @@ public abstract class CommonTests extends TestsBase {
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/a1.jsp");
 		assertEquals("ab", page.getPage().asText());
 		org.frontcache.core.WebResponse webResponse = frontcacheClient.getFromCache( getFrontCacheBaseURL() + "common/client-bot-browser/b1.jsp");
-		assertEquals("b", new String(webResponse.getContent()));
-		String maxage = webResponse.getHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
-		assertEquals("bot:60", maxage);
+		// b1.jsp has "bot:60" 
+		// request was from browser -> so, page is not cached
+		assertEquals(null, webResponse);	
 
 		// call with User-Agent Chrome to include -> it's dynamic
 		page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/b1.jsp");
 		assertEquals("b", page.getPage().asText());
 		com.gargoylesoftware.htmlunit.WebResponse pageWebResponse = page.getWebResponse(); 
-		maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		String maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
 		String debugCached = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("false", debugCached);
@@ -253,5 +253,19 @@ public abstract class CommonTests extends TestsBase {
 		debugCached = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("true", debugCached);
 	}
+	
+	
+	@Test
+	public void includeSync() throws Exception {
+		
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/client-bot-browser/a2.jsp");
+		assertEquals("ab", page.getPage().asText());
+
+		//  b2 has maxage="0" -> should not be cached
+		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache( getFrontCacheBaseURL() + "common/client-bot-browser/b2.jsp");
+		assertEquals(null, resp);	
+		
+	}
+	
 	
 }
