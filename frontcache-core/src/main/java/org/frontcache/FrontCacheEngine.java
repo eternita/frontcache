@@ -9,8 +9,10 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -61,6 +63,10 @@ import org.slf4j.LoggerFactory;
 public class FrontCacheEngine {
 
 	private final static String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "direct-urls.conf";
+	
+	private static final String BOT_CONIF_FILE = "bots.conf";
+	
+	private Set<String> botUserAgentKeywords = new LinkedHashSet<String>();
 	
 	private List <Pattern> uriIgnorePatterns = new ArrayList<Pattern>();
 
@@ -237,6 +243,7 @@ public class FrontCacheEngine {
 		}, 1000, 60000);
 		
 		loadCacheIgnoreURIPatterns();
+		loadBotConfigs();
 		
 
 		Thread t = new Thread(new Runnable() {
@@ -421,6 +428,9 @@ public class FrontCacheEngine {
         
         context.setRequestId(requestId);
         context.setRequestType(requestType);
+        
+        context.setClientType(getClientType(servletRequest)); // client type = bot | browser based on User-Agent Header and bots.conf
+        
 
         if (null != filterChain)
         {
@@ -431,6 +441,21 @@ public class FrontCacheEngine {
 		return context;
     }
 
+	private String getClientType(HttpServletRequest request)
+	{		
+
+		String userAgent = request.getHeader("User-Agent");
+		if (null != userAgent)
+		{
+			for (String botKeyword : botUserAgentKeywords)
+				if (userAgent.contains(botKeyword))
+					return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
+		} else {
+			return FCHeaders.REQUEST_CLIENT_TYPE_BOT; // no user-agent -> bot
+		}
+		
+		return FCHeaders.REQUEST_CLIENT_TYPE_BROWSER;
+	}
     
     private boolean ignoreCache(String uri)
     {
@@ -717,5 +742,55 @@ public class FrontCacheEngine {
 		}
 		
 	}
+	
+	private void loadBotConfigs() {		
+		logger.info("Loading list of bots from " + BOT_CONIF_FILE);
+		BufferedReader confReader = null;
+		InputStream is = null;
+				
+		try 
+		{
+			is = FCConfig.getConfigInputStream(BOT_CONIF_FILE);
+			if (null == is)
+			{
+				logger.info("List of bots is not loaded from " + BOT_CONIF_FILE);
+				return;
+			}
+
+			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+			String botStr;
+			int botConfigCounter = 0;
+			while ((botStr = confReader.readLine()) != null) {
+				if (botStr.trim().startsWith("#")) // handle comments
+					continue;
+				
+				if (0 == botStr.trim().length()) // skip empty
+					continue;
+				
+				botUserAgentKeywords.add(botStr);
+				botConfigCounter++;
+			}
+			logger.info("Successfully loaded " + botConfigCounter +  " User-Agent keywords for bots");					
+			
+		} catch (Exception e) {
+			logger.info("List of bots is not loaded from " + BOT_CONIF_FILE, e);
+		} finally {
+			if (null != confReader)
+			{
+				try {
+					confReader.close();
+				} catch (IOException e) { }
+			}
+			if (null != is)
+			{
+				try {
+					is.close();
+				} catch (IOException e) { }
+			}
+		}
+		
+		return;
+	}
+	
 		
 }
