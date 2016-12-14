@@ -505,5 +505,14 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         set("currentRequestURL", currentRequestURL);
 	}
 
+	// bot | browser
+	public String getClientType() {
+		return (String) get("currentClientType");
+	}
+
+	// bot | browser
+	public void setClientType(String currentClientType) {
+        set("currentClientType", currentClientType);
+	}
     
 }
