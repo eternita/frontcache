@@ -27,3 +27,4 @@
 Frontcache developed & tested with Java based Web apps but can be used with other languages/technologies as well. 
 
 ### Technical details - [check Wiki](https://github.com/eternita/frontcache/wiki "check Wiki")
+
