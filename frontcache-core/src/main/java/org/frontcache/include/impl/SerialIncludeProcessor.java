@@ -15,6 +15,7 @@ import org.frontcache.include.IncludeProcessorBase;
 /**
  * 
  * Processing URL example <fc:include url="/some/url/here" />
+ * @deprecated use ConcurrentIncludeProcessor
  *
  */
 public class SerialIncludeProcessor extends IncludeProcessorBase implements IncludeProcessor {
