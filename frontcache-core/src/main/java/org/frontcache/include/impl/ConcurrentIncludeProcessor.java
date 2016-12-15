@@ -149,11 +149,30 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					String includeURL = getIncludeURL(includeTagStr);
 					String includeType = getIncludeType(includeTagStr);
 					
-					if (null == includes)
-						includes = new ArrayList<IncludeResolutionPlaceholder>();
+					boolean performInclude = false;
+					String includeClientType = getIncludeClientType(includeTagStr);
+					if (null == includeClientType)
+					{
+						performInclude = true;
+						
+					} else if (includeClientType.equalsIgnoreCase(context.getClientType())) {
+
+						// client type specific include
+						performInclude = true;
+					} else {
+						
+						// client type for include and request doesnt match 
+						performInclude = false;
+					}
 					
-					// save placeholder
-					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, includeType, requestHeaders, client, context));
+					if (performInclude)
+					{
+						if (null == includes)
+							includes = new ArrayList<IncludeResolutionPlaceholder>();
+						
+						// save placeholder
+						includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, includeType, requestHeaders, client, context));
+					}
 					
 					scanIdx = endIdx;
 				} else {

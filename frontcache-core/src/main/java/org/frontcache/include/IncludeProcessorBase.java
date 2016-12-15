@@ -127,7 +127,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	protected String getIncludeType(String content)
 	{
 		logger.debug("include tag - " + content);
-		final String START_MARKER = "type=\"";
+		final String START_MARKER = "call=\"";
 		int startIdx = content.indexOf(START_MARKER);
 		if (-1 < startIdx)
 		{
@@ -138,7 +138,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 				
 				if (INCLUDE_TYPE_ASYNC.equalsIgnoreCase(typeValue))
 				{
-					logger.debug("include type - " + INCLUDE_TYPE_ASYNC);
+					logger.debug("include call-type - " + INCLUDE_TYPE_ASYNC);
 					return INCLUDE_TYPE_ASYNC;
 				}
 					
@@ -149,8 +149,41 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			// no type attribute
 		}
 		
-		logger.debug("include type - " + INCLUDE_TYPE_SYNC);
+		logger.debug("include call-type - " + INCLUDE_TYPE_SYNC);
 		return INCLUDE_TYPE_SYNC; // default
+	}
+
+	protected String getIncludeClientType(String content)
+	{
+		logger.debug("include tag - " + content);
+		final String START_MARKER = "client=\"";
+		int startIdx = content.indexOf(START_MARKER);
+		if (-1 < startIdx)
+		{
+			int endIdx = content.indexOf("\"", startIdx + START_MARKER.length());
+			if (-1 < endIdx)
+			{
+				String typeValue = content.substring(startIdx + START_MARKER.length(), endIdx);
+				
+				if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equalsIgnoreCase(typeValue))
+				{
+					logger.debug("include client-type - " + FCHeaders.REQUEST_CLIENT_TYPE_BOT);
+					return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
+				}
+				if (FCHeaders.REQUEST_CLIENT_TYPE_BROWSER.equalsIgnoreCase(typeValue))
+				{
+					logger.debug("include client-type - " + FCHeaders.REQUEST_CLIENT_TYPE_BROWSER);
+					return FCHeaders.REQUEST_CLIENT_TYPE_BROWSER;
+				}
+					
+			} else {
+				// can't find closing 
+			}
+		} else {
+			// no type attribute
+		}
+		
+		return null; // default
 	}
 	
 	/**

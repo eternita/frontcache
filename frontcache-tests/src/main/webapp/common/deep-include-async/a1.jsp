@@ -1,1 +1,1 @@
-<%@ taglib uri="http://frontcache.org/core" prefix="fc" %><fc:component maxage="0" />a<fc:include url="/common/deep-include-async/b1.jsp" type="async" />
+<%@ taglib uri="http://frontcache.org/core" prefix="fc" %><fc:component maxage="0" />a<fc:include url="/common/deep-include-async/b1.jsp" call="async" />
