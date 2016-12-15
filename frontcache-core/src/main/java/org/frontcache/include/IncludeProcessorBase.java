@@ -202,10 +202,38 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		long start = System.currentTimeMillis();
 		
 		CacheProcessor cacheProcessor = CacheManager.getInstance();
-		WebResponse webResponse = cacheProcessor.getFromCache(urlStr); 
+		WebResponse webResponse = cacheProcessor.getFromCache(urlStr);
+		
+		boolean isCacheableForClientType = true;
+
 		if (null != webResponse)
 		{
+			String clientType = context.getClientType(); // bot | browser
+			Map<String, Long> expireTimeMap = webResponse.getExpireTimeMap();
+		
+			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);
 
+			// if data is cacheable for client type -> check data for expiration (only)
+			// if data is dynamic for client type -> no expiration / invalidation check
+			if (isCacheableForClientType && FCUtils.isWebComponentExpired(expireTimeMap, clientType))
+			{
+				
+				String refreshType = webResponse.getRefreshType();
+				if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType))
+				{
+					// soft expiration
+					cacheProcessor.doSoftInvalidation(urlStr, urlStr, requestHeaders, client, context);
+				} else {
+					// regular expiration
+					cacheProcessor.removeFromCache(urlStr);
+					webResponse = null; // refresh from origin
+				}
+			}
+		}
+			
+			
+		if (null != webResponse && isCacheableForClientType)
+		{
 			{ // request logging
 				RequestContext contextCopy = new RequestContext();
 				contextCopy.putAll(context);

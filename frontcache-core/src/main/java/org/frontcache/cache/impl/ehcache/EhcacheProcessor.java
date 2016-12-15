@@ -62,6 +62,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	
 	@Override
 	public void destroy() {
+		super.destroy();
 		
 		try
 		{
