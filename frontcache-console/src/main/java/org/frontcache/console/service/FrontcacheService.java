@@ -255,4 +255,10 @@ public class FrontcacheService {
 		if (null != edge)
 			frontcacheAgentURLs.remove(edge);
 	}
+	
+	public void invalidateEdge(String edgeURL, String filter) {
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL);
+		fcClient.removeFromCache(filter);
+	}
+	
 }
