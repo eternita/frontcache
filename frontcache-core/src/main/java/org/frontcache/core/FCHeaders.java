@@ -9,9 +9,14 @@ public class FCHeaders {
     public static final String REQUEST_CLIENT_TYPE_BOT = "bot";
     public static final String REQUEST_CLIENT_TYPE_BROWSER = "browser";
     
+    public static final String COMPONENT_REFRESH_TYPE_REGULAR = "regular"; // for X_FRONTCACHE_COMPONENT_REFRESH_TYPE
+    public static final String COMPONENT_REFRESH_TYPE_SOFT = "soft";
+    
     public static final String X_FRONTCACHE_ID = "X-frontcache.id";
     
     public static final String X_FRONTCACHE_DEBUG = "X-frontcache.debug";
+
+    public static final String X_FRONTCACHE_DYNAMIC_REQUEST = "X-frontcache.dynamic-request";
 
     public static final String X_FRONTCACHE_DEBUG_CACHEABLE = "X-frontcache.debug.cacheable";
     public static final String X_FRONTCACHE_DEBUG_CACHED = "X-frontcache.debug.cached";
@@ -25,6 +30,7 @@ public class FCHeaders {
     
     
     public static final String X_FRONTCACHE_COMPONENT_MAX_AGE = "X-frontcache.component.maxage";
+    public static final String X_FRONTCACHE_COMPONENT_REFRESH_TYPE = "X-frontcache.component.refresh";
     public static final String X_FRONTCACHE_COMPONENT_TAGS = "X-frontcache.component.tags"; // invalidation tags 
     public static final String X_FRONTCACHE_REQUEST_ID = "X-frontcache.request-id";
     public static final String X_FRONTCACHE_CLIENT_IP = "X-frontcache.client-ip";

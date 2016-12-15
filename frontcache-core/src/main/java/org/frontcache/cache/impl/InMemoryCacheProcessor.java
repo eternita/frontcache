@@ -83,6 +83,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 
 	@Override
 	public void destroy() {
+		super.destroy();
 		cache.clear();
 		
 		return;

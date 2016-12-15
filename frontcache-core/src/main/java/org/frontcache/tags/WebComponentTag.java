@@ -11,4 +11,8 @@ public class WebComponentTag extends WebComponentSupport {
 		super.tags = tags;
 	}
 	
+	public void setRefresh(String refresh) {
+		super.refresh = refresh;
+	}
+	
 }

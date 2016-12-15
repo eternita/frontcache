@@ -1,6 +1,7 @@
 package org.frontcache.tests.base;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
@@ -267,5 +268,68 @@ public abstract class CommonTests extends TestsBase {
 		
 	}
 	
+	@Test
+	public void cacheRefreshSoft1() throws Exception {
+		
+		// call
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/refresh-regular-soft/a.jsp");
+		long timestamp1 = Long.parseLong(page.getPage().asText());
+		
+		// common/refresh-regular-soft/b.jsp has maxage 3sec
+		// so, aster sleep it's expired
+		Thread.sleep(5000); 
+		
+		// call the same page
+		// because of soft cache refresh expired data is returned
+		// and will be refreshed in background
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/refresh-regular-soft/a.jsp");
+		long timestamp2 = Long.parseLong(page.getPage().asText());
+		
+		assertEquals(timestamp1, timestamp2);
+		
+		Thread.sleep(1000); // wait a sec to make sure background update completed 
+		
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/refresh-regular-soft/a.jsp");
+		long timestamp3 = Long.parseLong(page.getPage().asText());
+		
+		assertNotEquals(timestamp1, timestamp3); 
+	}
+
+	@Test
+	public void cacheRefreshSoft2() throws Exception {
+		
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		
+		// call
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/refresh-regular-soft/a1.jsp");
+		long timestamp1 = Long.parseLong(page.getPage().asText());
+		
+		// common/refresh-regular-soft/b1.jsp has maxage=bot:3
+		// so, aster sleep it's expired
+		Thread.sleep(5000); 
+
+		// call the same page as browser (data should be dynamic)
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/refresh-regular-soft/a1.jsp");
+		long timestamp21 = Long.parseLong(page.getPage().asText());
+		
+		assertNotEquals(timestamp1, timestamp21);
+		
+		// call the same page
+		// because of soft cache refresh expired data is returned
+		// and will be refreshed in background
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/refresh-regular-soft/a1.jsp");
+		long timestamp22 = Long.parseLong(page.getPage().asText());
+		
+		assertEquals(timestamp1, timestamp22);
+		
+		Thread.sleep(1000); // wait a sec to make sure background update completed 
+		
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/refresh-regular-soft/a1.jsp");
+		long timestamp3 = Long.parseLong(page.getPage().asText());
+		
+		assertNotEquals(timestamp1, timestamp3); 
+	}
 	
 }
