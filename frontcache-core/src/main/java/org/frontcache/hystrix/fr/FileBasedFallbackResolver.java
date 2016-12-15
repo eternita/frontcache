@@ -27,7 +27,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.frontcache.FCConfig;
-import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.StringUtils;
@@ -360,11 +359,11 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		String fallbackURLPattern = null;
 		String[] arr = fallbackStr.split(" ");
 		if (arr.length == 2) {
-			fileName = arr[0];
-			fallbackURLPattern = arr[1];
+			fallbackURLPattern = arr[0];
+			fileName = arr[1];
 		} else if (arr.length == 3) {
-			fileName = arr[0];
-			fallbackURLPattern = arr[1];
+			fallbackURLPattern = arr[0];
+			fileName = arr[1];
 			fetchURL = arr[2];
 			
 			file2fetchURLMap.put(fileName, fetchURL);
