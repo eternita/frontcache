@@ -9,6 +9,7 @@ import javax.servlet.jsp.PageContext;
 import javax.servlet.jsp.tagext.BodyTagSupport;
 
 
+@SuppressWarnings("serial")
 public class IncludeSupport extends BodyTagSupport {
 
 
@@ -16,7 +17,8 @@ public class IncludeSupport extends BodyTagSupport {
 	// Internal state
 
 	protected Object ulr; // tag attribute
-	protected Object includeType; // tag attribute
+	protected Object includeCallType; // tag attribute
+	protected Object includeClientType; // tag attribute
 
 	// *********************************************************************
 	// Construction and initialization
@@ -53,7 +55,7 @@ public class IncludeSupport extends BodyTagSupport {
 		try {
 			// print value if available; otherwise, try 'default'
 			if (ulr != null) {
-				out(pageContext, ulr, includeType);
+				out(pageContext, ulr, includeCallType, includeClientType);
 				return SKIP_BODY;
 			}
 			return SKIP_BODY;
@@ -70,7 +72,7 @@ public class IncludeSupport extends BodyTagSupport {
 	// *********************************************************************
 	// Public utility methods
 
-	public static void out(PageContext pageContext, Object url, Object includeType) throws IOException {
+	public static void out(PageContext pageContext, Object url, Object includeType, Object clientType) throws IOException {
 		JspWriter w = pageContext.getOut();
 		
 		w.write("<fc:include url=\"");
@@ -90,7 +92,7 @@ public class IncludeSupport extends BodyTagSupport {
 		
 		if (null != includeType)
 		{
-			w.write(" type=\"");
+			w.write(" call=\"");
 			if (includeType instanceof Reader) {
 				Reader reader = (Reader) includeType;
 				char[] buf = new char[4096];
@@ -104,7 +106,24 @@ public class IncludeSupport extends BodyTagSupport {
 			
 			w.write("\"");
 		}
+
+		if (null != clientType)
+		{
+			w.write(" client=\"");
+			if (includeType instanceof Reader) {
+				Reader reader = (Reader) includeType;
+				char[] buf = new char[4096];
+				int count;
+				while ((count = reader.read(buf, 0, 4096)) != -1) {
+					w.write(buf, 0, count);
+				}
+			} else {
+				w.write(clientType.toString());
+			}
 			
+			w.write("\"");
+		}
+		
 		w.write(" />");
 	}
 }

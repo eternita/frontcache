@@ -35,7 +35,7 @@ public abstract class IncludeTests extends TestsBase {
 	public void includeAsync1() throws Exception {
 		
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/deep-include-async/a1.jsp");
-		assertEquals("a", page.getPage().asText()); // no 'ef' in response because 'e' included in async mode
+		assertEquals("a", page.getPage().asText()); // no 'b' in response because 'b' included in async mode
 	}
 	
 	
@@ -64,7 +64,7 @@ public abstract class IncludeTests extends TestsBase {
 		assertEquals("c<fc:include url=\"/common/deep-include-async/d.jsp\" />", new String(resp.getContent()));	
 		
 		resp = frontcacheClient.getFromCache(getFrontCacheBaseURL() + "common/deep-include-async/d.jsp");
-		assertEquals("d<fc:include url=\"/common/deep-include-async/e.jsp\" type=\"async\" />", new String(resp.getContent()));	
+		assertEquals("d<fc:include url=\"/common/deep-include-async/e.jsp\" call=\"async\" />", new String(resp.getContent()));	
 		
 		resp = frontcacheClient.getFromCache(getFrontCacheBaseURL() + "common/deep-include-async/e.jsp");
 		assertEquals("e<fc:include url=\"/common/deep-include-async/f.jsp\" />", new String(resp.getContent()));	
@@ -73,5 +73,48 @@ public abstract class IncludeTests extends TestsBase {
 		resp = frontcacheClient.getFromCache(getFrontCacheBaseURL() + "common/deep-include-async/f.jsp");
 		assertEquals(null, resp);	
 	}
+	
+	@Test
+	public void includeClientSpecific1() throws Exception {
+		HtmlPage page = null;
+		// request as bot
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/include-bot-browser/a.jsp");
+		assertEquals("ab", page.getPage().asText());
+		
+		// request as browser
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/include-bot-browser/a.jsp");
+		assertEquals("ab", page.getPage().asText());
+	}
+	
+	@Test
+	public void includeClientSpecific2() throws Exception {
+		HtmlPage page = null;
+		// request as bot
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/include-bot-browser/a1.jsp");
+		assertEquals("ab", page.getPage().asText());
+		
+		// request as browser
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/include-bot-browser/a1.jsp");
+		assertEquals("a", page.getPage().asText());
+	}
+	
+	@Test
+	public void includeClientSpecific3() throws Exception {
+		HtmlPage page = null;
+		// request as bot
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/include-bot-browser/a2.jsp");
+		assertEquals("a", page.getPage().asText());
+		
+		// request as browser
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/include-bot-browser/a2.jsp");
+		assertEquals("ab", page.getPage().asText());
+	}
+	
 	
 }

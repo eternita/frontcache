@@ -1,5 +1,6 @@
 package org.frontcache.tags;
 
+@SuppressWarnings("serial")
 public class WebComponentTag extends WebComponentSupport {
 
 	public void setMaxage(String maxage) {
