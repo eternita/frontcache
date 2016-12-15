@@ -1,0 +1,1 @@
+<%@ taglib uri="http://frontcache.org/core" prefix="fc" %><fc:component maxage="1h" /><fc:include url="/common/refresh-regular-soft/b1.jsp" />

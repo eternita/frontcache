@@ -1,0 +1,1 @@
+<%@ taglib uri="http://frontcache.org/core" prefix="fc" %><fc:component maxage="bot:3" refresh="soft" /><%= System.currentTimeMillis()%>

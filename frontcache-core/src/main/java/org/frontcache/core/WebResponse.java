@@ -27,7 +27,7 @@ public class WebResponse implements Serializable {
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 5L; // v0.4 -> 4, v1.0 -> 10
+	private static final long serialVersionUID = 6L; 
 
 	private int statusCode = -1; // for redirects
 	
@@ -49,8 +49,10 @@ public class WebResponse implements Serializable {
 	// empty map -> never cache
 	private Map<String, Long> expireTimeMap = new HashMap<String, Long>();
 	
+	private String refreshType = null; // null is default (regular) [regular | soft]
+	
 	public WebResponse() { // for JSON converter
-		this("dummy", null, null);
+		this("dummy", null, null, null);
 	}
 	/**
 	 * some responses has no body (e.g. response for redirect)
@@ -60,7 +62,7 @@ public class WebResponse implements Serializable {
 	 * @param url
 	 */
 	public WebResponse(String url) {
-		this(url, null, null);
+		this(url, null, null, null);
 	}
 	
 	/**
@@ -71,15 +73,16 @@ public class WebResponse implements Serializable {
 	 * @param content
 	 */
 	public WebResponse(String url, byte[] content) {
-		this(url, content, null);
+		this(url, content, null, null);
 	}
 	
-	public WebResponse(String url, byte[] content, String maxAgeStr) {
+	public WebResponse(String url, byte[] content, String maxAgeStr, String refreshType) {
 		super();
 		this.url = url;
 		this.headers = new HashMap<String, List<String>>();
 		this.content = content;
 		setExpireTime(maxAgeStr);
+		this.refreshType = refreshType;
 	}	
 	
 	public int getStatusCode() {
@@ -296,7 +299,7 @@ public class WebResponse implements Serializable {
     	WebResponse copy = new WebResponse(this.url, this.content);
     	copy.expireTimeMap.putAll(this.getExpireTimeMap());
     	copy.statusCode = this.statusCode;
-    	
+    	copy.refreshType = this.refreshType;
 		copy.tags.addAll(this.tags);
     	
     	if (null != headers)
@@ -318,6 +321,12 @@ public class WebResponse implements Serializable {
 	public void setExpireTimeMap(Map<String, Long> expireTimeMap) {
 		this.expireTimeMap = expireTimeMap;
 	}
-    
-    
+	
+	public String getRefreshType() {
+		return refreshType;
+	}
+	
+	public void setRefreshType(String refreshType) {
+		this.refreshType = refreshType;
+	}
 }

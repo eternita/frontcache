@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.servlet.FilterChain;
@@ -513,6 +514,16 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 	// bot | browser
 	public void setClientType(String currentClientType) {
         set("currentClientType", currentClientType);
+	}
+	
+	public RequestContext copy() {
+
+		RequestContext copy = new RequestContext();
+		
+		copy.putAll(this);
+		copy.setRequestId(UUID.randomUUID().toString());
+		
+		return copy;
 	}
     
 }

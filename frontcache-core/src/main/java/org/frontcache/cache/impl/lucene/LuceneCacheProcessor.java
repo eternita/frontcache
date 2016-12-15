@@ -60,6 +60,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	
 	@Override
 	public void destroy() {
+		super.destroy();
 		indexManager.close();
 	}
 	
