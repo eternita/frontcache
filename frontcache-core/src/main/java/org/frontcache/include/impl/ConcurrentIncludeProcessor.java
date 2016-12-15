@@ -1,6 +1,8 @@
 package org.frontcache.include.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -14,6 +16,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheEngine;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -149,6 +152,15 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					String includeURL = getIncludeURL(includeTagStr);
 					String includeType = getIncludeType(includeTagStr);
 					
+					Map<String, List<String>> includeRequestHeaders = requestHeaders;
+					if (INCLUDE_TYPE_ASYNC.equals(includeType))
+					{
+						// create a copy and extend it
+						includeRequestHeaders = new HashMap<String, List<String>>();
+						includeRequestHeaders.putAll(requestHeaders);
+						includeRequestHeaders.put(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE, Arrays.asList(new String[]{"true"}));
+					}
+					
 					boolean performInclude = false;
 					String includeClientType = getIncludeClientType(includeTagStr);
 					if (null == includeClientType)
@@ -171,7 +183,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 							includes = new ArrayList<IncludeResolutionPlaceholder>();
 						
 						// save placeholder
-						includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, includeType, requestHeaders, client, context));
+						includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, includeType, includeRequestHeaders, client, context));
 					}
 					
 					scanIdx = endIdx;
