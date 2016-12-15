@@ -17,6 +17,7 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_DEBUG = "X-frontcache.debug";
 
     public static final String X_FRONTCACHE_DYNAMIC_REQUEST = "X-frontcache.dynamic-request";
+    public static final String X_FRONTCACHE_ASYNC_INCLUDE = "X-frontcache.async-include";
 
     public static final String X_FRONTCACHE_DEBUG_CACHEABLE = "X-frontcache.debug.cacheable";
     public static final String X_FRONTCACHE_DEBUG_CACHED = "X-frontcache.debug.cached";
@@ -25,8 +26,9 @@ public class FCHeaders {
 
     public static final String X_FRONTCACHE_COMPONENT = "X-frontcache.component";
 
-    public static final String X_FRONTCACHE_COMPONENT_TOPLEVEL = "toplevel";
-    public static final String X_FRONTCACHE_COMPONENT_INCLUDE = "include";
+    public static final String COMPONENT_TOPLEVEL = "toplevel";
+    public static final String COMPONENT_INCLUDE = "include";
+    public static final String COMPONENT_ASYNC_INCLUDE = "include-async";
     
     
     public static final String X_FRONTCACHE_COMPONENT_MAX_AGE = "X-frontcache.component.maxage";
