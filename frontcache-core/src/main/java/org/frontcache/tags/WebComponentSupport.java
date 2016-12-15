@@ -13,6 +13,7 @@ public class WebComponentSupport extends BodyTagSupport {
 
 	protected String maxage;
 	protected String tags;
+	protected String refresh;
 
 
 	/**
@@ -28,6 +29,7 @@ public class WebComponentSupport extends BodyTagSupport {
 	private void init() {
 		this.maxage = null;
 		this.tags = null;
+		this.refresh = null;
 	}
 
 	// Releases any resources we may have (or inherit)
@@ -51,6 +53,9 @@ public class WebComponentSupport extends BodyTagSupport {
 			
 			if (null != tags)
 				response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS, tags);
+			
+			if (null != refresh)
+				response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_REFRESH_TYPE, refresh);
 			
 			return SKIP_BODY;
 		} catch (Exception ex) {

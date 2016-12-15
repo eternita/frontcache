@@ -34,4 +34,7 @@ public interface CacheProcessor {
 	public Map<String, String> getCacheStatus();
 	
 	public List<String> getCachedKeys();
+	
+	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context);
+	
 }

@@ -56,7 +56,66 @@ public class FCUtils {
             "REMOTE_ADDR" 
     };
         
+
+	// true - save to cache
+	public static boolean isWebComponentCacheableForClientType(Map<String, Long> expireTimeMap, String clientType)
+	{
+		if (expireTimeMap.isEmpty())
+		{
+			// not a case -> log it
+			logger.error("isWebComponentCacheableForClientType() - expireTimeMap must not be empty for clientType=" + clientType);
+			return false; 
+		}
+		
+		Long expireTimeMillis = expireTimeMap.get(clientType);
+		if (null == expireTimeMillis)
+		{
+			// not a case -> log it
+			logger.error("isWebComponentCacheableForClientType() - expireTimeMillis must be in expireTimeMap for clientType=" + clientType);
+			return false; 			
+		}
+		
+		if (CacheProcessor.NO_CACHE == expireTimeMillis)
+			return false;
+		
+		return true;
+	}
+
+	/**
+	 * Check with current time if expired
+	 *  
+	 * @param clientType {bot | browser}
+	 * @return
+	 */
+	public static boolean isWebComponentExpired(Map<String, Long> expireTimeMap, String clientType)
+	{
+		if (expireTimeMap.isEmpty())
+		{
+			// not a case -> log it
+			logger.error("isWebComponentExpired() - expireTimeMap must not be empty for clientType=" + clientType);
+			return true; 
+		}
+		
+		Long expireTimeMillis = expireTimeMap.get(clientType);
+		if (null == expireTimeMillis)
+		{
+			// not a case -> log it
+			logger.error("isWebComponentExpired() - expireTimeMillis must be in expireTimeMap for clientType=" + clientType);
+			return true; 
+		}
+		
+		if (CacheProcessor.CACHE_FOREVER == expireTimeMillis)
+			return false;
+		
+		if (System.currentTimeMillis() > expireTimeMillis)
+			return true;
+		
+		return false;
+	}
+
 	
+	
+    
 	/**
 	 * e.g. localhost:8080
 	 * 
@@ -484,13 +543,19 @@ public class FCUtils {
 	private static final WebResponse parseWebComponent (String urlStr, byte[] content, Map<String, List<String>> headers) // , String contentType
 	{
 		String cacheMaxAgeSecStr = null;
+		String refreshTypeStr = null;
 		byte[] outContentBody = content;
 		
 		Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		if (null != collStr && !collStr.isEmpty())
 			cacheMaxAgeSecStr = collStr.iterator().next();
 		
-		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSecStr);
+		collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_REFRESH_TYPE);
+		if (null != collStr && !collStr.isEmpty())
+			refreshTypeStr = collStr.iterator().next();
+
+		
+		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSecStr, refreshTypeStr);
 		// set invalidation tags
 		Collection<String> tagsList = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS);
 		if (null != tagsList)
