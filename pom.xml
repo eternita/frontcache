@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.frontcache</groupId>
 	<artifactId>frontcache</artifactId>
-	<version>1.0.3-SNAPSHOT</version>
+	<version>1.1.0</version>
 	<packaging>pom</packaging>
 	
 	<name>${project.groupId}:${project.artifactId}</name>
@@ -54,7 +54,6 @@
 	<modules>
         <module>frontcache-core</module>
         <module>frontcache-agent</module>
-        <module>frontcache-server</module>
 	</modules>
 
 	<properties>
