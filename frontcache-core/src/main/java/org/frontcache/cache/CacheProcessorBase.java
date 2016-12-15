@@ -1,6 +1,6 @@
 package org.frontcache.cache;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -165,9 +165,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					Map<String, List<String>> requestHeadersCopy = new HashMap<String, List<String>>();
 					requestHeadersCopy.putAll(requestHeaders);
 					
-					List<String> headerParamList = new ArrayList<String>();
-					headerParamList.add("true");
-					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, headerParamList);
+					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
 					
 					WebResponse copy4cache = FCUtils.dynamicCall(originUrlStr, requestHeadersCopy, client, ctxCopy);
 					Map<String, List<String>> copyHeaders = copy4cache.getHeaders(); 

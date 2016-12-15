@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -417,12 +418,19 @@ public class FrontCacheEngine {
         context.setOriginURL(getOriginUrl(context));
         
         String requestId = servletRequest.getHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID);
-        String requestType = FCHeaders.X_FRONTCACHE_COMPONENT_INCLUDE;
+        String requestType = FCHeaders.COMPONENT_INCLUDE;
+        
         if (null == requestId)
         {
         	requestId = UUID.randomUUID().toString();
-        	requestType = FCHeaders.X_FRONTCACHE_COMPONENT_TOPLEVEL;
+        	requestType = FCHeaders.COMPONENT_TOPLEVEL;
         } else {
+            
+        	if (null != servletRequest.getHeader(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE))
+            	requestType = FCHeaders.COMPONENT_ASYNC_INCLUDE;
+        	else 
+        		requestType = FCHeaders.COMPONENT_INCLUDE;
+        	
             context.setRequestFromFrontcache();
         }
         
@@ -649,9 +657,7 @@ public class FrontCacheEngine {
 			String originLocation = originResponseHeaders.remove("Location").iterator().next();
 			
 			String fcLocation = FCUtils.transformRedirectURL(originLocation, context);
-			List hValues = new ArrayList<String>();
-			hValues.add(fcLocation);
-			originResponseHeaders.put("Location", hValues);
+			originResponseHeaders.put("Location",  Arrays.asList(new String[]{fcLocation}));
 		}
 		
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_ID, fcHostId);

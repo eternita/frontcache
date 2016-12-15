@@ -237,7 +237,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			{ // request logging
 				RequestContext contextCopy = new RequestContext();
 				contextCopy.putAll(context);
-				contextCopy.setRequestType(FCHeaders.X_FRONTCACHE_COMPONENT_INCLUDE);
+				contextCopy.setRequestType(FCHeaders.COMPONENT_INCLUDE);
 				
 				RequestLogger.logRequest(
 						urlStr, 
