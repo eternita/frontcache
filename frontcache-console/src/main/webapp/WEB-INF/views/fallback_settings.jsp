@@ -41,10 +41,10 @@
 	  	  <caption>Edge: <c:out value="${edge.key}"/></caption>
           <tr>
             <th>
-              <b>file name</b>
+              <b>URL pattern</b>
             </th>
             <th>
-              <b>url pattern / fetch url (to load fallback data)</b>
+              <b>Fallback File / Fetch URL for fallback file population</b>
             </th>
           </tr>
         </thead>
@@ -52,9 +52,9 @@
         <!-- start loop over configs -->
         <c:forEach var="config" items="${edge.value}">
           <tr>
-            <td>${config.fileName}  &nbsp;</td>
+            <td>${config.urlPattern}  &nbsp;</td>
             <td>
-            ${config.urlPattern} <br/>
+            ${config.fileName} <br/>
             ${config.initUrl} <br/> &nbsp;
             </td>
           </tr>
