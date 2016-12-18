@@ -314,6 +314,10 @@ public class FCUtils {
 	{
 		String fcLocation = null;
 		String protocol = getRequestProtocol(originLocation);
+		
+		if ("".equals(protocol)) // originLocation is relative path, so protocol is undefined
+			protocol = context.getFrontCacheProtocol(); // use current protocol from context
+		
 		if ("https".equalsIgnoreCase(protocol))
 			fcLocation = "https://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
 		else // http
