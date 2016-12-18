@@ -46,7 +46,7 @@ subprojects {
 	apply plugin: 'jacoco'
 	apply plugin: 'com.github.kt3k.coveralls'
 	
-    version = '1.1.0'
+    version = '1.1.1-SNAPSHOT'
     group = 'org.frontcache'
 	
 //	upload binaries to Maven repository.  $mavenLocalRepo (defined in gradle.properties)
@@ -224,6 +224,8 @@ project(':frontcache-tests') {
 	// gretty for FC filter and web app
 	gretty {
 		httpPort = 8080
+		httpsPort = 8443
+		httpsEnabled = true
 		servicePort = 8081
 		statusPort = 8082
   		contextPath = '/'
