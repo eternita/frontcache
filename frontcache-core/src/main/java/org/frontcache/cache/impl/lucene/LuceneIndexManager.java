@@ -106,8 +106,9 @@ public class LuceneIndexManager {
 		} else {
 			try {
 				indexWriter = getIndexWriter();
-			} catch (IOException e) {
-				logger.error("Error during creating indexWriter", e);
+			} catch (Exception e) {
+				// if other instance holds lock on index - lets try to get lock during runtime
+				logger.error("Error during creating indexWriter " + e.getMessage());
 			}
 		}
 	}
@@ -185,7 +186,7 @@ public class LuceneIndexManager {
 		if (indexWriter != null && indexWriter.isOpen()) {
 			try {
 				indexWriter.close();
-			} catch (IOException e) {
+			} catch (Exception e) {
 				logger.error("Error:", e);
 			}
 		}
@@ -220,8 +221,8 @@ public class LuceneIndexManager {
 			if (iWriter == null){
 				return null;
 			}
-		} catch (IOException e1) {
-			logger.debug("Error during getting indexWriter.", e1);
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
 			return null;
 		}
 		
@@ -266,8 +267,8 @@ public class LuceneIndexManager {
 			if (iWriter == null){
 				return ;
 			}
-		} catch (IOException e1) {
-			logger.debug("Error during getting indexWriter.", e1);
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
 			return;
 		}
 
@@ -311,8 +312,8 @@ public class LuceneIndexManager {
 			if (iWriter == null){
 				return Collections.emptyList();
 			}
-		} catch (IOException e1) {
-			logger.debug("Error during getting indexWriter.", e1);
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
 			return Collections.emptyList();
 		}
 		
@@ -384,8 +385,8 @@ public class LuceneIndexManager {
 			if (iWriter == null){
 				return -1;
 			}
-		} catch (IOException e1) {
-			logger.debug("Error during getting indexWriter.", e1);
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
 			return -1;
 		}
 		
