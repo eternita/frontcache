@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -120,7 +121,7 @@ public class LuceneIndexManager {
 	private IndexWriter getIndexWriter() throws IOException {
 		if (indexWriter == null) {
 			synchronized (IndexWriter.class) {
-
+                logger.info("Trying to get indexWriter...");
 				Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
 				Analyzer analyzer = new StandardAnalyzer();
 				IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
@@ -128,6 +129,7 @@ public class LuceneIndexManager {
 				iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
 				iwc.setRAMBufferSizeMB(250.0);
 				indexWriter = new IndexWriter(dir, iwc);
+				logger.info("IndexWriter initialized");
 			}
 		}
 
@@ -190,18 +192,21 @@ public class LuceneIndexManager {
 	}
 
 	public void truncate() {
-		try {
-			indexWriter.deleteAll();
-			logger.warn("lucene index truncated");
-		} catch (IOException ioEx) {
-			logger.error("Error truncating lucene index: {}", ioEx.getMessage(), ioEx);
-		} finally {
+		if (indexWriter != null && indexWriter.isOpen()){
 			try {
-				indexWriter.commit();
+				indexWriter.deleteAll();
+				logger.warn("lucene index truncated");
 			} catch (IOException ioEx) {
 				logger.error("Error truncating lucene index: {}", ioEx.getMessage(), ioEx);
-			}
+			} finally {
+				try {
+					indexWriter.commit();
+				} catch (IOException ioEx) {
+					logger.error("Error truncating lucene index: {}", ioEx.getMessage(), ioEx);
+				}
+			}			
 		}
+
 	}
 
 	/**
@@ -209,10 +214,21 @@ public class LuceneIndexManager {
 	 */
 	private Document getDocByURL(String url) throws IOException, ParseException {
 
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return null;
+			}
+		} catch (IOException e1) {
+			logger.debug("Error during getting indexWriter.", e1);
+			return null;
+		}
+		
 		Document doc = null;
 		IndexReader reader = null;
 		try {
-			reader = DirectoryReader.open(indexWriter);
+			reader = DirectoryReader.open(iWriter);
 
 			IndexSearcher searcher = new IndexSearcher(reader);
 
@@ -244,6 +260,18 @@ public class LuceneIndexManager {
 	 */
 	public void delete(String urlOrTag) {
 		
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return ;
+			}
+		} catch (IOException e1) {
+			logger.debug("Error during getting indexWriter.", e1);
+			return;
+		}
+
+		
 		try {
 			Query query1 = new TermQuery(new Term(URL_FIELD, urlOrTag));
 			Query query2 = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
@@ -253,13 +281,13 @@ public class LuceneIndexManager {
 			booleanQuery.add(query1, Occur.SHOULD);
 			booleanQuery.add(query2, Occur.SHOULD);
 			
-			long count = indexWriter.deleteDocuments(booleanQuery.build());
+			long count = iWriter.deleteDocuments(booleanQuery.build());
 			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
 		} catch (IOException e) {
 			logger.error(e.getMessage(), e);
 		} finally {
 			try {
-				indexWriter.commit();
+				iWriter.commit();
 			} catch (IOException e) {
 				logger.error(e.getMessage(), e);
 			}
@@ -276,11 +304,23 @@ public class LuceneIndexManager {
 	 */
 	public List<String> getKeys() 
 	{
+		
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return Collections.emptyList();
+			}
+		} catch (IOException e1) {
+			logger.debug("Error during getting indexWriter.", e1);
+			return Collections.emptyList();
+		}
+		
 		List<String> keys = new ArrayList<String>();
 
 		IndexReader reader = null;
 		try {
-			reader = DirectoryReader.open(indexWriter);
+			reader = DirectoryReader.open(iWriter);
 			
 			for (int i=0; i<reader.maxDoc(); i++) {
 			    Document doc = reader.document(i);
@@ -337,9 +377,21 @@ public class LuceneIndexManager {
 	 * @return
 	 */
 	public int getIndexSize(){
+		
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return -1;
+			}
+		} catch (IOException e1) {
+			logger.debug("Error during getting indexWriter.", e1);
+			return -1;
+		}
+		
 		int n = -1;
 		try {
-			IndexReader reader = DirectoryReader.open(indexWriter);
+			IndexReader reader = DirectoryReader.open(iWriter);
 			n = reader.numDocs();
 		} catch (IOException e) {
 			logger.error(e.getMessage(), e);

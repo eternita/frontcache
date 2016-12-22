@@ -60,6 +60,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	
 	@Override
 	public void destroy() {
+		logger.info("Running destroy() to release lock");
 		super.destroy();
 		indexManager.close();
 	}
