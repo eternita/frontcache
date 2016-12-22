@@ -19,6 +19,7 @@ import org.frontcache.cache.impl.lucene.LuceneCacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -198,13 +199,50 @@ public class LuceneIndexTests {
 			
 	}
 
+	@Test
 
+	public void multyWritersTest() throws Exception {
+
+		LuceneCacheProcessor pr1 = new LuceneCacheProcessor();
+		Properties prop = new Properties();
+		prop.put("front-cache.cache-processor.impl.cache-dir", "/tmp/cache/");
+		pr1.init(prop);
+
+
+		System.out.println("hello");
+		String url = UUID.randomUUID().toString();
+		pr.removeFromCache(url);
+
+		WebResponse response = new WebResponse(url, null);
+		List<String> list = new ArrayList<>();
+		list.add(UUID.randomUUID().toString());
+		response.getHeaders().put("Accept", list);
+		Set<String> set = new HashSet<>();
+		set.add("banana");
+		response.setTags(set);
+		response.setStatusCode(55);
+		pr1.putToCache(url, response);
+
+		pr.destroy();
+		
+		pr1.putToCache(url, response);
+		
+		// now second writer should have IndexWriter
+		WebResponse fromFile = pr1.getFromCacheImpl(url);
+		assertNotNull(fromFile);
+
+		pr1.destroy();
+
+	}
+	
+	
 	@Before
 	public void setUp() {
 		pr = new LuceneCacheProcessor();
 		Properties prop = new Properties();
 		prop.put("front-cache.cache-processor.impl.cache-dir", "/tmp/cache/");
 		pr.init(prop);
+		pr.removeFromCacheAll();
 	}
 
 	@After
