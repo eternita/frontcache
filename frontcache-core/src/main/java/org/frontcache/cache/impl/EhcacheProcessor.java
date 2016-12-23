@@ -1,4 +1,4 @@
-package org.frontcache.cache.impl.ehcache;
+package org.frontcache.cache.impl;
 
 import java.io.IOException;
 import java.io.InputStream;
