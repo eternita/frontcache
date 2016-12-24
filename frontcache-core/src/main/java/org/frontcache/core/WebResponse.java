@@ -27,7 +27,7 @@ public class WebResponse implements Serializable {
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 6L; 
+	private static final long serialVersionUID = 7L; 
 
 	private int statusCode = -1; // for redirects
 	
@@ -50,6 +50,9 @@ public class WebResponse implements Serializable {
 	private Map<String, Long> expireTimeMap = new HashMap<String, Long>();
 	
 	private String refreshType = null; // null is default (regular) [regular | soft]
+	
+	private String cacheLevel = null; // null is default (L2) [L1 | L2]
+	
 	
 	public WebResponse() { // for JSON converter
 		this("dummy", null, null, null);
@@ -300,6 +303,7 @@ public class WebResponse implements Serializable {
     	copy.expireTimeMap.putAll(this.getExpireTimeMap());
     	copy.statusCode = this.statusCode;
     	copy.refreshType = this.refreshType;
+    	copy.cacheLevel = this.cacheLevel;
 		copy.tags.addAll(this.tags);
     	
     	if (null != headers)
@@ -326,7 +330,15 @@ public class WebResponse implements Serializable {
 		return refreshType;
 	}
 	
+	// for JSON convenience only
 	public void setRefreshType(String refreshType) {
 		this.refreshType = refreshType;
 	}
+	public String getCacheLevel() {
+		return cacheLevel;
+	}
+	public void setCacheLevel(String cacheLevel) {
+		this.cacheLevel = cacheLevel;
+	}
+	
 }
