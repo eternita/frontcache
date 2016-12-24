@@ -1,4 +1,4 @@
-package org.frontcache.cache.impl.lucene;
+package org.frontcache.cache.impl;
 
 import java.io.IOException;
 import java.nio.file.Files;

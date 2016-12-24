@@ -1,4 +1,4 @@
-package org.frontcache.cache.impl.ehcache;
+package org.frontcache.cache.impl;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,7 +21,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 
 	private static final String DEFAULT_EHCACHE_CONFIG_FILE = "ehcache-config.xml";
 	
-	private static final String EHCACHE_CONFIG_FILE_KEY = "front-cache.cache-processor.impl.ehcache.config";
+	private static final String EHCACHE_CONFIG_FILE_KEY = "front-cache.cache-processor.impl.ehcache-config";
 	
 	private static final String FRONT_CACHE = "FRONT_CACHE"; // cache name inside config file (e.g. ehcache-config.xml)
 

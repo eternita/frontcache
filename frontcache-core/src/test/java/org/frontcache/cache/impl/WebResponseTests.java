@@ -1,4 +1,4 @@
-package org.frontcache.cache.impl.lucene;
+package org.frontcache.cache.impl;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -7,7 +7,7 @@ import static org.junit.Assert.fail;
 
 import java.util.Properties;
 
-import org.frontcache.cache.impl.lucene.LuceneCacheProcessor;
+import org.frontcache.cache.impl.LuceneCacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.junit.After;
 import org.junit.Before;

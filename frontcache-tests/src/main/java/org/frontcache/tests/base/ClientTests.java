@@ -200,9 +200,9 @@ public abstract class ClientTests extends TestsBase {
 		assertEquals("true", debugCached);
 		
 		// cache invalidation (both standalone and filter)
-		String response = frontcacheClientStandalone.removeFromCache(TEST_URI); // clean up FC standalone		
+		String response = frontcacheClientStandalone.removeFromCache(getFrontCacheBaseURL() + TEST_URI); // clean up FC standalone		
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
-		response = frontcacheClientFilter.removeFromCache(TEST_URI); // clean up FC filter
+		response = frontcacheClientFilter.removeFromCache(getFrontCacheBaseURL() + TEST_URI); // clean up FC filter
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		// third request - the same request - response is dynamic
@@ -245,7 +245,7 @@ public abstract class ClientTests extends TestsBase {
 		assertEquals("true", debugCached);
 		
 		// cache invalidation
-		String response = fcCluster.removeFromCache(TEST_URI).get(FRONTCACHE_CLUSTER_NODE1);
+		String response = fcCluster.removeFromCache(getFrontCacheBaseURL() + TEST_URI).get(FRONTCACHE_CLUSTER_NODE1);
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		// third request - the same request - response is dynamic

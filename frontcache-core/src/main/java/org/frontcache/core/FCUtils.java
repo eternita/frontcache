@@ -471,7 +471,7 @@ public class FCUtils {
         	// add parameters for storing 
         	// POST method parameters are not stored because they can be huge (e.g. file upload)
         	StringBuffer sb = new StringBuffer(requestURL);
-        	Enumeration paramNames = request.getParameterNames();
+        	Enumeration<String> paramNames = request.getParameterNames();
         	if (paramNames.hasMoreElements())
         		sb.append("?");
 
@@ -548,6 +548,7 @@ public class FCUtils {
 	{
 		String cacheMaxAgeSecStr = null;
 		String refreshTypeStr = null;
+		String cacheLevelStr = null;
 		byte[] outContentBody = content;
 		
 		Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
@@ -558,8 +559,15 @@ public class FCUtils {
 		if (null != collStr && !collStr.isEmpty())
 			refreshTypeStr = collStr.iterator().next();
 
+		collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_CACHE_LEVEL);
+		if (null != collStr && !collStr.isEmpty())
+			cacheLevelStr = collStr.iterator().next();
 		
 		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSecStr, refreshTypeStr);
+		
+		if (null != cacheLevelStr)
+			component.setCacheLevel(cacheLevelStr);
+		
 		// set invalidation tags
 		Collection<String> tagsList = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS);
 		if (null != tagsList)
