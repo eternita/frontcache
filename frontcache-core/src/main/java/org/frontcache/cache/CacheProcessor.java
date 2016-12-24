@@ -11,7 +11,7 @@ import org.frontcache.core.WebResponse;
 
 public interface CacheProcessor {
 
-	public final static String CACHED_ENTRIES = "cached entries";
+	public final static String CACHED_ENTRIES = "cached-entries";
 	
 	public final static int NO_CACHE = 0;
 	

@@ -30,7 +30,10 @@ public class FCHeaders {
     public static final String COMPONENT_INCLUDE = "include";
     public static final String COMPONENT_ASYNC_INCLUDE = "include-async";
     
+    public static final String CACHE_LEVEL_L1 = "L1";
+    public static final String CACHE_LEVEL_L2 = "L2";
     
+    public static final String X_FRONTCACHE_COMPONENT_CACHE_LEVEL = "X-frontcache.component.cache-level"; // [L1 | L2] default is L2 (if null); optional - used with some cache processors only (eg L1L2CacheProcessor)
     public static final String X_FRONTCACHE_COMPONENT_MAX_AGE = "X-frontcache.component.maxage";
     public static final String X_FRONTCACHE_COMPONENT_REFRESH_TYPE = "X-frontcache.component.refresh";
     public static final String X_FRONTCACHE_COMPONENT_TAGS = "X-frontcache.component.tags"; // invalidation tags 

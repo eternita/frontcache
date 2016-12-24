@@ -3,6 +3,9 @@ package org.frontcache.tests.base;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
+import java.util.Map;
+
+import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
 import org.junit.After;
@@ -146,6 +149,26 @@ public abstract class CommonTests extends TestsBase {
 		assertEquals("-1", maxage);
 		
 	}
+	
+	@Test
+	public void l1l2Cache() throws Exception {
+
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/l1-l2-cache-level/a1.jsp");
+		assertEquals("abc", page.getPage().asText());
+		
+		Map<String, String> state = frontcacheClient.getCacheState();
+
+		assertEquals("org.frontcache.cache.impl.L1L2CacheProcessor", state.get("impl"));
+		
+		assertEquals("3", state.get(CacheProcessor.CACHED_ENTRIES));
+		assertEquals("1", state.get(CacheProcessor.CACHED_ENTRIES + "-L1"));
+		assertEquals("2", state.get(CacheProcessor.CACHED_ENTRIES + "-L2"));
+
+		assertEquals("EhCache", state.get("impl_L1"));
+		assertEquals("Lucene", state.get("impl_L2"));
+		
+	}
+
 	
 	/**
 	 * for single page maxage="bot:60"
