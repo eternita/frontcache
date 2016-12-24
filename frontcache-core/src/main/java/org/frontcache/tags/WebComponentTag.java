@@ -15,4 +15,7 @@ public class WebComponentTag extends WebComponentSupport {
 		super.refresh = refresh;
 	}
 	
+	public void setLevel(String level) {
+		super.level = level;
+	}
 }
