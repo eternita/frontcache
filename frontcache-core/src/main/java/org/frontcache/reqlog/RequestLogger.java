@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
  *  cacheable_flag - true/1 if request is run through FrontCache engine (e.g. GET method, text data). false/0 - otherwise (request forwarded to origin)
  *  dynamic_flag{1|0} - true if origin has been requested. false/0 - otherwise (it's cacheable & cached). 
  *  
- *	log-timestamp request-id   http-method   is-hystrix-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|browser}    user-agent
+ *	log-timestamp request-id   http-method   is-hystrix-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache|dynamic-soft}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|browser}    user-agent
  *  
  *  EXAMPLE
  *  2016-06-03T15:06:35,092-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 GET success toplevel cacheable from-cache 0 50874 "http://myfc.coinshome.net:8080/en/coin_definition-1_Thaler-Silver-Kingdom_of_Prussia_(1701_1918)-c_sK.GJAIx4AAAEvnTTi7NnT.htm" 0:0:0:0:0:0:0:1 front-cache-local-1 browser
@@ -60,6 +60,10 @@ public class RequestLogger {
         HttpServletRequest request = context.getRequest();
         boolean isHystrixError = context.getHystrixError();
         String userAgent = request.getHeader("User-Agent");
+        
+        String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
+        if (!isCached && "true".equals(request.getHeader(FCHeaders.X_FRONTCACHE_SOFT_REFRESH)))
+        	requestTypeDynamicCachedSoft = "dynamic-soft";
 
 		// FORMAT
 		// dynamic_flag runtime_millis datalength_bytes url
@@ -71,7 +75,7 @@ public class RequestLogger {
 //		.append(SEPARATOR).append((isCacheable) ? 1 : 0)
 		.append(SEPARATOR).append((isCacheable) ? "cacheable" : "direct")
 //		.append(SEPARATOR).append((isCached) ? 1 : 0)
-		.append(SEPARATOR).append((isCached) ? "from-cache" : "dynamic")
+		.append(SEPARATOR).append(requestTypeDynamicCachedSoft)
 		.append(SEPARATOR).append(runtimeMillis)
 		.append(SEPARATOR).append(lengthBytes) 
 		.append(SEPARATOR).append("\"").append(url).append("\"")
