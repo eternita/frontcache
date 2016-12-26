@@ -33,6 +33,8 @@ import org.frontcache.FrontcacheAction;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.io.CacheStatusActionResponse;
+import org.frontcache.io.GetBotsActionResponse;
+import org.frontcache.io.GetDynamicURLsActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.slf4j.Logger;
@@ -246,6 +248,71 @@ public class FrontCacheClient {
 		
 		return actionResponse.getFallbackConfigs();
 	}
+
+	
+	/**
+	 * 
+	 * @return
+	 */
+	public GetBotsActionResponse getBotsActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_BOTS));
+		
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			GetBotsActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetBotsActionResponse.class);
+			return actionResponse;
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	public List<String> getBots()
+	{
+		GetBotsActionResponse actionResponse = getBotsActionResponse();
+		
+		if (null == actionResponse)
+			return null;
+		
+		return actionResponse.getBots();
+	}
+	
+
+	/**
+	 * 
+	 * @return
+	 */
+	public GetDynamicURLsActionResponse getDynamicURLsActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_DYNAMIC_URLS));
+		
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			GetDynamicURLsActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetDynamicURLsActionResponse.class);
+			return actionResponse;
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	public List<String> getDynamicURLs()
+	{
+		GetDynamicURLsActionResponse actionResponse = getDynamicURLsActionResponse();
+		
+		if (null == actionResponse)
+			return null;
+		
+		return actionResponse.getDynamicURLs();
+	}
+	
 	
 	/**
 	 * 

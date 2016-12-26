@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,8 @@ import org.frontcache.io.AccessDeniedActionResponse;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
+import org.frontcache.io.GetBotsActionResponse;
+import org.frontcache.io.GetDynamicURLsActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.HelpActionResponse;
@@ -133,6 +136,14 @@ public class FrontCacheIOServlet extends HttpServlet {
 			
 		case FrontcacheAction.GET_FALLBACK_CONFIGS:
 			aResponse = getFallbackConfigs(request);
+			break;
+			
+		case FrontcacheAction.GET_BOTS:
+			aResponse = getBots(request);
+			break;
+			
+		case FrontcacheAction.GET_DYNAMIC_URLS:
+			aResponse = getDynamicURLs(request);
 			break;
 			
 			default:
@@ -312,6 +323,36 @@ public class FrontCacheIOServlet extends HttpServlet {
 		
 		GetFallbackConfigActionResponse aResponse = new GetFallbackConfigActionResponse();
 		aResponse.setFallbackConfigs(fallbackConfigs);
+		
+		return aResponse;
+	}
+
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getBots(HttpServletRequest req)
+	{
+		List<String> bots = new ArrayList<String>();
+		bots.addAll(FrontCacheEngine.getFrontCache().getBotUserAgentKeywords());
+		GetBotsActionResponse aResponse = new GetBotsActionResponse();
+		aResponse.setBots(bots);
+		
+		return aResponse;
+	}
+	
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getDynamicURLs(HttpServletRequest req)
+	{
+		List<String> dynamicURLs = new ArrayList<String>();
+		dynamicURLs.addAll(FrontCacheEngine.getFrontCache().getDynamicURLs());
+		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
+		aResponse.setDynamicURLs(dynamicURLs);
 		
 		return aResponse;
 	}
