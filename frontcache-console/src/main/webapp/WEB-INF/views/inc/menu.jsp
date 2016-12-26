@@ -15,7 +15,9 @@
 		<nav class="collapse navbar-collapse" id="bs-navbar">
 			<ul class="nav navbar-nav">
 				<li><a href="realtime">Realtime monitor </a></li>
-				<li><a href="fallbacks">Fallback configs </a></li>
+                <li><a href="fallbacks">Fallback configs </a></li>
+                <li><a href="bot-configs">Bot configs </a></li>
+                <li><a href="dynamic-urls-configs">Dynamic URLs configs </a></li>
                 <li><a href="cache-view">Cache view </a></li>
                 <li><a href="cache-invalidation">Cache invalidation </a></li>
 				<li><a href="edges">Edges </a></li>

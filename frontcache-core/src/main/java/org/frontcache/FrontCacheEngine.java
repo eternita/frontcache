@@ -10,6 +10,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -63,13 +64,13 @@ import org.slf4j.LoggerFactory;
 
 public class FrontCacheEngine {
 
-	private final static String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "direct-urls.conf";
+	private final static String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "dynamic-urls.conf";
 	
 	private static final String BOT_CONIF_FILE = "bots.conf";
 	
 	private Set<String> botUserAgentKeywords = new LinkedHashSet<String>();
 	
-	private List <Pattern> uriIgnorePatterns = new ArrayList<Pattern>();
+	private List <Pattern> dynamicURLPatterns = new ArrayList<Pattern>();
 
 	private Map<String, Origin> domainOriginMap = new ConcurrentHashMap<String, Origin>();
 	
@@ -100,7 +101,7 @@ public class FrontCacheEngine {
 	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output 
 	
 	private static FrontCacheEngine instance;
-		
+	
 	public static FrontCacheEngine getFrontCache() {
 		if (null == instance) {
 			FCConfig.init();
@@ -467,7 +468,7 @@ public class FrontCacheEngine {
     
     private boolean ignoreCache(String uri)
     {
-    	for (Pattern p : uriIgnorePatterns)
+    	for (Pattern p : dynamicURLPatterns)
     		if (p.matcher(uri).find()) 
     			return true;
     	
@@ -709,7 +710,7 @@ public class FrontCacheEngine {
 			is = FCConfig.getConfigInputStream(CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
 			if (null == is)
 			{
-				logger.info("Cache ignore URI patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
+				logger.info("Dynamic URL patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
 				return;
 			}
 
@@ -724,16 +725,16 @@ public class FrontCacheEngine {
 					if (0 == patternStr.trim().length()) // skip empty
 						continue;
 					
-					uriIgnorePatterns.add(Pattern.compile(patternStr));
+					dynamicURLPatterns.add(Pattern.compile(patternStr));
 					patternCounter++;
 				} catch (PatternSyntaxException ex) {
-					logger.info("Cache ignore URI pattern - " + patternStr + " is not loaded");					
+					logger.info("Dynamic URL pattern - " + patternStr + " is not loaded");					
 				}
 			}
-			logger.info("Successfully loaded " + patternCounter +  " cache ignore URI patterns");					
+			logger.info("Successfully loaded " + patternCounter +  " dynamic URL patterns");					
 			
 		} catch (Exception e) {
-			logger.info("Cache ignore URI patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
+			logger.info("Dynamic URL patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
 		} finally {
 			if (null != confReader)
 			{
@@ -800,5 +801,19 @@ public class FrontCacheEngine {
 		return;
 	}
 	
+	public Set<String> getBotUserAgentKeywords()
+	{
+		return botUserAgentKeywords;
+	}
+		
+	public Set<String> getDynamicURLs()
+	{
+		Set<String> dynamicURLs = new HashSet<String>();
+		
+		for (Pattern p : dynamicURLPatterns)
+			dynamicURLs.add(p.toString());
+		
+		return dynamicURLs;
+	}
 		
 }
