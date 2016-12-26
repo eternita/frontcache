@@ -34,6 +34,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 //			FCHeaders.X_FRONTCACHE_COMPONENT_CACHE_LEVEL,
 //			FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE,
 //			FCHeaders.X_FRONTCACHE_COMPONENT_REFRESH_TYPE,
+//			FCHeaders.X_FRONTCACHE_SOFT_REFRESH,
 //			FCHeaders.X_FRONTCACHE_COMPONENT_TAGS, //  tags should not be filtered by FC (e.g. client -> fc2 (standalone) -> fc1 (filter) -> origin)
 			FCHeaders.X_FRONTCACHE_REQUEST_ID,
 			FCHeaders.X_FRONTCACHE_CLIENT_IP,
@@ -167,6 +168,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					requestHeadersCopy.putAll(requestHeaders);
 					
 					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
+					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_SOFT_REFRESH, Arrays.asList(new String[]{"true"}));
 					
 					WebResponse copy4cache = FCUtils.dynamicCall(originUrlStr, requestHeadersCopy, client, ctxCopy);
 					Map<String, List<String>> copyHeaders = copy4cache.getHeaders(); 
