@@ -20,6 +20,9 @@ public abstract class FrontcacheAction {
 	
 	public static final String GET_FROM_CACHE = "get-from-cache";
 	
+	public static final String GET_BOTS = "get-bots";
+	
+	public static final String GET_DYNAMIC_URLS = "get-dynamic-urls";
 	
 	public static Map<String, String> actionsDescriptionMap = new TreeMap<>();
 	
@@ -31,6 +34,8 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.DUMP_KEYS, "dump keys to a file at the edge - keys are saved to ./warmer dir");
 		actionsDescriptionMap.put(FrontcacheAction.GET_CACHED_KEYS, "get cached keys");
 		actionsDescriptionMap.put(FrontcacheAction.GET_FROM_CACHE, "get content from cache, accept 'key' parameter");
+		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get substring to determine bots based on User-Agent HTTP header from ./conf/bots.conf");
+		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
 	}
 	
 }
