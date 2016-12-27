@@ -1,7 +1,7 @@
 /build/
+/bin/
 /.gradle/
+/.settings/
+/frontcache-filter-tests/
 /gradle.properties
 /.DS_Store
-/scripts
-/target/
-/distribution/
