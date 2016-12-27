@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+export FRONTCACHE_HOME="/opt/frontcache"
+
+FRONTCACHE_SCRIPT="$0"
+verbose=false
+THIS_OS=`uname -s`
+
+# What version of Java is required to run this version of FRONTCACHE.
+JAVA_VER_REQ="8"         # For printing in echo
+
+stop_all=false
+
+
+
+# Resolve symlinks to this script
+while [ -h "$FRONTCACHE_SCRIPT" ] ; do
+  ls=`ls -ld "$FRONTCACHE_SCRIPT"`
+  # Drop everything prior to ->
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+    FRONTCACHE_SCRIPT="$link"
+  else
+    FRONTCACHE_SCRIPT=`dirname "$FRONTCACHE_SCRIPT"`/"$link"
+  fi
+done
+
+#echo "$FRONTCACHE_SCRIPT"
+
+
+FRONTCACHE_TIP=`dirname "$FRONTCACHE_SCRIPT"`/..
+FRONTCACHE_TIP=`cd "$FRONTCACHE_TIP"; pwd`
+
+DEFAULT_SERVER_DIR="$FRONTCACHE_TIP/server"
+FRONTCACHE_JETTY_BASE="$FRONTCACHE_TIP/frontcache-base"
+
+FRONTCACHE_BASE=`dirname "$FRONTCACHE_SCRIPT"`/../..
+FRONTCACHE_BASE=`cd "$FRONTCACHE_BASE"; pwd`
+
+export FRONTCACHE_HOME="$FRONTCACHE_BASE"/FRONTCACHE_HOME
+echo "FRONTCACHE_HOME"
+
+
+echo "$FRONTCACHE_TIP"
+echo "$FRONTCACHE_BASE"
+
+
+if [ -z "$FRONTCACHE_PID_DIR" ]; then
+  FRONTCACHE_PID_DIR="$FRONTCACHE_TIP/bin"
+fi
+
+
+if [ -n "$FRONTCACHE_JAVA_HOME" ]; then
+  JAVA="$FRONTCACHE_JAVA_HOME/bin/java"
+elif [ -n "$JAVA_HOME" ]; then
+  for java in "$JAVA_HOME"/bin/amd64/java "$JAVA_HOME"/bin/java; do
+    if [ -x "$java" ]; then
+      JAVA="$java"
+      break
+    fi
+  done
+  if [ -z "$JAVA" ]; then
+    echo >&2 "The currently defined JAVA_HOME ($JAVA_HOME) refers"
+    echo >&2 "to a location where Java could not be found.  Aborting."
+    echo >&2 "Either fix the JAVA_HOME variable or remove it from the"
+    echo >&2 "environment so that the system PATH will be searched."
+    exit 1
+  fi
+else
+  JAVA=java
+fi
+
+if [ -z "$FRONTCACHE_STOP_WAIT" ]; then
+  FRONTCACHE_STOP_WAIT=180
+fi
+# test that Java exists, is executable and correct version
+JAVA_VER=$("$JAVA" -version 2>&1)
+if [[ $? -ne 0 ]] ; then
+  echo >&2 "Java not found, or an error was encountered when running java."
+  echo >&2 "A working Java $JAVA_VER_REQ JRE is required to run FRONTCACHE!"
+  echo >&2 "Please install latest version of Java $JAVA_VER_REQ or set JAVA_HOME properly."
+  echo >&2 "Command that we tried: '${JAVA} -version', with response:"
+  echo >&2 "${JAVA_VER}"
+  echo
+  echo >&2 "Debug information:"
+  echo >&2 "JAVA_HOME: ${JAVA_HOME:-N/A}"
+  echo >&2 "Active Path:"
+  echo >&2 "${PATH}"
+  exit 1
+else
+  JAVA_VER=$(echo $JAVA_VER | awk -F '"' '/version/ {print $2}')
+  if [[ "$JAVA_VER" < "1.$JAVA_VER_REQ" ]] ; then
+    echo >&2 "Your current version of Java is too old to run this version of FRONTCACHE"
+    echo >&2 "We found version $JAVA_VER, using command '${JAVA}'"
+    echo >&2 "Please install latest version of Java $JAVA_VER_REQ or set JAVA_HOME properly."
+    echo
+    echo >&2 "Debug information:"
+    echo >&2 "JAVA_HOME: ${JAVA_HOME:-N/A}"
+    echo >&2 "Active Path:"
+    echo >&2 "${PATH}"
+    exit 1
+  fi
+fi
+
+java_ver_out=`echo "$("$JAVA" -version 2>&1)"`
+JAVA_VERSION=`echo $java_ver_out | grep "java version" | awk '{ print substr($3, 2, length($3)-2); }'`
+JAVA_VENDOR="Oracle"
+
+echo "java version $JAVA_VERSION"
+# Select HTTP OR HTTPS related configurations
+FRONTCACHE_URL_SCHEME=http
+FRONTCACHE_JETTY_CONFIG=()
+FRONTCACHE_SSL_OPTS=""
+
+exec "$JAVA" -jar "$FRONTCACHE_TIP/start.jar" "jetty.base=$FRONTCACHE_JETTY_BASE" "-Dfrontcache.home=$FRONTCACHE_HOME"  "-Dlogback.configurationFile=$FRONTCACHE_HOME/conf/fc-logback.xml"
