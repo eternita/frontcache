@@ -1,4 +1,4 @@
-package org.frontcache;
+package org.frontcache.io;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -17,22 +17,12 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.frontcache.FCConfig;
+import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
-import org.frontcache.io.AccessDeniedActionResponse;
-import org.frontcache.io.ActionResponse;
-import org.frontcache.io.CacheStatusActionResponse;
-import org.frontcache.io.DumpKeysActionResponse;
-import org.frontcache.io.GetBotsActionResponse;
-import org.frontcache.io.GetDynamicURLsActionResponse;
-import org.frontcache.io.GetFallbackConfigActionResponse;
-import org.frontcache.io.GetFromCacheActionResponse;
-import org.frontcache.io.HelpActionResponse;
-import org.frontcache.io.InvalidateActionResponse;
-import org.frontcache.io.ReloadActionResponse;
-import org.frontcache.io.ReloadFallbacksActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

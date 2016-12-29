@@ -141,7 +141,8 @@ public class FrontCacheEngine {
 		initialize();
 	}
 	
-	HttpClient getHttpClient()
+	// used by FrontCacheIOServlet
+	public HttpClient getHttpClient()
 	{
 		return httpClient;
 	}
