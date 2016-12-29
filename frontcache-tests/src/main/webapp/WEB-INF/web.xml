@@ -20,7 +20,7 @@
 
 	<servlet>
 		<servlet-name>FrontCacheIOServlet</servlet-name>
-		<servlet-class>org.frontcache.FrontCacheIOServlet</servlet-class>
+		<servlet-class>org.frontcache.io.FrontCacheIOServlet</servlet-class>
 	</servlet>
 
 	<servlet-mapping>
