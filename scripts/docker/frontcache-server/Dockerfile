@@ -1,0 +1,8 @@
+FROM frontcache/tomcat8
+
+RUN mkdir /opt/frontcache
+ENV FRONTCACHE_HOME /opt/frontcache
+COPY FRONTCACHE_HOME/ ${FRONTCACHE_HOME}
+RUN rm -R ${DEPLOYMENT_DIR}/*/
+COPY dist/ROOT.war ${DEPLOYMENT_DIR}
+EXPOSE 8080
