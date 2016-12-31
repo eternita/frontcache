@@ -2,17 +2,24 @@ package org.frontcache.core;
 
 public class Origin {
 
+	private String domain;
 	private String host;
 	private String httpPort;
 	private String httpsPort;
 	
 		
-	public Origin(String host, String httpPort, String httpsPort) {
+	public Origin(String domain, String host, String httpPort, String httpsPort) {
 		super();
+		this.domain = domain;
 		this.host = host;
 		this.httpPort = httpPort;
 		this.httpsPort = httpsPort;
 	}
+	
+	public String getDomain() {
+		return domain;
+	}
+
 
 	public String getHost() {
 		return host;
@@ -29,13 +36,14 @@ public class Origin {
 
 	@Override
 	public String toString() {
-		return "Origin [host=" + host + ", httpPort=" + httpPort + ", httpsPort=" + httpsPort + "]";
+		return "Origin [domain=" + domain + ", host=" + host + ", httpPort=" + httpPort + ", httpsPort=" + httpsPort + "]";
 	}
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
+		result = prime * result + ((domain == null) ? 0 : domain.hashCode());
 		result = prime * result + ((host == null) ? 0 : host.hashCode());
 		result = prime * result + ((httpPort == null) ? 0 : httpPort.hashCode());
 		result = prime * result + ((httpsPort == null) ? 0 : httpsPort.hashCode());
@@ -51,6 +59,11 @@ public class Origin {
 		if (getClass() != obj.getClass())
 			return false;
 		Origin other = (Origin) obj;
+		if (domain == null) {
+			if (other.domain != null)
+				return false;
+		} else if (!domain.equals(other.domain))
+			return false;
 		if (host == null) {
 			if (other.host != null)
 				return false;
@@ -67,7 +80,6 @@ public class Origin {
 		} else if (!httpsPort.equals(other.httpsPort))
 			return false;
 		return true;
-	}
-	
+	}	
 	
 }
