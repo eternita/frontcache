@@ -157,7 +157,7 @@ public class FrontCacheEngine {
 		String defaultOriginHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 		
 		domainOriginMap.put(DEFAULT_ORIGIN, 
-				new Origin(defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
+				new Origin(DEFAULT_ORIGIN, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
 		
 		String domainList = FCConfig.getProperty("front-cache.domains");
 		if (null != domainList)
@@ -169,7 +169,7 @@ public class FrontCacheEngine {
 				String originHttpsPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-https-port", defaultOriginHttpsPort);
 				
 				domainOriginMap.put(domain, 
-						new Origin(originHost, originHttpPort, originHttpsPort));
+						new Origin(domain, originHost, originHttpPort, originHttpsPort));
 			}
 		}
 		logger.info("Loaded following origin configurations: ");
