@@ -1,6 +1,6 @@
 #!/bin/bash
 
-array=("fc-debian" "fc-java" "fc-tomcat8" "frontcache-server" "fc-elk")
+array=("fc-debian" "fc-java" "fc-tomcat8" "frontcache-server" "fc-logstash"  "fc-elk")
 for f in "${array[@]}"
 do
 echo "Building image $f"
