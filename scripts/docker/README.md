@@ -16,6 +16,14 @@ Stop elk
 stop_fc_elk.sh
 
 
+Remove all containers and images 
+
+docker stop $(docker ps -a -q)
+docker rm $(docker ps -a -q)
+ssh
+
+docker exec -i -t <containerid>  /bin/bash
+
 ##logstash
 
 copy logs 
