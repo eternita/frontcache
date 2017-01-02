@@ -90,19 +90,40 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
         for (IncludeResolutionPlaceholder inc : includes)
 		{
-			if (INCLUDE_TYPE_ASYNC.equals(inc.includeType))
+        	
+			boolean performInclude = false; // check for client specific include
+			if (null == inc.includeClientType)
 			{
-				// run concurrent include resolution
-				// for Async includes - do NOT wait for response from Origin
-				// response from Origin is NOT included to response to client
-				// useful for counters - e.g. response totally from cache (fast) and async call to origin 
-				executor.submit(inc);
+				performInclude = true;
+				
+			} else if (inc.includeClientType.equalsIgnoreCase(context.getClientType())) {
+
+				// client type specific include
+				performInclude = true;
 			} else {
-				// run concurrent include resolution
-				// for Sync includes - wait for response from Origin (until timeout)
-				// origin responses are sent to client
-	            futureList.add(executor.submit(inc));
+				
+				// client type for include and request doesnt match 
+				performInclude = false;
 			}
+        	
+        	inc.performInclude = performInclude; // save for include resolution
+        	
+			if (performInclude)
+			{
+				if (INCLUDE_TYPE_ASYNC.equals(inc.includeType))
+				{
+					// run concurrent include resolution
+					// for Async includes - do NOT wait for response from Origin
+					// response from Origin is NOT included to response to client
+					// useful for counters - e.g. response totally from cache (fast) and async call to origin 
+					executor.submit(inc);
+				} else {
+					// run concurrent include resolution
+					// for Sync includes - wait for response from Origin (until timeout)
+					// origin responses are sent to client
+		            futureList.add(executor.submit(inc));
+				}
+			} // if (performInclude)
 		}
       
 		// processing timeouts for Sync includes 
@@ -161,30 +182,13 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 						includeRequestHeaders.put(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE, Arrays.asList(new String[]{"true"}));
 					}
 					
-					boolean performInclude = false;
 					String includeClientType = getIncludeClientType(includeTagStr);
-					if (null == includeClientType)
-					{
-						performInclude = true;
-						
-					} else if (includeClientType.equalsIgnoreCase(context.getClientType())) {
-
-						// client type specific include
-						performInclude = true;
-					} else {
-						
-						// client type for include and request doesnt match 
-						performInclude = false;
-					}
 					
-					if (performInclude)
-					{
-						if (null == includes)
-							includes = new ArrayList<IncludeResolutionPlaceholder>();
-						
-						// save placeholder
-						includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, includeType, includeRequestHeaders, client, context));
-					}
+					if (null == includes)
+						includes = new ArrayList<IncludeResolutionPlaceholder>();
+					
+					// save placeholder
+					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, includeType, includeClientType, includeRequestHeaders, client, context));
 					
 					scanIdx = endIdx;
 				} else {
@@ -219,6 +223,9 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	        if (null != inc.webResponse) {
 	        	logger.debug("include "  + inc.includeURL + " has content");
+	        	
+	        } else if (!inc.performInclude) {
+	        	// it's client specific include and should not be performed -> replace include tag with blank string
 	        } else { 
 	        	logger.debug("include detais "  + inc.includeURL + " content is not resolved due to timeout (" + timeout + ")  getting defaults");
 	        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), inc.includeURL);
@@ -259,17 +266,20 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		int endIdx;
 		String includeURL;
 		String includeType; // sync|async
+		String includeClientType; // bot|browser
 		WebResponse webResponse;
 		Map<String, List<String>> requestHeaders; 
 		HttpClient client;
 		RequestContext context;
+		boolean performInclude = true;
 		
-		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String includeType, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
+		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String includeType, String includeClientType, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
 			super();
 			this.startIdx = startIdx;
 			this.endIdx = endIdx;
 			this.includeURL = includeURL;
 			this.includeType = includeType;
+			this.includeClientType = includeClientType;
 			this.requestHeaders = requestHeaders;
 			this.client = client;
 			this.context = context;

@@ -116,5 +116,18 @@ public abstract class IncludeTests extends TestsBase {
 		assertEquals("ab", page.getPage().asText());
 	}
 	
+	@Test
+	public void includeClientSpecific4() throws Exception {
+		HtmlPage page = null;
+		// request as bot
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/include-bot-browser/a3.jsp");
+		assertEquals(page.getPage().asText(), "a");
+		
+		// request as browser
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		page = webClient.getPage(getFrontCacheBaseURL() + "common/include-bot-browser/a3.jsp");
+		assertEquals(page.getPage().asText(), "a");
+	}
 	
 }
