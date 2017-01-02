@@ -1,0 +1,49 @@
+- name: Create lucene cache dir
+  sudo: yes
+  file: path=/tmp/cache state=directory mode=0755
+
+#- name: remove default ROOT app
+#  file: path=/srv/tomcat/catalina/tomcat/webapps/ROOT state=absent
+#  file: path=/srv/tomcat/catalina/tomcat/webapps/ROOT.war state=absent
+
+- name: service stop tomcat
+  become: yes
+  service:
+    state: stopped
+    name: "tomcat@tomcat"
+
+- name: Clean webapps
+  file: path=/srv/tomcat/catalina/tomcat/webapps state=absent
+
+- name: Creating webapps
+  become: yes
+  file: path=/srv/tomcat/catalina/tomcat/webapps state=directory mode=0755 owner=tomcat group=tomcat
+  
+- lineinfile: dest=/srv/tomcat/catalina/tomcat/.systemd.conf line="FRONTCACHE_HOME=/opt/cache/"
+
+- lineinfile: dest=/srv/tomcat/catalina/tomcat/conf/tomcat-users.xml line="<role rolename='frontcache-console'/>" insertbefore="</tomcat-users>" state=present
+
+- lineinfile: dest=/srv/tomcat/catalina/tomcat/conf/tomcat-users.xml line="<user username='frontcache' password='frontcache' roles='frontcache-console'/>" insertbefore="<role rolename='frontcache-console'/>" state=present 
+
+- name: Copy cache configuration
+  copy: src=../../roles/frontcache.app/files/FRONTCACHE_HOME/{{ item }} dest=/opt/cache/ 
+  with_items:
+   - "conf"
+   - "cache"
+   - "fallbacks"
+   - "logs"
+   
+- name: Copy application to tomcat
+  sudo: yes
+  copy: src=../../roles/frontcache.app/files/bin/frontcache-web.war  dest=/srv/tomcat/catalina/tomcat/webapps/ROOT.war
+
+- name: Copy console to tomcat
+  sudo: yes
+  copy: src=../../roles/frontcache.app/files/bin/frontcache-console.war  dest=/srv/tomcat/catalina/tomcat/webapps/console.war
+
+- name: service restart tomcat
+  become: yes
+  service:
+    state: restarted
+    name: "tomcat@tomcat"
+
