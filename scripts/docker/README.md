@@ -16,13 +16,16 @@ Stop elk
 stop_fc_elk.sh
 
 
-Remove all containers and images 
+###Remove all containers and images 
 
 docker stop $(docker ps -a -q)
 docker rm $(docker ps -a -q)
-ssh
+###ssh
 
 docker exec -i -t <containerid>  /bin/bash
+
+### check network
+docker network inspect bridge
 
 ##logstash
 
@@ -34,6 +37,8 @@ unzip 'zips/*.zip'  -d logs/
 
 
 ##elastic
+http://localhost:9200/
+
 get all indexes
 curl 'localhost:9200/_cat/indices?v'
 
@@ -41,3 +46,8 @@ in kibana Dev Tools
 
 DELETE /logstash-2016.12.27?pretty
 GET /_cat/indices?v
+
+
+## kibana
+
+http://localhost:5601/
