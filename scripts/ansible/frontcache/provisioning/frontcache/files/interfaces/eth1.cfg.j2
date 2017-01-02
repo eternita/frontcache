@@ -1,0 +1,5 @@
+auto eth1
+iface eth1 inet static
+      address {{public_ip}} 
+      netmask {{public_mask}}
+      {% if public_gateway is defined %}gateway {{public_gateway}} {% endif %}

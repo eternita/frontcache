@@ -1,0 +1,13 @@
+---
+- src: https://github.com/silpion/ansible-lib
+  name: silpion.lib
+  version: 2.0.2
+- src: https://github.com/silpion/ansible-util
+  name: silpion.util
+  version: 2.0.4
+- src: https://github.com/silpion/ansible-java
+  name: groover.java
+  version: 2.1.0  
+- src: https://github.com/silpion/ansible-tomcat
+  name: groover.tomcat
+  version: 2.1.0
