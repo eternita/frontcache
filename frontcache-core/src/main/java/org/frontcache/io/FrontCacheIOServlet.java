@@ -6,10 +6,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -324,8 +325,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 */
 	private ActionResponse getBots(HttpServletRequest req)
 	{
-		List<String> bots = new ArrayList<String>();
-		bots.addAll(FCConfig.getBotUserAgentKeywords());
+		Map<String, Set<String>> bots = new HashMap<String, Set<String>>();
+		bots.putAll(FCConfig.getBotUserAgentKeywords());
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
 		aResponse.setBots(bots);
 		
@@ -339,8 +340,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 */
 	private ActionResponse getDynamicURLs(HttpServletRequest req)
 	{
-		List<String> dynamicURLs = new ArrayList<String>();
-		dynamicURLs.addAll(FCConfig.getDynamicURLs());
+		Map<String, Set<String>> dynamicURLs = new HashMap<String, Set<String>>();
+		dynamicURLs.putAll(FCConfig.getDynamicURLs());
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
 		aResponse.setDynamicURLs(dynamicURLs);
 		

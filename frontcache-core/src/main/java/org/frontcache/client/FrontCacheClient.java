@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
@@ -271,7 +272,7 @@ public class FrontCacheClient {
 		return null;
 	}
 	
-	public List<String> getBots()
+	public Map<String, Set<String>> getBots()
 	{
 		GetBotsActionResponse actionResponse = getBotsActionResponse();
 		
@@ -303,7 +304,7 @@ public class FrontCacheClient {
 		return null;
 	}
 	
-	public List<String> getDynamicURLs()
+	public Map<String, Set<String>> getDynamicURLs()
 	{
 		GetDynamicURLsActionResponse actionResponse = getDynamicURLsActionResponse();
 		

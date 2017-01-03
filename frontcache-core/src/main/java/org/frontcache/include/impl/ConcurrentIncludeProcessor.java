@@ -228,7 +228,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	        	// it's client specific include and should not be performed -> replace include tag with blank string
 	        } else { 
 	        	logger.debug("include detais "  + inc.includeURL + " content is not resolved due to timeout (" + timeout + ")  getting defaults");
-	        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), inc.includeURL);
+	        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(inc.context.getDomainContext(), this.getClass().getName(), inc.includeURL);
 	        }
 	        	
 			
@@ -301,7 +301,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				logger.error("Throwable: unexpected error processing include " + includeURL, e);
 			} finally {
 				if (null == this.webResponse)
-					this.webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), includeURL);
+					this.webResponse = FallbackResolverFactory.getInstance().getFallback(this.context.getDomainContext(), this.getClass().getName(), includeURL);
 			}
 	    	
 	        return this;

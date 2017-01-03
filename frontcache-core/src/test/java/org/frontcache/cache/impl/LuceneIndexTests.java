@@ -15,11 +15,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.frontcache.cache.CacheProcessor;
-import org.frontcache.cache.impl.LuceneCacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

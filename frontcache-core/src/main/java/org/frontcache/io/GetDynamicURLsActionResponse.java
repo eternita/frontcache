@@ -1,20 +1,21 @@
 package org.frontcache.io;
 
-import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class GetDynamicURLsActionResponse extends ActionResponse {
 
-	private List<String> dynamicURLs;
+	private Map<String, Set<String>> dynamicURLs;
 
 	public GetDynamicURLsActionResponse() { // for JSON mapper
 		setResponseStatus(RESPONSE_STATUS_OK);
 	}
 
-	public List<String> getDynamicURLs() {
+	public Map<String, Set<String>> getDynamicURLs() {
 		return dynamicURLs;
 	}
 
-	public void setDynamicURLs(List<String> dynamicURLs) {
+	public void setDynamicURLs(Map<String, Set<String>> dynamicURLs) {
 		this.dynamicURLs = dynamicURLs;
 	}
 	

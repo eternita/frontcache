@@ -27,6 +27,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.frontcache.FCConfig;
+import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.StringUtils;
@@ -86,7 +87,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	}
 	
 	@Override
-	public WebResponse getFallback(String fallbackSource, String urlStr)
+	public WebResponse getFallback(DomainContext domain, String fallbackSource, String urlStr)
 	{
 		
 		String currentFallbackURLpattern = null;
