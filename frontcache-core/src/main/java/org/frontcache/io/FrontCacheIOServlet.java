@@ -325,7 +325,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse getBots(HttpServletRequest req)
 	{
 		List<String> bots = new ArrayList<String>();
-		bots.addAll(FrontCacheEngine.getFrontCache().getBotUserAgentKeywords());
+		bots.addAll(FCConfig.getBotUserAgentKeywords());
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
 		aResponse.setBots(bots);
 		
@@ -340,7 +340,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse getDynamicURLs(HttpServletRequest req)
 	{
 		List<String> dynamicURLs = new ArrayList<String>();
-		dynamicURLs.addAll(FrontCacheEngine.getFrontCache().getDynamicURLs());
+		dynamicURLs.addAll(FCConfig.getDynamicURLs());
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
 		aResponse.setDynamicURLs(dynamicURLs);
 		

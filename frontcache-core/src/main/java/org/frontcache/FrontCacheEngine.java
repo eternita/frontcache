@@ -1,26 +1,19 @@
 package org.frontcache;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
@@ -64,13 +57,6 @@ import org.slf4j.LoggerFactory;
 
 public class FrontCacheEngine {
 
-	private final static String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "dynamic-urls.conf";
-	
-	private static final String BOT_CONIF_FILE = "bots.conf";
-	
-	private Set<String> botUserAgentKeywords = new LinkedHashSet<String>();
-	
-	private List <Pattern> dynamicURLPatterns = new ArrayList<Pattern>();
 
 	private Map<String, Origin> domainOriginMap = new ConcurrentHashMap<String, Origin>();
 	
@@ -104,7 +90,7 @@ public class FrontCacheEngine {
 	
 	public static FrontCacheEngine getFrontCache() {
 		if (null == instance) {
-			FCConfig.init();
+//			FCConfig.init();
 			
 			//Logs config ->  !!! -Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
 			
@@ -244,9 +230,6 @@ public class FrontCacheEngine {
 //				System.out.println("pool stats \n " + poolStats);
 			}
 		}, 1000, 60000);
-		
-		loadCacheIgnoreURIPatterns();
-		loadBotConfigs();
 		
 
 		Thread t = new Thread(new Runnable() {
@@ -457,7 +440,7 @@ public class FrontCacheEngine {
 		String userAgent = request.getHeader("User-Agent");
 		if (null != userAgent)
 		{
-			for (String botKeyword : botUserAgentKeywords)
+			for (String botKeyword : FCConfig.getBotUserAgentKeywords())
 				if (userAgent.contains(botKeyword))
 					return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
 		} else {
@@ -469,7 +452,7 @@ public class FrontCacheEngine {
     
     private boolean ignoreCache(String uri)
     {
-    	for (Pattern p : dynamicURLPatterns)
+    	for (Pattern p : FCConfig.getDynamicURLPatterns())
     		if (p.matcher(uri).find()) 
     			return true;
     	
@@ -703,118 +686,5 @@ public class FrontCacheEngine {
 		}
 	}	
 	
-	private void loadCacheIgnoreURIPatterns() {
-		BufferedReader confReader = null;
-		InputStream is = null;
-		try 
-		{
-			is = FCConfig.getConfigInputStream(CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
-			if (null == is)
-			{
-				logger.info("Dynamic URL patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
-				return;
-			}
-
-			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String patternStr;
-			int patternCounter = 0;
-			while ((patternStr = confReader.readLine()) != null) {
-				try {
-					if (patternStr.trim().startsWith("#")) // handle comments
-						continue;
-					
-					if (0 == patternStr.trim().length()) // skip empty
-						continue;
-					
-					dynamicURLPatterns.add(Pattern.compile(patternStr));
-					patternCounter++;
-				} catch (PatternSyntaxException ex) {
-					logger.info("Dynamic URL pattern - " + patternStr + " is not loaded");					
-				}
-			}
-			logger.info("Successfully loaded " + patternCounter +  " dynamic URL patterns");					
-			
-		} catch (Exception e) {
-			logger.info("Dynamic URL patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
-		} finally {
-			if (null != confReader)
-			{
-				try {
-					confReader.close();
-				} catch (IOException e) { }
-			}
-			if (null != is)
-			{
-				try {
-					is.close();
-				} catch (IOException e) { }
-			}
-		}
-		
-	}
-	
-	private void loadBotConfigs() {		
-		logger.info("Loading list of bots from " + BOT_CONIF_FILE);
-		BufferedReader confReader = null;
-		InputStream is = null;
-				
-		try 
-		{
-			is = FCConfig.getConfigInputStream(BOT_CONIF_FILE);
-			if (null == is)
-			{
-				logger.info("List of bots is not loaded from " + BOT_CONIF_FILE);
-				return;
-			}
-
-			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String botStr;
-			int botConfigCounter = 0;
-			while ((botStr = confReader.readLine()) != null) {
-				if (botStr.trim().startsWith("#")) // handle comments
-					continue;
-				
-				if (0 == botStr.trim().length()) // skip empty
-					continue;
-				
-				botUserAgentKeywords.add(botStr);
-				botConfigCounter++;
-			}
-			logger.info("Successfully loaded " + botConfigCounter +  " User-Agent keywords for bots");					
-			
-		} catch (Exception e) {
-			logger.info("List of bots is not loaded from " + BOT_CONIF_FILE, e);
-		} finally {
-			if (null != confReader)
-			{
-				try {
-					confReader.close();
-				} catch (IOException e) { }
-			}
-			if (null != is)
-			{
-				try {
-					is.close();
-				} catch (IOException e) { }
-			}
-		}
-		
-		return;
-	}
-	
-	public Set<String> getBotUserAgentKeywords()
-	{
-		return botUserAgentKeywords;
-	}
-		
-	public Set<String> getDynamicURLs()
-	{
-		Set<String> dynamicURLs = new HashSet<String>();
-		
-		for (Pattern p : dynamicURLPatterns)
-			dynamicURLs.add(p.toString());
-		
-		return dynamicURLs;
-	}
 		
 }
