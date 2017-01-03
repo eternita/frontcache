@@ -1,6 +1,6 @@
 package org.frontcache.core;
 
-public class Origin {
+public class DomainContext {
 
 	private String domain;
 	private String host;
@@ -8,7 +8,7 @@ public class Origin {
 	private String httpsPort;
 	
 		
-	public Origin(String domain, String host, String httpPort, String httpsPort) {
+	public DomainContext(String domain, String host, String httpPort, String httpsPort) {
 		super();
 		this.domain = domain;
 		this.host = host;
@@ -58,7 +58,7 @@ public class Origin {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		Origin other = (Origin) obj;
+		DomainContext other = (DomainContext) obj;
 		if (domain == null) {
 			if (other.domain != null)
 				return false;

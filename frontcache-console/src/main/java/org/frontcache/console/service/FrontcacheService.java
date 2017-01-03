@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.FrontCacheStatus;
@@ -166,14 +167,14 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, List<String>> getBotConfigs() {
+	public Map<String, Set<String>> getBotConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		Map<String, List<String>> clusterStatus = new HashMap<String, List<String>>();
+		Map<String, Set<String>> clusterStatus = new HashMap<String, Set<String>>();
 		// TODO: make requests to nodes concurrent
 		for (FrontCacheClient fcClient : fcClients)
 		{
-			List<String> botConfigs = fcClient.getBots(); 
+			Set<String> botConfigs = fcClient.getBots().get(FCConfig.DEFAULT_DOMAIN); 
 			if (null != botConfigs)
 				clusterStatus.put(fcClient.getName(), botConfigs);
 		}
@@ -181,14 +182,14 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, List<String>> getDynamicURLsConfigs() {
+	public Map<String, Set<String>> getDynamicURLsConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		Map<String, List<String>> clusterStatus = new HashMap<String, List<String>>();
+		Map<String, Set<String>> clusterStatus = new HashMap<String, Set<String>>();
 		// TODO: make requests to nodes concurrent
 		for (FrontCacheClient fcClient : fcClients)
 		{
-			List<String> dynamicURLs = fcClient.getDynamicURLs(); 
+			Set<String> dynamicURLs = fcClient.getDynamicURLs().get(FCConfig.DEFAULT_DOMAIN); 
 			if (null != dynamicURLs)
 				clusterStatus.put(fcClient.getName(), dynamicURLs);
 		}

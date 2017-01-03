@@ -1,7 +1,7 @@
 package org.frontcache.console.web.controllers;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +20,7 @@ public class DynamicURLConfigController {
     @RequestMapping(value = "/dynamic-urls-configs", method = RequestMethod.GET)
     public String getDynamicURLConfigs(ModelMap model) {
     	
-    	Map<String, List<String>> dynamicURLsConfigs = frontcacheService.getDynamicURLsConfigs();
+    	Map<String, Set<String>> dynamicURLsConfigs = frontcacheService.getDynamicURLsConfigs();
 		model.put("dynamicURLsConfigs", dynamicURLsConfigs);
     	
         return "dynamic_urls_configs";
