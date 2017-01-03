@@ -1,5 +1,10 @@
 FROM logstash:5
 
+RUN \
+  apt-get clean all && \
+  apt-get update && \
+  apt-get install nano
+
 RUN mkdir /opt/geoip
 RUN mkdir /var/log/fc
 

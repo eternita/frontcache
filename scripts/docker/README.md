@@ -23,6 +23,7 @@ docker rm $(docker ps -a -q)
 ###ssh
 
 docker exec -i -t <containerid>  /bin/bash
+docker exec -it $container /bin/bash -c "export TERM=xterm; exec bash"
 
 ### check network
 docker network inspect bridge
