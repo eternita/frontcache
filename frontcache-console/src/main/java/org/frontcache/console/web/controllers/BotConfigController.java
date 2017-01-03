@@ -20,7 +20,7 @@ public class BotConfigController {
     @RequestMapping(value = "/bot-configs", method = RequestMethod.GET)
     public String getBotConfigs(ModelMap model) {
     	
-    	Map<String, Set<String>> botConfigs = frontcacheService.getBotConfigs();
+    	Map<String, Map<String, Set<String>>> botConfigs = frontcacheService.getBotConfigs();
 		model.put("botConfigs", botConfigs);
 
         return "bot_configs";
