@@ -51,9 +51,7 @@ public class FallbackResolverFactory {
 				return fallbackResolver;
 			}
 		} catch (Exception ex) {
-			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + DefaultFallbackResolver.class.getCanonicalName());
-			
-			// 
+			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + FileBasedFallbackResolver.class.getCanonicalName());
 			return new FileBasedFallbackResolver();
 		}
 		

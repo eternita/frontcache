@@ -308,7 +308,7 @@ public class FCConfig {
 	
 	
 	
-	private static List<String> getDomains()
+	public static List<String> getDomains()
 	{
 		
 		File configDir = getConfDir();

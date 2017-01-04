@@ -310,7 +310,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse getFallbackConfigs(HttpServletRequest req)
 	{
 		FallbackResolverFactory.init(FrontCacheEngine.getFrontCache().getHttpClient());
-		List<FallbackConfigEntry> fallbackConfigs = FallbackResolverFactory.getInstance().getFallbackConfigs();
+		Map <String, Set<FallbackConfigEntry>> fallbackConfigs = FallbackResolverFactory.getInstance().getFallbackConfigs();
 		
 		GetFallbackConfigActionResponse aResponse = new GetFallbackConfigActionResponse();
 		aResponse.setFallbackConfigs(fallbackConfigs);

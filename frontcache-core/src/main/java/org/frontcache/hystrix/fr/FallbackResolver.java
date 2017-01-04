@@ -1,6 +1,7 @@
 package org.frontcache.hystrix.fr;
 
-import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.DomainContext;
@@ -12,5 +13,5 @@ public interface FallbackResolver {
 
 	public WebResponse getFallback(DomainContext domain, String fallbackSource, String urlStr);
 
-	public List<FallbackConfigEntry> getFallbackConfigs();
+	public Map <String, Set<FallbackConfigEntry>> getFallbackConfigs();
 }

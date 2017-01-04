@@ -1,8 +1,9 @@
 package org.frontcache.hystrix.fr;
 
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.http.client.HttpClient;
 import org.frontcache.core.DomainContext;
@@ -39,8 +40,8 @@ public class DefaultFallbackResolver implements FallbackResolver {
 	}
 
 	@Override
-	public List<FallbackConfigEntry> getFallbackConfigs() {
-		return new ArrayList<FallbackConfigEntry>();
+	public Map <String, Set<FallbackConfigEntry>> getFallbackConfigs() {
+		return new HashMap<String, Set<FallbackConfigEntry>>();
 	}
 
 }
