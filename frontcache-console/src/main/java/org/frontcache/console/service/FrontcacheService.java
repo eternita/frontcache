@@ -151,14 +151,14 @@ public class FrontcacheService {
 	 * @param domain
 	 * @return
 	 */
-	public Map<String, List<FallbackConfigEntry>> getFallbackConfigs() {
+	public Map<String, Map<String, Set<FallbackConfigEntry>>> getFallbackConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		Map<String, List<FallbackConfigEntry>> clusterStatus = new HashMap<String, List<FallbackConfigEntry>>();
+		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new HashMap<String, Map<String, Set<FallbackConfigEntry>>>();
 		// TODO: make requests to nodes concurrent
 		for (FrontCacheClient fcClient : fcClients)
 		{
-			List<FallbackConfigEntry> fallbackConfigs = fcClient.getFallbackConfigs(); 
+			Map<String, Set<FallbackConfigEntry>> fallbackConfigs = fcClient.getFallbackConfigs(); 
 			if (null != fallbackConfigs)
 				clusterStatus.put(fcClient.getName(), fallbackConfigs);
 		}

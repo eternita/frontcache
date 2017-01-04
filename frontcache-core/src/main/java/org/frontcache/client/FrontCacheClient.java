@@ -240,7 +240,7 @@ public class FrontCacheClient {
 		return null;
 	}
 	
-	public List<FallbackConfigEntry> getFallbackConfigs()
+	public Map <String, Set<FallbackConfigEntry>> getFallbackConfigs()
 	{
 		GetFallbackConfigActionResponse actionResponse = getFallbackConfigsActionResponse();
 		
