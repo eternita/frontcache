@@ -133,17 +133,18 @@ public class FrontCacheEngine {
 		return httpClient;
 	}
 	
-	private static final String DEFAULT_ORIGIN = "default";
+	private static final String DEFAULT_ORIGIN = "default-domain";
 	
 	private void loadDomainConfigs()
 	{
 		
+		String defaultDomain = FCConfig.getProperty("front-cache.default-domain", "localhost");
 		String defaultOriginHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
 		String defaultOriginHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		String defaultOriginHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 		
 		domainConfigMap.put(DEFAULT_ORIGIN, 
-				new DomainContext(DEFAULT_ORIGIN, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
+				new DomainContext(defaultDomain, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
 		
 		String domainList = FCConfig.getProperty("front-cache.domains");
 		if (null != domainList)
@@ -171,7 +172,7 @@ public class FrontCacheEngine {
 	 * @param requestDomainName
 	 * @return
 	 */
-	private DomainContext getOrigin(String requestDomainName)
+	private DomainContext getDomainContext(String requestDomainName)
 	{
 		for (String domainSuffix : domainConfigMap.keySet())
 		{
@@ -399,7 +400,7 @@ public class FrontCacheEngine {
 		context.setFrontCacheHttpPort(frontcacheHttpPort);
 		context.setFrontCacheHttpsPort(frontcacheHttpsPort);
 		
-		DomainContext domainContex = getOrigin(context.getRequest().getServerName());
+		DomainContext domainContex = getDomainContext(context.getRequest().getServerName());
 		context.setDomainContext(domainContex);
 		
 		context.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
@@ -432,7 +433,7 @@ public class FrontCacheEngine {
         if (null != filterChain)
         {
             context.setFilterChain(filterChain);
-    		DomainContext origin = getOrigin(context.getRequest().getServerName());
+    		DomainContext origin = getDomainContext(context.getRequest().getServerName());
     		context.setFrontCacheHost(origin.getHost()); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
         }
 		return context;
