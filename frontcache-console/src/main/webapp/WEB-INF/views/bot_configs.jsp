@@ -9,27 +9,54 @@
     <h2 align="center">Bot Configs</h2>
     <hr>
     
-    <!-- start loop over edges -->
+    <!-- start loop over edges - Map <clusterNode, Map <domain, Set <BotConfgi>>> -->
     <c:forEach var="edge" items="${botConfigs}">
         
 	  <table class="table table-striped">
-	  <thead>
-	  	  <caption>Edge: <c:out value="${edge.key}"/></caption>
+	    <thead>
           <tr>
             <th>
-              <b>Bot pattern (for User-Agent header)</b>
+              <b>Edge: ${edge.key} - Bot pattern (for User-Agent header)</b>
             </th>
           </tr>
         </thead>
         <tbody>
-        <!-- start loop over configs -->
-        <c:forEach var="bot" items="${edge.value}">
-          <tr>
-            <td>${bot}  &nbsp;</td>
-          </tr>
+        <!-- start loop over domain 
+              first loop over default domain
+        -->
+        <c:forEach var="botsDomain" items="${edge.value}">
+        
+	        <c:if test="${'DEFAULT_DOMAIN' == botsDomain.key}">
+	          <tr>
+	            <td align="center"><b> ${botsDomain.key}  </b></td>
+	          </tr>
+	          
+	          <c:forEach var="bot" items="${botsDomain.value}">
+	              <tr>
+	                <td>${bot}  &nbsp;</td>
+	              </tr>
+	          </c:forEach>
+	        </c:if>
         </c:forEach>
+        
+        <!--  the same loop for other domains (domain specific bots)  -->        
+        <c:forEach var="botsDomain" items="${edge.value}">
+        
+            <c:if test="${'DEFAULT_DOMAIN' != botsDomain.key}">
+              <tr>
+                <td align="center"><b> ${botsDomain.key}  </b></td>
+              </tr>
+              
+              <c:forEach var="bot" items="${botsDomain.value}">
+                  <tr>
+                    <td>${bot}  &nbsp;</td>
+                  </tr>
+              </c:forEach>
+            </c:if>
+        </c:forEach>
+        
         </tbody> 
-        <!-- end loop over configs -->
+        <!-- end loop over domains -->
       </table> 
       
       <hr>

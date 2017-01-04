@@ -2,9 +2,9 @@ package org.frontcache.hystrix.fr;
 
 public class FallbackConfigEntry {
 
-	private String fileName;
-	private String urlPattern;
-	private String initUrl;
+	protected String fileName;
+	protected String urlPattern;
+	protected String initUrl;
 	
 	public FallbackConfigEntry() { // for JSON mapper
 	}

@@ -14,23 +14,55 @@
         
 	  <table class="table table-striped">
 	  <thead>
-	  	  <caption>Edge: <c:out value="${edge.key}"/></caption>
           <tr>
             <th>
-              <b>Dynamic URL pattern (mached URL goes directly to origin)</b>
+              <b>Edge: ${edge.key} - Dynamic URL pattern (mached URL goes directly to origin)</b>
             </th>
           </tr>
         </thead>
         <tbody>
-        <!-- start loop over configs -->
-        <c:forEach var="dynamicURL" items="${edge.value}">
-          <tr>
-            <td>${dynamicURL}  &nbsp;</td>
-          </tr>
+        
+        <!-- start loop over domain 
+              first loop over default domain
+        -->
+        <c:forEach var="dynamicURLDomain" items="${edge.value}">
+        
+            <c:if test="${'DEFAULT_DOMAIN' == dynamicURLDomain.key}">
+              <tr>
+                <td align="center"><b> ${dynamicURLDomain.key}  </b></td>
+              </tr>
+              
+              <c:forEach var="dynamicURL" items="${dynamicURLDomain.value}">
+                  <tr>
+                    <td>${dynamicURL}  &nbsp;</td>
+                  </tr>
+              </c:forEach>
+            </c:if>
         </c:forEach>
+        
+        <!--  the same loop for other domains (domain specific dynamic URLs)  -->        
+        <c:forEach var="dynamicURLDomain" items="${edge.value}">
+        
+            <c:if test="${'DEFAULT_DOMAIN' != dynamicURLDomain.key}">
+              <tr>
+                <td align="center"><b> ${dynamicURLDomain.key}  </b></td>
+              </tr>
+              
+              <c:forEach var="dynamicURL" items="${dynamicURLDomain.value}">
+                  <tr>
+                    <td>${dynamicURL}  &nbsp;</td>
+                  </tr>
+              </c:forEach>
+            </c:if>
+        </c:forEach>
+        
+
+
         </tbody> 
-        <!-- end loop over configs -->
+        <!-- end loop over domains -->
       </table> 
+      
+      
       
       <hr>
     </c:forEach>

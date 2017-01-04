@@ -525,5 +525,14 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 		
 		return copy;
 	}
+	
+    public void setDomainContext(DomainContext domainContext) {
+        set("domainContext", domainContext);
+    }
+
+    public DomainContext getDomainContext() {
+        return (DomainContext) get("domainContext");
+    }
+	
     
 }

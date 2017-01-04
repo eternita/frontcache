@@ -98,6 +98,7 @@ public class FrontCacheCluster {
 			}
 			
 		} catch (Exception e) {
+			logger.error("Frontcache cluster nodes can't be loaded from " + configName, e);
 			throw new RuntimeException("Frontcache cluster nodes can't be loaded from " + configName, e);
 		} finally {
 			if (null != confReader)

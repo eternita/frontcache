@@ -1,7 +1,7 @@
 package org.frontcache.console.web.controllers;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +20,7 @@ public class BotConfigController {
     @RequestMapping(value = "/bot-configs", method = RequestMethod.GET)
     public String getBotConfigs(ModelMap model) {
     	
-    	Map<String, List<String>> botConfigs = frontcacheService.getBotConfigs();
+    	Map<String, Map<String, Set<String>>> botConfigs = frontcacheService.getBotConfigs();
 		model.put("botConfigs", botConfigs);
 
         return "bot_configs";
