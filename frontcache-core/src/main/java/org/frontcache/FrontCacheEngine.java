@@ -133,8 +133,6 @@ public class FrontCacheEngine {
 		return httpClient;
 	}
 	
-	private static final String DEFAULT_ORIGIN = "default-domain";
-	
 	private void loadDomainConfigs()
 	{
 		
@@ -143,7 +141,7 @@ public class FrontCacheEngine {
 		String defaultOriginHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		String defaultOriginHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 		
-		domainConfigMap.put(DEFAULT_ORIGIN, 
+		domainConfigMap.put(FCConfig.DEFAULT_DOMAIN, 
 				new DomainContext(defaultDomain, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
 		
 		String domainList = FCConfig.getProperty("front-cache.domains");
@@ -187,7 +185,7 @@ public class FrontCacheEngine {
 		}
 		
 		// default
-		return domainConfigMap.get(DEFAULT_ORIGIN);
+		return domainConfigMap.get(FCConfig.DEFAULT_DOMAIN);
 	}
 	
 	private void initialize() {
