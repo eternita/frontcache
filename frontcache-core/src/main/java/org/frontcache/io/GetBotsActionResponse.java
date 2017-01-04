@@ -1,20 +1,21 @@
 package org.frontcache.io;
 
-import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class GetBotsActionResponse extends ActionResponse {
 
-	private List<String> bots;
+	private Map<String, Set<String>> bots;
 
 	public GetBotsActionResponse() { // for JSON mapper
 		setResponseStatus(RESPONSE_STATUS_OK);
 	}
 	
-	public List<String> getBots() {
+	public Map<String, Set<String>> getBots() {
 		return bots;
 	}
 
-	public void setBots(List<String> bots) {
+	public void setBots(Map<String, Set<String>> bots) {
 		this.bots = bots;
 	}
 	

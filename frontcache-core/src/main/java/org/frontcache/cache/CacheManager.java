@@ -28,6 +28,7 @@ public class CacheManager {
 
 		try
 		{
+			@SuppressWarnings("rawtypes")
 			Class clazz = Class.forName(cacheImplStr);
 			Object obj = clazz.newInstance();
 			if (null != obj && obj instanceof CacheProcessor)

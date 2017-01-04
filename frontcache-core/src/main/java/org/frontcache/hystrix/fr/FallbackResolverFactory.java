@@ -40,6 +40,7 @@ public class FallbackResolverFactory {
 		try
 		{
 
+			@SuppressWarnings("rawtypes")
 			Class clazz = Class.forName(implStr);
 			Object obj = clazz.newInstance();
 			if (null != obj && obj instanceof FallbackResolver)
@@ -50,13 +51,11 @@ public class FallbackResolverFactory {
 				return fallbackResolver;
 			}
 		} catch (Exception ex) {
-			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + DefaultFallbackResolver.class.getCanonicalName());
-			
-			// 
-			return new DefaultFallbackResolver();
+			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + FileBasedFallbackResolver.class.getCanonicalName());
+			return new FileBasedFallbackResolver();
 		}
 		
-		return null;
+		return new FileBasedFallbackResolver();
 	}
 
 	public static void destroy()

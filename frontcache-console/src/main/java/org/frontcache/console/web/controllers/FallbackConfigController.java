@@ -1,7 +1,7 @@
 package org.frontcache.console.web.controllers;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.frontcache.console.service.FrontcacheService;
@@ -25,7 +25,7 @@ public class FallbackConfigController {
     @RequestMapping(value = "/fallbacks", method = RequestMethod.GET)
     public String fallbacks(ModelMap model) {
     	
-    	Map<String, List<FallbackConfigEntry>> fallbackConfigs = frontcacheService.getFallbackConfigs();
+    	Map<String, Map<String, Set<FallbackConfigEntry>>> fallbackConfigs = frontcacheService.getFallbackConfigs();
 		model.put("fallbackConfigs", fallbackConfigs);
     	
     	

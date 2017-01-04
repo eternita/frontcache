@@ -1,26 +1,19 @@
 package org.frontcache;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
@@ -50,7 +43,7 @@ import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
-import org.frontcache.core.Origin;
+import org.frontcache.core.DomainContext;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.FC_BypassCache;
@@ -64,15 +57,8 @@ import org.slf4j.LoggerFactory;
 
 public class FrontCacheEngine {
 
-	private final static String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "dynamic-urls.conf";
-	
-	private static final String BOT_CONIF_FILE = "bots.conf";
-	
-	private Set<String> botUserAgentKeywords = new LinkedHashSet<String>();
-	
-	private List <Pattern> dynamicURLPatterns = new ArrayList<Pattern>();
 
-	private Map<String, Origin> domainOriginMap = new ConcurrentHashMap<String, Origin>();
+	private Map<String, DomainContext> domainConfigMap = new ConcurrentHashMap<String, DomainContext>(); // <DomainStr, DomainConfig>
 	
 	private String frontcacheHttpPort = null;
 
@@ -104,7 +90,7 @@ public class FrontCacheEngine {
 	
 	public static FrontCacheEngine getFrontCache() {
 		if (null == instance) {
-			FCConfig.init();
+//			FCConfig.init();
 			
 			//Logs config ->  !!! -Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
 			
@@ -149,15 +135,15 @@ public class FrontCacheEngine {
 	
 	private static final String DEFAULT_ORIGIN = "default";
 	
-	private void loadOrigins()
+	private void loadDomainConfigs()
 	{
 		
 		String defaultOriginHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
 		String defaultOriginHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		String defaultOriginHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 		
-		domainOriginMap.put(DEFAULT_ORIGIN, 
-				new Origin(defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
+		domainConfigMap.put(DEFAULT_ORIGIN, 
+				new DomainContext(DEFAULT_ORIGIN, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
 		
 		String domainList = FCConfig.getProperty("front-cache.domains");
 		if (null != domainList)
@@ -168,14 +154,14 @@ public class FrontCacheEngine {
 				String originHttpPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-http-port", defaultOriginHttpPort);
 				String originHttpsPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-https-port", defaultOriginHttpsPort);
 				
-				domainOriginMap.put(domain, 
-						new Origin(originHost, originHttpPort, originHttpsPort));
+				domainConfigMap.put(domain, 
+						new DomainContext(domain, originHost, originHttpPort, originHttpsPort));
 			}
 		}
 		logger.info("Loaded following origin configurations: ");
 
-		for (String domain : domainOriginMap.keySet())
-			logger.info(" -- " + domainOriginMap.get(domain));
+		for (String domain : domainConfigMap.keySet())
+			logger.info(" -- " + domainConfigMap.get(domain));
 			
 		return;
 	}
@@ -185,29 +171,29 @@ public class FrontCacheEngine {
 	 * @param requestDomainName
 	 * @return
 	 */
-	private Origin getOrigin(String requestDomainName)
+	private DomainContext getOrigin(String requestDomainName)
 	{
-		for (String domainSuffix : domainOriginMap.keySet())
+		for (String domainSuffix : domainConfigMap.keySet())
 		{
 			if (requestDomainName.endsWith(domainSuffix))
 			{
 				if (requestDomainName.equals(domainSuffix))
-					return domainOriginMap.get(domainSuffix);
+					return domainConfigMap.get(domainSuffix);
 				//case for abc.com & bc.com
 				if (requestDomainName.endsWith("." + domainSuffix))
-					return domainOriginMap.get(domainSuffix);
+					return domainConfigMap.get(domainSuffix);
 			}
 		}
 		
 		// default
-		return domainOriginMap.get(DEFAULT_ORIGIN);
+		return domainConfigMap.get(DEFAULT_ORIGIN);
 	}
 	
 	private void initialize() {
 		
 		logger = LoggerFactory.getLogger(FrontCacheEngine.class);
 		
-		loadOrigins();
+		loadDomainConfigs();
 		
 		frontcacheHttpPort = FCConfig.getProperty("front-cache.http-port", "80");
 		frontcacheHttpsPort = FCConfig.getProperty("front-cache.https-port", "443");
@@ -245,9 +231,6 @@ public class FrontCacheEngine {
 			}
 		}, 1000, 60000);
 		
-		loadCacheIgnoreURIPatterns();
-		loadBotConfigs();
-		
 
 		Thread t = new Thread(new Runnable() {
 
@@ -276,22 +259,22 @@ public class FrontCacheEngine {
 			str.append("http");	
 		}
 		
-		Origin origin = getOrigin(context.getRequest().getServerName());
+		DomainContext domainCtx = context.getDomainContext();
 		
-		str.append("://").append(origin.getHost());
+		str.append("://").append(domainCtx.getHost());
 		if (isSecure) {
-			if (!"443".equals(origin.getHttpsPort()))
-				str.append(":").append(origin.getHttpsPort());
+			if (!"443".equals(domainCtx.getHttpsPort()))
+				str.append(":").append(domainCtx.getHttpsPort());
 		} else {
-			if (!"80".equals(origin.getHttpPort()))
-				str.append(":").append(origin.getHttpPort());
+			if (!"80".equals(domainCtx.getHttpPort()))
+				str.append(":").append(domainCtx.getHttpPort());
 		}
 
 		try {
 			URL routeUrl = new URL(str.toString());
 			return  routeUrl;
 		} catch (MalformedURLException e) {
-			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + origin.getHost() + ")", e);
+			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + domainCtx.getHost() + ")", e);
 		}
 
 	}
@@ -416,7 +399,11 @@ public class FrontCacheEngine {
 		context.setFrontCacheHttpPort(frontcacheHttpPort);
 		context.setFrontCacheHttpsPort(frontcacheHttpsPort);
 		
+		DomainContext domainContex = getOrigin(context.getRequest().getServerName());
+		context.setDomainContext(domainContex);
+		
 		context.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
+
         context.setOriginURL(getOriginUrl(context));
         
         String requestId = servletRequest.getHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID);
@@ -439,25 +426,25 @@ public class FrontCacheEngine {
         context.setRequestId(requestId);
         context.setRequestType(requestType);
         
-        context.setClientType(getClientType(servletRequest)); // client type = bot | browser based on User-Agent Header and bots.conf
+        context.setClientType(getClientType(servletRequest, domainContex.getDomain())); // client type = bot | browser based on User-Agent Header and bots.conf
         
 
         if (null != filterChain)
         {
             context.setFilterChain(filterChain);
-    		Origin origin = getOrigin(context.getRequest().getServerName());
+    		DomainContext origin = getOrigin(context.getRequest().getServerName());
     		context.setFrontCacheHost(origin.getHost()); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
         }
 		return context;
     }
 
-	private String getClientType(HttpServletRequest request)
+	private String getClientType(HttpServletRequest request, String domain)
 	{		
 
 		String userAgent = request.getHeader("User-Agent");
 		if (null != userAgent)
 		{
-			for (String botKeyword : botUserAgentKeywords)
+			for (String botKeyword : FCConfig.getBotUserAgentKeywords(domain))
 				if (userAgent.contains(botKeyword))
 					return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
 		} else {
@@ -467,9 +454,9 @@ public class FrontCacheEngine {
 		return FCHeaders.REQUEST_CLIENT_TYPE_BROWSER;
 	}
     
-    private boolean ignoreCache(String uri)
+    private boolean ignoreCache(String uri, String domain)
     {
-    	for (Pattern p : dynamicURLPatterns)
+    	for (Pattern p : FCConfig.getDynamicURLPatterns(domain))
     		if (p.matcher(uri).find()) 
     			return true;
     	
@@ -523,7 +510,7 @@ public class FrontCacheEngine {
 		
 		boolean dynamicRequest = ("true".equals(httpRequest.getHeader(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST))) ? true : false;
 				
-		if (!dynamicRequest && context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method without jsessionid
+		if (!dynamicRequest && context.isCacheableRequest() && !ignoreCache(context.getRequestURI(), context.getDomainContext().getDomain())) // GET method without jsessionid
 		{
 			Map<String, List<String>> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 			getCurrentRequestURL2Context(context);
@@ -703,118 +690,5 @@ public class FrontCacheEngine {
 		}
 	}	
 	
-	private void loadCacheIgnoreURIPatterns() {
-		BufferedReader confReader = null;
-		InputStream is = null;
-		try 
-		{
-			is = FCConfig.getConfigInputStream(CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
-			if (null == is)
-			{
-				logger.info("Dynamic URL patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
-				return;
-			}
-
-			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String patternStr;
-			int patternCounter = 0;
-			while ((patternStr = confReader.readLine()) != null) {
-				try {
-					if (patternStr.trim().startsWith("#")) // handle comments
-						continue;
-					
-					if (0 == patternStr.trim().length()) // skip empty
-						continue;
-					
-					dynamicURLPatterns.add(Pattern.compile(patternStr));
-					patternCounter++;
-				} catch (PatternSyntaxException ex) {
-					logger.info("Dynamic URL pattern - " + patternStr + " is not loaded");					
-				}
-			}
-			logger.info("Successfully loaded " + patternCounter +  " dynamic URL patterns");					
-			
-		} catch (Exception e) {
-			logger.info("Dynamic URL patterns are not loaded from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
-		} finally {
-			if (null != confReader)
-			{
-				try {
-					confReader.close();
-				} catch (IOException e) { }
-			}
-			if (null != is)
-			{
-				try {
-					is.close();
-				} catch (IOException e) { }
-			}
-		}
-		
-	}
-	
-	private void loadBotConfigs() {		
-		logger.info("Loading list of bots from " + BOT_CONIF_FILE);
-		BufferedReader confReader = null;
-		InputStream is = null;
-				
-		try 
-		{
-			is = FCConfig.getConfigInputStream(BOT_CONIF_FILE);
-			if (null == is)
-			{
-				logger.info("List of bots is not loaded from " + BOT_CONIF_FILE);
-				return;
-			}
-
-			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String botStr;
-			int botConfigCounter = 0;
-			while ((botStr = confReader.readLine()) != null) {
-				if (botStr.trim().startsWith("#")) // handle comments
-					continue;
-				
-				if (0 == botStr.trim().length()) // skip empty
-					continue;
-				
-				botUserAgentKeywords.add(botStr);
-				botConfigCounter++;
-			}
-			logger.info("Successfully loaded " + botConfigCounter +  " User-Agent keywords for bots");					
-			
-		} catch (Exception e) {
-			logger.info("List of bots is not loaded from " + BOT_CONIF_FILE, e);
-		} finally {
-			if (null != confReader)
-			{
-				try {
-					confReader.close();
-				} catch (IOException e) { }
-			}
-			if (null != is)
-			{
-				try {
-					is.close();
-				} catch (IOException e) { }
-			}
-		}
-		
-		return;
-	}
-	
-	public Set<String> getBotUserAgentKeywords()
-	{
-		return botUserAgentKeywords;
-	}
-		
-	public Set<String> getDynamicURLs()
-	{
-		Set<String> dynamicURLs = new HashSet<String>();
-		
-		for (Pattern p : dynamicURLPatterns)
-			dynamicURLs.add(p.toString());
-		
-		return dynamicURLs;
-	}
 		
 }

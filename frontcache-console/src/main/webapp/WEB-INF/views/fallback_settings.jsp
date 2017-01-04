@@ -38,10 +38,9 @@
         
 	  <table class="table table-striped">
 	  <thead>
-	  	  <caption>Edge: <c:out value="${edge.key}"/></caption>
           <tr>
             <th>
-              <b>URL pattern</b>
+              <b>Edge: ${edge.key} - URL pattern</b>
             </th>
             <th>
               <b>Fallback File / Fetch URL for fallback file population</b>
@@ -49,16 +48,49 @@
           </tr>
         </thead>
         <tbody>
-        <!-- start loop over configs -->
-        <c:forEach var="config" items="${edge.value}">
-          <tr>
-            <td>${config.urlPattern}  &nbsp;</td>
-            <td>
-            ${config.fileName} <br/>
-            ${config.initUrl} <br/> &nbsp;
-            </td>
-          </tr>
+
+        <!-- start loop over domain 
+              first loop over default domain
+        -->
+        <c:forEach var="fallbacksDomain" items="${edge.value}">
+        
+            <c:if test="${'DEFAULT_DOMAIN' == fallbacksDomain.key}">
+              <tr>
+                <td colspan="2" align="center"><b> ${fallbacksDomain.key}  </b></td>
+              </tr>
+              
+              <c:forEach var="config" items="${fallbacksDomain.value}">
+		          <tr>
+		            <td>${config.urlPattern}  &nbsp;</td>
+		            <td>
+		            ${config.fileName} <br/>
+		            ${config.initUrl} <br/> &nbsp;
+		            </td>
+		          </tr>
+              </c:forEach>
+            </c:if>
         </c:forEach>
+        
+        <!--  the same loop for other domains (domain specific fallbacks)  -->        
+        <c:forEach var="fallbacksDomain" items="${edge.value}">
+            <c:if test="${'DEFAULT_DOMAIN' != fallbacksDomain.key}">
+              <tr>
+                <td colspan="2" align="center"><b> ${fallbacksDomain.key}  </b></td>
+              </tr>
+              
+              <c:forEach var="config" items="${fallbacksDomain.value}">
+                  <tr>
+                    <td>${config.urlPattern}  &nbsp;</td>
+                    <td>
+                    ${config.fileName} <br/>
+                    ${config.initUrl} <br/> &nbsp;
+                    </td>
+                  </tr>
+              </c:forEach>
+            </c:if>
+        </c:forEach>
+        
+        
         </tbody> 
         <!-- end loop over configs -->
       </table> 

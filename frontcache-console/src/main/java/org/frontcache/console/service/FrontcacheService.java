@@ -151,14 +151,14 @@ public class FrontcacheService {
 	 * @param domain
 	 * @return
 	 */
-	public Map<String, List<FallbackConfigEntry>> getFallbackConfigs() {
+	public Map<String, Map<String, Set<FallbackConfigEntry>>> getFallbackConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		Map<String, List<FallbackConfigEntry>> clusterStatus = new HashMap<String, List<FallbackConfigEntry>>();
+		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new HashMap<String, Map<String, Set<FallbackConfigEntry>>>();
 		// TODO: make requests to nodes concurrent
 		for (FrontCacheClient fcClient : fcClients)
 		{
-			List<FallbackConfigEntry> fallbackConfigs = fcClient.getFallbackConfigs(); 
+			Map<String, Set<FallbackConfigEntry>> fallbackConfigs = fcClient.getFallbackConfigs(); 
 			if (null != fallbackConfigs)
 				clusterStatus.put(fcClient.getName(), fallbackConfigs);
 		}
@@ -166,29 +166,30 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, List<String>> getBotConfigs() {
+	public Map<String,  Map<String, Set<String>>> getBotConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		Map<String, List<String>> clusterStatus = new HashMap<String, List<String>>();
+		// Map <clusterNode, Map <domain, Set <BotConfgi>>>
+		Map<String,  Map<String, Set<String>>> clusterStatus = new HashMap<String,  Map<String, Set<String>>>();
 		// TODO: make requests to nodes concurrent
 		for (FrontCacheClient fcClient : fcClients)
 		{
-			List<String> botConfigs = fcClient.getBots(); 
+			 Map<String, Set<String>> botConfigs = fcClient.getBots(); 
 			if (null != botConfigs)
 				clusterStatus.put(fcClient.getName(), botConfigs);
 		}
 		
 		return clusterStatus;
 	}
-
-	public Map<String, List<String>> getDynamicURLsConfigs() {
+	
+	public Map<String, Map<String, Set<String>>> getDynamicURLsConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		Map<String, List<String>> clusterStatus = new HashMap<String, List<String>>();
+		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
 		// TODO: make requests to nodes concurrent
 		for (FrontCacheClient fcClient : fcClients)
 		{
-			List<String> dynamicURLs = fcClient.getDynamicURLs(); 
+			Map<String, Set<String>> dynamicURLs = fcClient.getDynamicURLs(); 
 			if (null != dynamicURLs)
 				clusterStatus.put(fcClient.getName(), dynamicURLs);
 		}

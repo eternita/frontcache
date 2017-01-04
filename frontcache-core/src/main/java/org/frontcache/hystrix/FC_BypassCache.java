@@ -70,7 +70,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			context.setHystrixError();
 			logger.error("FC - ORIGIN ERROR - " + url);
 			
-			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
+			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
 			
 			httpResponse.getOutputStream().write(webResponse.getContent());
 			httpResponse.setContentType(webResponse.getHeader(FCHeaders.CONTENT_TYPE));
