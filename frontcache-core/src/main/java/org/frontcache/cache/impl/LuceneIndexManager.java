@@ -286,6 +286,12 @@ public class LuceneIndexManager {
 	 */
 	public void deleteAll(String domain) {
 		
+		if (null == domain)
+		{
+			logger.error("Cant delete all with null domain");
+			return;
+		}
+			
 		IndexWriter iWriter = null;
 		try {
 			iWriter = getIndexWriter();
@@ -299,6 +305,8 @@ public class LuceneIndexManager {
 
 		
 		try {
+			logger.debug("Removing all documents for {}.", domain);
+			
 			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
 			
 			long count = iWriter.deleteDocuments(domainQuery);

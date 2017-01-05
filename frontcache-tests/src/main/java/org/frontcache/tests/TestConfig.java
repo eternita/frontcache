@@ -9,8 +9,8 @@ public class TestConfig {
 	
 	public static final String FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST = "http://localhost:8080/";
 
-	public static final String FRONTCACHE_STANDALONE_TEST_BASE_URI_IP = "http://127.0.0.1:9080/";
+	public static final String FRONTCACHE_STANDALONE_TEST_BASE_URI_IP = "http://localhost2:9080/";
 	
-	public static final String FRONTCACHE_FILTER_TEST_BASE_URI_IP = "http://127.0.0.1:8080/";
+	public static final String FRONTCACHE_FILTER_TEST_BASE_URI_IP = "http://localhost2:8080/";
 	
 }

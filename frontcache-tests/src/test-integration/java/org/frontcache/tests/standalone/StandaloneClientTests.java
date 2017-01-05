@@ -15,4 +15,9 @@ public class StandaloneClientTests extends ClientTests {
 		return getStandaloneBaseURLLocalhost();
 	}
 	
+	@Override
+	public String getFrontCacheBaseURLIP() {
+		return getStandaloneBaseURLIP();
+	}
+	
 }
