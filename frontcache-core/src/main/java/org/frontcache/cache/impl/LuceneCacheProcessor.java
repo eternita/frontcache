@@ -17,6 +17,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Cache processor based on Apache Lucene.
+ * 
+ * @deprecated use L1L2CacheProcessor. LuceneCacheProcessor doesn't implement some features (e.g. domain specific indexing). 
+ * If you need it sync with Lucene code with L1L2CacheProcessor
  *
  */
 public class LuceneCacheProcessor extends CacheProcessorBase implements CacheProcessor {
@@ -73,7 +76,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	 * Saves web response to cache-file
 	 */
 	@Override
-	public void putToCache(String url, WebResponse component) {
+	public void putToCache(String domain, String url, WebResponse component) {
 		try {
 			indexManager.indexDoc(component);
 		} catch (IOException e) {
@@ -94,13 +97,13 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	
 
 	@Override
-	public void removeFromCache(String filter) {
+	public void removeFromCache(String domain, String filter) {
 		logger.debug("Removing from cache {}", filter);
-		indexManager.delete(filter);
+		indexManager.delete(domain, filter);
 	}
 
 	@Override
-	public void removeFromCacheAll() {
+	public void removeFromCacheAll(String domain) {
 		logger.debug("truncate cache");
 		indexManager.truncate();
 	}

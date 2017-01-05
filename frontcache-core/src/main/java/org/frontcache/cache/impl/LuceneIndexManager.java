@@ -58,6 +58,7 @@ public class LuceneIndexManager {
 	// searchable fields
 	public static final String TAGS_FIELD = "tags"; // for invalidation
 	public static final String URL_FIELD = "url"; 
+	public static final String DOMAIN_FIELD = "domain"; // for shared / multidomain mode 
 	public static final String EXPIRE_DATE_FIELD = "expire_date"; 
 	
 	private IndexWriter indexWriter = null;
@@ -157,6 +158,9 @@ public class LuceneIndexManager {
 		}
 
 		doc.add(new StringField(URL_FIELD, url, Field.Store.YES));
+		
+		doc.add(new StringField(DOMAIN_FIELD, response.getDomain(), Field.Store.YES));
+		
 		if (null != response.getContent())
 			doc.add(new StoredField(BIN_FIELD, response.getContent()));
 		
@@ -236,13 +240,10 @@ public class LuceneIndexManager {
 			Term term = new Term(URL_FIELD, url);
 			Query query = new TermQuery(term);
 			
-			TopDocs results = searcher.search(query, 2);
+			TopDocs results = searcher.search(query, 1);
 
 			if (results.scoreDocs != null) {
-				if (results.scoreDocs.length == 2) {
-					delete(url);
-					return null;
-				} else if (results.scoreDocs.length == 1) {
+				if (results.scoreDocs.length == 1) {
 					doc = searcher.doc(results.scoreDocs[0].doc);
 				}
 			}
@@ -259,7 +260,7 @@ public class LuceneIndexManager {
 	 * Removes documents by url or tags
 	 * @param urlOrTag
 	 */
-	public void delete(String urlOrTag) {
+	public void delete(String domain, String urlOrTag) {
 		
 		IndexWriter iWriter = null;
 		try {
@@ -274,13 +275,15 @@ public class LuceneIndexManager {
 
 		
 		try {
-			Query query1 = new TermQuery(new Term(URL_FIELD, urlOrTag));
-			Query query2 = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
+			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
+			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
+			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
 			
 			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
 			
-			booleanQuery.add(query1, Occur.SHOULD);
-			booleanQuery.add(query2, Occur.SHOULD);
+			booleanQuery.add(domainQuery, Occur.MUST);
+			booleanQuery.add(urlQuery, Occur.SHOULD);
+			booleanQuery.add(tagsQuery, Occur.SHOULD);
 			
 			long count = iWriter.deleteDocuments(booleanQuery.build());
 			logger.debug("Removed  {} documents for {}.", count, urlOrTag);

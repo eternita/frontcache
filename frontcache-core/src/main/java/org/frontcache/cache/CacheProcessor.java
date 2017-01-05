@@ -21,13 +21,13 @@ public interface CacheProcessor {
 	
 	public void destroy();
 	
-	public void putToCache(String url, WebResponse component);
+	public void putToCache(String domain, String url, WebResponse component);
 	
 	public WebResponse getFromCache(String url);
 	
-	public void removeFromCache(String filter);
+	public void removeFromCache(String domain, String filter);
 	
-	public void removeFromCacheAll();
+	public void removeFromCacheAll(String domain);
 	
 	public WebResponse processRequest(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException;
 	

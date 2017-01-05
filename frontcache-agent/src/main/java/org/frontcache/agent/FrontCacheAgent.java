@@ -32,6 +32,8 @@ public class FrontCacheAgent {
 	private String frontCacheURL;
 	
 	private String frontCacheURI;
+
+	private String siteKey = "";
 	
 	private final static String IO_URI = "frontcache-io";
 	private final static String INVALIDATE = "invalidate";
@@ -89,6 +91,12 @@ public class FrontCacheAgent {
 			this.frontCacheURI = frontcacheURL + "/" + IO_URI;
 	}
 	
+	public FrontCacheAgent(String frontcacheURL, String siteKey) {
+		this(frontcacheURL);
+		this.siteKey = siteKey;
+	}
+
+	
 	/**
 	 * 
 	 * @param filter
@@ -119,6 +127,9 @@ public class FrontCacheAgent {
 		HttpPost post = new HttpPost(frontCacheURI);
 
 //    	post.addHeader("Accept-Encoding", "gzip");
+		
+		if (null != siteKey)
+			post.addHeader("X-frontcache.site-key", siteKey);
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 

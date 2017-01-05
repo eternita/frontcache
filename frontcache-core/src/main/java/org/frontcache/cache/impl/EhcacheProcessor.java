@@ -17,6 +17,12 @@ import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
 import net.sf.ehcache.Element;
 
+/**
+ * 
+ * @deprecated use L1L2CacheProcessor. EhcacheProcessor doesn't implement some features (e.g. domain specific indexing). 
+ * If you need it sync with L1L2CacheProcessor
+ *
+ */
 public class EhcacheProcessor extends CacheProcessorBase implements CacheProcessor {
 
 	private static final String DEFAULT_EHCACHE_CONFIG_FILE = "ehcache-config.xml";
@@ -85,7 +91,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	 * 
 	 */
 	@Override
-	public void putToCache(String url, WebResponse component) {
+	public void putToCache(String domain, String url, WebResponse component) {
 		logger.debug(url);
 		cache.put(new Element(url, component));
 	}
@@ -106,7 +112,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	}
 
 	@Override
-	public void removeFromCache(String filter) {
+	public void removeFromCache(String domain, String filter) {
 		List<Object> removeList = new ArrayList<Object>();
 		
 		for(Object key : cache.getKeys())
@@ -121,7 +127,7 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 	}
 
 	@Override
-	public void removeFromCacheAll() {
+	public void removeFromCacheAll(String domain) {
 		cache.removeAll();
 	}
 	

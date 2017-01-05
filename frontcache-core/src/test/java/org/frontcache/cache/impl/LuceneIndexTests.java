@@ -26,6 +26,7 @@ public class LuceneIndexTests {
 
 	protected Logger logger = LoggerFactory.getLogger(LuceneIndexTests.class);
 	LuceneCacheProcessor pr = null;
+	private final static String DOMAIN = "test-domain";
 
 	@Test
 	public void fileSaveTest() throws Exception {
@@ -34,7 +35,7 @@ public class LuceneIndexTests {
 		for (int i = 0; i < size; i++) {
 			String url = UUID.randomUUID().toString();
 			String content = UUID.randomUUID().toString();
-			pr.removeFromCache(url);
+			pr.removeFromCache(DOMAIN, url);
 
 			WebResponse response = new WebResponse(url, content.getBytes());
 			List<String> list = new ArrayList<>();
@@ -44,7 +45,7 @@ public class LuceneIndexTests {
 			tagSet.add(tags[i]);
 			response.setTags(tagSet);
 			response.setStatusCode(55);
-			pr.putToCache(url, response);
+			pr.putToCache(DOMAIN, url, response);
 
 			WebResponse fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
@@ -57,7 +58,7 @@ public class LuceneIndexTests {
 		}
 
 		assertEquals(size, pr.getIndexManager().getIndexSize());
-		pr.getIndexManager().delete("apple");
+		pr.getIndexManager().delete(DOMAIN, "apple");
 		assertEquals(size - 1, pr.getIndexManager().getIndexSize());
 		assertEquals(size - 1 + "", pr.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES));
 
@@ -80,7 +81,7 @@ public class LuceneIndexTests {
 			set.add(tags[i]);
 			response.setTags(set);
 			response.setStatusCode(55);
-			pr.putToCache(url, response);
+			pr.putToCache(DOMAIN, url, response);
 
 			WebResponse fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
@@ -92,7 +93,7 @@ public class LuceneIndexTests {
 		}
 
 		assertEquals(size, pr.getIndexManager().getIndexSize());
-		pr.getIndexManager().delete("apple");
+		pr.getIndexManager().delete(DOMAIN, "apple");
 		assertEquals(size - 1, pr.getIndexManager().getIndexSize());
 		assertEquals(size - 1 + "", pr.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES));
 
@@ -119,7 +120,7 @@ public class LuceneIndexTests {
 			set.add(tags[i]);
 			response.setTags(set);
 			response.setStatusCode(55);
-			pr.putToCache(url, response);
+			pr.putToCache(DOMAIN, url, response);
 
 			WebResponse fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
@@ -134,7 +135,7 @@ public class LuceneIndexTests {
 			WebResponse fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
 			assertEquals(urls.get(url), new String(fromFile.getContent()));
-			pr.getIndexManager().delete(url);
+			pr.getIndexManager().delete(DOMAIN, url);
 			fromFile = pr.getFromCacheImpl(url);
 			assertNull(fromFile);
 		}
@@ -146,18 +147,18 @@ public class LuceneIndexTests {
 
 		String url = "https://www.coinshome.net/en/coin_definition-1_Escudo-Gold-Centralist_Republic_of_Mexico_(1835_1846)-E9AKbzbiOBIAAAFG0vnZjkvL.htm";
 
-		pr.removeFromCache(url);
+		pr.removeFromCache(DOMAIN, url);
 		
 		WebResponse response = new WebResponse(url, "data".getBytes());
 		response.addTags(Arrays.asList(new String[]{"E9AKbzbiOBIAAAFG0vnZjkvL"}));
 		
-		pr.putToCache(url, response);
+		pr.putToCache(DOMAIN, url, response);
 		
 		WebResponse fromFile = pr.getFromCache(url);
 		assertEquals(url, fromFile.getUrl());
 		assertEquals(new String("data".getBytes()), new String(fromFile.getContent()));
 		
-		pr.getIndexManager().delete("E9AKbzbiOBIAAAFG0vnZjkvL");
+		pr.getIndexManager().delete(DOMAIN, "E9AKbzbiOBIAAAFG0vnZjkvL");
 		
 		fromFile = pr.getFromCache(url);
 		assertNull(fromFile);
@@ -168,7 +169,7 @@ public class LuceneIndexTests {
 	public void fileEmptyByteTest() throws Exception {
 
 			String url = UUID.randomUUID().toString();
-			pr.removeFromCache(url);
+			pr.removeFromCache(DOMAIN, url);
 
 			WebResponse response = new WebResponse(url, null);
 			List<String> list = new ArrayList<>();
@@ -178,19 +179,19 @@ public class LuceneIndexTests {
 			set.add("banana");
 			response.setTags(set);
 			response.setStatusCode(55);
-			pr.putToCache(url, response);
+			pr.putToCache(DOMAIN, url, response);
 
 			WebResponse fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
 			
 			response.setContent(new byte[0]);
-			pr.putToCache(url, response);
+			pr.putToCache(DOMAIN, url, response);
 			
 			fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
 			
 			response.setContent(new byte[]{'a'});
-			pr.putToCache(url, response);
+			pr.putToCache(DOMAIN, url, response);
 			
 			fromFile = pr.getFromCacheImpl(url);
 			assertNotNull(fromFile);
@@ -209,7 +210,7 @@ public class LuceneIndexTests {
 
 		System.out.println("hello");
 		String url = UUID.randomUUID().toString();
-		pr.removeFromCache(url);
+		pr.removeFromCache(DOMAIN, url);
 
 		WebResponse response = new WebResponse(url, null);
 		List<String> list = new ArrayList<>();
@@ -219,11 +220,11 @@ public class LuceneIndexTests {
 		set.add("banana");
 		response.setTags(set);
 		response.setStatusCode(55);
-		pr1.putToCache(url, response);
+		pr1.putToCache(DOMAIN, url, response);
 
 		pr.destroy();
 		
-		pr1.putToCache(url, response);
+		pr1.putToCache(DOMAIN, url, response);
 		
 		// now second writer should have IndexWriter
 		WebResponse fromFile = pr1.getFromCacheImpl(url);
@@ -240,12 +241,12 @@ public class LuceneIndexTests {
 		Properties prop = new Properties();
 		prop.put("front-cache.cache-processor.impl.cache-dir", "/tmp/cache/");
 		pr.init(prop);
-		pr.removeFromCacheAll();
+		pr.removeFromCacheAll(DOMAIN);
 	}
 
 	@After
 	public void cleanUp() {
-		pr.removeFromCacheAll();
+		pr.removeFromCacheAll(DOMAIN);
 		pr.destroy();
 
 	}
