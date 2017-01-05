@@ -28,7 +28,7 @@ public abstract class AgentTests extends TestsBase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		frontcacheClient = new FrontCacheAgent(getFrontCacheBaseURL());
+		frontcacheClient = new FrontCacheAgent(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClient.removeFromCache("*"); // clean up		
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");

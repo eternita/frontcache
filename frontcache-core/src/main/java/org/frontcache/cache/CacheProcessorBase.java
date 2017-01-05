@@ -93,7 +93,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					doSoftInvalidation(currentRequestURL, originUrlStr, requestHeaders, client, context);
 				} else {
 					// regular expiration
-					removeFromCache(currentRequestURL);
+					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
 					cachedWebResponse = null; // refresh from origin
 				}
 			}
@@ -122,7 +122,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 						copyHeaders.remove(removeKey);
 					
 					copy4cache.setUrl(currentRequestURL);
-					putToCache(currentRequestURL, copy4cache); // put to cache copy
+					putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
 				}
 			} catch (FrontCacheException ex) {
 				throw ex;
@@ -177,9 +177,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					
 					copy4cache.setUrl(currentRequestURL);
 					
-					removeFromCache(currentRequestURL);
+					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
 
-					putToCache(currentRequestURL, copy4cache); // put to cache copy
+					putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
 				} catch (FrontCacheException e) {
 					
 					logger.error("Soft invalidation/refresh failed", e);

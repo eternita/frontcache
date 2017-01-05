@@ -35,10 +35,10 @@ public class TestsBase {
 		webClient = new WebClient();
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 		
-		frontcacheClientStandalone = new FrontCacheClient(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI);
+		frontcacheClientStandalone = new FrontCacheClient(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI, SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClientStandalone.removeFromCacheAll(); // clean up		
 		
-		frontcacheClientFilter = new FrontCacheClient(TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI);
+		frontcacheClientFilter = new FrontCacheClient(TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI, SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClientFilter.removeFromCacheAll(); // clean up		
 		
 	}

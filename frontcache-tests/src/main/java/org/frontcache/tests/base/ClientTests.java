@@ -37,7 +37,7 @@ public abstract class ClientTests extends TestsBase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClient.removeFromCacheAll(); // clean up		
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
@@ -65,7 +65,7 @@ public abstract class ClientTests extends TestsBase {
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
 		
 		// clean up
 		String response = frontcacheClient.removeFromCacheAll();
@@ -112,7 +112,7 @@ public abstract class ClientTests extends TestsBase {
 		
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
 		
 		// clean up
 		String response = frontcacheClient.removeFromCacheAll();
@@ -128,7 +128,7 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void getCacheStatusClient() throws Exception {
 		
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
 		
 		Map<String, String> response = frontcacheClient.getCacheState();
 		Assert.assertNotNull(response);
@@ -138,8 +138,8 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void getCacheStatusCluster() throws Exception {
 		
-		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1);
-		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2);
+		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1, SiteKeys.TEST_SITE_KEY_1);
+		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2, SiteKeys.TEST_SITE_KEY_1);
 		FrontCacheCluster fcCluster = new FrontCacheCluster(frontCacheClient1, frontCacheClient2);
 		
 		Map<String, String> response = fcCluster.getCacheState().get(frontCacheClient1);
@@ -264,7 +264,7 @@ public abstract class ClientTests extends TestsBase {
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 		final String TEST_URI_B = "common/fc-client/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL());
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
 		
 		// clean up
 		String response = frontcacheClient.removeFromCacheAll();

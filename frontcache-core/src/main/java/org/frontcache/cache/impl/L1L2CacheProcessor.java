@@ -140,7 +140,9 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	 * Saves web response to cache-file
 	 */
 	@Override
-	public void putToCache(String url, WebResponse component) {
+	public void putToCache(String domain, String url, WebResponse component) {
+		
+		component.setDomain(domain);
 		
 		if (FCHeaders.CACHE_LEVEL_L1.equalsIgnoreCase(component.getCacheLevel()))
 		{
@@ -177,7 +179,7 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	
 
 	@Override
-	public void removeFromCache(String filter) {
+	public void removeFromCache(String domain, String filter) {
 		logger.debug("Removing from cache {}", filter);
 		
 		{ // remove from ehCache
@@ -195,12 +197,12 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		}
 
 		// remove from Lucene
-		luceneIndexManager.delete(filter);
+		luceneIndexManager.delete(domain, filter);
 	}
 
 	
 	@Override
-	public void removeFromCacheAll() {
+	public void removeFromCacheAll(String domain) {
 		logger.debug("truncate cache");
 
 		ehCache.removeAll(); // ehCache

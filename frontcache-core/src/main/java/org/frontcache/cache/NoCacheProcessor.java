@@ -45,7 +45,7 @@ public class NoCacheProcessor implements CacheProcessor {
 	}
 
 	@Override
-	public void putToCache(String url, WebResponse component) {
+	public void putToCache(String domain, String url, WebResponse component) {
 		// TODO Auto-generated method stub
 
 	}
@@ -57,13 +57,13 @@ public class NoCacheProcessor implements CacheProcessor {
 	}
 
 	@Override
-	public void removeFromCache(String filter) {
+	public void removeFromCache(String domain, String filter) {
 		// TODO Auto-generated method stub
 
 	}
 
 	@Override
-	public void removeFromCacheAll() {
+	public void removeFromCacheAll(String domain) {
 		// TODO Auto-generated method stub
 
 	}

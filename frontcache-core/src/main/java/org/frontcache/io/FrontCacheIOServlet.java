@@ -21,6 +21,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheManager;
+import org.frontcache.core.DomainContext;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
@@ -158,11 +160,18 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 			return aResponse;
 		}
-			
+	    
+		String siteKey = req.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
+		String domain = null;
+		
+		DomainContext domainContext = FrontCacheEngine.getFrontCache().getDomainContexBySiteKey(siteKey);
+		if (null != domainContext)
+			domain = domainContext.getDomain();
+		
 		if ("*".equals(filter))
-			CacheManager.getInstance().removeFromCacheAll();
+			CacheManager.getInstance().removeFromCacheAll(domain);
 		else
-			CacheManager.getInstance().removeFromCache(filter);
+			CacheManager.getInstance().removeFromCache(domain, filter);
 			
 		logger.info("Invalidation for filter: " + filter);
 		return aResponse;
