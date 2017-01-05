@@ -10,4 +10,8 @@ public class FilterClientTests extends ClientTests {
 		return getFilterBaseURLLocahhost();
 	}
 	
+	@Override
+	public String getFrontCacheBaseURLIP() {
+		return getFilterBaseURLIP();
+	}
 }

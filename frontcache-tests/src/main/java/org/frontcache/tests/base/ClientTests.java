@@ -38,9 +38,18 @@ public abstract class ClientTests extends TestsBase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
+		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(
+				new FrontCacheClient[]{
+						new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1), 
+						new FrontCacheClient(getFrontCacheBaseURLIP(), SiteKeys.TEST_SITE_KEY_2)}
+			));
+	
+		// clean up
+		fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
+	
+	
 		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1);
-		frontcacheClient.removeFromCacheAll(); // clean up		
-
+		
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
 	}
 
@@ -51,6 +60,7 @@ public abstract class ClientTests extends TestsBase {
 	
 	public abstract String getFrontCacheBaseURLLocalhost(); 
 
+	public abstract String getFrontCacheBaseURLIP(); 
 	
 	@Test
 	public void getFromCacheClient() throws Exception {
@@ -257,11 +267,16 @@ public abstract class ClientTests extends TestsBase {
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 		final String TEST_URI_B = "common/fc-client/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1);
 		
-		// clean up
-		String response = frontcacheClient.removeFromCacheAll();
-		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
+		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(
+				new FrontCacheClient[]{
+						new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1), 
+						new FrontCacheClient(getFrontCacheBaseURLIP(), SiteKeys.TEST_SITE_KEY_2)}
+			));
+		
+		fcCluster.removeFromCacheAll(); // clean up		
+
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1);
 
 		// the first request a - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_A);
@@ -281,7 +296,7 @@ public abstract class ClientTests extends TestsBase {
 		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 
 		// cache invalidation
-		response = frontcacheClient.removeFromCacheAll();
+		String response = frontcacheClient.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		cacheState = frontcacheClient.getCacheState();
@@ -295,11 +310,21 @@ public abstract class ClientTests extends TestsBase {
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 		final String TEST_URI_B = "common/fc-client/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), SiteKeys.TEST_SITE_KEY_1);
+		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(
+					new FrontCacheClient[]{
+							new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1), 
+							new FrontCacheClient(getFrontCacheBaseURLIP(), SiteKeys.TEST_SITE_KEY_2)}
+				));
 		
 		// clean up
 		String response = fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
+		
+//		fcCluster = new FrontCacheCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), SiteKeys.TEST_SITE_KEY_2);
+//		
+//		// clean up
+//		response = fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
+//		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 
 		// the first request a - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_A);
@@ -324,6 +349,63 @@ public abstract class ClientTests extends TestsBase {
 		
 		cacheState = frontcacheClient.getCacheState();
 		Assert.assertEquals("0", cacheState.get(CacheProcessor.CACHED_ENTRIES));
+		
+		return;
+	}
+	
+	@Test
+	public void invalidationAllMultidomainTestCluster() throws Exception {
+		
+		final String TEST_URI_A = "common/fc-client/a.jsp";
+		final String TEST_URI_B = "common/fc-client/b.jsp";
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(
+				new FrontCacheClient[]{
+						new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1), 
+						new FrontCacheClient(getFrontCacheBaseURLIP(), SiteKeys.TEST_SITE_KEY_2)}
+			));
+		
+		// clean up
+		String response = fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
+		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
+
+		// the first request a - response should be cached
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_A);
+		assertEquals("a", page.getPage().asText());		
+		WebResponse webResponse = page.getWebResponse(); 
+		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("false", debugCached);
+
+		// the first request b - response should be cached
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_B);
+		assertEquals("b", page.getPage().asText());		
+		webResponse = page.getWebResponse(); 
+		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("false", debugCached);
+		
+		Map<String, String> cacheState = frontcacheClient.getCacheState();
+		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES));
+		
+
+		// same pages with IP instead of localhost
+		// the first request a - response should be cached
+		page = webClient.getPage(getFrontCacheBaseURLIP() + TEST_URI_A);
+		assertEquals("a", page.getPage().asText());		
+
+		// the first request b - response should be cached
+		page = webClient.getPage(getFrontCacheBaseURLIP() + TEST_URI_B);
+		assertEquals("b", page.getPage().asText());		
+		
+		cacheState = frontcacheClient.getCacheState();
+		Assert.assertEquals("4", cacheState.get(CacheProcessor.CACHED_ENTRIES));
+		
+		
+		// cache invalidation
+		response = frontcacheClient.removeFromCacheAll();
+		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
+		
+		cacheState = frontcacheClient.getCacheState();
+		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES)); // pages with IP instead of localhost remain in cache
 		
 		return;
 	}
