@@ -6,7 +6,7 @@ public class FilterAgentTests extends AgentTests {
 
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getFilterBaseURL();
+		return getFilterBaseURLLocahhost();
 	}
 	
 }

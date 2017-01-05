@@ -187,9 +187,11 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 			
 			for(Object key : ehCache.getKeys())
 			{
+				String objDomain = ((WebResponse) ehCache.get(key).getObjectValue()).getDomain();
+				
 				String str = key.toString();
-				if (-1 < str.indexOf(filter))
-					removeList.add(key);	
+				if (domain.equals(objDomain) && -1 < str.indexOf(filter))
+					removeList.add(key);
 			}
 			
 			for(Object key : removeList)
@@ -205,9 +207,21 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	public void removeFromCacheAll(String domain) {
 		logger.debug("truncate cache");
 
-		ehCache.removeAll(); // ehCache
+		{ // remove from ehCache
+			List<Object> removeList = new ArrayList<Object>();
+			
+			for(Object key : ehCache.getKeys())
+			{
+				String objDomain = ((WebResponse) ehCache.get(key).getObjectValue()).getDomain();
+				if (domain.equals(objDomain))
+					removeList.add(key);
+			}
+			
+			for(Object key : removeList)
+				ehCache.remove(key);
+		}
 
-		luceneIndexManager.truncate(); // lucene
+		luceneIndexManager.deleteAll(domain);
 	}
 	
 	

@@ -6,7 +6,7 @@ public class StandaloneInvalidationTagsTests extends InvalidationTagsTests {
 
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURL();
+		return getStandaloneBaseURLLocalhost();
 	}
 
 }

@@ -35,10 +35,10 @@ public class TestsBase {
 		webClient = new WebClient();
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 		
-		frontcacheClientStandalone = new FrontCacheClient(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI, SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClientStandalone = new FrontCacheClient(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST, SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClientStandalone.removeFromCacheAll(); // clean up		
 		
-		frontcacheClientFilter = new FrontCacheClient(TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI, SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClientFilter = new FrontCacheClient(TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST, SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClientFilter.removeFromCacheAll(); // clean up		
 		
 	}
@@ -90,14 +90,24 @@ public class TestsBase {
 	}
 	
 	
-	protected static String getFilterBaseURL()
+	protected static String getFilterBaseURLLocahhost()
 	{
-		return TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI;
+		return TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST;
 	}
 
-	protected static String getStandaloneBaseURL()
+	protected static String getStandaloneBaseURLLocalhost()
 	{
-		return TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI;
+		return TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST;
+	}
+
+	protected static String getFilterBaseURLIP()
+	{
+		return TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_IP;
+	}
+
+	protected static String getStandaloneBaseURLIP()
+	{
+		return TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_IP;
 	}
 	
 }

@@ -34,7 +34,7 @@ public class FilterFallbackHystrixTests extends FallbackHystrixTests {
 	
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getFilterBaseURL();
+		return getFilterBaseURLLocahhost();
 	}
 
 	

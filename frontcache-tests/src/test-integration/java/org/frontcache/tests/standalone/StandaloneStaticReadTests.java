@@ -13,7 +13,7 @@ public class StandaloneStaticReadTests extends StaticReadTests {
 	
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURL();
+		return getStandaloneBaseURLLocalhost();
 	}
 	
 }

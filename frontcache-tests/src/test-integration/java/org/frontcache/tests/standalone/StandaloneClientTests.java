@@ -11,8 +11,8 @@ import org.frontcache.tests.base.ClientTests;
 public class StandaloneClientTests extends ClientTests {
 
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURL();
+	public String getFrontCacheBaseURLLocalhost() {
+		return getStandaloneBaseURLLocalhost();
 	}
 	
 }

@@ -24,7 +24,7 @@ public class FilterCommonTests extends CommonTests {
 
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getFilterBaseURL();
+		return getFilterBaseURLLocahhost();
 	}
 	
 }

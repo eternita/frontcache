@@ -6,7 +6,7 @@ public class FilterInvalidationTagsTests extends InvalidationTagsTests {
 
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getFilterBaseURL();
+		return getFilterBaseURLLocahhost();
 	}
 
 }
