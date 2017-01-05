@@ -2,6 +2,8 @@ package org.frontcache.tests.base;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.Arrays;
+
 import org.frontcache.agent.FrontCacheAgent;
 import org.frontcache.agent.FrontCacheAgentCluster;
 import org.frontcache.core.FCHeaders;
@@ -90,7 +92,8 @@ public abstract class AgentTests extends TestsBase {
 	@Test
 	public void invalidationByFilterTestCluster() throws Exception {
 		
-		FrontCacheAgentCluster fcCluster = new FrontCacheAgentCluster(FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2);
+		
+		FrontCacheAgentCluster fcCluster = new FrontCacheAgentCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), SiteKeys.TEST_SITE_KEY_1);
 		final String TEST_URI = "common/fc-agent/a.jsp";
 		
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");

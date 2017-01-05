@@ -20,18 +20,12 @@ public class FrontCacheAgentCluster {
 	
 	private final static String DEFAULT_SITE_KEY = "";
 	
-	public FrontCacheAgentCluster(Set<String> fcURLSet) 
+	public FrontCacheAgentCluster(Collection<String> fcURLSet, String siteKey) 
 	{
 		for (String url : fcURLSet)
-			fcCluster.add(new FrontCacheAgent(url));
+			fcCluster.add(new FrontCacheAgent(url, siteKey));
 	}
 	
-	public FrontCacheAgentCluster(String ... fcURLs) 
-	{
-		for (String url : fcURLs)
-			fcCluster.add(new FrontCacheAgent(url));
-	}
-
 	public FrontCacheAgentCluster(FrontCacheAgent ... fcClients) 
 	{
 		for (FrontCacheAgent fcClient : fcClients)

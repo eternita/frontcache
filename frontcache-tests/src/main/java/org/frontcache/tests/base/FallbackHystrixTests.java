@@ -66,7 +66,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	}
 	
 	@Test
-	public void customeFallbackTest1() throws Exception {
+	public void customFallbackTest1() throws Exception {
 		// page timeout more than Hystrix timeout
 		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/fallback1.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
@@ -76,7 +76,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	}
 	
 	@Test
-	public void customeFallbackTest2LoadFromURL() throws Exception {
+	public void customFallbackTest2LoadFromURL() throws Exception {
 		// cleanup is in @BeforeClass
 		// wait while server is started and fallbacks are loaded from URLs (they are loaded in separate thread during startup)
 		// so, it's possible state (server is started but fallback configs are not loaded yet)
@@ -97,7 +97,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	}
 	
 	@Test
-	public void customeFallbackTest3URLPattern() throws Exception {
+	public void customFallbackTest3URLPattern() throws Exception {
 		// page timeout more than Hystrix timeout
 		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/fallback3-pattern.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
