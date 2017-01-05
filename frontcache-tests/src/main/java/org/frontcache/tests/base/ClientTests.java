@@ -29,16 +29,16 @@ import com.gargoylesoftware.htmlunit.util.NameValuePair;
  */
 public abstract class ClientTests extends TestsBase {
 
-	private String FRONTCACHE_CLUSTER_NODE1 = getFrontCacheBaseURL();
+	private String FRONTCACHE_CLUSTER_NODE1 = getFrontCacheBaseURLLocalhost();
 	
-	private String FRONTCACHE_CLUSTER_NODE2 = getFrontCacheBaseURL();
+	private String FRONTCACHE_CLUSTER_NODE2 = getFrontCacheBaseURLLocalhost();
 	
 	protected FrontCacheClient frontcacheClient = null;
 	
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClient.removeFromCacheAll(); // clean up		
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
@@ -49,15 +49,7 @@ public abstract class ClientTests extends TestsBase {
 		super.tearDown();
 	}
 	
-	// in case of standalone mode getCacheKeyBaseURL() has port 8080
-	// and getFrontCacheBaseURL() has port 9080
-	// in filter mode getCacheKeyBaseURL() and getFrontCacheBaseURL() are the same
-	public final String getCacheKeyBaseURL()
-	{
-		return getFrontCacheBaseURL();
-	}
-	
-	public abstract String getFrontCacheBaseURL(); 
+	public abstract String getFrontCacheBaseURLLocalhost(); 
 
 	
 	@Test
@@ -66,17 +58,17 @@ public abstract class ClientTests extends TestsBase {
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1);
 		
 		// clean up
 		String response = frontcacheClient.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 
 		// the first request a - response should be cached
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_A);
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_A);
 		assertEquals("a", page.getPage().asText());		
 
-		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache(getFrontCacheBaseURL() + TEST_URI_A);
+		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache(getFrontCacheBaseURLLocalhost() + TEST_URI_A);
 
 		assertEquals("a", new String(resp.getContent()));	
 		return;
@@ -85,25 +77,25 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void deepInclude() throws Exception {
 		
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/deep-include-cache/a.jsp");
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/deep-include-cache/a.jsp");
 		assertEquals("abcdef", page.getPage().asText());
 
-		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache(getCacheKeyBaseURL() + "common/deep-include-cache/a.jsp");
+		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache(getFrontCacheBaseURLLocalhost() + "common/deep-include-cache/a.jsp");
 		assertEquals("a<fc:include url=\"/common/deep-include-cache/b.jsp\" />", new String(resp.getContent()));	
 
-		resp = frontcacheClient.getFromCache(getCacheKeyBaseURL() + "common/deep-include-cache/b.jsp");
+		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLLocalhost() + "common/deep-include-cache/b.jsp");
 		assertEquals("b<fc:include url=\"/common/deep-include-cache/c.jsp\" />", new String(resp.getContent()));	
 		
-		resp = frontcacheClient.getFromCache(getCacheKeyBaseURL() + "common/deep-include-cache/c.jsp");
+		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLLocalhost() + "common/deep-include-cache/c.jsp");
 		assertEquals("c<fc:include url=\"/common/deep-include-cache/d.jsp\" />", new String(resp.getContent()));	
 		
-		resp = frontcacheClient.getFromCache(getCacheKeyBaseURL() + "common/deep-include-cache/d.jsp");
+		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLLocalhost() + "common/deep-include-cache/d.jsp");
 		assertEquals("d<fc:include url=\"/common/deep-include-cache/e.jsp\" />", new String(resp.getContent()));	
 		
-		resp = frontcacheClient.getFromCache(getCacheKeyBaseURL() + "common/deep-include-cache/e.jsp");
+		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLLocalhost() + "common/deep-include-cache/e.jsp");
 		assertEquals("e<fc:include url=\"/common/deep-include-cache/f.jsp\" />", new String(resp.getContent()));	
 		
-		resp = frontcacheClient.getFromCache(getCacheKeyBaseURL() + "common/deep-include-cache/f.jsp");
+		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLLocalhost() + "common/deep-include-cache/f.jsp");
 		assertEquals("f", new String(resp.getContent()));	
 		
 	}
@@ -113,13 +105,13 @@ public abstract class ClientTests extends TestsBase {
 		
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1);
 		
 		// clean up
 		String response = frontcacheClient.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 
-		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCacheActionResponse(getCacheKeyBaseURL() + TEST_URI_A).getValue();
+		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCacheActionResponse(getFrontCacheBaseURLLocalhost() + TEST_URI_A).getValue();
 
 		assertNull(resp);	
 		return;
@@ -129,7 +121,7 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void getCacheStatusClient() throws Exception {
 		
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1);
 		
 		Map<String, String> response = frontcacheClient.getCacheState();
 		Assert.assertNotNull(response);
@@ -180,7 +172,7 @@ public abstract class ClientTests extends TestsBase {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
 		// the first request - response should be cached
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		
 		WebResponse webResponse = page.getWebResponse(); 
@@ -194,20 +186,20 @@ public abstract class ClientTests extends TestsBase {
 		assertEquals("1", debugResponseSize);
 
 		// second request - the same request - response should be from the cache now
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("true", debugCached);
 		
 		// cache invalidation (both standalone and filter)
-		String response = frontcacheClientStandalone.removeFromCache(getFrontCacheBaseURL() + TEST_URI); // clean up FC standalone		
+		String response = frontcacheClientStandalone.removeFromCache(getFrontCacheBaseURLLocalhost() + TEST_URI); // clean up FC standalone		
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
-		response = frontcacheClientFilter.removeFromCache(getFrontCacheBaseURL() + TEST_URI); // clean up FC filter
+		response = frontcacheClientFilter.removeFromCache(getFrontCacheBaseURLLocalhost() + TEST_URI); // clean up FC filter
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		// third request - the same request - response is dynamic
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 
@@ -225,7 +217,7 @@ public abstract class ClientTests extends TestsBase {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
 		// the first request - response should be cached
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		
 		WebResponse webResponse = page.getWebResponse(); 
@@ -239,18 +231,18 @@ public abstract class ClientTests extends TestsBase {
 		assertEquals("1", debugResponseSize);
 
 		// second request - the same request - response should be from the cache now
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("true", debugCached);
 		
 		// cache invalidation
-		String response = fcCluster.removeFromCache(getFrontCacheBaseURL() + TEST_URI).get(FRONTCACHE_CLUSTER_NODE1);
+		String response = fcCluster.removeFromCache(getFrontCacheBaseURLLocalhost() + TEST_URI).get(FRONTCACHE_CLUSTER_NODE1);
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		// third request - the same request - response is dynamic
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 
@@ -265,21 +257,21 @@ public abstract class ClientTests extends TestsBase {
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 		final String TEST_URI_B = "common/fc-client/b.jsp";
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_1);
 		
 		// clean up
 		String response = frontcacheClient.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 
 		// the first request a - response should be cached
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_A);
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_A);
 		assertEquals("a", page.getPage().asText());		
 		WebResponse webResponse = page.getWebResponse(); 
 		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("false", debugCached);
 
 		// the first request b - response should be cached
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_B);
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_B);
 		assertEquals("b", page.getPage().asText());		
 		webResponse = page.getWebResponse(); 
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
@@ -310,14 +302,14 @@ public abstract class ClientTests extends TestsBase {
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 
 		// the first request a - response should be cached
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_A);
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_A);
 		assertEquals("a", page.getPage().asText());		
 		WebResponse webResponse = page.getWebResponse(); 
 		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("false", debugCached);
 
 		// the first request b - response should be cached
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_B);
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_B);
 		assertEquals("b", page.getPage().asText());		
 		webResponse = page.getWebResponse(); 
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
@@ -338,7 +330,7 @@ public abstract class ClientTests extends TestsBase {
 	
 	@Test
 	public void httpHeadersDuplication() throws Exception {
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + "common/deep-include-cache/e.jsp");
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/deep-include-cache/e.jsp");
 		assertEquals("ef", page.getPage().asText());
 		
 		List<NameValuePair> headers = page.getWebResponse().getResponseHeaders();

@@ -36,7 +36,7 @@ public class StandaloneFallbackHystrixTests extends FallbackHystrixTests {
 
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURL();
+		return getStandaloneBaseURLLocalhost();
 	}
 
 }

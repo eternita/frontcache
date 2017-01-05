@@ -196,24 +196,6 @@ public class LuceneIndexManager {
 		}
 	}
 
-	public void truncate() {
-		if (indexWriter != null && indexWriter.isOpen()){
-			try {
-				indexWriter.deleteAll();
-				logger.warn("lucene index truncated");
-			} catch (IOException ioEx) {
-				logger.error("Error truncating lucene index: {}", ioEx.getMessage(), ioEx);
-			} finally {
-				try {
-					indexWriter.commit();
-				} catch (IOException ioEx) {
-					logger.error("Error truncating lucene index: {}", ioEx.getMessage(), ioEx);
-				}
-			}			
-		}
-
-	}
-
 	/**
 	 * Returns document based on url
 	 */
@@ -298,6 +280,40 @@ public class LuceneIndexManager {
 		}
 	}
 
+	/**
+	 * Removes documents by url or tags
+	 * @param urlOrTag
+	 */
+	public void deleteAll(String domain) {
+		
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return ;
+			}
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
+			return;
+		}
+
+		
+		try {
+			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
+			
+			long count = iWriter.deleteDocuments(domainQuery);
+			logger.debug("Removed  {} documents for {}.", count, domain);
+		} catch (IOException e) {
+			logger.error(e.getMessage(), e);
+		} finally {
+			try {
+				iWriter.commit();
+			} catch (IOException e) {
+				logger.error(e.getMessage(), e);
+			}
+		}
+	}
+	
 	public void deleteExpired() {
 		// TODO: implement me : query EXPIRE_DATE_FIELD and delete
 	}

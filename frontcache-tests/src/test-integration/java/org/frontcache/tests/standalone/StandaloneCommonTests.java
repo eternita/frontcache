@@ -30,7 +30,7 @@ public class StandaloneCommonTests extends CommonTests {
 
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURL();
+		return getStandaloneBaseURLLocalhost();
 	}
 	
 }

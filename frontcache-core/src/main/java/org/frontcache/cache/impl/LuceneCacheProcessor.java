@@ -105,7 +105,7 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	@Override
 	public void removeFromCacheAll(String domain) {
 		logger.debug("truncate cache");
-		indexManager.truncate();
+		indexManager.deleteAll(domain);
 	}
 	
 	@Override

@@ -6,7 +6,7 @@ public class FilterStaticReadTests extends StaticReadTests {
 
 	@Override
 	public String getFrontCacheBaseURL() {
-		return getFilterBaseURL();
+		return getFilterBaseURLLocahhost();
 	}
 
 }
