@@ -90,6 +90,16 @@ public class TestsBase {
 	}
 	
 	
+	protected static String getFilterBaseURLLocalhost()
+	{
+		return TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST;
+	}
+
+	protected static String getStandaloneBaseURLLocalhost()
+	{
+		return TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST;
+	}
+
 	protected static String getFilterBaseURLDomainFC1()
 	{
 		return TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_FC1;
