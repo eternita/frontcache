@@ -307,7 +307,7 @@ public class WebResponse implements Serializable {
     	copy.refreshType = this.refreshType;
     	copy.cacheLevel = this.cacheLevel;
     	copy.domain = this.domain;
-		copy.tags.addAll(this.tags);
+    	copy.tags.addAll(this.tags);
     	
     	if (null != headers)
     	{
