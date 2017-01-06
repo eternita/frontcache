@@ -30,11 +30,19 @@ public class FilterFallbackHystrixTests extends FallbackHystrixTests {
 		File fallbackDataFile = new File(new File(frontcacheHome), "fallbacks/fallback2.txt");
 		if (fallbackDataFile.exists())
 			fallbackDataFile.delete();
+		fallbackDataFile = new File(new File(frontcacheHome), "fallbacks/" + TestConfig.TEST_DOMAIN_FC1  + "/fallback2.txt");
+		if (fallbackDataFile.exists())
+			fallbackDataFile.delete();
 	}
 	
 	@Override
 	public String getFrontCacheBaseURLDomainFC1() {
 		return getFilterBaseURLDomainFC1();
+	}
+
+	@Override
+	public String getFrontCacheBaseURLLocalhost() {
+		return getFilterBaseURLLocalhost();
 	}
 
 	
