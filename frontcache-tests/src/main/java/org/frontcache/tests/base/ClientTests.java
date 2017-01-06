@@ -383,11 +383,12 @@ public abstract class ClientTests extends TestsBase {
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("false", debugCached);
 		
-		Map<String, String> cacheState = frontcacheClient.getCacheState();
+		FrontCacheClient frontcacheClient1 = new FrontCacheClient(getFrontCacheBaseURLDomainFC1(), SiteKeys.TEST_SITE_KEY_1);
+		Map<String, String> cacheState = frontcacheClient1.getCacheState();
 		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 		
 
-		// same pages with IP instead of localhost
+		// same pages with fc2.test.org instead of fc1.test.org
 		// the first request a - response should be cached
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC2() + TEST_URI_A);
 		assertEquals("a", page.getPage().asText());		
@@ -396,16 +397,24 @@ public abstract class ClientTests extends TestsBase {
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC2() + TEST_URI_B);
 		assertEquals("b", page.getPage().asText());		
 		
-		cacheState = frontcacheClient.getCacheState();
+		cacheState = frontcacheClient1.getCacheState();
 		Assert.assertEquals("4", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 		
 		
-		// cache invalidation
-		response = frontcacheClient.removeFromCacheAll();
+		// cache invalidation - remove all for fc1.test.org
+		response = frontcacheClient1.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
-		cacheState = frontcacheClient.getCacheState();
-		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES)); // pages with IP instead of localhost remain in cache
+		cacheState = frontcacheClient1.getCacheState();
+		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES)); // pages from fc2.test.org remain in cache
+		
+		FrontCacheClient frontcacheClient2 = new FrontCacheClient(getFrontCacheBaseURLDomainFC2(), SiteKeys.TEST_SITE_KEY_2);
+		// fc2 cache invalidation - remove all for fc2.test.org
+		response = frontcacheClient2.removeFromCacheAll();
+		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
+
+		cacheState = frontcacheClient1.getCacheState();
+		Assert.assertEquals("0", cacheState.get(CacheProcessor.CACHED_ENTRIES)); // cache is empty
 		
 		return;
 	}
