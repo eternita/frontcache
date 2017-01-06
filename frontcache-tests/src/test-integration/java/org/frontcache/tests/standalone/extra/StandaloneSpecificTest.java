@@ -31,7 +31,7 @@ public class StandaloneSpecificTest extends TestsBase {
 	@Test
 	public void test2() throws Exception {
 		
-		TextPage page = webClient.getPage(getStandaloneBaseURL() + "standalone/2/a.txt");
+		TextPage page = webClient.getPage(getStandaloneBaseURLDomainFC1() + "standalone/2/a.txt");
 		assertEquals("ab", page.getContent());
 	}
 	

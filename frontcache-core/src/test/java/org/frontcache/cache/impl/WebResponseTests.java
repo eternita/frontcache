@@ -24,16 +24,17 @@ public class WebResponseTests {
 
 	protected Logger logger = LoggerFactory.getLogger(WebResponseTests.class);
 	LuceneCacheProcessor pr = null;
+	private final static String DOMAIN = "test-domain";
 
 	@Test
 	public void fileSaveTest() throws Exception {
 
 		String url = "someUrl";
-		pr.removeFromCache(url);
+		pr.removeFromCache(DOMAIN, url);
 
 		WebResponse response = new WebResponse(url, "<b>some text123</b>".getBytes());
 
-		pr.putToCache(url, response);
+		pr.putToCache(DOMAIN, url, response);
 
 		WebResponse fromFile = pr.getFromCache(url);
 		// assertEquals(url, fromFile.getUrl());
@@ -54,11 +55,11 @@ public class WebResponseTests {
 		byte[] data = body.bytes();
 		assertNotNull(data);
 
-		pr.removeFromCache(url);
+		pr.removeFromCache(DOMAIN, url);
 
 		WebResponse response = new WebResponse(url, data);
 
-		pr.putToCache(url, response);
+		pr.putToCache(DOMAIN, url, response);
 
 		WebResponse fromFile = pr.getFromCache(url);
 		assertEquals(url, fromFile.getUrl());
@@ -73,7 +74,7 @@ public class WebResponseTests {
 
 		WebResponse response = new WebResponse(url, "<b>some text123</b>".getBytes());
 
-		pr.putToCache(url, response);
+		pr.putToCache(DOMAIN, url, response);
 
 		WebResponse fromCache = pr.getFromCacheImpl(url);
 
@@ -84,7 +85,7 @@ public class WebResponseTests {
 		assertEquals(response.getContentLenth(), fromCache.getContentLenth());
 		assertEquals(response.getStatusCode(), fromCache.getStatusCode());
 
-		pr.removeFromCache(url);
+		pr.removeFromCache(DOMAIN, url);
 
 		fromCache = pr.getFromCacheImpl(url);
 
@@ -127,7 +128,7 @@ public class WebResponseTests {
 
 	@After
 	public void cleanUp() {
-		pr.removeFromCacheAll();
+		pr.removeFromCacheAll(DOMAIN);
 		pr.destroy();
 
 	}

@@ -16,18 +16,16 @@ public class FrontCacheAgentCluster {
 	
 	private final static String DEFAULT_CLUSTER_CONFIG_NAME = "frontcache-cluster.conf";
 	
-	public FrontCacheAgentCluster(Set<String> fcURLSet) 
+	private final static String SITE_KEY_CONFIG_FILE = "frontcache-site-key.conf";
+	
+	private final static String DEFAULT_SITE_KEY = "";
+	
+	public FrontCacheAgentCluster(Collection<String> fcURLSet, String siteKey) 
 	{
 		for (String url : fcURLSet)
-			fcCluster.add(new FrontCacheAgent(url));
+			fcCluster.add(new FrontCacheAgent(url, siteKey));
 	}
 	
-	public FrontCacheAgentCluster(String ... fcURLs) 
-	{
-		for (String url : fcURLs)
-			fcCluster.add(new FrontCacheAgent(url));
-	}
-
 	public FrontCacheAgentCluster(FrontCacheAgent ... fcClients) 
 	{
 		for (FrontCacheAgent fcClient : fcClients)
@@ -48,10 +46,50 @@ public class FrontCacheAgentCluster {
 	public FrontCacheAgentCluster(String configResourceName) 
 	{
 		Set<String> fcURLSet = loadFrontcacheClusterNodes(configResourceName);
+		String siteKey = loadSiteKey();
+		
 		for (String url : fcURLSet)
-			fcCluster.add(new FrontCacheAgent(url));
+			fcCluster.add(new FrontCacheAgent(url, siteKey));
 	}
 
+	private String loadSiteKey()
+	{
+		String siteKey = DEFAULT_SITE_KEY;
+		BufferedReader confReader = null;
+		InputStream is = null;
+		try 
+		{
+			is = FrontCacheAgentCluster.class.getClassLoader().getResourceAsStream(SITE_KEY_CONFIG_FILE);
+			if (null == is)
+			{
+				return siteKey;
+			}
+
+			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+			siteKey = confReader.readLine();
+			if (null == siteKey)
+				siteKey = "";
+			
+		} catch (Exception e) {
+			// TODO: log ...
+//			throw new RuntimeException("Frontcache cluster nodes can't be loaded from " + configName, e);
+		} finally {
+			if (null != confReader)
+			{
+				try {
+					confReader.close();
+				} catch (IOException e) { }
+			}
+			if (null != is)
+			{
+				try {
+					is.close();
+				} catch (IOException e) { }
+			}
+		}
+		
+		return siteKey;
+	}
 		
 	private Set<String> loadFrontcacheClusterNodes(String configName) {
 		Set<String> fcURLSet = new HashSet<String>();

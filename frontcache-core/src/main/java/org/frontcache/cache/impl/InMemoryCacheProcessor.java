@@ -57,7 +57,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}	
 
 	@Override
-	public void putToCache(String url, WebResponse component) {
+	public void putToCache(String domain, String url, WebResponse component) {
 		
 		int newSize = currentSize + component.getContent().length;
 		if (newSize < maxSize)
@@ -90,7 +90,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}
 
 	@Override
-	public void removeFromCache(String filter) {
+	public void removeFromCache(String domain, String filter) {
 
 		List<String> removeList = new ArrayList<String>();
 		
@@ -107,7 +107,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}
 
 	@Override
-	public void removeFromCacheAll() {
+	public void removeFromCacheAll(String domain) {
 		cache.clear();
 	}
 	

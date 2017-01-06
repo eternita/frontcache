@@ -40,13 +40,13 @@ public abstract class StaticReadTests extends TestsBase {
 		super.tearDown();
 	}
 	
-	public abstract String getFrontCacheBaseURL(); 
+	public abstract String getFrontCacheBaseURLDomainFC1(); 
 	
 	@Test
 	public void text1() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
 
-		TextPage page = webClient.getPage(getFrontCacheBaseURL() + "common/static-read/a.txt");
+		TextPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/a.txt");
 		String pageAsText = page.getContent();
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
@@ -57,7 +57,7 @@ public abstract class StaticReadTests extends TestsBase {
 	public void text2() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "*/*");
 
-		TextPage page = webClient.getPage(getFrontCacheBaseURL() + "common/static-read/a.txt");
+		TextPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/a.txt");
 		String pageAsText = page.getContent();
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
@@ -68,7 +68,7 @@ public abstract class StaticReadTests extends TestsBase {
 	public void js() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "*/*");
 
-		JavaScriptPage page = webClient.getPage(getFrontCacheBaseURL() + "common/static-read/jquery.js");
+		JavaScriptPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/jquery.js");
 		String pageAsText = page.getContent();
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
@@ -80,7 +80,7 @@ public abstract class StaticReadTests extends TestsBase {
 	@Test
 	public void img() throws Exception {
 
-		String urlStr = getFrontCacheBaseURL() + "common/static-read/image.jpg";
+		String urlStr = getFrontCacheBaseURLDomainFC1() + "common/static-read/image.jpg";
 		CloseableHttpClient httpclient = HttpClients.createDefault();
 		
 		HttpResponse response = null;

@@ -102,6 +102,15 @@ public class FrontCacheEngine {
 		}
 		return instance;
 	}
+	
+	public DomainContext getDomainContexBySiteKey(String siteKey)
+	{
+		for (DomainContext domainContext : domainConfigMap.values())
+			if (null != domainContext.getSiteKey() && domainContext.getSiteKey().equals(siteKey))
+				return domainContext;
+				
+		return null;
+	}
 
 	public static void destroy() {
 		if (null != instance) {
@@ -137,24 +146,26 @@ public class FrontCacheEngine {
 	{
 		
 		String defaultDomain = FCConfig.getProperty("front-cache.default-domain", "localhost");
+		String defaultSiteKey = FCConfig.getProperty("front-cache.site-key", "");
 		String defaultOriginHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
 		String defaultOriginHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		String defaultOriginHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 		
 		domainConfigMap.put(FCConfig.DEFAULT_DOMAIN, 
-				new DomainContext(defaultDomain, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
+				new DomainContext(defaultDomain, defaultSiteKey, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
 		
 		String domainList = FCConfig.getProperty("front-cache.domains");
 		if (null != domainList)
 		{
 			for(String domain : domainList.split(","))
 			{
+				String siteKey = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".site-key", "");
 				String originHost = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-host", defaultOriginHost);
 				String originHttpPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-http-port", defaultOriginHttpPort);
 				String originHttpsPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-https-port", defaultOriginHttpsPort);
 				
 				domainConfigMap.put(domain, 
-						new DomainContext(domain, originHost, originHttpPort, originHttpsPort));
+						new DomainContext(domain, siteKey, originHost, originHttpPort, originHttpsPort));
 			}
 		}
 		logger.info("Loaded following origin configurations: ");

@@ -5,8 +5,8 @@ import org.frontcache.tests.base.StaticReadTests;
 public class FilterStaticReadTests extends StaticReadTests {
 
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getFilterBaseURL();
+	public String getFrontCacheBaseURLDomainFC1() {
+		return getFilterBaseURLDomainFC1();
 	}
 
 }

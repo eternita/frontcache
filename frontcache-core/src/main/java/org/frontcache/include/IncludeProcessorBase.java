@@ -225,7 +225,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 					cacheProcessor.doSoftInvalidation(urlStr, urlStr, requestHeaders, client, context);
 				} else {
 					// regular expiration
-					cacheProcessor.removeFromCache(urlStr);
+					cacheProcessor.removeFromCache(context.getDomainContext().getDomain(), urlStr);
 					webResponse = null; // refresh from origin
 				}
 			}

@@ -6,8 +6,8 @@ public class FilterIncludeTests extends IncludeTests {
 
 
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getFilterBaseURL();
+	public String getFrontCacheBaseURLDomainFC1() {
+		return getFilterBaseURLDomainFC1();
 	}
 	
 }
