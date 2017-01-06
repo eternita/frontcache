@@ -31,12 +31,21 @@ public class StandaloneFallbackHystrixTests extends FallbackHystrixTests {
 		File fallbackDataFile = new File(new File(frontcacheHome), "fallbacks/fallback2.txt");
 		if (fallbackDataFile.exists())
 			fallbackDataFile.delete();
+		fallbackDataFile = new File(new File(frontcacheHome), "fallbacks/" + TestConfig.TEST_DOMAIN_FC1  + "/fallback2.txt");
+		if (fallbackDataFile.exists())
+			fallbackDataFile.delete();
 	}
 	
 
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURL();
+	public String getFrontCacheBaseURLDomainFC1() {
+		return getStandaloneBaseURLDomainFC1();
+	}
+
+
+	@Override
+	public String getFrontCacheBaseURLLocalhost() {
+		return getStandaloneBaseURLLocalhost();
 	}
 
 }

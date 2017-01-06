@@ -30,6 +30,7 @@ import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.io.CacheStatusActionResponse;
@@ -48,6 +49,8 @@ public class FrontCacheClient {
 	private String frontCacheURL;
 	
 	private String frontCacheURI;
+	
+	private String siteKey = "";
 	
 	private final static String IO_URI = "frontcache-io";
 	
@@ -106,6 +109,16 @@ public class FrontCacheClient {
 			this.frontCacheURI = frontcacheURL + IO_URI;
 		else
 			this.frontCacheURI = frontcacheURL + "/" + IO_URI;
+	}
+
+	/**
+	 * 
+	 * @param frontcacheURL
+	 * @param siteKey
+	 */
+	public FrontCacheClient(String frontcacheURL, String siteKey) {	
+		this(frontcacheURL);
+		this.siteKey = siteKey;
 	}
 	
 	/**
@@ -359,6 +372,9 @@ public class FrontCacheClient {
 		HttpPost post = new HttpPost(frontCacheURI);
 
 //    	post.addHeader("Accept-Encoding", "gzip");
+		
+		if (null != siteKey)
+			post.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 

@@ -42,7 +42,7 @@ public class FCConfig {
 
     private static Properties config;
     
-    public static final String DEFAULT_DOMAIN = "DEFAULT_DOMAIN";
+    public static final String DEFAULT_DOMAIN = "localhost";
     
 	private static final String BOT_CONIF_FILE = "bots.conf";
 	
