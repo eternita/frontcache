@@ -5,8 +5,8 @@ import org.frontcache.tests.base.InvalidationTagsTests;
 public class StandaloneInvalidationTagsTests extends InvalidationTagsTests {
 
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURLLocalhost();
+	public String getFrontCacheBaseURLDomainFC1() {
+		return getStandaloneBaseURLDomainFC1();
 	}
 
 }

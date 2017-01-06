@@ -13,7 +13,7 @@ import com.gargoylesoftware.htmlunit.WebResponse;
 
 public abstract class FallbackHystrixTests extends TestsBase {
 
-	public abstract String getFrontCacheBaseURL(); 
+	public abstract String getFrontCacheBaseURLDomainFC1(); 
 	
 	@Before
 	public void setUp() throws Exception {
@@ -28,7 +28,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	@Test
 	public void customTimeoutTest() throws Exception {
 		// page timeout 1500ms. Hystrix timeout - 3000ms, what is more than default 1000ms
-		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/a.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/a.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		assertEquals("Hi from Hystrix", webResponse.getContentAsString().trim());
@@ -37,7 +37,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	@Test
 	public void timeoutFailTest() throws Exception {
 		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/b.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/b.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		
@@ -53,7 +53,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	@Test
 	public void timeoutInsideIncludeTest() throws Exception {
 		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/top1.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/top1.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		
@@ -68,7 +68,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	@Test
 	public void customFallbackTest1() throws Exception {
 		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/fallback1.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/fallback1.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		
@@ -89,7 +89,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 		Thread.sleep(5000); 
 
 		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/fallback2.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/fallback2.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		
@@ -99,7 +99,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	@Test
 	public void customFallbackTest3URLPattern() throws Exception {
 		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURL() + "common/hystrix/fallback3-pattern.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/fallback3-pattern.jsp");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		

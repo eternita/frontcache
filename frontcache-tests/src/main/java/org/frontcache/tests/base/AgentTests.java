@@ -21,16 +21,16 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
  */
 public abstract class AgentTests extends TestsBase {
 
-	private String FRONTCACHE_CLUSTER_NODE1 = getFrontCacheBaseURL();
+	private String FRONTCACHE_CLUSTER_NODE1 = getFrontCacheBaseURLDomainFC1();
 	
-	private String FRONTCACHE_CLUSTER_NODE2 = getFrontCacheBaseURL();
+	private String FRONTCACHE_CLUSTER_NODE2 = getFrontCacheBaseURLDomainFC1();
 	
 	protected FrontCacheAgent frontcacheClient = null;
 	
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		frontcacheClient = new FrontCacheAgent(getFrontCacheBaseURL(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient = new FrontCacheAgent(getFrontCacheBaseURLDomainFC1(), SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClient.removeFromCache("*"); // clean up		
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
@@ -41,7 +41,7 @@ public abstract class AgentTests extends TestsBase {
 		super.tearDown();
 	}
 	
-	public abstract String getFrontCacheBaseURL(); 
+	public abstract String getFrontCacheBaseURLDomainFC1(); 
 
 
 	
@@ -53,7 +53,7 @@ public abstract class AgentTests extends TestsBase {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
 		// the first request - response should be cached
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		
 		WebResponse webResponse = page.getWebResponse(); 
@@ -67,20 +67,20 @@ public abstract class AgentTests extends TestsBase {
 		assertEquals("1", debugResponseSize);
 
 		// second request - the same request - response should be from the cache now
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("true", debugCached);
 		
 		// cache invalidation (both standalone and filter)
-		String response = frontcacheClientStandalone.removeFromCache(getFrontCacheBaseURL() + TEST_URI); // clean up FC standalone		
+		String response = frontcacheClientStandalone.removeFromCache(getFrontCacheBaseURLDomainFC1() + TEST_URI); // clean up FC standalone		
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
-		response = frontcacheClientFilter.removeFromCache(getFrontCacheBaseURL() + TEST_URI); // clean up FC filter
+		response = frontcacheClientFilter.removeFromCache(getFrontCacheBaseURLDomainFC1() + TEST_URI); // clean up FC filter
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		// third request - the same request - response is dynamic
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 
@@ -99,7 +99,7 @@ public abstract class AgentTests extends TestsBase {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
 
 		// the first request - response should be cached
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		
 		WebResponse webResponse = page.getWebResponse(); 
@@ -113,18 +113,18 @@ public abstract class AgentTests extends TestsBase {
 		assertEquals("1", debugResponseSize);
 
 		// second request - the same request - response should be from the cache now
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 		assertEquals("true", debugCached);
 		
 		// cache invalidation
-		String response = fcCluster.removeFromCache(getFrontCacheBaseURL() + TEST_URI).get(FRONTCACHE_CLUSTER_NODE1);
+		String response = fcCluster.removeFromCache(getFrontCacheBaseURLDomainFC1() + TEST_URI).get(FRONTCACHE_CLUSTER_NODE1);
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
 		// third request - the same request - response is dynamic
-		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI);
+		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 

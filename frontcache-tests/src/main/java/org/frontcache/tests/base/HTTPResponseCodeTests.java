@@ -21,11 +21,11 @@ public abstract class HTTPResponseCodeTests extends TestsBase {
 		super.tearDown();
 	}
 	
-	public abstract String getFrontCacheBaseURL(); 
+	public abstract String getFrontCacheBaseURLDomainFC1(); 
 
 	@Test
 	public void code404() throws Exception {
-		Page page = webClient.getPage(getFrontCacheBaseURL() + "something/what-doesnt-exist");
+		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "something/what-doesnt-exist");
 		WebResponse webResponse = page.getWebResponse(); 
 		printHeaders(webResponse);
 		

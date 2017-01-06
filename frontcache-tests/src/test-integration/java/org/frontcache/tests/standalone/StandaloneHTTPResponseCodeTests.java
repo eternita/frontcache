@@ -5,8 +5,8 @@ import org.frontcache.tests.base.HTTPResponseCodeTests;
 public class StandaloneHTTPResponseCodeTests extends HTTPResponseCodeTests {
 
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURLLocalhost();
+	public String getFrontCacheBaseURLDomainFC1() {
+		return getStandaloneBaseURLDomainFC1();
 	}
 
 }
