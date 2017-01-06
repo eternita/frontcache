@@ -6,8 +6,8 @@ public class StandaloneIncludeTests extends IncludeTests {
 
 	
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURLLocalhost();
+	public String getFrontCacheBaseURLDomainFC1() {
+		return getStandaloneBaseURLDomainFC1();
 	}
 	
 }

@@ -12,8 +12,8 @@ public class StandaloneAgentTests extends AgentTests {
 
 	
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getStandaloneBaseURLLocalhost();
+	public String getFrontCacheBaseURLDomainFC1() {
+		return getStandaloneBaseURLDomainFC1();
 	}
 	
 }

@@ -5,8 +5,8 @@ import org.frontcache.tests.base.HTTPResponseCodeTests;
 public class FilterHTTPResponseCodeTests extends HTTPResponseCodeTests {
 
 	@Override
-	public String getFrontCacheBaseURL() {
-		return getFilterBaseURLLocahhost();
+	public String getFrontCacheBaseURLDomainFC1() {
+		return getFilterBaseURLDomainFC1();
 	}
 
 }
