@@ -302,8 +302,10 @@ public class FCConfig {
 				return fcConfig;
 			}
 		}
+		
+		logger.error("Can't find config dir for " + FRONT_CACHE_HOME_SYSTEM_KEY + "=" + System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY) + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + "=" + System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY) + " (environment variable)");
 
-		throw new RuntimeException("Can't find config dir for " + FRONT_CACHE_HOME_SYSTEM_KEY + "=" + System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY) + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + "=" + System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY) + " (environment variable)");		
+		return null;
 	}
 	
 	
@@ -311,7 +313,11 @@ public class FCConfig {
 	public static List<String> getDomains()
 	{
 		
+		List<String> domains = new ArrayList<String>();
 		File configDir = getConfDir();
+		if (null == configDir)
+			return domains;
+		
 		String configDirStr = configDir.getAbsolutePath();
 		
 		FileFilter dirFilter = new FileFilter() {
@@ -319,8 +325,6 @@ public class FCConfig {
 		        return file.isDirectory();
 		    }
 		};
-		
-		List<String> domains = new ArrayList<String>();
 		
 		for (File domainDir : configDir.listFiles(dirFilter))
 		{
