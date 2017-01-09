@@ -4,6 +4,7 @@ import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
+import org.frontcache.core.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -187,7 +188,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 		try {
 			
 			final String domain = FCUtils.getDomainFromSiteKeyHeader(request);
-			if (domain == null){
+			if (StringUtils.isEmpty(domain)){
 				response.sendError(503, "Can't resolve domain from siteKey");
 			}
 			
