@@ -31,7 +31,7 @@ public class FC_Total extends HystrixCommand<Object> {
     public FC_Total(FrontCacheEngine frontCacheEngine, RequestContext context) {
         
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Input-Requests"))
                 );
         this.frontCacheEngine = frontCacheEngine;

@@ -39,5 +39,9 @@ public class StringUtils {
 	  	}
 		return list;
   }
+
+	public static boolean isEmpty(Object str) {
+		return (str == null || "".equals(str));
+	}
   
 }

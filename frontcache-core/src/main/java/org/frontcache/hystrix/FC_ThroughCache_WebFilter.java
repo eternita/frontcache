@@ -31,7 +31,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
     public FC_ThroughCache_WebFilter(RequestContext context) {
         
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
         		);
         
