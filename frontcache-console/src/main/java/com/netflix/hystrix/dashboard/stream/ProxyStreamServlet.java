@@ -35,8 +35,11 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.PoolingClientConnectionManager;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
+import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Proxy an EventStream request (data.stream via proxy.stream) since EventStream does not yet support CORS (https://bugs.webkit.org/show_bug.cgi?id=61862)
@@ -62,7 +65,9 @@ public class ProxyStreamServlet extends HttpServlet {
             return;
         }
         origin = origin.trim();
-
+        
+        String siteKey = FCUtils.getSiteKeyByOriginUrl(origin);
+        
         HttpGet httpget = null;
         InputStream is = null;
         boolean hasFirstParameter = false;
@@ -95,6 +100,9 @@ public class ProxyStreamServlet extends HttpServlet {
             httpget = new HttpGet(proxyUrl);
             if (authorization != null) {
                 httpget.addHeader("Authorization", authorization);
+            }
+            if (siteKey != null) {
+                httpget.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
             }
             HttpClient client = ProxyConnectionManager.httpClient;
             HttpResponse httpResponse = client.execute(httpget);
@@ -173,4 +181,5 @@ public class ProxyStreamServlet extends HttpServlet {
             threadSafeConnectionManager.setMaxTotal(400);
         }
     }
+    
 }
