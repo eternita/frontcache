@@ -202,6 +202,27 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		luceneIndexManager.delete(domain, filter);
 	}
 
+
+	public void removeFromCache(String filter) {
+		logger.debug("Removing from cache {}", filter);
+		
+		{ // remove from ehCache
+			List<Object> removeList = new ArrayList<Object>();
+			
+			for(Object key : ehCache.getKeys())
+			{
+				String str = key.toString();
+				if (-1 < str.indexOf(filter))
+					removeList.add(key);
+			}
+			
+			for(Object key : removeList)
+				ehCache.remove(key);
+		}
+
+		// remove from Lucene
+		luceneIndexManager.delete(filter);
+	}
 	
 	@Override
 	public void removeFromCacheAll(String domain) {
@@ -234,6 +255,13 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		status.put(CacheProcessor.CACHED_ENTRIES, "" + (ehCache.getKeys().size() + luceneIndexManager.getIndexSize()));
 		status.put(CacheProcessor.CACHED_ENTRIES + "-L1", "" + ehCache.getKeys().size());
 		status.put(CacheProcessor.CACHED_ENTRIES + "-L2", "" + luceneIndexManager.getIndexSize());
+		
+		for (String domain : FCConfig.getDomains())
+		{
+			long domainCount = luceneIndexManager.getDocumentsCount(domain);
+			status.put(CacheProcessor.CACHED_ENTRIES + "-L2." + domain, "" + domainCount);
+		}
+		
 		return status;
 	}
 	
@@ -251,6 +279,47 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		
 		return keys;
 	}
-	
+
+	@Override
+	public void patch() {
+		
+		final String domain = "coinshome.net";
+		long webResponseNullCounter = 0;
+		long webResponseDomainErrorCounter = 0;
+		long webResponseDomainNullErrorCounter = 0;
+		
+		for (String url : luceneIndexManager.getKeys())
+		{
+			WebResponse webResponse = getFromCache(url);
+			
+			if (null == webResponse)
+			{
+				System.out.println("webResponse = null for " + url);
+				webResponseNullCounter++;
+				removeFromCache(domain, url);
+				continue;
+			}
+			
+			if (null != webResponse.getDomain()) 
+			{
+				System.out.println("1. domain = " + webResponse.getDomain() + " should be null");
+				webResponseDomainErrorCounter++;
+			} else {
+				putToCache(domain, url, webResponse);
+			}
+			
+			webResponse = getFromCache(url);
+			if (null == webResponse.getDomain())
+			{
+				System.out.println("1. domain = null, should be " + domain);
+				webResponseDomainNullErrorCounter++;
+			}
+			
+		} // for (String url : luceneIndexManager.getKeys())
+
+		System.out.println("webResponseNullCounter = " + webResponseNullCounter + " webResponseDomainErrorCounter = " + webResponseDomainErrorCounter + ", webResponseDomainNullErrorCounter = " + webResponseDomainNullErrorCounter);
+		
+		return;
+	}
 }
 

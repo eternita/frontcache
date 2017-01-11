@@ -37,4 +37,6 @@ public interface CacheProcessor {
 	
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context);
 	
+	public void patch();	
+	
 }

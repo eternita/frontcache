@@ -8,7 +8,6 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -137,6 +136,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			
 		case FrontcacheAction.GET_DYNAMIC_URLS:
 			aResponse = getDynamicURLs(request);
+			break;
+			
+		case FrontcacheAction.PATCH:
+			aResponse = patch(request);
 			break;
 			
 			default:
@@ -354,6 +357,27 @@ public class FrontCacheIOServlet extends HttpServlet {
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
 		aResponse.setDynamicURLs(dynamicURLs);
 		
+		return aResponse;
+	}
+
+	/**
+	 * 
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse patch(HttpServletRequest req)
+	{
+		
+		Runnable r = new Runnable() {
+			public void run() {
+				CacheManager.getInstance().patch();
+			}
+		};
+		
+		Thread t = new Thread(r);
+		t.start();				
+		
+		PatchActionResponse aResponse = new PatchActionResponse();
 		return aResponse;
 	}
 	
