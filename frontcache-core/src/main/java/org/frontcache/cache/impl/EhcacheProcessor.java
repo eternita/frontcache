@@ -150,6 +150,12 @@ public class EhcacheProcessor extends CacheProcessorBase implements CacheProcess
 
 		return keys;
 	}
+
+	@Override
+	public void patch() {
+		// TODO Auto-generated method stub
+		
+	}
 	
 }
 

@@ -88,6 +88,12 @@ public class NoCacheProcessor implements CacheProcessor {
 		return;
 	}
 
+	@Override
+	public void patch() {
+		// TODO Auto-generated method stub
+		
+	}
+
 }
 
 

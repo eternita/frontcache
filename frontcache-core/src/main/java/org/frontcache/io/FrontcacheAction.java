@@ -23,6 +23,8 @@ public abstract class FrontcacheAction {
 	public static final String GET_BOTS = "get-bots";
 	
 	public static final String GET_DYNAMIC_URLS = "get-dynamic-urls";
+
+	public static final String PATCH = "patch";
 	
 	public static Map<String, String> actionsDescriptionMap = new TreeMap<>();
 	

@@ -23,12 +23,14 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.index.TermContext;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TermStatistics;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -237,7 +239,46 @@ public class LuceneIndexManager {
 
 		return doc;
 	}
+	
 
+	public long getDocumentsCount(String domain) {
+
+		long count = -1;
+		
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return count;
+			}
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
+			return count;
+		}
+		
+		IndexReader reader = null;
+		try {
+			reader = DirectoryReader.open(iWriter);
+			Term domainTerm = new Term(DOMAIN_FIELD, domain);
+			IndexSearcher searcher = new IndexSearcher(reader);
+			TermStatistics termStat = searcher.termStatistics(domainTerm, TermContext.build(searcher.getIndexReader().getContext(), domainTerm));
+			count = termStat.docFreq();
+		} catch (Exception e1) {
+			logger.debug("Error during reader.totalTermFreq(domainTerm). " + e1.getMessage());
+		} finally {
+			if (reader != null) {
+				try {
+					reader.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+
+		return count;
+	}
+	
 	/**
 	 * Removes documents by url or tags
 	 * @param urlOrTag
@@ -280,6 +321,41 @@ public class LuceneIndexManager {
 		}
 	}
 
+	public void delete(String urlOrTag) {
+		
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return ;
+			}
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
+			return;
+		}
+		
+		try {
+			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
+			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
+			
+			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
+			
+			booleanQuery.add(urlQuery, Occur.SHOULD);
+			booleanQuery.add(tagsQuery, Occur.SHOULD);
+			
+			long count = iWriter.deleteDocuments(booleanQuery.build());
+			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
+		} catch (IOException e) {
+			logger.error(e.getMessage(), e);
+		} finally {
+			try {
+				iWriter.commit();
+			} catch (IOException e) {
+				logger.error(e.getMessage(), e);
+			}
+		}
+	}
+	
 	/**
 	 * Removes documents by url or tags
 	 * @param urlOrTag
@@ -350,7 +426,7 @@ public class LuceneIndexManager {
 		try {
 			reader = DirectoryReader.open(iWriter);
 			
-			for (int i=0; i<reader.maxDoc(); i++) {
+			for (int i=0; i<reader.numDocs(); i++) {
 			    Document doc = reader.document(i);
 			    if (null != doc)
 			    {

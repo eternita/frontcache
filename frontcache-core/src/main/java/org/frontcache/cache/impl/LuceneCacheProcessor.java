@@ -120,6 +120,12 @@ public class LuceneCacheProcessor extends CacheProcessorBase implements CachePro
 	public List<String> getCachedKeys() {
 		return indexManager.getKeys();
 	}
+
+	@Override
+	public void patch() {
+		// TODO Auto-generated method stub
+		
+	}
 	
 }
 
