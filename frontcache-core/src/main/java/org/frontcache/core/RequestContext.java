@@ -280,13 +280,16 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public boolean isCacheableRequest()
     {
     	
-    	if (!"GET".equals(FCUtils.getVerb(this.getRequest())))
-    		return false;
+    	if ("GET".equals(FCUtils.getVerb(this.getRequest())))
+    		return true;
+    	
+    	if ("HEAD".equals(FCUtils.getVerb(this.getRequest())))
+    		return true;
     	
 //    	if (-1 < this.getRequestURI().indexOf("jsessionid="))
 //    		return false;
     	
-    	return true;
+    	return false;
     	//bot's send requests without header (accept=text/html) #36
 //        final String requestEncoding = this.getRequest().getHeader(FCHeaders.ACCEPT);
 //        return requestEncoding != null && requestEncoding.toLowerCase().contains("text");
