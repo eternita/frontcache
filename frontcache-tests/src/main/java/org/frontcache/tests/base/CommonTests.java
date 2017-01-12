@@ -3,11 +3,20 @@ package org.frontcache.tests.base;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
+import java.net.URL;
 import java.util.Map;
 
+import org.apache.http.HttpHost;
+import org.apache.http.HttpRequest;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpHead;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -354,5 +363,55 @@ public abstract class CommonTests extends TestsBase {
 		
 		assertNotEquals(timestamp1, timestamp3); 
 	}
+	
+	@Test
+	public void testCacheForHTTPMethod() throws Exception {
+		
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		
+		// the first request - response should be cached
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/methods/a.jsp");
+		assertEquals("a", page.getPage().asText());
+		
+		WebResponse webResponse = page.getWebResponse(); 
+
+		String debugCacheable = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE);
+		assertEquals("true", debugCacheable);
+		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("false", debugCached);
+
+		
+		// second request - the same request - response should be from the cache now
+		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/methods/a.jsp");
+		assertEquals("a", page.getPage().asText());
+		webResponse = page.getWebResponse(); 
+
+		debugCacheable = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE);
+		assertEquals("true", debugCacheable);
+		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
+		assertEquals("true", debugCached);
+
+		
+		// third request (HEAD METHOD) - the same request - response should be from the cache now
+
+		String urlStr = getFrontCacheBaseURLDomainFC1() + "common/methods/a.jsp";
+		CloseableHttpClient httpclient = HttpClients.createDefault();
+		
+		HttpResponse response = null;
+
+		HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
+		HttpRequest httpRequest = new HttpHead(FCUtils.buildRequestURI(urlStr));
+		httpRequest.addHeader(FCHeaders.ACCEPT, "text/html");
+		httpRequest.addHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+
+		response = httpclient.execute(httpHost, httpRequest);
+		
+		assertEquals("true", response.getFirstHeader(FCHeaders.X_FRONTCACHE_DEBUG_CACHED).getValue());
+		
+		((CloseableHttpResponse) response).close();
+		
+		return;
+	}
+	
 	
 }
