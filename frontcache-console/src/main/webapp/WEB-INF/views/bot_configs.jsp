@@ -26,9 +26,9 @@
         -->
         <c:forEach var="botsDomain" items="${edge.value}">
         
-	        <c:if test="${'DEFAULT_DOMAIN' == botsDomain.key}">
+	        <c:if test="${'default-domain' == botsDomain.key}">
 	          <tr>
-	            <td align="center"><b> ${botsDomain.key}  </b></td>
+	            <td align="center"><b> Default settings  </b></td>
 	          </tr>
 	          
 	          <c:forEach var="bot" items="${botsDomain.value}">
@@ -42,7 +42,7 @@
         <!--  the same loop for other domains (domain specific bots)  -->        
         <c:forEach var="botsDomain" items="${edge.value}">
         
-            <c:if test="${'DEFAULT_DOMAIN' != botsDomain.key}">
+            <c:if test="${'default-domain' != botsDomain.key}">
               <tr>
                 <td align="center"><b> ${botsDomain.key}  </b></td>
               </tr>

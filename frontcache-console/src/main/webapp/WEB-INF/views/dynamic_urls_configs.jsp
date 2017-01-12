@@ -27,9 +27,9 @@
         -->
         <c:forEach var="dynamicURLDomain" items="${edge.value}">
         
-            <c:if test="${'DEFAULT_DOMAIN' == dynamicURLDomain.key}">
+            <c:if test="${'default-domain' == dynamicURLDomain.key}">
               <tr>
-                <td align="center"><b> ${dynamicURLDomain.key}  </b></td>
+                <td align="center"><b> Default settings  </b></td>
               </tr>
               
               <c:forEach var="dynamicURL" items="${dynamicURLDomain.value}">
@@ -43,7 +43,7 @@
         <!--  the same loop for other domains (domain specific dynamic URLs)  -->        
         <c:forEach var="dynamicURLDomain" items="${edge.value}">
         
-            <c:if test="${'DEFAULT_DOMAIN' != dynamicURLDomain.key}">
+            <c:if test="${'default-domain' != dynamicURLDomain.key}">
               <tr>
                 <td align="center"><b> ${dynamicURLDomain.key}  </b></td>
               </tr>
