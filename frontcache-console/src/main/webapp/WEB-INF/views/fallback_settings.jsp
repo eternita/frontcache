@@ -54,9 +54,9 @@
         -->
         <c:forEach var="fallbacksDomain" items="${edge.value}">
         
-            <c:if test="${'DEFAULT_DOMAIN' == fallbacksDomain.key}">
+            <c:if test="${'default-domain' == fallbacksDomain.key}">
               <tr>
-                <td colspan="2" align="center"><b> ${fallbacksDomain.key}  </b></td>
+                <td colspan="2" align="center"><b> Default settings  </b></td>
               </tr>
               
               <c:forEach var="config" items="${fallbacksDomain.value}">
@@ -73,7 +73,7 @@
         
         <!--  the same loop for other domains (domain specific fallbacks)  -->        
         <c:forEach var="fallbacksDomain" items="${edge.value}">
-            <c:if test="${'DEFAULT_DOMAIN' != fallbacksDomain.key}">
+            <c:if test="${'default-domain' != fallbacksDomain.key}">
               <tr>
                 <td colspan="2" align="center"><b> ${fallbacksDomain.key}  </b></td>
               </tr>

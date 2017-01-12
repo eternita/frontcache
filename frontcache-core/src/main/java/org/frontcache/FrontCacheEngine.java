@@ -145,7 +145,7 @@ public class FrontCacheEngine {
 	private void loadDomainConfigs()
 	{
 		
-		String defaultDomain = FCConfig.getProperty("front-cache.default-domain", "localhost");
+		String defaultDomain = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
 		String defaultSiteKey = FCConfig.getProperty("front-cache.site-key", "");
 		String defaultOriginHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
 		String defaultOriginHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
