@@ -132,6 +132,12 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 		keys.addAll(cache.keySet());
 		return keys;
 	}
+
+	@Override
+	public void patch() {
+		// TODO Auto-generated method stub
+		
+	}
 	
 }
 
