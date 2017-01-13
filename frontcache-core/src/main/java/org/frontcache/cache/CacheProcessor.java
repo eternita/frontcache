@@ -13,9 +13,9 @@ public interface CacheProcessor {
 
 	public final static String CACHED_ENTRIES = "cached-entries";
 	
-	public final static int NO_CACHE = 0;
+	public final static long NO_CACHE = 0;
 	
-	public final static int CACHE_FOREVER = -1;
+	public final static long CACHE_FOREVER = -1;
 
 	public void init(Properties properties);
 	

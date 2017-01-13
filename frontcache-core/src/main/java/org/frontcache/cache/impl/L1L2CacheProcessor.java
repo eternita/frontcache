@@ -283,14 +283,28 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	@Override
 	public void patch() {
 		
+		System.out.println("!!!!! start patching ");
+		logger.info("!!!!! start patching ");
+		
 		final String domain = "coinshome.net";
 		long webResponseNullCounter = 0;
 		long webResponseDomainErrorCounter = 0;
 		long webResponseDomainNullErrorCounter = 0;
 		
-		for (String url : luceneIndexManager.getKeys())
+		System.out.println("!!!!! start getting keys ... ");
+		logger.info("!!!!! start getting keys ... ");
+		List<String> urls = luceneIndexManager.getKeys();
+		System.out.println("" + urls.size() + " keys are found ... ");
+		logger.info("" + urls.size() + " keys are found ... ");
+		
+		long counter = 0;
+		for (String url : urls)
 		{
-			WebResponse webResponse = getFromCache(url);
+			counter++;
+			if (0 == counter % 1000)
+				logger.info("" + counter + " items processed");
+			
+			WebResponse webResponse = getFromCacheImpl(url);
 			
 			if (null == webResponse)
 			{
