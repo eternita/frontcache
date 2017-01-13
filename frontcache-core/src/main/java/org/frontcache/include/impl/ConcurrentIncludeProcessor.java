@@ -301,7 +301,13 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				logger.error("Throwable: unexpected error processing include " + includeURL, e);
 			} finally {
 				if (null == this.webResponse)
-					this.webResponse = FallbackResolverFactory.getInstance().getFallback(this.context.getDomainContext(), this.getClass().getName(), includeURL);
+				{
+					// dont get fallback for async calls
+					// when async call -> webResponse is null because we don't wait for response
+					// get fallback for SYNC includes only 
+					if (!INCLUDE_TYPE_ASYNC.equals(includeType))
+						this.webResponse = FallbackResolverFactory.getInstance().getFallback(this.context.getDomainContext(), this.getClass().getName(), includeURL);
+				}
 			}
 	    	
 	        return this;
