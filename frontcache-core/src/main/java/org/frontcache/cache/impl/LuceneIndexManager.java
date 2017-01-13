@@ -304,7 +304,7 @@ public class LuceneIndexManager {
 			
 			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
 			
-			booleanQuery.add(domainQuery, Occur.MUST);
+//			booleanQuery.add(domainQuery, Occur.MUST);
 			booleanQuery.add(urlQuery, Occur.SHOULD);
 			booleanQuery.add(tagsQuery, Occur.SHOULD);
 			

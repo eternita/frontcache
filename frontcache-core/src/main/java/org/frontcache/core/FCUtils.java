@@ -577,7 +577,7 @@ public class FCUtils {
 		return component;
 	}
 	
-	public static int maxAgeStr2Int(String maxAgeStr)
+	public static long maxAgeStr2Int(String maxAgeStr)
 	{
 		try
 		{

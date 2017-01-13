@@ -257,9 +257,11 @@ public class WebResponse implements Serializable {
 		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType))
 		{
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, CacheProcessor.NO_CACHE);
 			
 		} else if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType)) {
 			
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, CacheProcessor.NO_CACHE);
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, cacheMaxAgeSecLong);
 		} else {
 			// default
