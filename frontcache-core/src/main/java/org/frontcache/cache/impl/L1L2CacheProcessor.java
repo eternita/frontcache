@@ -190,7 +190,8 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 				String objDomain = ((WebResponse) ehCache.get(key).getObjectValue()).getDomain();
 				
 				String str = key.toString();
-				if (domain.equals(objDomain) && -1 < str.indexOf(filter))
+//				if (domain.equals(objDomain) && -1 < str.indexOf(filter))
+				if (-1 < str.indexOf(filter))
 					removeList.add(key);
 			}
 			
