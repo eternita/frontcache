@@ -553,5 +553,12 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return get("IncludeLevel") != null ? (String) get("IncludeLevel") : "0";
     }
     
+    public void setToplevelCached() {
+        set("ToplevelCached", true);
+    }
+
+    public boolean isToplevelCached() {
+        return getBoolean("ToplevelCached", false);
+    }
     
 }

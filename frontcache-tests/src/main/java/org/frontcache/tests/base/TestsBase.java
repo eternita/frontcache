@@ -51,13 +51,7 @@ public class TestsBase {
 	
 	protected void printHeaders(WebResponse webResponse)
 	{
-		String debugCacheable = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE);
-		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
-		String debugResponseTime = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME);
-		String debugResponseSize = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE);
-		
-		String logStr = "cacheable: " + debugCacheable + ", cached:" + debugCached + ", responseTime: " + debugResponseTime + ", responseSize: " + debugResponseSize;
-		logger.info(logStr);
+		logger.info(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST));
 		return;
 	}
 	

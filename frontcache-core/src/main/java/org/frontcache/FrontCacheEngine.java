@@ -577,7 +577,7 @@ public class FrontCacheEngine {
 					RequestLogger.logRequestToHeader(
 							currentRequestBaseURL + context.getRequestURI() + context.getRequestQueryString(),
 							context.getRequestType(),
-							true, // isCached 
+							context.isToplevelCached(), // isCached 
 							false, // soft refresh
 							System.currentTimeMillis() - start, 
 							webResponse.getContentLenth(), // lengthBytes 
