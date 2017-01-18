@@ -1,8 +1,5 @@
 package org.frontcache.hystrix.stream;
 
-import org.frontcache.FrontCacheEngine;
-import org.frontcache.core.DomainContext;
-import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.StringUtils;
 import org.slf4j.Logger;
@@ -86,7 +83,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 	}
 
 	private static boolean isOwnerGroup(HystrixThreadPoolMetrics commandMetrics, final String siteKey) {
-		logger.info("commandMetrics.getThreadPoolKey().name() {}",  commandMetrics.getThreadPoolKey().name());
+		logger.info("HystrixThreadPoolMetrics {}",  commandMetrics.getThreadPoolKey().name());
 		if (commandMetrics.getThreadPoolKey().name().equals(siteKey)) {
 			return true;
 		} else {
@@ -96,7 +93,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 	}
 
 	private static boolean isOwnerGroup(HystrixCollapserMetrics collapserMetrics, final String siteKey) {
-		logger.info("collapserMetrics.getCollapserKey().name() {}", collapserMetrics.getCollapserKey().name());
+		logger.info("HystrixCollapserMetrics {}", collapserMetrics.getCollapserKey().name());
 
 		if (collapserMetrics.getCollapserKey().name().equals(siteKey)) {
 			return true;
@@ -107,7 +104,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 	}
 	
 	private static boolean isOwnerGroup(HystrixCommandMetrics commandMetrics, final String siteKey) {
-		logger.info("commandMetrics.getCommandGroup().name() {}", commandMetrics.getCommandGroup().name());
+		logger.info("HystrixCommandMetrics {}", commandMetrics.getCommandGroup().name());
 
 		if (commandMetrics.getCommandGroup().name().equals(siteKey)) {
 			return true;
@@ -183,14 +180,17 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 		final AtomicBoolean moreDataWillBeSent = new AtomicBoolean(true);
 		Subscription sampleSubscription = null;
 
+		final String domain = FCUtils.getDomainFromSiteKeyHeader(request);
+		if (StringUtils.isEmpty(domain)){
+			response.sendError(503, "Can't resolve domain from siteKey");
+			return;
+		}
+		
 		/* ensure we aren't allowing more connections than we want */
 		int numberConnections = incrementAndGetCurrentConcurrentConnections();
 		try {
 			
-			final String domain = FCUtils.getDomainFromSiteKeyHeader(request);
-			if (StringUtils.isEmpty(domain)){
-				response.sendError(503, "Can't resolve domain from siteKey");
-			}
+
 			
 			int maxNumberConnectionsAllowed = getMaxNumberConcurrentConnectionsAllowed();
 			if (numberConnections > maxNumberConnectionsAllowed) {

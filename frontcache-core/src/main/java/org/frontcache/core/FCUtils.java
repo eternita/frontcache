@@ -721,12 +721,6 @@ public class FCUtils {
 		}
 	}
 	
-	public static String getDomainName(String url) throws URISyntaxException {
-	    URI uri = new URI(url);
-	    String domain = uri.getHost();
-	    return domain.startsWith("www.") ? domain.substring(4) : domain;
-	}
-	
 	public static String getDomainFromSiteKeyHeader(HttpServletRequest request) {
 		String siteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
 		if (siteKey == null) {
@@ -743,21 +737,4 @@ public class FCUtils {
 	}
 	
 	
-	public static String getSiteKeyByOriginUrl(String origin) {
-
-		String domain;
-		try {
-			domain = FCUtils.getDomainName(origin);
-		} catch (URISyntaxException e) {
-			logger.warn("Can't get domain from {}", origin);
-			return null;
-		}
-
-		DomainContext context = FrontCacheEngine.getFrontCache().getDomainContexByOrigin(domain);
-		if (context != null) {
-			return context.getSiteKey();
-		}
-
-		return null;
-	}
 }
