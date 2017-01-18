@@ -42,11 +42,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL,
 			FCHeaders.X_FRONTCACHE_CLIENT_IP,
 			FCHeaders.X_FRONTCACHE_DEBUG,
-			FCHeaders.X_FRONTCACHE_DEBUG_REQUEST,
-			FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE,
-			FCHeaders.X_FRONTCACHE_DEBUG_CACHED,
-			FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME,
-			FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE
+			FCHeaders.X_FRONTCACHE_DEBUG_REQUEST
 		};
 	
 	public abstract WebResponse getFromCacheImpl(String url);
@@ -138,6 +134,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			
 			cachedWebResponse = cachedWebResponse.copy(); //to avoid modification instance in cache
 			isCached = true;
+			context.setToplevelCached();
 			lengthBytes = cachedWebResponse.getContentLenth();			
 		}
 		
