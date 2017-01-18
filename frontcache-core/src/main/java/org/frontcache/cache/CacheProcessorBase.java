@@ -2,10 +2,12 @@ package org.frontcache.cache;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -37,12 +39,10 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 //			FCHeaders.X_FRONTCACHE_SOFT_REFRESH,
 //			FCHeaders.X_FRONTCACHE_COMPONENT_TAGS, //  tags should not be filtered by FC (e.g. client -> fc2 (standalone) -> fc1 (filter) -> origin)
 			FCHeaders.X_FRONTCACHE_REQUEST_ID,
+			FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL,
 			FCHeaders.X_FRONTCACHE_CLIENT_IP,
-			FCHeaders.X_FRONTCACHE_DEBUG,
-			FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE,
-			FCHeaders.X_FRONTCACHE_DEBUG_CACHED,
-			FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME,
-			FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE
+			FCHeaders.X_FRONTCACHE_TRACE,
+			FCHeaders.X_FRONTCACHE_TRACE_REQUEST
 		};
 	
 	public abstract WebResponse getFromCacheImpl(String url);
@@ -118,8 +118,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				{
 					WebResponse copy4cache = cachedWebResponse.copy();
 					Map<String, List<String>> copyHeaders = copy4cache.getHeaders(); 
-					for (String removeKey : NON_PERSISTENT_HEADERS)
-						copyHeaders.remove(removeKey);
+					cleanupNonPersistentHeaders(copyHeaders);
 					
 					copy4cache.setUrl(currentRequestURL);
 					putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
@@ -135,6 +134,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			
 			cachedWebResponse = cachedWebResponse.copy(); //to avoid modification instance in cache
 			isCached = true;
+			context.setToplevelCached();
 			lengthBytes = cachedWebResponse.getContentLenth();			
 		}
 		
@@ -172,8 +172,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					
 					WebResponse copy4cache = FCUtils.dynamicCall(originUrlStr, requestHeadersCopy, client, ctxCopy);
 					Map<String, List<String>> copyHeaders = copy4cache.getHeaders(); 
-					for (String removeKey : NON_PERSISTENT_HEADERS)
-						copyHeaders.remove(removeKey);
+					cleanupNonPersistentHeaders(copyHeaders);
 					
 					copy4cache.setUrl(currentRequestURL);
 					
@@ -187,6 +186,25 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			}
 			
 		});
+		
+		return;
+	}
+	
+	/**
+	 * remove header not supposed to be stored in cache
+	 * right before saving to cache
+	 * 
+	 * @param headers
+	 */
+	private void cleanupNonPersistentHeaders(Map<String, List<String>> headers)
+	{
+		Set<String> cleanupKeys = new HashSet<String>(Arrays.asList(NON_PERSISTENT_HEADERS));
+		for(String key : headers.keySet())
+			if (key.startsWith(FCHeaders.X_FRONTCACHE_TRACE_REQUEST)) // X-frontcache.debug.request.0, X-frontcache.debug.request.1.1.2.3.4.33, etc
+				cleanupKeys.add(key);
+
+		for (String removeKey : cleanupKeys)
+			headers.remove(removeKey);
 		
 		return;
 	}

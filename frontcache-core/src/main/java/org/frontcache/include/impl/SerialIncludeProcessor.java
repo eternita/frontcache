@@ -29,7 +29,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 	 * @param hostURL
 	 * @return
 	 */
-	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
+	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context, int recursionLevel)
 	{
 		String content = new String(parentWebResponse.getContent());
 		StringBuffer outSb = new StringBuffer();
@@ -53,7 +53,7 @@ public class SerialIncludeProcessor extends IncludeProcessorBase implements Incl
 					outSb.append(content.substring(scanIdx, startIdx));
 					
 					try {
-						WebResponse webResponse = callInclude(hostURL + includeURL, requestHeaders, client, context);
+						WebResponse webResponse = callInclude(hostURL + includeURL, requestHeaders, client, context, "includeLevel.placeholder", "include-type.placeholder");
 						if (FrontCacheEngine.debugComments)
 							outSb.append("<!-- start fc:include ").append(includeURL).append(" -->"); // for debugging
 						
