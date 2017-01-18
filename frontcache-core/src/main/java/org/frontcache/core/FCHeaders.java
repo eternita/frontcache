@@ -27,6 +27,9 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_DEBUG_RESPONSE_TIME = "X-frontcache.debug.response-time";
     public static final String X_FRONTCACHE_DEBUG_RESPONSE_SIZE = "X-frontcache.debug.response-size";
 
+    public static final String X_FRONTCACHE_DEBUG_REQUEST = "X-frontcache.debug.request";
+    public static final String X_FRONTCACHE_INCLUDE_LEVEL = "X-frontcache.include-level";
+    
     public static final String X_FRONTCACHE_COMPONENT = "X-frontcache.component";
 
     public static final String COMPONENT_TOPLEVEL = "toplevel";

@@ -27,7 +27,7 @@ public class NoCacheProcessor implements CacheProcessor {
 
 		lengthBytes = cachedWebResponse.getContentLenth();
 
-		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
+		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context, context.getIncludeLevel());
 
 		return cachedWebResponse;
 	}

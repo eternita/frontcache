@@ -78,7 +78,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param hostURL
 	 * @return
 	 */
-	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
+	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context, int recursionLevel)
 	{
 		String contentStr = new String(parentWebResponse.getContent());
 		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, requestHeaders, client, context);
@@ -88,8 +88,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
         List<Future<IncludeResolutionPlaceholder>> futureList = new ArrayList<Future<IncludeResolutionPlaceholder>>(includes.size()); // for sync includes
 
-        for (IncludeResolutionPlaceholder inc : includes)
+        for (int i=0; i < includes.size(); i++)
 		{
+        	IncludeResolutionPlaceholder inc = includes.get(i);
+        	inc.includeLevel = "" + recursionLevel + "." + i;
         	
 			boolean performInclude = false; // check for client specific include
 			if (null == inc.includeClientType)
@@ -231,8 +233,14 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	        } else if (!inc.performInclude) {
 	        	// it's client specific include and should not be performed -> replace include tag with blank string
 	        } else { 
-	        	logger.debug("include detais "  + inc.includeURL + " content is not resolved due to timeout (" + timeout + ")  getting defaults");
-	        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(inc.context.getDomainContext(), this.getClass().getName(), inc.includeURL);
+				// dont get fallback for async calls
+				// when async call -> webResponse is null because we don't wait for response
+				// get fallback for SYNC includes only 
+				if (!INCLUDE_TYPE_ASYNC.equals(inc.includeType))
+				{
+		        	logger.debug("include detais "  + inc.includeURL + " content is not resolved due to timeout (" + timeout + ")  getting defaults");
+		        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(inc.context.getDomainContext(), this.getClass().getName(), inc.includeURL);
+				}
 	        }
 	        	
 			
@@ -276,6 +284,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		HttpClient client;
 		RequestContext context;
 		boolean performInclude = true;
+		String includeLevel = null;
 		
 		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String includeType, String includeClientType, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
 			super();
@@ -293,7 +302,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	    public IncludeResolutionPlaceholder call() throws Exception {
 	    	
 			try {
-				this.webResponse = callInclude(this.includeURL, this.requestHeaders, this.client, this.context);
+				this.webResponse = callInclude(this.includeURL, this.requestHeaders, this.client, this.context, this.includeLevel, this.includeType);
 
 			} catch (FrontCacheException e) {
 				logger.error("FrontCacheException: unexpected error processing include " + includeURL, e);
