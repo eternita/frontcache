@@ -8,17 +8,13 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.StringTokenizer;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -152,6 +148,9 @@ public class FCUtils {
 	 */
 	public static WebResponse dynamicCall(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
+		// add include-level header - to trace include tree 
+		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL, "" + context.getIncludeLevel());
+		
 		// add request-id header - to distinguish if sent by frontcache or not (for include processing) 
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 		
@@ -162,12 +161,11 @@ public class FCUtils {
     }
 
 	/**
-	 * for includes - they allways use httpClient
+	 * for includes ONLY - they allways use httpClient
 	 */
-	public static WebResponse dynamicCallHttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
+	public static WebResponse includeDynamicCallHttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
-		// add request-id header - to distinguish (toplevel vs include) 
-		// & distinguish if sent by frontcache or not (for include processing) 
+		// add request-id header - to trace include tree 
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 		
 		// add header with client IP
@@ -195,9 +193,7 @@ public class FCUtils {
 	 */
 	private static void addHeader(Map<String, List<String>> requestHeaders, String key, String name)
 	{
-		List<String> valuesList = new ArrayList<String>();
-		valuesList.add(name);
-		requestHeaders.put(key, valuesList);
+		requestHeaders.put(key, Arrays.asList(new String[]{name}));
 		return;
 	}
 	
@@ -330,70 +326,6 @@ public class FCUtils {
 	}
 	
 	
-    /**
-     * returns query params as a Map with String keys and Lists of Strings as values
-     * @return
-     */
-    public static Map<String, List<String>> getQueryParams(RequestContext context) {
-
-        Map<String, List<String>> qp = context.getRequestQueryParams();
-        if (qp != null) return qp;
-
-        HttpServletRequest request = context.getRequest();
-
-        qp = new HashMap<String, List<String>>();
-
-        if (request.getQueryString() == null) return qp;
-        StringTokenizer st = new StringTokenizer(request.getQueryString(), "&");
-        int i;
-
-        while (st.hasMoreTokens()) {
-            String s = st.nextToken();
-            i = s.indexOf("=");
-            if (i > 0 && s.length() >= i + 1) {
-                String name = s.substring(0, i);
-                String value = s.substring(i + 1);
-
-                try {
-                    name = URLDecoder.decode(name, "UTF-8");
-                } catch (Exception e) {
-                }
-                try {
-                    value = URLDecoder.decode(value, "UTF-8");
-                } catch (Exception e) {
-                }
-
-                List<String> valueList = qp.get(name);
-                if (valueList == null) {
-                    valueList = new LinkedList<String>();
-                    qp.put(name, valueList);
-                }
-
-                valueList.add(value);
-            }
-            else if (i == -1)
-            {
-                String name=s;
-                String value="";
-                try {
-                    name = URLDecoder.decode(name, "UTF-8");
-                } catch (Exception e) {
-                }
-               
-                List<String> valueList = qp.get(name);
-                if (valueList == null) {
-                    valueList = new LinkedList<String>();
-                    qp.put(name, valueList);
-                }
-
-                valueList.add(value);
-                
-            }
-        }
-
-        context.setRequestQueryParams(qp);
-        return qp;
-    }
 	
     /**
      * revert header from HttpClient format (call to origin) to Map 
@@ -490,31 +422,6 @@ public class FCUtils {
         return requestURL;
 	}
 
-	public static String getQueryString(HttpServletRequest request, RequestContext context) {
-		Map<String, List<String>> params = FCUtils.getQueryParams(context); 
-		StringBuilder query=new StringBuilder();
-		
-		try {
-			for (String paramKey : params.keySet())
-			{
-				String key = URLEncoder.encode(paramKey, "UTF-8");
-				for (String value : params.get(paramKey))
-				{
-					query.append("&");
-					query.append(key);
-					if (null != value && value.length() > 0)
-						query.append("=").append(URLEncoder.encode(value, "UTF-8"));
-				}
-				
-			}		
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		}
-
-		return (query.length()>0) ? "?" + query.substring(1) : "";
-	}
-
-	
 	/**
 	 * http://www.coinshome.net/en/welcome.htm -> /en/welcome.htm
 	 * 

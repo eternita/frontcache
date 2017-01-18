@@ -25,6 +25,6 @@ public interface IncludeProcessor {
 
 	public boolean hasIncludes(WebResponse webResponse, int recursionLevel);
 
-	public WebResponse processIncludes(WebResponse parentWebResponse, String appOriginBaseURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context);
+	public WebResponse processIncludes(WebResponse parentWebResponse, String appOriginBaseURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context, int recursionLevel);
 	
 }

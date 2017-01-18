@@ -40,10 +40,10 @@ import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.FC_BypassCache;
@@ -66,6 +66,8 @@ public class FrontCacheEngine {
 	
 	private String fcHostId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
 	
+    private boolean logToHeadersConfig = false; // log requests/includes performance stat to HTTP headers
+	
 	public final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
 	
 	private static int fcConnectionsMaxTotal = 200;
@@ -87,6 +89,8 @@ public class FrontCacheEngine {
 	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output 
 	
 	private static FrontCacheEngine instance;
+	
+    private static final String INCLUDE_LEVEL_TOP_LEVEL = "0";
 	
 	public static FrontCacheEngine getFrontCache() {
 		if (null == instance) {
@@ -216,6 +220,8 @@ public class FrontCacheEngine {
 		if (null == fcHostId)
 			fcHostId = DEFAULT_FRONTCACHE_HOST_NAME_VALUE;
 			
+        logToHeadersConfig = "true".equals(FCConfig.getProperty("front-cache.log-to-headers", "false")) ? true : false;
+		
 		cacheProcessor = CacheManager.getInstance();
 
 		includeProcessor = IncludeProcessorManager.getInstance();
@@ -407,7 +413,10 @@ public class FrontCacheEngine {
 			uri = uri.replaceAll(";jsessionid=.*?(?=\\?|$)", "");
 		
 		context.setRequestURI(uri);
-		String queryString = FCUtils.getQueryString(servletRequest, context);
+		
+		String queryString =  servletRequest.getQueryString(); // FCUtils.getQueryString(servletRequest, context);
+		queryString = ( null == queryString) ? "" : "?" + queryString; 
+		
 		context.setRequestQueryString(queryString);
 		context.setFrontCacheHost(FCUtils.getHost(servletRequest));
 		context.setFrontCacheHttpPort(frontcacheHttpPort);
@@ -419,9 +428,20 @@ public class FrontCacheEngine {
 		context.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
 
         context.setOriginURL(getOriginUrl(context));
+
+        if (logToHeadersConfig || "true".equalsIgnoreCase(servletRequest.getHeader(FCHeaders.X_FRONTCACHE_TRACE)))
+        {
+            context.setLogToHTTPHeaders();
+        }
         
         String requestId = servletRequest.getHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID);
         String requestType = FCHeaders.COMPONENT_INCLUDE;
+        
+        String includeLevelStr = servletRequest.getHeader(FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL);
+        if (null == includeLevelStr)
+        	includeLevelStr = INCLUDE_LEVEL_TOP_LEVEL; // default (top level)
+
+        context.setIncludeLevel(includeLevelStr); // top level 
         
         if (null == requestId)
         {
@@ -526,6 +546,8 @@ public class FrontCacheEngine {
 				
 		if (!dynamicRequest && context.isCacheableRequest() && !ignoreCache(context.getRequestURI(), context.getDomainContext().getDomain())) // GET method without jsessionid
 		{
+			long start = System.currentTimeMillis();
+
 			Map<String, List<String>> requestHeaders = FCUtils.buildRequestHeaders(httpRequest);
 			getCurrentRequestURL2Context(context);
 
@@ -549,19 +571,33 @@ public class FrontCacheEngine {
 					while (includeProcessor.hasIncludes(webResponse, recursionLevel++))
 					{
 						// include processor return new webResponse with processed includes and merged headers
-						WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient, context);
+						WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient, context, recursionLevel);
 						
 						// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
 						webResponse.setContent(incWebResponse.getContent());
 					}
 				}
 				
+
+				if (INCLUDE_LEVEL_TOP_LEVEL.equals(context.getIncludeLevel()))
+				{
+					RequestLogger.logRequestToHeader(
+							currentRequestBaseURL + context.getRequestURI() + context.getRequestQueryString(),
+							context.getRequestType(),
+							context.isToplevelCached(), // isCached 
+							false, // soft refresh
+							System.currentTimeMillis() - start, 
+							webResponse.getContentLenth(), // lengthBytes 
+							context, 
+							INCLUDE_LEVEL_TOP_LEVEL); // includeLevel
+				}
 				
 				addResponseHeaders(webResponse, context);
 				writeResponse(webResponse, context);
 				
 				if (null != context.getHttpClientResponse())
 					context.getHttpClientResponse().close();
+				
 				return;
 			}
 

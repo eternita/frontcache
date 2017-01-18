@@ -235,7 +235,7 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 			for(Object key : ehCache.getKeys())
 			{
 				String objDomain = ((WebResponse) ehCache.get(key).getObjectValue()).getDomain();
-				if (domain.equals(objDomain))
+				if (null != domain && domain.equals(objDomain))
 					removeList.add(key);
 			}
 			
