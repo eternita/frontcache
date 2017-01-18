@@ -425,7 +425,7 @@ public class FrontCacheEngine {
 
         context.setOriginURL(getOriginUrl(context));
 
-        if (logToHeadersConfig || "true".equalsIgnoreCase(servletRequest.getHeader(FCHeaders.X_FRONTCACHE_DEBUG)))
+        if (logToHeadersConfig || "true".equalsIgnoreCase(servletRequest.getHeader(FCHeaders.X_FRONTCACHE_TRACE)))
         {
             context.setLogToHTTPHeaders();
         }

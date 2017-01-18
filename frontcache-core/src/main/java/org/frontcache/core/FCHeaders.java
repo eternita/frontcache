@@ -20,9 +20,9 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_SOFT_REFRESH = "X-frontcache.soft-refresh";
     public static final String X_FRONTCACHE_ASYNC_INCLUDE = "X-frontcache.async-include";
 
-    public static final String X_FRONTCACHE_DEBUG = "X-frontcache.debug"; // request
+    public static final String X_FRONTCACHE_TRACE = "X-frontcache.trace"; // request
 
-    public static final String X_FRONTCACHE_DEBUG_REQUEST = "X-frontcache.debug.request"; // response 
+    public static final String X_FRONTCACHE_TRACE_REQUEST = "X-frontcache.trace.request"; // response 
     public static final String X_FRONTCACHE_INCLUDE_LEVEL = "X-frontcache.include-level"; // response
     
     public static final String X_FRONTCACHE_COMPONENT = "X-frontcache.component";

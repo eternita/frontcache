@@ -118,7 +118,7 @@ public class RequestLogger {
 //    		.append(SEPARATOR).append(dummy)
     		.append(SEPARATOR).append(context.getClientType());
     		
-    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + "." + includeLevel, sb4header.toString());
+    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + "." + includeLevel, sb4header.toString());
         }
         
 	}
