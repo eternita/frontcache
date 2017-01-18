@@ -256,7 +256,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 						true, // isCached 
 						System.currentTimeMillis() - start, 
 						webResponse.getContentLenth(), // lengthBytes 
-						contextCopy, includeLevel);
+						contextCopy);
 				
 				RequestLogger.logRequestToHeader(
 						urlStr, 

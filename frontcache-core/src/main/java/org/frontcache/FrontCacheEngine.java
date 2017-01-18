@@ -606,7 +606,7 @@ public class FrontCacheEngine {
 //			forwardToOrigin();		
 			new FC_BypassCache(httpClient, context).execute();
 			
-			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context, context.getIncludeLevel());			
+			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);			
 			addResponseHeaders(context);
 			writeResponse(context);
 			if (null != context.getHttpClientResponse())

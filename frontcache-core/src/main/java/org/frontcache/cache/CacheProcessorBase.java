@@ -139,7 +139,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		}
 		
 		
-		RequestLogger.logRequest(currentRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context, context.getIncludeLevel());
+		RequestLogger.logRequest(currentRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
 		
 		return cachedWebResponse;
 	}
