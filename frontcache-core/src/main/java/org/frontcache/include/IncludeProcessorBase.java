@@ -36,7 +36,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	
 	
 	private static final String[] NON_MERGEABLE_RESPONSE_HEADERS = new String[]{
-			FCHeaders.X_FRONTCACHE_DEBUG_REQUEST
+			FCHeaders.X_FRONTCACHE_TRACE_REQUEST
 		};
 	
 	public IncludeProcessorBase() {

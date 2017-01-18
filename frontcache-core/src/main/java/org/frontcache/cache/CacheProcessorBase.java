@@ -41,8 +41,8 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			FCHeaders.X_FRONTCACHE_REQUEST_ID,
 			FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL,
 			FCHeaders.X_FRONTCACHE_CLIENT_IP,
-			FCHeaders.X_FRONTCACHE_DEBUG,
-			FCHeaders.X_FRONTCACHE_DEBUG_REQUEST
+			FCHeaders.X_FRONTCACHE_TRACE,
+			FCHeaders.X_FRONTCACHE_TRACE_REQUEST
 		};
 	
 	public abstract WebResponse getFromCacheImpl(String url);
@@ -200,7 +200,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	{
 		Set<String> cleanupKeys = new HashSet<String>(Arrays.asList(NON_PERSISTENT_HEADERS));
 		for(String key : headers.keySet())
-			if (key.startsWith(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST)) // X-frontcache.debug.request.0, X-frontcache.debug.request.1.1.2.3.4.33, etc
+			if (key.startsWith(FCHeaders.X_FRONTCACHE_TRACE_REQUEST)) // X-frontcache.debug.request.0, X-frontcache.debug.request.1.1.2.3.4.33, etc
 				cleanupKeys.add(key);
 
 		for (String removeKey : cleanupKeys)

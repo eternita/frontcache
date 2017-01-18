@@ -50,20 +50,20 @@ public abstract class AgentTests extends TestsBase {
 		
 		final String TEST_URI = "common/fc-agent/a.jsp";
 		
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 
 		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		
 		WebResponse webResponse = page.getWebResponse(); 
-		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
 		// second request - the same request - response should be from the cache now
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
-		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		
 		// cache invalidation (both standalone and filter)
 		String response = frontcacheClientStandalone.removeFromCache(getFrontCacheBaseURLDomainFC1() + TEST_URI); // clean up FC standalone		
@@ -76,7 +76,7 @@ public abstract class AgentTests extends TestsBase {
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 
-		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		return;
 	}
 
@@ -87,20 +87,20 @@ public abstract class AgentTests extends TestsBase {
 		FrontCacheAgentCluster fcCluster = new FrontCacheAgentCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), SiteKeys.TEST_SITE_KEY_1);
 		final String TEST_URI = "common/fc-agent/a.jsp";
 		
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 
 		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		
 		WebResponse webResponse = page.getWebResponse(); 
-		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
 		// second request - the same request - response should be from the cache now
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
-		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		
 		// cache invalidation
 		String response = fcCluster.removeFromCache(getFrontCacheBaseURLDomainFC1() + TEST_URI).get(FRONTCACHE_CLUSTER_NODE1);
@@ -111,7 +111,7 @@ public abstract class AgentTests extends TestsBase {
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 
-		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		return;
 	}
 

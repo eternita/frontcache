@@ -111,7 +111,7 @@ public abstract class CommonTests extends TestsBase {
 	@Test
 	public void debugMode() throws Exception {
 		
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		
 		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/debug/a.jsp");
@@ -120,7 +120,7 @@ public abstract class CommonTests extends TestsBase {
 		WebResponse webResponse = page.getWebResponse(); 
 
 //		X-frontcache.debug.request.0: success toplevel from-cache 1 1 "http://localhost:9080/common/debug/a.jsp" frontcache-localhost-1 browser
-		String logStr = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0");
+		String logStr = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
 		
 		assertNotEquals(-1, logStr.indexOf("common/debug/a.jsp"));
 		assertNotEquals(-1, logStr.indexOf("success"));
@@ -133,7 +133,7 @@ public abstract class CommonTests extends TestsBase {
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 
-		logStr = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0");
+		logStr = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
 		
 		assertNotEquals(-1, logStr.indexOf("common/debug/a.jsp"));
 		assertNotEquals(-1, logStr.indexOf("success"));
@@ -145,7 +145,7 @@ public abstract class CommonTests extends TestsBase {
 
 	@Test
 	public void httpHeadersMode() throws Exception {
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/fc-headers/a.jsp");
 		assertEquals("a", page.getPage().asText());
 		
@@ -192,7 +192,7 @@ public abstract class CommonTests extends TestsBase {
 		// single page maxage="bot:60"
 		
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 
 		// call with User-Agent GoogleBot -> dynamic
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a.jsp");
@@ -200,7 +200,7 @@ public abstract class CommonTests extends TestsBase {
 		WebResponse webResponse = page.getWebResponse(); 
 		String maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
-		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
 		// call with User-Agent GoogleBot -> cached
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a.jsp");
@@ -208,7 +208,7 @@ public abstract class CommonTests extends TestsBase {
 		webResponse = page.getWebResponse(); 
 		maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
-		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		
@@ -221,7 +221,7 @@ public abstract class CommonTests extends TestsBase {
 			webResponse = page.getWebResponse(); 
 			maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 			assertEquals("bot:60", maxage);
-			assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+			assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		}
 		
 		return;
@@ -241,7 +241,7 @@ public abstract class CommonTests extends TestsBase {
 	public void clientTypeSpecificIncludes() throws Exception {
 		
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 
 		// call with User-Agent Chrome -> include is in cache
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a1.jsp");
@@ -257,7 +257,7 @@ public abstract class CommonTests extends TestsBase {
 		com.gargoylesoftware.htmlunit.WebResponse pageWebResponse = page.getWebResponse(); 
 		String maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
-		assertEquals(false, TestUtils.isRequestFromCache(pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(false, TestUtils.isRequestFromCache(pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		
 		
 		webClient.addRequestHeader("User-Agent", "Googlebot");
@@ -276,7 +276,7 @@ public abstract class CommonTests extends TestsBase {
 		pageWebResponse = page.getWebResponse(); 
 		maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
-		assertEquals(true, TestUtils.isRequestFromCache(pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(true, TestUtils.isRequestFromCache(pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 	}
 	
 	
@@ -359,7 +359,7 @@ public abstract class CommonTests extends TestsBase {
 	@Test
 	public void testCacheForHTTPMethod() throws Exception {
 		
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		
 		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/methods/a.jsp");
@@ -367,7 +367,7 @@ public abstract class CommonTests extends TestsBase {
 		
 		WebResponse webResponse = page.getWebResponse(); 
 
-		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
 		
 		// second request - the same request - response should be from the cache now
@@ -375,7 +375,7 @@ public abstract class CommonTests extends TestsBase {
 		assertEquals("a", page.getPage().asText());
 		webResponse = page.getWebResponse(); 
 
-		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0")));
+		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
 		
 		// third request (HEAD METHOD) - the same request - response should be from the cache now
@@ -388,11 +388,11 @@ public abstract class CommonTests extends TestsBase {
 		HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
 		HttpRequest httpRequest = new HttpHead(FCUtils.buildRequestURI(urlStr));
 		httpRequest.addHeader(FCHeaders.ACCEPT, "text/html");
-		httpRequest.addHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		httpRequest.addHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 
 		response = httpclient.execute(httpHost, httpRequest);
 	
-		assertEquals(true, TestUtils.isRequestFromCache(response.getFirstHeader(FCHeaders.X_FRONTCACHE_DEBUG_REQUEST + ".0").getValue()));
+		assertEquals(true, TestUtils.isRequestFromCache(response.getFirstHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0").getValue()));
 		
 		((CloseableHttpResponse) response).close();
 		
