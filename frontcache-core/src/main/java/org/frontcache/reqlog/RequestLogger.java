@@ -53,9 +53,8 @@ public class RequestLogger {
 	 * @param isCached - true if origin has been cached. false/0 - otherwise (origin is called).
 	 * @param runtimeMillis - runtime is milliseconds
 	 * @param lengthBytes - content length in bytes. 
-	 * @param includeLevel
 	 */
-	public static void logRequest(String url, boolean isCacheable, boolean isCached, long runtimeMillis, long lengthBytes, RequestContext context, String includeLevel) {
+	public static void logRequest(String url, boolean isCacheable, boolean isCached, long runtimeMillis, long lengthBytes, RequestContext context) {
 
 		StringBuilder sb4file = new StringBuilder();
         HttpServletRequest request = context.getRequest();
@@ -68,7 +67,6 @@ public class RequestLogger {
 
 		sb4file.append(logTimeDateFormat.format(new Date()))
 		.append(SEPARATOR).append(context.getRequestId())
-		.append(SEPARATOR).append(includeLevel)
 		.append(SEPARATOR).append(context.getDomainContext().getDomain())
 		.append(SEPARATOR).append(request.getMethod())
 		.append(SEPARATOR).append((isHystrixError) ? "error" : "success")

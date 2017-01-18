@@ -18,7 +18,6 @@ import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
