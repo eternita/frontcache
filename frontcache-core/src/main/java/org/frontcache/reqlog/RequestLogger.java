@@ -56,7 +56,7 @@ public class RequestLogger {
 	 */
 	public static void logRequest(String url, boolean isCacheable, boolean isCached, long runtimeMillis, long lengthBytes, RequestContext context) {
 
-		StringBuilder sb = new StringBuilder();
+		StringBuilder sb4file = new StringBuilder();
         HttpServletRequest request = context.getRequest();
         boolean isHystrixError = context.getHystrixError();
         String userAgent = request.getHeader("User-Agent");
@@ -65,17 +65,13 @@ public class RequestLogger {
         if (!isCached && "true".equals(request.getHeader(FCHeaders.X_FRONTCACHE_SOFT_REFRESH)))
         	requestTypeDynamicCachedSoft = "dynamic-soft";
 
-		// FORMAT
-		// dynamic_flag runtime_millis datalength_bytes url
-		sb.append(logTimeDateFormat.format(new Date()))
+		sb4file.append(logTimeDateFormat.format(new Date()))
 		.append(SEPARATOR).append(context.getRequestId())
 		.append(SEPARATOR).append(context.getDomainContext().getDomain())
 		.append(SEPARATOR).append(request.getMethod())
 		.append(SEPARATOR).append((isHystrixError) ? "error" : "success")
-		.append(SEPARATOR).append(context.getRequestType()) // toplevel | include
-//		.append(SEPARATOR).append((isCacheable) ? 1 : 0)
+		.append(SEPARATOR).append(context.getRequestType()) // toplevel | include | include-async
 		.append(SEPARATOR).append((isCacheable) ? "cacheable" : "direct")
-//		.append(SEPARATOR).append((isCached) ? 1 : 0)
 		.append(SEPARATOR).append(requestTypeDynamicCachedSoft)
 		.append(SEPARATOR).append(runtimeMillis)
 		.append(SEPARATOR).append(lengthBytes) 
@@ -84,19 +80,47 @@ public class RequestLogger {
 		.append(SEPARATOR).append(context.getFrontCacheId())
 		.append(SEPARATOR).append(context.getClientType())
 		.append(SEPARATOR).append("\"").append(userAgent).append("\"");
-		
 
-		logger.trace(sb.toString());
-
-        if ("true".equalsIgnoreCase(request.getHeader(FCHeaders.X_FRONTCACHE_DEBUG)))
-        {
-    		HttpServletResponse servletResponse = context.getResponse();
-    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE, (isCacheable) ? "true" : "false");
-    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_CACHED, (isCached) ? "true" : "false");
-    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME, "" + runtimeMillis);
-    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE, "" + lengthBytes);
-        }
-		
+		logger.trace(sb4file.toString());
 		return;
 	}
+
+	/**
+	 * 
+	 * @param url
+	 * @param requestType
+	 * @param isCached
+	 * @param softRefresh
+	 * @param runtimeMillis
+	 * @param lengthBytes
+	 * @param context
+	 * @param includeLevel
+	 * @param dummy
+	 */
+	public static void logRequestToHeader(String url, String requestType, boolean isCached, boolean softRefresh, long runtimeMillis, long lengthBytes, RequestContext context, String includeLevel) {
+        boolean isHystrixError = context.getHystrixError();
+        String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
+        if (!isCached && softRefresh)
+        	requestTypeDynamicCachedSoft = "dynamic-soft";
+        
+        if (context.getLogToHTTPHeaders())
+        {
+    		HttpServletResponse servletResponse = context.getResponse();
+    		
+    		StringBuilder sb4header = new StringBuilder();
+    		sb4header.append((isHystrixError) ? "error" : "success")
+    		.append(SEPARATOR).append(requestType) // toplevel | include | include-async
+    		.append(SEPARATOR).append(requestTypeDynamicCachedSoft)
+    		.append(SEPARATOR).append(runtimeMillis)
+    		.append(SEPARATOR).append(lengthBytes) 
+    		.append(SEPARATOR).append("\"").append(url).append("\"")
+    		.append(SEPARATOR).append(context.getFrontCacheId())
+//    		.append(SEPARATOR).append(dummy)
+    		.append(SEPARATOR).append(context.getClientType());
+    		
+    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + "." + includeLevel, sb4header.toString());
+        }
+        
+	}
+	
 }

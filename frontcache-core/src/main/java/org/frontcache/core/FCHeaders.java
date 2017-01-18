@@ -14,19 +14,17 @@ public class FCHeaders {
     
     public static final String X_FRONTCACHE_ID = "X-frontcache.id";
     
-    public static final String X_FRONTCACHE_DEBUG = "X-frontcache.debug";
-
     public static final String X_FRONTCACHE_SITE_KEY = "X-frontcache.site-key"; // hardcoded in 'frontcache-agent' - remember to update when needed
 
     public static final String X_FRONTCACHE_DYNAMIC_REQUEST = "X-frontcache.dynamic-request";
     public static final String X_FRONTCACHE_SOFT_REFRESH = "X-frontcache.soft-refresh";
     public static final String X_FRONTCACHE_ASYNC_INCLUDE = "X-frontcache.async-include";
 
-    public static final String X_FRONTCACHE_DEBUG_CACHEABLE = "X-frontcache.debug.cacheable";
-    public static final String X_FRONTCACHE_DEBUG_CACHED = "X-frontcache.debug.cached";
-    public static final String X_FRONTCACHE_DEBUG_RESPONSE_TIME = "X-frontcache.debug.response-time";
-    public static final String X_FRONTCACHE_DEBUG_RESPONSE_SIZE = "X-frontcache.debug.response-size";
+    public static final String X_FRONTCACHE_TRACE = "X-frontcache.trace"; // request
 
+    public static final String X_FRONTCACHE_TRACE_REQUEST = "X-frontcache.trace.request"; // response 
+    public static final String X_FRONTCACHE_INCLUDE_LEVEL = "X-frontcache.include-level"; // response
+    
     public static final String X_FRONTCACHE_COMPONENT = "X-frontcache.component";
 
     public static final String COMPONENT_TOPLEVEL = "toplevel";
