@@ -66,6 +66,8 @@ public class FrontCacheEngine {
 	
 	private String fcHostId = null;	// used to determine which front cache processed request (forwarded by GEO Load Balancer e.g. route53 AWS)
 	
+    private boolean logToHeadersConfig = false; // log requests/includes performance stat to HTTP headers
+	
 	public final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
 	
 	private static int fcConnectionsMaxTotal = 200;
@@ -214,6 +216,8 @@ public class FrontCacheEngine {
 		if (null == fcHostId)
 			fcHostId = DEFAULT_FRONTCACHE_HOST_NAME_VALUE;
 			
+        logToHeadersConfig = "true".equals(FCConfig.getProperty("front-cache.log-to-headers", "false")) ? true : false;
+		
 		cacheProcessor = CacheManager.getInstance();
 
 		includeProcessor = IncludeProcessorManager.getInstance();
@@ -421,7 +425,6 @@ public class FrontCacheEngine {
 
         context.setOriginURL(getOriginUrl(context));
 
-        boolean logToHeadersConfig = true; // TODO: read from frontcache.properties
         if (logToHeadersConfig || "true".equalsIgnoreCase(servletRequest.getHeader(FCHeaders.X_FRONTCACHE_DEBUG)))
         {
             context.setLogToHTTPHeaders();
