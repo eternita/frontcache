@@ -95,13 +95,12 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			// stand alone mode
 			
 			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request);
-			Map<String, List<String>> params = FCUtils.getQueryParams(context);
 			String verb = FCUtils.getVerb(request);
 			InputStream requestEntity = getRequestBody(request);
 			String uri = context.getRequestURI();
 
 			try {
-				HttpResponse response = forward(client, verb, uri, request, headers, params, requestEntity);
+				HttpResponse response = forward(client, verb, uri, request, headers, requestEntity);
 				
 				// response 2 context
 				setResponse(response);
@@ -174,7 +173,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 	 * @throws Exception
 	 */
 	private HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
-			Map<String, List<String>> headers, Map<String, List<String>> params, InputStream requestEntity)
+			Map<String, List<String>> headers, InputStream requestEntity)
 					throws Exception {
 
 		URL host = context.getOriginURL();

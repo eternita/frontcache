@@ -1,6 +1,7 @@
 package org.frontcache.include;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -33,6 +34,10 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	protected static final String INCLUDE_TYPE_SYNC = "sync"; // default
 	protected static final String INCLUDE_TYPE_ASYNC = "async";
 	
+	
+	private static final String[] NON_MERGEABLE_RESPONSE_HEADERS = new String[]{
+			FCHeaders.X_FRONTCACHE_TRACE_REQUEST
+		};
 	
 	public IncludeProcessorBase() {
 	}
@@ -69,6 +74,9 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	
 	protected void mergeIncludeResponseHeaders(Map<String, List<String>> outHeaders, Map<String, List<String>> includeResponseHeaders) 
 	{
+		for (String removeKey : NON_MERGEABLE_RESPONSE_HEADERS)
+			includeResponseHeaders.remove(removeKey);
+
 		synchronized (outHeaders) {
 			for (String name : includeResponseHeaders.keySet()) {
 				for (String value : includeResponseHeaders.get(name)) {
@@ -193,7 +201,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * @param client
 	 * @return
 	 */
-	protected WebResponse callInclude(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
+	protected WebResponse callInclude(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context, String includeLevel, String includeType) throws FrontCacheException
     {
 
 		// in case response is from cache -> log request
@@ -205,6 +213,8 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		WebResponse webResponse = cacheProcessor.getFromCache(urlStr);
 		
 		boolean isCacheableForClientType = true;
+		
+		boolean softRefresh = false;
 
 		if (null != webResponse)
 		{
@@ -223,6 +233,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 				{
 					// soft expiration
 					cacheProcessor.doSoftInvalidation(urlStr, urlStr, requestHeaders, client, context);
+					softRefresh = true;
 				} else {
 					// regular expiration
 					cacheProcessor.removeFromCache(context.getDomainContext().getDomain(), urlStr);
@@ -246,12 +257,36 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 						System.currentTimeMillis() - start, 
 						webResponse.getContentLenth(), // lengthBytes 
 						contextCopy);
+				
+				RequestLogger.logRequestToHeader(
+						urlStr, 
+						includeType, // it's include (sync or asyn)   { toplevel | include | include-async }
+						true, // isCached 
+						softRefresh,
+						System.currentTimeMillis() - start, 
+						webResponse.getContentLenth(), // lengthBytes 
+						contextCopy, includeLevel);
 			}
 			return webResponse;
 		}
 		
 		// recursive call to FCServlet
-		return FCUtils.dynamicCallHttpClient(urlStr, requestHeaders, client, context);
+ 		requestHeaders.put(FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL, Arrays.asList(new String[]{includeLevel})); // add include-level header
+ 		
+ 		WebResponse outWebResponse =  FCUtils.includeDynamicCallHttpClient(urlStr, requestHeaders, client, context);
+ 		
+ 		// TODO: sometimes async includes are not logged to headers because response returned faster then async IncludeResolutionPlaceholder.call() is triggered
+ 		// However async includes are always in log files
+		RequestLogger.logRequestToHeader(
+				urlStr, 
+				includeType, // it's include (sync or asyn)   { toplevel | include | include-async }
+				false, // isCached 
+				softRefresh, 
+				System.currentTimeMillis() - start, 
+				outWebResponse.getContentLenth(), // lengthBytes 
+				context, includeLevel);
+		
+ 		return outWebResponse;
     }
 
 	@Override

@@ -537,5 +537,28 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return (DomainContext) get("domainContext");
     }
 	
+    public void setLogToHTTPHeaders() {
+        set("LogToHTTPHeaders", true);
+    }
+
+    public boolean getLogToHTTPHeaders() {
+        return getBoolean("LogToHTTPHeaders", false);
+    }
+
+    public void setIncludeLevel(String includeLevel) {
+        set("IncludeLevel", includeLevel);
+    }
+    
+    public String getIncludeLevel() {
+        return get("IncludeLevel") != null ? (String) get("IncludeLevel") : "0";
+    }
+    
+    public void setToplevelCached() {
+        set("ToplevelCached", true);
+    }
+
+    public boolean isToplevelCached() {
+        return getBoolean("ToplevelCached", false);
+    }
     
 }

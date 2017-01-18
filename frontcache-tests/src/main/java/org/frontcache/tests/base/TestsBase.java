@@ -33,7 +33,7 @@ public class TestsBase {
 	@Before
 	public void setUp() throws Exception {
 		webClient = new WebClient();
-		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_DEBUG, "true");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		
 		frontcacheClientStandalone = new FrontCacheClient(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_FC1, SiteKeys.TEST_SITE_KEY_1);
 		frontcacheClientStandalone.removeFromCacheAll(); // clean up		
@@ -51,13 +51,7 @@ public class TestsBase {
 	
 	protected void printHeaders(WebResponse webResponse)
 	{
-		String debugCacheable = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHEABLE);
-		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
-		String debugResponseTime = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_TIME);
-		String debugResponseSize = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_RESPONSE_SIZE);
-		
-		String logStr = "cacheable: " + debugCacheable + ", cached:" + debugCached + ", responseTime: " + debugResponseTime + ", responseSize: " + debugResponseSize;
-		logger.info(logStr);
+		logger.info(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST));
 		return;
 	}
 	
