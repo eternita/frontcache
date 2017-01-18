@@ -6,6 +6,8 @@ import com.netflix.config.DynamicIntProperty;
 import com.netflix.config.DynamicPropertyFactory;
 import com.netflix.hystrix.metric.consumer.HystrixDashboardStream;
 
+import rx.Observable;
+
 public class FrontcacheHystrixMetricsStreamServlet extends FrontcacheHystrixSampleSseServlet {
 
     private static final long serialVersionUID = -7548505095303313237L;
@@ -16,7 +18,11 @@ public class FrontcacheHystrixMetricsStreamServlet extends FrontcacheHystrixSamp
             DynamicPropertyFactory.getInstance().getIntProperty("hystrix.config.stream.maxConcurrentConnections", 5);
 
     public FrontcacheHystrixMetricsStreamServlet() {
-        super(HystrixDashboardStream.getInstance().observe(), DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS);
+        this(HystrixDashboardStream.getInstance().observe());
+    }
+    
+    public FrontcacheHystrixMetricsStreamServlet(Observable<HystrixDashboardStream.DashboardData> sampleStream) {
+        super(sampleStream, DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS);
     }
 
     @Override
