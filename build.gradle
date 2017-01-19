@@ -200,8 +200,8 @@ project(':frontcache-console') {
 		httpsEnabled = true
 		servicePort = 7081
 		statusPort = 7082
-//		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002']
-
+//		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.properties']
+//		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.properties', '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002']
 	}
 
 	farm {
