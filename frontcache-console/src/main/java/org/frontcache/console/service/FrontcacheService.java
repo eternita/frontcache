@@ -1,10 +1,5 @@
 package org.frontcache.console.service;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -24,9 +19,15 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+import com.typesafe.config.ConfigValue;
 
 @Service("frontcacheService")
 public class FrontcacheService {
+
+
+	final Config fcConsoleConfig = ConfigFactory.load().getConfig("frontcache").getConfig("console");
 
 
 	private static final Logger logger = LoggerFactory.getLogger(FrontcacheService.class);
@@ -39,53 +40,21 @@ public class FrontcacheService {
 	}
 
 	private void loadConfigs() {
-		String frontcacheConsoleConfPath = System.getProperty("org.frontcache.console.config");
 		
-		if (null == frontcacheConsoleConfPath)
-		{
-			logger.info("System property 'org.frontcache.console.config' is not defined");					
-			return;
+
+		List<ConfigValue> urls = fcConsoleConfig.getList("urls");
+		for (ConfigValue urlValue : urls) {
+			String url = urlValue.unwrapped().toString();
+			logger.info(" -- Loading url {} from console config", url);
+			frontcacheAgentURLs.add(url);
 		}
+		String siteKey = fcConsoleConfig.getString("siteKey");
+		logger.info(" -- Loading siteKey {} from console config", siteKey);
 		
-		BufferedReader confReader = null;
-		InputStream is = null;
-		try 
-		{
-			is = new FileInputStream(frontcacheConsoleConfPath);
-			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String frontcacheURLStr;
-			int hostCounter = 0;
-			while ((frontcacheURLStr = confReader.readLine()) != null) {
-				if (frontcacheURLStr.trim().startsWith("#")) // handle comments
-					continue;
-				
-				if (0 == frontcacheURLStr.trim().length()) // skip empty
-					continue;
-				
-				frontcacheAgentURLs.add(frontcacheURLStr);
-				hostCounter++;
-			}
-			logger.info("Successfully loaded " + hostCounter +  " frontcacheAgentURLs to frontcache console");					
-			
-		} catch (Exception e) {
-			logger.error("Console frontcacheAgentURLs are not loaded from " + frontcacheConsoleConfPath);
-			throw new RuntimeException("Can't initialize Frontcache Console", e);
-		} finally {
-			if (null != confReader)
-			{
-				try {
-					confReader.close();
-				} catch (IOException e) { }
-			}
-			if (null != is)
-			{
-				try {
-					is.close();
-				} catch (IOException e) { }
-			}
-		}
-		
-		
+	}
+	
+	public String getSiteKey(){
+		return fcConsoleConfig.getString("siteKey");
 	}
 	
 	public boolean isFrontCacheEdgeAvailable(String frontcacheURL)

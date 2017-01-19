@@ -115,6 +115,10 @@ public class FrontCacheEngine {
 				
 		return null;
 	}
+	
+	public DomainContext getDomainContexByOrigin(String origin) {
+		return getDomainContext(origin);
+	}
 
 	public static void destroy() {
 		if (null != instance) {

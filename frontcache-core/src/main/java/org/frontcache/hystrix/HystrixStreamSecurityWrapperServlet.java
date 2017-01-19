@@ -8,13 +8,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.FCConfig;
+import org.frontcache.hystrix.stream.FrontcacheHystrixMetricsStreamServlet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.netflix.hystrix.contrib.metrics.eventstream.HystrixMetricsStreamServlet;
-
 @SuppressWarnings("serial")
-public class HystrixStreamSecurityWrapperServlet extends HystrixMetricsStreamServlet {
+public class HystrixStreamSecurityWrapperServlet extends FrontcacheHystrixMetricsStreamServlet {
 
 	private int managementPort = -1; // management port for security
 

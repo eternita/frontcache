@@ -139,9 +139,11 @@ project(':frontcache-core') {
         compile         'com.google.code.gson:gson:2.5'
         compile         'org.apache.lucene:lucene-core:6.2.0'
         compile         'org.apache.lucene:lucene-queryparser:6.2.0'
+        compile         'com.typesafe:config:1.3.0'
 		
         testCompile     'junit:junit:4.12'
         testCompile     'com.squareup.okhttp:okhttp:2.5.0'
+        testCompile     'org.mockito:mockito-all:2.0.2-beta'
     }
 	
 //	build.dependsOn uploadArchives	
@@ -187,7 +189,7 @@ project(':frontcache-server') {
 project(':frontcache-console') {
 	apply plugin: 'war'
 	apply plugin: 'org.akhikhl.gretty'
-	
+		
 	ext {
 		springVersion = '4.2.6.RELEASE'
 	}
@@ -198,14 +200,24 @@ project(':frontcache-console') {
 		httpsEnabled = true
 		servicePort = 7081
 		statusPort = 7082
-//		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.properties']
+//		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002']
+
 	}
+
+	farm {
+		webapp ':frontcache-console'
+
+	  }
 	
 	dependencies {
 		compile project(':frontcache-core')
 		compile "org.springframework:spring-context:${springVersion}"
 		compile "org.springframework:spring-webmvc:${springVersion}"
 		compile 'jstl:jstl:1.2'
+		compile 'com.typesafe:config:1.3.0'
+
+		testCompile 'org.springframework:spring-test:4.0.5.RELEASE'
+		testCompile 'org.mockito:mockito-all:2.0.2-beta'
         provided 'javax.servlet:javax.servlet-api:3.1.0'
 	}
 }

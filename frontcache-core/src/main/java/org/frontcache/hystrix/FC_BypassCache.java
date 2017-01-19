@@ -43,7 +43,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     public FC_BypassCache(HttpClient client, RequestContext context) {
         
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
         		);
         
