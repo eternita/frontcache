@@ -267,32 +267,38 @@ public class FrontCacheEngine {
 
 	private URL getOriginUrl(RequestContext context) {
 		boolean isSecure = context.getRequest().isSecure();
-		StringBuffer str = new StringBuffer();
-		if (isSecure)
-		{
-			str.append("https");	
-		} else {
-			str.append("http");	
-		}
-		
 		DomainContext domainCtx = context.getDomainContext();
-		
-		str.append("://").append(domainCtx.getHost());
-		if (isSecure) {
-			if (!"443".equals(domainCtx.getHttpsPort()))
-				str.append(":").append(domainCtx.getHttpsPort());
-		} else {
-			if (!"80".equals(domainCtx.getHttpPort()))
-				str.append(":").append(domainCtx.getHttpPort());
-		}
 
+		String port = isSecure ? domainCtx.getHttpsPort() : domainCtx.getHttpPort();
+		
+		String urlStr = makeURL(isSecure, domainCtx.getHost(), port);
 		try {
-			URL routeUrl = new URL(str.toString());
+			URL routeUrl = new URL(urlStr);
 			return  routeUrl;
 		} catch (MalformedURLException e) {
 			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + domainCtx.getHost() + ")", e);
 		}
 
+	}
+	
+	private String makeURL(boolean isSecure, String host, String port)
+	{
+		StringBuffer str = new StringBuffer();
+		if (isSecure)
+			str.append("https");	
+		else
+			str.append("http");	
+
+		str.append("://").append(host);
+		if (isSecure) {
+			if (!"443".equals(port))
+				str.append(":").append(port);
+		} else {
+			if (!"80".equals(port))
+				str.append(":").append(port);
+		}
+		
+		return str.toString();
 	}
 	
 	
@@ -535,7 +541,9 @@ public class FrontCacheEngine {
 		HttpServletRequest httpRequest = context.getRequest();
 		String originRequestURL = getOriginUrl(context) + context.getRequestURI() + context.getRequestQueryString();
 		logger.debug("originRequestURL: " + originRequestURL);
-		String currentRequestBaseURL = context.getFrontCacheProtocol() + "://" + context.getFrontCacheHost() + ":" + httpRequest.getServerPort();
+		
+		boolean isSecure = ("https".equalsIgnoreCase(context.getFrontCacheProtocol())) ? true : false;
+		String currentRequestBaseURL = makeURL(isSecure, context.getFrontCacheHost(), "" + httpRequest.getServerPort());
 		logger.debug("currentRequestBaseURL: " + currentRequestBaseURL);
 		
 		boolean dynamicRequest = ("true".equals(httpRequest.getHeader(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST))) ? true : false;
