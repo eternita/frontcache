@@ -298,7 +298,7 @@ public class LuceneIndexManager {
 
 		
 		try {
-			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
+//			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
 			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
 			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
 			
