@@ -18,8 +18,10 @@ package com.netflix.hystrix.dashboard.stream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URISyntaxException;
 import java.util.Map;
 
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -35,8 +37,19 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.PoolingClientConnectionManager;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
+import org.frontcache.FrontCacheEngine;
+import org.frontcache.console.service.FrontcacheService;
+import org.frontcache.core.DomainContext;
+import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.context.support.WebApplicationContextUtils;
+
 
 /**
  * Proxy an EventStream request (data.stream via proxy.stream) since EventStream does not yet support CORS (https://bugs.webkit.org/show_bug.cgi?id=61862)
@@ -46,23 +59,41 @@ public class ProxyStreamServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private static final Logger logger = LoggerFactory.getLogger(ProxyStreamServlet.class);
 
+    protected AutowireCapableBeanFactory ctx;
+    
+	@Autowired
+	private FrontcacheService frontcacheService;
+	
     public ProxyStreamServlet() {
         super();
+    }
+    
+    @Override
+    public void init(ServletConfig config) throws ServletException {
+       super.init(config);
+
+       WebApplicationContext context = WebApplicationContextUtils
+               .getWebApplicationContext(getServletContext());
+       ctx = context.getAutowireCapableBeanFactory();
+       ctx.autowireBean(this);
+
     }
 
     /**
      * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
      */
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String origin = request.getParameter("origin");
+
+    	String origin = request.getParameter("origin");
         String authorization = request.getParameter("authorization");
         if (origin == null) {
             response.setStatus(500);
             response.getWriter().println("Required parameter 'origin' missing. Example: 107.20.175.135:7001");
             return;
         }
-        origin = origin.trim();
-
+        
+        String siteKey = frontcacheService.getSiteKey();
+        
         HttpGet httpget = null;
         InputStream is = null;
         boolean hasFirstParameter = false;
@@ -95,6 +126,10 @@ public class ProxyStreamServlet extends HttpServlet {
             httpget = new HttpGet(proxyUrl);
             if (authorization != null) {
                 httpget.addHeader("Authorization", authorization);
+            }
+            if (siteKey != null) {
+                logger.info("Setting header {} to {}", FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
+                httpget.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
             }
             HttpClient client = ProxyConnectionManager.httpClient;
             HttpResponse httpResponse = client.execute(httpget);
@@ -173,4 +208,6 @@ public class ProxyStreamServlet extends HttpServlet {
             threadSafeConnectionManager.setMaxTotal(400);
         }
     }
+    
+    
 }

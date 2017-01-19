@@ -19,9 +19,9 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 	private final CacheProcessorBase cacheProcessorBase;
 
     public FC_ThroughCache(CacheProcessorBase cacheProcessorBase, String originUrlStr) {
-        
+        //TODO: replace wit hdomainContext
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("Frontcache"))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("coinshome.net"))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Hits"))
         		);
         
