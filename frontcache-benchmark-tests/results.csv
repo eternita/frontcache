@@ -1,0 +1,2 @@
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99.9%)","Unit"
+"org.frontcache.benchmark.Frontcache.benchmark","thrpt",1,50,7872.208729,273.721894,"ops/s"
