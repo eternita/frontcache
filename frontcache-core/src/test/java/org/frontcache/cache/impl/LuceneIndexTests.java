@@ -27,16 +27,13 @@ public class LuceneIndexTests {
 	protected Logger logger = LoggerFactory.getLogger(LuceneIndexTests.class);
 	LuceneCacheProcessor pr = null;
 	private final static String DOMAIN = "test-domain";
+	private final static String COINSHOME_DOMAIN = "coinshome.net";
 	
 	@Test
 	public void dummy() throws Exception {
 		
 	}
-/*
-Tests are commented out becase they are not jnit tests (they are integrations because they require multiple config files and whole engine up)
-integration tests are in frontcache-tests project
 
-should be reworked to be unit tests
 
 	@Test
 	public void fileSaveTest() throws Exception {
@@ -53,6 +50,7 @@ should be reworked to be unit tests
 			response.getHeaders().put("Accept", list);
 			Set<String> tagSet = new HashSet<>();
 			tagSet.add(tags[i]);
+			response.setDomain(DOMAIN);
 			response.setTags(tagSet);
 			response.setStatusCode(55);
 			pr.putToCache(DOMAIN, url, response);
@@ -91,6 +89,7 @@ should be reworked to be unit tests
 			set.add(tags[i]);
 			response.setTags(set);
 			response.setStatusCode(55);
+			response.setDomain(DOMAIN);
 			pr.putToCache(DOMAIN, url, response);
 
 			WebResponse fromFile = pr.getFromCacheImpl(url);
@@ -130,6 +129,7 @@ should be reworked to be unit tests
 			set.add(tags[i]);
 			response.setTags(set);
 			response.setStatusCode(55);
+			response.setDomain(DOMAIN);
 			pr.putToCache(DOMAIN, url, response);
 
 			WebResponse fromFile = pr.getFromCacheImpl(url);
@@ -161,8 +161,8 @@ should be reworked to be unit tests
 		
 		WebResponse response = new WebResponse(url, "data".getBytes());
 		response.addTags(Arrays.asList(new String[]{"E9AKbzbiOBIAAAFG0vnZjkvL"}));
-		
-		pr.putToCache(DOMAIN, url, response);
+		response.setDomain(COINSHOME_DOMAIN);
+		pr.putToCache(COINSHOME_DOMAIN, url, response);
 		
 		WebResponse fromFile = pr.getFromCache(url);
 		assertEquals(url, fromFile.getUrl());
@@ -189,6 +189,7 @@ should be reworked to be unit tests
 			set.add("banana");
 			response.setTags(set);
 			response.setStatusCode(55);
+			response.setDomain(DOMAIN);
 			pr.putToCache(DOMAIN, url, response);
 
 			WebResponse fromFile = pr.getFromCacheImpl(url);
@@ -223,6 +224,7 @@ should be reworked to be unit tests
 		pr.removeFromCache(DOMAIN, url);
 
 		WebResponse response = new WebResponse(url, null);
+		response.setDomain(DOMAIN);
 		List<String> list = new ArrayList<>();
 		list.add(UUID.randomUUID().toString());
 		response.getHeaders().put("Accept", list);
@@ -240,8 +242,8 @@ should be reworked to be unit tests
 		WebResponse fromFile = pr1.getFromCacheImpl(url);
 		assertNotNull(fromFile);
 
-		pr1.destroy();
 
+		pr = pr1;
 	}
 	
 	
@@ -260,6 +262,6 @@ should be reworked to be unit tests
 		pr.destroy();
 
 	}
-//*/
+
 	
 }
