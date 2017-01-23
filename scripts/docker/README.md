@@ -52,3 +52,8 @@ GET /_cat/indices?v
 ## kibana
 
 http://localhost:5601/
+
+Import Dashboard
+ * Open http://localhost:5601/app/kibana#/management?_g=()
+ * Saved Objects
+ * Import -> scripts/docker/fc-elk/kibana.json
