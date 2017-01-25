@@ -10,11 +10,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 
-import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.junit.After;
 import org.junit.Before;
@@ -25,15 +23,17 @@ import org.slf4j.LoggerFactory;
 public class LuceneIndexTests {
 
 	protected Logger logger = LoggerFactory.getLogger(LuceneIndexTests.class);
-	LuceneCacheProcessor pr = null;
+
+	LuceneIndexManager luceneIndexManager = null;
+
 	private final static String DOMAIN = "test-domain";
+	
 	private final static String COINSHOME_DOMAIN = "coinshome.net";
 	
 	@Test
 	public void dummy() throws Exception {
 		
 	}
-
 
 	@Test
 	public void fileSaveTest() throws Exception {
@@ -42,7 +42,7 @@ public class LuceneIndexTests {
 		for (int i = 0; i < size; i++) {
 			String url = UUID.randomUUID().toString();
 			String content = UUID.randomUUID().toString();
-			pr.removeFromCache(DOMAIN, url);
+			luceneIndexManager.delete(DOMAIN, url);
 
 			WebResponse response = new WebResponse(url, content.getBytes());
 			List<String> list = new ArrayList<>();
@@ -53,9 +53,9 @@ public class LuceneIndexTests {
 			response.setDomain(DOMAIN);
 			response.setTags(tagSet);
 			response.setStatusCode(55);
-			pr.putToCache(DOMAIN, url, response);
+			luceneIndexManager.indexDoc(response);
 
-			WebResponse fromFile = pr.getFromCacheImpl(url);
+			WebResponse fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
 			assertEquals(url, fromFile.getUrl());
 			assertEquals(content, new String(fromFile.getContent()));
@@ -65,13 +65,12 @@ public class LuceneIndexTests {
 			assertEquals(tagSet, fromFile.getTags()); // tags are restorable from index
 		}
 
-		assertEquals(size, pr.getIndexManager().getIndexSize());
-		pr.getIndexManager().delete(DOMAIN, "apple");
-		assertEquals(size - 1, pr.getIndexManager().getIndexSize());
-		assertEquals(size - 1 + "", pr.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES));
+		assertEquals(size, luceneIndexManager.getIndexSize());
+		luceneIndexManager.delete(DOMAIN, "apple");
+		assertEquals(size - 1, luceneIndexManager.getIndexSize());
 
 	}
-
+	
 	@Test
 	public void deleteTest() throws Exception {
 		String[] tags = { "apple", "limon", "banana", "chery", "peach" };
@@ -90,9 +89,9 @@ public class LuceneIndexTests {
 			response.setTags(set);
 			response.setStatusCode(55);
 			response.setDomain(DOMAIN);
-			pr.putToCache(DOMAIN, url, response);
+			luceneIndexManager.indexDoc(response);
 
-			WebResponse fromFile = pr.getFromCacheImpl(url);
+			WebResponse fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
 			assertEquals(url, fromFile.getUrl());
 			assertEquals(content, new String(fromFile.getContent()));
@@ -101,13 +100,13 @@ public class LuceneIndexTests {
 			assertEquals(fromFile.getStatusCode(), response.getStatusCode());
 		}
 
-		assertEquals(size, pr.getIndexManager().getIndexSize());
-		pr.getIndexManager().delete(DOMAIN, "apple");
-		assertEquals(size - 1, pr.getIndexManager().getIndexSize());
-		assertEquals(size - 1 + "", pr.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES));
+		assertEquals(size, luceneIndexManager.getIndexSize());
+		luceneIndexManager.delete(DOMAIN, "apple");
+		assertEquals(size - 1, luceneIndexManager.getIndexSize());
 
 	}
 
+	
 	@Test
 	public void deleteByUrl() throws Exception {
 		String[] tags = { "apple", "limon", "banana", "chery", "peach" };
@@ -130,9 +129,9 @@ public class LuceneIndexTests {
 			response.setTags(set);
 			response.setStatusCode(55);
 			response.setDomain(DOMAIN);
-			pr.putToCache(DOMAIN, url, response);
+			luceneIndexManager.indexDoc(response);
 
-			WebResponse fromFile = pr.getFromCacheImpl(url);
+			WebResponse fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
 			assertEquals(url, fromFile.getUrl());
 			assertEquals(content, new String(fromFile.getContent()));
@@ -142,11 +141,11 @@ public class LuceneIndexTests {
 		}
 
 		for (String url : urls.keySet()) {
-			WebResponse fromFile = pr.getFromCacheImpl(url);
+			WebResponse fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
 			assertEquals(urls.get(url), new String(fromFile.getContent()));
-			pr.getIndexManager().delete(DOMAIN, url);
-			fromFile = pr.getFromCacheImpl(url);
+			luceneIndexManager.delete(DOMAIN, url);
+			fromFile = luceneIndexManager.getResponse(url);
 			assertNull(fromFile);
 		}
 
@@ -157,20 +156,20 @@ public class LuceneIndexTests {
 
 		String url = "https://www.coinshome.net/en/coin_definition-1_Escudo-Gold-Centralist_Republic_of_Mexico_(1835_1846)-E9AKbzbiOBIAAAFG0vnZjkvL.htm";
 
-		pr.removeFromCache(DOMAIN, url);
+		luceneIndexManager.delete(DOMAIN, url);
 		
 		WebResponse response = new WebResponse(url, "data".getBytes());
 		response.addTags(Arrays.asList(new String[]{"E9AKbzbiOBIAAAFG0vnZjkvL"}));
 		response.setDomain(COINSHOME_DOMAIN);
-		pr.putToCache(COINSHOME_DOMAIN, url, response);
+		luceneIndexManager.indexDoc(response);
 		
-		WebResponse fromFile = pr.getFromCache(url);
+		WebResponse fromFile = luceneIndexManager.getResponse(url);
 		assertEquals(url, fromFile.getUrl());
 		assertEquals(new String("data".getBytes()), new String(fromFile.getContent()));
 		
-		pr.getIndexManager().delete(DOMAIN, "E9AKbzbiOBIAAAFG0vnZjkvL");
+		luceneIndexManager.delete(DOMAIN, "E9AKbzbiOBIAAAFG0vnZjkvL");
 		
-		fromFile = pr.getFromCache(url);
+		fromFile = luceneIndexManager.getResponse(url);
 		assertNull(fromFile);
 		
 	}
@@ -179,7 +178,7 @@ public class LuceneIndexTests {
 	public void fileEmptyByteTest() throws Exception {
 
 			String url = UUID.randomUUID().toString();
-			pr.removeFromCache(DOMAIN, url);
+			luceneIndexManager.delete(DOMAIN, url);
 
 			WebResponse response = new WebResponse(url, null);
 			List<String> list = new ArrayList<>();
@@ -190,38 +189,37 @@ public class LuceneIndexTests {
 			response.setTags(set);
 			response.setStatusCode(55);
 			response.setDomain(DOMAIN);
-			pr.putToCache(DOMAIN, url, response);
+			luceneIndexManager.indexDoc(response);
 
-			WebResponse fromFile = pr.getFromCacheImpl(url);
+			WebResponse fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
 			
 			response.setContent(new byte[0]);
-			pr.putToCache(DOMAIN, url, response);
+			luceneIndexManager.indexDoc(response);
 			
-			fromFile = pr.getFromCacheImpl(url);
+			fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
 			
 			response.setContent(new byte[]{'a'});
-			pr.putToCache(DOMAIN, url, response);
+			luceneIndexManager.indexDoc(response);
 			
-			fromFile = pr.getFromCacheImpl(url);
+			fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
-			
+			return;
 	}
 
+	
 	@Test
-
 	public void multyWritersTest() throws Exception {
 
-		LuceneCacheProcessor pr1 = new LuceneCacheProcessor();
-		Properties prop = new Properties();
-		prop.put("front-cache.cache-processor.impl.cache-dir", "/tmp/cache/");
-		pr1.init(prop);
+		String baseDir = "/tmp/lucene-text-index-l2-" + System.currentTimeMillis();
+		LuceneIndexManager luceneIndexManager1 = new LuceneIndexManager(baseDir); // INDEX_BASE_DIR
+		LuceneIndexManager luceneIndexManager2 = new LuceneIndexManager(baseDir); // INDEX_BASE_DIR
 
 
-		System.out.println("hello");
+//		System.out.println("hello");
 		String url = UUID.randomUUID().toString();
-		pr.removeFromCache(DOMAIN, url);
+		luceneIndexManager1.delete(DOMAIN, url);
 
 		WebResponse response = new WebResponse(url, null);
 		response.setDomain(DOMAIN);
@@ -232,35 +230,38 @@ public class LuceneIndexTests {
 		set.add("banana");
 		response.setTags(set);
 		response.setStatusCode(55);
-		pr1.putToCache(DOMAIN, url, response);
+		try
+		{
+			luceneIndexManager2.indexDoc(response);
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
 
-		pr.destroy();
+		luceneIndexManager1.close();
 		
-		pr1.putToCache(DOMAIN, url, response);
+		luceneIndexManager2.indexDoc(response);
 		
 		// now second writer should have IndexWriter
-		WebResponse fromFile = pr1.getFromCacheImpl(url);
+		WebResponse fromFile = luceneIndexManager2.getResponse(url);
 		assertNotNull(fromFile);
 
-
-		pr = pr1;
+		luceneIndexManager1 = luceneIndexManager2;
+		luceneIndexManager1.close();
+		return;
 	}
-	
+
 	
 	@Before
 	public void setUp() {
-		pr = new LuceneCacheProcessor();
-		Properties prop = new Properties();
-		prop.put("front-cache.cache-processor.impl.cache-dir", "/tmp/cache/");
-		pr.init(prop);
-		pr.removeFromCacheAll(DOMAIN);
+		luceneIndexManager = new LuceneIndexManager("/tmp/lucene-text-index-l2-" + System.currentTimeMillis()); // INDEX_BASE_DIR
+		return;
 	}
 
+	
 	@After
 	public void cleanUp() {
-		pr.removeFromCacheAll(DOMAIN);
-		pr.destroy();
-
+		luceneIndexManager.close();
+		return;
 	}
 
 	

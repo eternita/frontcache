@@ -100,11 +100,18 @@ public class LuceneIndexManager {
 		Path path = Paths.get(INDEX_PATH);
 		if (!Files.exists(path)) {
 			try {
-				Files.createDirectories(path.getParent());
+				if (path.getParent().toFile().isDirectory() && !path.getParent().toFile().exists())
+					Files.createDirectories(path.getParent());
+				
 				// create dummy index
-				WebResponse dummy =  new WebResponse(UUID.randomUUID().toString());
-				dummy.setDomain(UUID.randomUUID().toString());
-				indexDoc(dummy);
+				{
+					String url = UUID.randomUUID().toString();
+					String domain = UUID.randomUUID().toString();
+					WebResponse dummy =  new WebResponse(url);
+					dummy.setDomain(domain);
+					indexDoc(dummy);
+					delete(domain, url);
+				}
 			} catch (IOException e) {
 				logger.error("Error during creating cache-file", e);
 			}
