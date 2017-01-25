@@ -161,8 +161,6 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
 		
-		long parsingStartTimeMillis = System.currentTimeMillis();
-		
 		int scanIdx = 0;
 		while(scanIdx < content.length())
 		{
@@ -203,8 +201,6 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				scanIdx = content.length(); // scan complete
 			}
 		}
-		
-		logger.info("Includes parsing time: " + (System.currentTimeMillis() - parsingStartTimeMillis) + " ms");
 		
 		return includes;
 	}
