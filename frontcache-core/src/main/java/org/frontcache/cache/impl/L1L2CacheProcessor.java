@@ -71,13 +71,28 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		}
 		
 		logger.info("Loading " + ehCacheConfigFile);
-		InputStream is = FCConfig.getConfigInputStream(ehCacheConfigFile);
-		ehCacheManager = CacheManager.create(is);
+		InputStream is = null;
+		if (null != ehCacheConfigFile)
+		{
+			try {
+				is = FCConfig.getConfigInputStream(ehCacheConfigFile);
+			} catch (Throwable t) {
+				t.printStackTrace();
+			}
+		}
+
+		if (null != is)
+			ehCacheManager = CacheManager.create(is);
+		else 
+			ehCacheManager = CacheManager.create();
+			
 		
 		if (null != is)
-		try {
-			is.close();
-		} catch (IOException e) {		}
+		{
+			try {
+				is.close();
+			} catch (IOException e) {		}
+		}
 		
         ehCache = ehCacheManager.getCache(FRONT_CACHE);
         if (null == ehCache)
@@ -131,10 +146,6 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		luceneIndexManager.close();
 		return;
 	}
-	
-//	public LuceneIndexManager getIndexManager(){
-//		return indexManager;
-//	}
 
 	/**
 	 * Saves web response to cache-file
