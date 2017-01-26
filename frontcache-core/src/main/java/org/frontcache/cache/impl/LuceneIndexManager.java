@@ -490,25 +490,29 @@ public class LuceneIndexManager {
 	 * @return
 	 */
 	public int getIndexSize(){
-		
-		IndexWriter iWriter = null;
-		try {
-			iWriter = getIndexWriter();
-			if (iWriter == null){
-				return -1;
-			}
-		} catch (Exception e1) {
-			logger.debug("Error during getting indexWriter. " + e1.getMessage());
-			return -1;
-		}
-		
 		int n = -1;
+		IndexReader reader = null;
 		try {
-			IndexReader reader = DirectoryReader.open(iWriter);
+			
+			Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
+			reader = DirectoryReader.open(dir);
 			n = reader.numDocs();
+
 		} catch (IOException e) {
+			
 			logger.error(e.getMessage(), e);
+		} finally {
+			
+			if (null != reader)
+			{
+				try {
+					reader.close();
+				} catch (IOException e) {
+					logger.error(e.getMessage(), e);
+				}
+			}
 		}
+		
 		return n;
 	}
 	
