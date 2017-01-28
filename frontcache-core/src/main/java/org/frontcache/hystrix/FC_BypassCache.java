@@ -3,6 +3,7 @@ package org.frontcache.hystrix;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -100,6 +101,8 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			// stand alone mode
 			
 			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request);
+			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{FCUtils.getClientIP(context.getRequest())}));
+			
 			String verb = FCUtils.getVerb(request);
 			InputStream requestEntity = getRequestBody(request);
 			String uri = context.getRequestURI();

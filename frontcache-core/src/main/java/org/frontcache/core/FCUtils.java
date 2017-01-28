@@ -4,9 +4,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,7 +37,8 @@ public class FCUtils {
 	
 	private static Logger logger = LoggerFactory.getLogger(FCUtils.class);
 		
-    private static final String[] CLIENT_IP_SOURCE_HEADER_LIST = { 
+    private static final String[] CLIENT_IP_SOURCE_HEADER_LIST = {
+    		FCHeaders.X_FRONTCACHE_CLIENT_IP,
             "x-forwarded-for",
             "X-Forwarded-For",
             "Proxy-Client-IP",
@@ -174,7 +172,7 @@ public class FCUtils {
 		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }
 	
-	private static String getClientIP(HttpServletRequest request) {
+	public static String getClientIP(HttpServletRequest request) {
 		for (String header : CLIENT_IP_SOURCE_HEADER_LIST) {
 			String ip = request.getHeader(header);
 			if (ip != null && ip.length() != 0 && !"unknown".equalsIgnoreCase(ip)) {
