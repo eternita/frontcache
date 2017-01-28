@@ -444,10 +444,6 @@ public class FrontCacheEngine {
         String requestType = FCHeaders.COMPONENT_INCLUDE;
         
         String includeLevelStr = servletRequest.getHeader(FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL);
-        if (null == includeLevelStr)
-        	includeLevelStr = INCLUDE_LEVEL_TOP_LEVEL; // default (top level)
-
-        context.setIncludeLevel(includeLevelStr); // top level 
         
         if (null == requestId)
         {
@@ -455,13 +451,26 @@ public class FrontCacheEngine {
         	requestType = FCHeaders.COMPONENT_TOPLEVEL;
         } else {
             
-        	if (null != servletRequest.getHeader(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE))
-            	requestType = FCHeaders.COMPONENT_ASYNC_INCLUDE;
-        	else 
-        		requestType = FCHeaders.COMPONENT_INCLUDE;
+        	// can be include 
+        	// or top_level (e.g. FC1 in scenario browser -> FC2 -> FC1 -> app )
+        	
+        	if ("0".equals(includeLevelStr)) // it's second level FC (e.g. FC1 in scenario browser -> FC2 -> FC1 -> app ) 
+        	{
+            	requestType = FCHeaders.COMPONENT_TOPLEVEL;
+        	} else {
+            	if (null != servletRequest.getHeader(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE))
+                	requestType = FCHeaders.COMPONENT_ASYNC_INCLUDE;
+            	else 
+            		requestType = FCHeaders.COMPONENT_INCLUDE;
+        	}
         	
             context.setRequestFromFrontcache();
         }
+        
+        if (null == includeLevelStr)
+        	includeLevelStr = INCLUDE_LEVEL_TOP_LEVEL; // default (top level)
+
+        context.setIncludeLevel(includeLevelStr); // top level 
         
         context.setRequestId(requestId);
         context.setRequestType(requestType);
