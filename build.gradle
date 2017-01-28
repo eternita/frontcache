@@ -284,6 +284,7 @@ project(':frontcache-tests') {
 		systemProperty 'frontcache.standalone.frontcache.web.dir', '' + projectDir + '/src/test-integration/webapp'
 		systemProperty 'frontcache.standalone.frontcache.port', '9080'
 		systemProperty 'frontcache.home', '' + projectDir + '/FRONTCACHE_HOME_STANDALONE'
+		systemProperty 'logback.configurationFile', '' + projectDir + '/FRONTCACHE_HOME_STANDALONE/conf/fc-logback.xml'
 	}
 	
 	task startStandaloneFrontcache(type: ExecWait) {

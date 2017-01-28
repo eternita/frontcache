@@ -37,6 +37,12 @@ public class FallbackResolverFactory {
 	private static FallbackResolver getFallbackResolver()
 	{
 		String implStr = FCConfig.getProperty("front-cache.fallback-resolver.impl");
+		if (null == implStr)
+		{
+			logger.info("Default implementation is loaded: " + FileBasedFallbackResolver.class.getCanonicalName());
+			return new FileBasedFallbackResolver();
+		}
+		
 		try
 		{
 
