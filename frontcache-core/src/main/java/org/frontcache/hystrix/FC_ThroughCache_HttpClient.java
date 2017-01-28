@@ -83,7 +83,13 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     protected WebResponse getFallback() {
 		context.setHystrixError();
 
+		String failedExceptionMessage = "";
+		if (null != getFailedExecutionException())
+			failedExceptionMessage += getFailedExecutionException().getMessage();
+			
 		String includeCurrentURL = getIncludeCurrentURL(currentRequestURL, originRequestURL);
+		logger.error("FC_ThroughCache_HttpClient - ERROR FOR - " + includeCurrentURL + " " + failedExceptionMessage + ", Events " + getExecutionEvents());
+		
 		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), includeCurrentURL);
 		
 		return webResponse;

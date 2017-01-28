@@ -53,7 +53,6 @@ public class FC_Total extends HystrixCommand<Object> {
     	
 		try {
 			context.setHystrixError();
-			logger.error("FC-Total - ERROR FOR - " + url);
 			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
 			if (null != webResponse)
 			{
@@ -61,6 +60,11 @@ public class FC_Total extends HystrixCommand<Object> {
 				httpResponse.setContentType(webResponse.getHeader(FCHeaders.CONTENT_TYPE));
 			}
 			
+			String failedExceptionMessage = "";
+			if (null != getFailedExecutionException())
+				failedExceptionMessage += getFailedExecutionException().getMessage();
+			
+			logger.error("FC-Total - ERROR FOR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
