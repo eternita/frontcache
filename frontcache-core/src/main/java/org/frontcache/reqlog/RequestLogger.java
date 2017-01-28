@@ -8,6 +8,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,7 @@ public class RequestLogger {
 		.append(SEPARATOR).append(runtimeMillis)
 		.append(SEPARATOR).append(lengthBytes) 
 		.append(SEPARATOR).append("\"").append(url).append("\"")
-		.append(SEPARATOR).append(request.getRemoteAddr())
+		.append(SEPARATOR).append(FCUtils.getClientIP(request))
 		.append(SEPARATOR).append(context.getFrontCacheId())
 		.append(SEPARATOR).append(context.getClientType())
 		.append(SEPARATOR).append("\"").append(userAgent).append("\"");
