@@ -560,5 +560,14 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public boolean isToplevelCached() {
         return getBoolean("ToplevelCached", false);
     }
+
+
+	@Override
+	public String toString() {
+		String str = super.toString();
+		str = str.replaceAll("(\\r|\\n|\\r\\n)+", " ");
+		return "RequestContext: " + str;
+	}
+    
     
 }

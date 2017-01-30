@@ -2,6 +2,7 @@ package org.frontcache.hystrix;
 
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,10 +20,11 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 
 	private final String originUrlStr;
 	private final CacheProcessorBase cacheProcessorBase;
+	private final RequestContext context;
 	
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache.class);
 
-    public FC_ThroughCache(CacheProcessorBase cacheProcessorBase, String originUrlStr) {
+    public FC_ThroughCache(CacheProcessorBase cacheProcessorBase, String originUrlStr, RequestContext context) {
         //TODO: replace wit hdomainContext
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("coinshome.net"))
@@ -31,6 +33,7 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
         
         this.originUrlStr = originUrlStr;
         this.cacheProcessorBase = cacheProcessorBase;
+        this.context = context;
     }
 
     @Override
@@ -45,7 +48,7 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 		if (null != getFailedExecutionException())
 			failedExceptionMessage += getFailedExecutionException().getMessage();
 		
-		logger.error("FC_ThroughCache - ERROR FOR - " + originUrlStr + " " + failedExceptionMessage + ", Events " + getExecutionEvents());
+		logger.error("FC_ThroughCache - ERROR FOR - " + originUrlStr + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
 		
 		return null;
     }
