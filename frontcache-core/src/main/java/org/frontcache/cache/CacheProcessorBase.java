@@ -50,7 +50,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	@Override
 	public final WebResponse getFromCache(String url)
 	{
-		WebResponse cachedWebResponse = new FC_ThroughCache(this, url).execute();
+		WebResponse cachedWebResponse = new FC_ThroughCache(this, url, null).execute();
 		
 		return cachedWebResponse;
 	}
@@ -67,7 +67,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		
 		String currentRequestURL = context.getCurrentRequestURL();
 		
-		WebResponse cachedWebResponse = new FC_ThroughCache(this, currentRequestURL).execute();
+		WebResponse cachedWebResponse = new FC_ThroughCache(this, currentRequestURL, context).execute();
 		
 		// isDynamicForClientType depends on clientType (bot|browser) - maxAge="[bot|browser:]30d"
 		// content is cached for bots and dynamic for browsers
