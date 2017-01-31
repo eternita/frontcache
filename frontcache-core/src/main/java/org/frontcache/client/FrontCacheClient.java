@@ -61,7 +61,7 @@ public class FrontCacheClient {
 	private Logger logger = LoggerFactory.getLogger(FrontCacheClient.class);
 
 
-	public FrontCacheClient(String frontcacheURL) {
+	private FrontCacheClient(String frontcacheURL) {
 		final RequestConfig requestConfig = RequestConfig.custom()
 				.setSocketTimeout(10000)
 				.setConnectTimeout(3000)

@@ -1,5 +1,6 @@
 package org.frontcache.console.service;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -27,7 +28,7 @@ import com.typesafe.config.ConfigValue;
 public class FrontcacheService {
 
 
-	final Config fcConsoleConfig = ConfigFactory.load().getConfig("frontcache").getConfig("console");
+	private Config fcConsoleConfig = null;
 
 
 	private static final Logger logger = LoggerFactory.getLogger(FrontcacheService.class);
@@ -35,32 +36,57 @@ public class FrontcacheService {
 	
 	private Set<String> frontcacheAgentURLs = new LinkedHashSet<String>();
 	
+	private String siteKey = "default-site-key";
+	
 	public FrontcacheService() {
 		loadConfigs();
 	}
 
 	private void loadConfigs() {
 		
-
+		String frontcacheConsoleConfPath = System.getProperty("org.frontcache.console.config");
+		
+		if (null == frontcacheConsoleConfPath)
+		{
+			logger.info("System property 'org.frontcache.console.config' is not defined");					
+			return;
+		}
+		
+		try 
+		{
+			File configFile = new File(frontcacheConsoleConfPath);
+			if (!configFile.exists())
+			{
+				logger.info("Console config file doesn't exist: " + configFile.getAbsolutePath());					
+				return;
+			}
+			
+			fcConsoleConfig = ConfigFactory.parseFile(configFile).getConfig("frontcache").getConfig("console");
+			
+		} catch (Exception e) {
+			logger.error("Console frontcacheAgentURLs are not loaded from " + frontcacheConsoleConfPath);
+			throw new RuntimeException("Can't initialize Frontcache Console", e);
+		}
+		
 		List<ConfigValue> urls = fcConsoleConfig.getList("urls");
 		for (ConfigValue urlValue : urls) {
 			String url = urlValue.unwrapped().toString();
 			logger.info(" -- Loading url {} from console config", url);
 			frontcacheAgentURLs.add(url);
 		}
-		String siteKey = fcConsoleConfig.getString("siteKey");
+		siteKey = fcConsoleConfig.getString("siteKey");
 		logger.info(" -- Loading siteKey {} from console config", siteKey);
 		
 	}
 	
 	public String getSiteKey(){
-		return fcConsoleConfig.getString("siteKey");
+		return siteKey;
 	}
 	
 	public boolean isFrontCacheEdgeAvailable(String frontcacheURL)
 	{
 		boolean available = false;
-		FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL);
+		FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, siteKey);
 		if (null != fcClient.getCacheState()) // if get state work -> FC is active
 			available = true;
 		
@@ -211,7 +237,7 @@ public class FrontcacheService {
 		if (null == key)
 			return null;
 		
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL);
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
 		WebResponse webResponse = fcClient.getFromCache(key.trim());
 		
 		return webResponse;
@@ -228,7 +254,7 @@ public class FrontcacheService {
 		List<FrontCacheClient> fcClients = new ArrayList<FrontCacheClient>();
 		for (String frontcacheURL : frontcacheAgentURLs)
 		{
-			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL);
+			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, siteKey);
 			
 			if (activeOnly)
 			{
@@ -257,7 +283,7 @@ public class FrontcacheService {
 	}
 	
 	public void invalidateEdge(String edgeURL, String filter) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL);
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
 		fcClient.removeFromCache(filter);
 	}
 	
