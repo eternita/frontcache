@@ -46,7 +46,7 @@ subprojects {
 	apply plugin: 'jacoco'
 	apply plugin: 'com.github.kt3k.coveralls'
 	
-    version = '1.1.5'
+    version = '1.1.6'
     group = 'org.frontcache'
 	
 //	upload binaries to Maven repository.  $mavenLocalRepo (defined in gradle.properties)
@@ -128,8 +128,8 @@ project(':frontcache-core') {
         provided        'javax.servlet:javax.servlet-api:3.1.0'
 		provided        'javax.servlet.jsp:jsp-api:2.0'
 		
-		compile 		'com.fasterxml.jackson.core:jackson-databind:2.1.2'
-		compile         'com.fasterxml.jackson.core:jackson-annotations:2.1.2'		
+		compile 		'com.fasterxml.jackson.core:jackson-databind:2.7.5'
+		compile         'com.fasterxml.jackson.core:jackson-annotations:2.7.5'		
         compile         'org.apache.httpcomponents:httpclient:4.5.1'
         compile         'commons-io:commons-io:2.4'
         compile         'ch.qos.logback:logback-classic:1.1.3'
