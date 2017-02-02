@@ -114,27 +114,6 @@ public class FCUtils {
 	
     
 	/**
-	 * e.g. localhost:8080
-	 * 
-	 * @param httpRequest
-	 * @return
-	 */
-    public static String getHost(HttpServletRequest httpRequest)
-    {
-    	StringBuffer sb = new StringBuffer();
-    	sb.append(httpRequest.getServerName());
-    	return sb.toString();
-    }
-
-    public static String getProtocol(HttpServletRequest httpRequest)
-    {
-    	if (httpRequest.isSecure())
-    		return "https";
-    	else
-    		return "http";
-    }
-	
-	/**
 	 * GET method only for text requests
 	 * 
 	 * for cache processor - it can use both (httpClient or filter)
@@ -404,35 +383,12 @@ public class FCUtils {
         	// add parameters for storing 
         	// POST method parameters are not stored because they can be huge (e.g. file upload)
         	StringBuffer sb = new StringBuffer(requestURL);
-        	Enumeration<String> paramNames = request.getParameterNames();
-        	if (paramNames.hasMoreElements())
-        		sb.append("?");
+        	if (!request.getParameterMap().isEmpty())
+        		sb.append("?").append(request.getQueryString());
 
-        	while (paramNames.hasMoreElements()){
-        		String name = (String) paramNames.nextElement();
-        		sb.append(name).append("=").append(request.getParameter(name));
-        		
-        		if (paramNames.hasMoreElements())
-        			sb.append("&");
-        	}
         	requestURL = sb.toString();
         }	
         return requestURL;
-	}
-
-	/**
-	 * http://www.coinshome.net/en/welcome.htm -> /en/welcome.htm
-	 * 
-	 * @param request
-	 * @return
-	 */
-	public static String getRequestURLWithoutHostPort(HttpServletRequest request)
-	{
-        String requestURL = getRequestURL(request);
-        int sIdx = 10; // requestURL.indexOf("://"); // http://www.coinshome.net/en/welcome.htm
-        int idx = requestURL.indexOf("/", sIdx);
-
-        return requestURL.substring(idx);
 	}
 
     /**
@@ -545,7 +501,7 @@ public class FCUtils {
 	 * @param urlStr
 	 * @return
 	 */
-	public static String getRequestProtocol(String urlStr) {
+	private static String getRequestProtocol(String urlStr) {
 		
 		int idx = urlStr.indexOf(":");
 		if (-1 < idx)
@@ -603,11 +559,6 @@ public class FCUtils {
 	}
 	
 	
-	public static String getVerb(HttpServletRequest request) {
-		String sMethod = request.getMethod();
-		return sMethod.toUpperCase();
-	}	
-
 	public static void writeResponse(InputStream zin, OutputStream out) throws Exception {
 		byte[] bytes = new byte[1024];
 		int bytesRead = -1;

@@ -424,14 +424,14 @@ public class FrontCacheEngine {
 		queryString = ( null == queryString) ? "" : "?" + queryString; 
 		
 		context.setRequestQueryString(queryString);
-		context.setFrontCacheHost(FCUtils.getHost(servletRequest));
+		context.setFrontCacheHost(servletRequest.getServerName());
 		context.setFrontCacheHttpPort(frontcacheHttpPort);
 		context.setFrontCacheHttpsPort(frontcacheHttpsPort);
 		
 		DomainContext domainContex = getDomainContext(context.getRequest().getServerName());
 		context.setDomainContext(domainContex);
 		
-		context.setFrontCacheProtocol(FCUtils.getProtocol(servletRequest));
+		context.setFrontCacheProtocol(servletRequest.getScheme());
 
         context.setOriginURL(getOriginUrl(context));
 
