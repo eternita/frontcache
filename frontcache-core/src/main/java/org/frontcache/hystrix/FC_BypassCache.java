@@ -103,7 +103,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request);
 			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{FCUtils.getClientIP(context.getRequest())}));
 			
-			String verb = FCUtils.getVerb(request);
+			String verb = request.getMethod();
 			InputStream requestEntity = getRequestBody(request);
 			String uri = context.getRequestURI();
 

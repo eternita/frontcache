@@ -280,10 +280,10 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public boolean isCacheableRequest()
     {
     	
-    	if ("GET".equals(FCUtils.getVerb(this.getRequest())))
+    	if ("GET".equals(this.getRequest().getMethod().toUpperCase()))
     		return true;
     	
-    	if ("HEAD".equals(FCUtils.getVerb(this.getRequest())))
+    	if ("HEAD".equals(this.getRequest().getMethod().toUpperCase()))
     		return true;
     	
 //    	if (-1 < this.getRequestURI().indexOf("jsessionid="))
