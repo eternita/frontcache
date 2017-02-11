@@ -53,6 +53,19 @@ public class FCUtils {
             "REMOTE_ADDR" 
     };
         
+	public static boolean isWebComponentSubjectToCache(Map<String, Long> expireTimeMap)
+	{
+		if (null == expireTimeMap)
+			return false;
+		
+		if (null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER))
+			return false;
+		
+		if (0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && 0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER))
+			return false;
+		
+		return true;
+	}
 
 	// true - save to cache
 	public static boolean isWebComponentCacheableForClientType(Map<String, Long> expireTimeMap, String clientType)
