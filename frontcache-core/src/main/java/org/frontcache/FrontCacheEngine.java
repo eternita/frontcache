@@ -477,13 +477,9 @@ public class FrontCacheEngine {
         
         context.setClientType(getClientType(servletRequest, domainContex.getDomain())); // client type = bot | browser based on User-Agent Header and bots.conf
         
-
         if (null != filterChain)
-        {
             context.setFilterChain(filterChain);
-    		DomainContext origin = getDomainContext(context.getRequest().getServerName());
-    		context.setFrontCacheHost(origin.getHost()); // in case of filter fc host = origin host (don't put localhost it can make issues with HTTPS and certificates for includes)
-        }
+
 		return context;
     }
 
