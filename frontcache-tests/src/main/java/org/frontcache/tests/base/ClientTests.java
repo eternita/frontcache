@@ -365,7 +365,7 @@ public abstract class ClientTests extends TestsBase {
 		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 		
 
-		// same pages with fc2.test.org instead of fc1.test.org
+		// same pages with fc2.test.org instead of fc1-test.org
 		// the first request a - response should be cached
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC2() + TEST_URI_A);
 		assertEquals("a", page.getPage().asText());		
@@ -378,7 +378,7 @@ public abstract class ClientTests extends TestsBase {
 		Assert.assertEquals("4", cacheState.get(CacheProcessor.CACHED_ENTRIES));
 		
 		
-		// cache invalidation - remove all for fc1.test.org
+		// cache invalidation - remove all for fc1-test.org
 		response = frontcacheClient1.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 		
