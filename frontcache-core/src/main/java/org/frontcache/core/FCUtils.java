@@ -287,7 +287,7 @@ public class FCUtils {
 		{
 //			logger.error(new String(respData));
 			// error
-			throw new RuntimeException("Wrong response code " + httpResponseCode + " for " + url);
+			throw new FrontCacheException("Wrong response code " + httpResponseCode + " for " + url);
 		}
 		
 		// process redirects
