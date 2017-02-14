@@ -59,7 +59,7 @@ public class RequestLogger {
 
 		StringBuilder sb4file = new StringBuilder();
         HttpServletRequest request = context.getRequest();
-        boolean isHystrixError = context.getHystrixError();
+        boolean isHystrixError = context.isHystrixFallback();
         String userAgent = request.getHeader("User-Agent");
         
         String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
@@ -99,7 +99,7 @@ public class RequestLogger {
 	 * @param dummy
 	 */
 	public static void logRequestToHeader(String url, String requestType, boolean isCached, boolean softRefresh, long runtimeMillis, long lengthBytes, RequestContext context, String includeLevel) {
-        boolean isHystrixError = context.getHystrixError();
+        boolean isHystrixError = context.isHystrixFallback();
         String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
         if (!isCached && softRefresh)
         	requestTypeDynamicCachedSoft = "dynamic-soft";

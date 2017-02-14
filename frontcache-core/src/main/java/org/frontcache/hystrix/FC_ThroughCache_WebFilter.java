@@ -50,7 +50,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 		try {
 			chain.doFilter(httpRequest, wrappedResponse); // run request to origin
 			
-			WebResponse webResponse = FCUtils.httpResponse2WebComponent(url, wrappedResponse);
+			WebResponse webResponse = FCUtils.httpResponse2WebComponent(url, wrappedResponse, context);
 			return webResponse;
 			
 		} catch (IOException | ServletException e) {
@@ -62,7 +62,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
     
     @Override
     protected WebResponse getFallback() {
-		context.setHystrixError();
+		context.setHystrixFallback();
 		
 		String failedExceptionMessage = "";
 		if (null != getFailedExecutionException())
