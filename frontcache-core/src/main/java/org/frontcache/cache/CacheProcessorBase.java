@@ -33,6 +33,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			"Date",
 			FCHeaders.X_FRONTCACHE_ID,
 			FCHeaders.X_FRONTCACHE_COMPONENT,
+//			FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED, - if you see it in cache - something wrong - requests with fallbacks should not be cached
 //			FCHeaders.X_FRONTCACHE_COMPONENT_CACHE_LEVEL,
 //			FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE,
 //			FCHeaders.X_FRONTCACHE_COMPONENT_REFRESH_TYPE,
@@ -114,7 +115,10 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				lengthBytes = cachedWebResponse.getContentLenth();
 
 				// save to cache
-				if (isCacheableForClientType && isFreshDataCacheableForClientType && cachedWebResponse.isCacheable())
+				if (!context.isHystrixFallback() // don't cache hystrix fallbacks 
+						&& isCacheableForClientType 
+						&& isFreshDataCacheableForClientType 
+						&& cachedWebResponse.isCacheable())
 				{
 					WebResponse copy4cache = cachedWebResponse.copy();
 					Map<String, List<String>> copyHeaders = copy4cache.getHeaders(); 
@@ -162,6 +166,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			public void run() {
 				try {
 					
+//					logger.info("Soft invalidation: removing form cache: " + currentRequestURL);
+					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
+					
 					RequestContext ctxCopy = context.copy();
 					ctxCopy.setFilterChain(null); // async calls for ServletFilter doesnt works (some objects already disposed), so use http calls for soft resets 
 					Map<String, List<String>> requestHeadersCopy = new HashMap<String, List<String>>();
@@ -175,13 +182,13 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					cleanupNonPersistentHeaders(copyHeaders);
 					
 					copy4cache.setUrl(currentRequestURL);
-					
-					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
 
-					putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
-				} catch (FrontCacheException e) {
+					if (!ctxCopy.isHystrixFallback()) // don't cache hystrix fallbacks
+						putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
 					
-					logger.error("Soft invalidation/refresh failed", e);
+				} catch (Exception e) {
+					
+					logger.error("Soft invalidation/refresh failed: " + originUrlStr, e);
 				}  
 			}
 			
@@ -189,6 +196,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		
 		return;
 	}
+
 	
 	/**
 	 * remove header not supposed to be stored in cache

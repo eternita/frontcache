@@ -197,7 +197,7 @@ public class FCUtils {
 	 * @throws FrontCacheException
 	 * @throws IOException
 	 */
-	public static WebResponse httpResponse2WebComponent(String url, FrontCacheHttpResponseWrapper originWrappedResponse) throws FrontCacheException, IOException
+	public static WebResponse httpResponse2WebComponent(String url, FrontCacheHttpResponseWrapper originWrappedResponse, RequestContext context) throws FrontCacheException, IOException
 	{
 		WebResponse webResponse = null;
 		
@@ -240,6 +240,9 @@ public class FCUtils {
 			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType); 
 		}
 		
+		if (null != headers.get(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED))
+			context.setHystrixFallback();
+		
 		return webResponse;
 	}
 	
@@ -249,11 +252,6 @@ public class FCUtils {
 		
 		int httpResponseCode = response.getStatusLine().getStatusCode();
 			
-		if (httpResponseCode < 200 || httpResponseCode > 299)
-		{
-			// error
-//			throw new RuntimeException("Wrong response code " + httpResponseCode);
-		}
 		
 		String contentType = "";
 		Header contentTypeHeader = response.getFirstHeader(FCHeaders.CONTENT_TYPE);
@@ -284,6 +282,13 @@ public class FCUtils {
 		webResponse.setStatusCode(httpResponseCode);
 		if (null == headers.get(FCHeaders.CONTENT_TYPE))
 			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType); 
+
+		if (httpResponseCode < 200 || httpResponseCode > 499) // 2XX - OK, 3XX - REDIRECTS, 4XX - client error (e.g. page not found)
+		{
+//			logger.error(new String(respData));
+			// error
+			throw new RuntimeException("Wrong response code " + httpResponseCode + " for " + url);
+		}
 		
 		// process redirects
 		Header locationHeader = response.getFirstHeader("Location");
@@ -295,6 +300,10 @@ public class FCUtils {
 			webResponse.getHeaders().remove("Location");
 			webResponse.addHeader("Location", fcLocation);
 		}
+		
+		Header hystrixFallbackHeader = response.getFirstHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED);
+		if (null != hystrixFallbackHeader)
+			context.setHystrixFallback();
 		
 		return webResponse;
 	}

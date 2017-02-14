@@ -166,6 +166,12 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 			return;
 		}
 		
+		if (component.getStatusCode() >= 500)
+		{
+			logger.error("Can't cache responses with statusCode 5XX: statusCode:" + component.getStatusCode() + ", url " + component.getUrl());
+			return;
+		}
+		
 		component.setDomain(domain);
 		
 		if (FCHeaders.CACHE_LEVEL_L1.equalsIgnoreCase(component.getCacheLevel()))
