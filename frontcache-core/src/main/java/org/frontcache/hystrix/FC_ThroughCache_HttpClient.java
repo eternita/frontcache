@@ -81,7 +81,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     
     @Override
     protected WebResponse getFallback() {
-		context.setHystrixError();
+		context.setHystrixFallback();
 
 		String failedExceptionMessage = "";
 		if (null != getFailedExecutionException())

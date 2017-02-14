@@ -16,6 +16,8 @@ public class FCHeaders {
     
     public static final String X_FRONTCACHE_SITE_KEY = "X-frontcache.site-key"; // hardcoded in 'frontcache-agent' - remember to update when needed
 
+    public static final String X_FRONTCACHE_FALLBACK_IS_USED = "X-frontcache.fallback-is-used";
+
     public static final String X_FRONTCACHE_DYNAMIC_REQUEST = "X-frontcache.dynamic-request";
     public static final String X_FRONTCACHE_SOFT_REFRESH = "X-frontcache.soft-refresh";
     public static final String X_FRONTCACHE_ASYNC_INCLUDE = "X-frontcache.async-include";
