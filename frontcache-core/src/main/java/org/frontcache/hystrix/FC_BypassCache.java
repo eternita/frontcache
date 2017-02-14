@@ -68,7 +68,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			String url = FCUtils.getRequestURL(httpRequest);
 			HttpServletResponse httpResponse = context.getResponse();
 			
-			context.setHystrixError();
+			context.setHystrixFallback();
 			
 			String failedExceptionMessage = "";
 			if (null != getFailedExecutionException())
@@ -119,7 +119,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 				context.set("error.status_code", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 				context.set("error.exception", ex);
 				
-				context.setHystrixError();
+				context.setHystrixFallback();
 				logger.error("FC - ORIGIN ERROR - " + uri);
 				
 			}

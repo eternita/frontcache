@@ -714,6 +714,10 @@ public class FrontCacheEngine {
 		
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_ID, fcHostId);
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
+		
+		if (context.isHystrixFallback())
+			servletResponse.addHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED, "true");
+			
 		servletResponse.setStatus(context.getResponseStatusCode());
 		
 		if (originResponseHeaders != null) {

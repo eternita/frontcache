@@ -13,6 +13,7 @@ import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
 import org.frontcache.core.WebResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,6 +153,24 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	 */
 	@Override
 	public void putToCache(String domain, String url, WebResponse component) {
+		
+		// don't cache pure dynamic components
+		if (!FCUtils.isWebComponentSubjectToCache(component.getExpireTimeMap()))
+		{
+			try {
+				throw new Exception("Debug call trace - component.getExpireTimeMap() shouldn't be like that " + component.getExpireTimeMap());
+			} catch (Exception e) {
+				logger.error("Debuging #202 (dynamic response caching) ", e);
+			}
+			
+			return;
+		}
+		
+		if (component.getStatusCode() >= 500)
+		{
+			logger.error("Can't cache responses with statusCode 5XX: statusCode:" + component.getStatusCode() + ", url " + component.getUrl());
+			return;
+		}
 		
 		component.setDomain(domain);
 		
