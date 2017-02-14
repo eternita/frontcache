@@ -293,18 +293,9 @@ project(':frontcache-tests') {
 		directory '.'
 	}
 		
-	task stopStandaloneFrontcacheByPort << {
-		def ports = [9080]
-	 
-		ports.each { port ->
-			def cmd = "lsof -Fp -i :$port"
-			def process = cmd.execute()
-			process.in.eachLine { line ->
-				def killProcess = "kill -9 ${ line.substring(1) }".execute()
-				killProcess.waitFor()
-			}
-		}
-	}
+//	task stopStandaloneFrontcacheByPort(type: Exec) {
+//		commandLine 'bash', '-c', "ps -e | grep standaloneFrontcacheJetty | cut -d' ' -f2 | xargs kill -9"
+//	}
 	
 	task end2endTests {
 		dependsOn integrationTest
