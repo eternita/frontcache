@@ -46,7 +46,7 @@ subprojects {
 	apply plugin: 'jacoco'
 	apply plugin: 'com.github.kt3k.coveralls'
 	
-    version = '1.1.6'
+    version = '1.1.8'
     group = 'org.frontcache'
 	
 //	upload binaries to Maven repository.  $mavenLocalRepo (defined in gradle.properties)

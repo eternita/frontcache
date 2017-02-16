@@ -431,7 +431,8 @@ public class FrontCacheEngine {
 		DomainContext domainContex = getDomainContext(context.getRequest().getServerName());
 		context.setDomainContext(domainContex);
 		
-		context.setFrontCacheProtocol(servletRequest.getScheme());
+		String protocol = "https".equalsIgnoreCase(servletRequest.getScheme()) ? "https" : "http";
+		context.setFrontCacheProtocol(protocol);
 
         context.setOriginURL(getOriginUrl(context));
 
