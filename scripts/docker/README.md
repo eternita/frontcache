@@ -15,6 +15,8 @@ start_fc_elk.sh
 Stop elk
 stop_fc_elk.sh
 
+### resize Docker.qcow2
+qemu-img resize ~/Library/Containers/com.docker.docker/Data/com.docker.driver.amd64-linux/Docker.qcow2 +20G
 
 ###Remove all containers and images 
 
