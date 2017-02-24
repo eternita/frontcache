@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import com.netflix.hystrix.HystrixCommand;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
+import com.netflix.hystrix.HystrixThreadPoolKey;
 
 public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
@@ -38,7 +39,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
-        		);
+                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("Origin-Hits-Pool")));
         
         this.originRequestURL = urlStr;
         this.currentRequestURL = context.getCurrentRequestURL();
@@ -88,7 +89,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 			failedExceptionMessage += getFailedExecutionException().getMessage();
 			
 		String includeCurrentURL = getIncludeCurrentURL(currentRequestURL, originRequestURL);
-		logger.error("FC_ThroughCache_HttpClient - ERROR FOR - " + includeCurrentURL + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
+		logger.error("FC_ThroughCache_HttpClient - ERROR FOR - " + includeCurrentURL + " / " + originRequestURL + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
 		
 		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), includeCurrentURL);
 		

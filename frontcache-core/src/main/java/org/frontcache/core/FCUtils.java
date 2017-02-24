@@ -4,12 +4,17 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +26,7 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.message.BasicHeader;
+import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.hystrix.FC_ThroughCache_HttpClient;
@@ -499,6 +505,7 @@ public class FCUtils {
 		return uri;
 	}		
 
+
 	/**
 	 * http://localhost:8080/coin_instance_details.htm? -> /coin_instance_details.htm?
 	 * 
@@ -507,15 +514,69 @@ public class FCUtils {
 	 */
 	public static String buildRequestURI(String urlStr) {
 		
+		logger.info("IN URL " + urlStr);
+		String outStr = urlStr;
 		int idx = urlStr.indexOf("//");
 		if (-1 < idx)
 		{
 			idx = urlStr.indexOf("/", idx + "//".length());
 			if (-1 < idx)
-				return urlStr.substring(idx);
+				outStr = urlStr.substring(idx);
 		} 
 		
-		return urlStr;
+		idx = outStr.indexOf("?"); // has params
+		if (-1 < idx)
+		{
+			String uri = outStr.substring(0, idx + 1); 
+			String queryParams = outStr.substring(idx + 1);
+
+			// encode / decode params
+			try {
+				Map<String, List<String>> parameterMap = splitQueryParameters(queryParams);
+				
+				StringBuffer queryParamsSB = new StringBuffer("");
+				
+				for (String key : parameterMap.keySet())
+				{
+					for (String value : parameterMap.get(key))
+					{
+						if (null != value)
+						{
+							if (queryParamsSB.length() > 1)
+								queryParamsSB.append("&");
+							
+							queryParamsSB.append(key).append("=").append(URLEncoder.encode(value, "UTF-8"));
+						}
+					}
+				}
+				
+				queryParams = queryParamsSB.toString();
+			} catch (Exception e) {
+				logger.error("error buildRequestURI for " + urlStr, e);
+			}
+			
+			outStr = uri + queryParams;
+		} 
+		
+		logger.info("IN URL encoded " + outStr);
+		return outStr;
+	}
+	
+	
+	public static Map<String, List<String>> splitQueryParameters(String paramsStr) throws UnsupportedEncodingException {
+		final Map<String, List<String>> queryPairs = new LinkedHashMap<String, List<String>>();
+		final String[] pairs = paramsStr.split("&");
+		for (String pair : pairs) {
+			final int idx = pair.indexOf("=");
+			final String key = idx > 0 ? URLDecoder.decode(pair.substring(0, idx), "UTF-8") : pair;
+			if (!queryPairs.containsKey(key)) {
+				queryPairs.put(key, new LinkedList<String>());
+			}
+			final String value = idx > 0 && pair.length() > idx + 1
+					? URLDecoder.decode(pair.substring(idx + 1), "UTF-8") : null;
+			queryPairs.get(key).add(value);
+		}
+		return queryPairs;
 	}
 	
 	/**
@@ -602,7 +663,7 @@ public class FCUtils {
 	public static String getDomainFromSiteKeyHeader(HttpServletRequest request) {
 		String siteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
 		if (siteKey == null) {
-			return null;
+			return FCConfig.DEFAULT_DOMAIN;
 		}
 
 		String domain = null;
@@ -610,6 +671,9 @@ public class FCUtils {
 		DomainContext domainContext = FrontCacheEngine.getFrontCache().getDomainContexBySiteKey(siteKey);
 		if (null != domainContext)
 			domain = domainContext.getDomain();
+
+		if (domain == null) 
+			return FCConfig.DEFAULT_DOMAIN;
 
 		return domain;
 	}
