@@ -55,6 +55,11 @@ GET /_cat/indices?v
 
 http://localhost:5601/
 
+curl -s -X GET http://localhost:9200/kibana-int/dashboard/mydashboard/_source > mydashboard.json
+curl -X PUT http://localhost:9200/kibana-int/dashboard/mydashboard -T mydashboard.json
+curl -XGET "http://xxx.xxx.xxx.xxx:9200/.kibana/dashboard/dashboard_name?pretty=1"
+curl -XGET "http://xxx.xxx.xxx.xxx:9200/.kibana/visualization/visualization_name?pretty=1"
+
 Import Dashboard
  * Open http://localhost:5601/app/kibana#/management?_g=()
  * Saved Objects
