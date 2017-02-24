@@ -83,7 +83,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 	}
 
 	private static boolean isOwnerGroup(HystrixThreadPoolMetrics commandMetrics, final String siteKey) {
-		logger.info("HystrixThreadPoolMetrics {}",  commandMetrics.getThreadPoolKey().name());
+		logger.debug("HystrixThreadPoolMetrics {}",  commandMetrics.getThreadPoolKey().name());
 		if (commandMetrics.getThreadPoolKey().name().equals(siteKey)) {
 			return true;
 		} else {
@@ -93,7 +93,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 	}
 
 	private static boolean isOwnerGroup(HystrixCollapserMetrics collapserMetrics, final String siteKey) {
-		logger.info("HystrixCollapserMetrics {}", collapserMetrics.getCollapserKey().name());
+		logger.debug("HystrixCollapserMetrics {}", collapserMetrics.getCollapserKey().name());
 
 		if (collapserMetrics.getCollapserKey().name().equals(siteKey)) {
 			return true;
