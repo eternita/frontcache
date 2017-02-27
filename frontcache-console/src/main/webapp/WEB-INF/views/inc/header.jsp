@@ -4,6 +4,7 @@
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 		<title>Frontcache console</title>
+		<link rel="shortcut icon" href="static/images/favicon.ico" type="image/x-icon"/> 
 		<link href="<c:url value='/static/css/bootstrap.css' />"  rel="stylesheet"></link>
 		<script src="<c:url value='https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js' />"></script>
 		 <script src="<c:url value='/static/js/bootstrap.js' />"></script>

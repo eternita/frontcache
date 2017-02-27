@@ -10,7 +10,7 @@
 					class="icon-bar"></span> <span class="icon-bar"></span> <span
 					class="icon-bar"></span>
 			</button>
-			<a href="index" class="navbar-brand"><img alt="Brand" src="static/images/logo.jpeg" width="50px"></a>
+			<a href="index" class=""><img alt="Brand" style="padding-top: 5px; " src="static/images/frontcache-logo-200.png" width="150px"></a>
 		</div>
 		<nav class="collapse navbar-collapse" id="bs-navbar">
 			<ul class="nav navbar-nav">
