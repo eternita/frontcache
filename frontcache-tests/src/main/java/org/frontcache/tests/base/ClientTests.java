@@ -138,17 +138,17 @@ public abstract class ClientTests extends TestsBase {
 		logger.debug("response " + response);
 	}
 
-	@Test
-	public void getCacheStatusCluster() throws Exception {
-		
-		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1, SiteKeys.TEST_SITE_KEY_1);
-		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2, SiteKeys.TEST_SITE_KEY_1);
-		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(new FrontCacheClient[]{frontCacheClient1, frontCacheClient2}));
-		
-		Map<String, String> response = fcCluster.getCacheState().get(frontCacheClient1);
-		Assert.assertNotNull(response);
-		logger.debug("response " + response);
-	}
+//	@Test
+//	public void getCacheStatusCluster() throws Exception {
+//		
+//		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1, SiteKeys.TEST_SITE_KEY_1);
+//		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2, SiteKeys.TEST_SITE_KEY_1);
+//		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(new FrontCacheClient[]{frontCacheClient1, frontCacheClient2}));
+//		
+//		Map<String, String> response = fcCluster.getCacheState().get(frontCacheClient1);
+//		Assert.assertNotNull(response);
+//		logger.debug("response " + response);
+//	}
 
 //	@Test
 //	public void getCachedKeysClient() throws Exception {

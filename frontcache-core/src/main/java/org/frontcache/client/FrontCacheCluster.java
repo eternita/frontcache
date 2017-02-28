@@ -4,11 +4,20 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +33,13 @@ public class FrontCacheCluster {
 	private final static String DEFAULT_SITE_KEY = "";
 	
 	private Logger logger = LoggerFactory.getLogger(FrontCacheCluster.class);
+	
+	private static final int THREAD_AMOUNT = 4;
+    
+	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_AMOUNT);
+	
+	private static final long FRONTCACHE_CLIENT_TIMEOUT = 5*1000; // 5 second
+	
 	
 	public FrontCacheCluster(Collection<String> fcURLSet, String siteKey) 
 	{
@@ -49,6 +65,11 @@ public class FrontCacheCluster {
 
 		for (String url : fcURLSet)
 			fcCluster.add(new FrontCacheClient(url, siteKey));
+	}
+	
+	public void close()
+	{
+		executor.shutdown();
 	}
 
 	private String loadSiteKey()
@@ -90,22 +111,6 @@ public class FrontCacheCluster {
 		return siteKey;
 	}
 	
-	
-	private static FrontCacheCluster instance = null;
-	
-	public static FrontCacheCluster getInstance()
-	{
-		if (null == instance)
-			instance = new FrontCacheCluster();
-		
-		return instance;
-	}
-	
-	public static FrontCacheCluster reload()
-	{
-		instance = new FrontCacheCluster();
-		return instance;
-	}
 	
 	private Set<String> loadFrontcacheClusterNodes(String configName) {
 		Set<String> fcURLSet = new HashSet<String>();
@@ -161,24 +166,24 @@ public class FrontCacheCluster {
 		return nodes;
 	}
 	
-	/**
-	 * 
-	 * @return
-	 */
-	public Map<FrontCacheClient, Map<String, String>> getCacheState()
-	{
-		Map<FrontCacheClient, Map<String, String>> response = new ConcurrentHashMap<FrontCacheClient, Map<String, String>>();
-//		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.getCacheState()));
-
-		for (FrontCacheClient client : fcCluster)
-		{
-			Map<String, String> cacheStatus = client.getCacheState();
-			if (null != cacheStatus)
-				response.put(client, cacheStatus);
-		}
-
-		return response;
-	}
+//	/**
+//	 * 
+//	 * @return
+//	 */
+//	public Map<FrontCacheClient, Map<String, String>> getCacheState()
+//	{
+//		Map<FrontCacheClient, Map<String, String>> response = new ConcurrentHashMap<FrontCacheClient, Map<String, String>>();
+////		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.getCacheState()));
+//
+//		for (FrontCacheClient client : fcCluster)
+//		{
+//			Map<String, String> cacheStatus = client.getCacheState();
+//			if (null != cacheStatus)
+//				response.put(client, cacheStatus);
+//		}
+//
+//		return response;
+//	}
 
 	/**
 	 * 
@@ -188,11 +193,24 @@ public class FrontCacheCluster {
 	public Map<String, String> removeFromCache(String filter)
 	{
 		Map<String, String> response = new ConcurrentHashMap<String, String>();
-		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.removeFromCache(filter)));
+        List<Future<InvalidationResponse>> futureList = new ArrayList<Future<InvalidationResponse>>();
+        
+		fcCluster.forEach(client -> futureList.add(executor.submit(new InvalidationCaller(client, filter))));
 
-//		Map<String, String> response = new HashMap<String, String>();
-//		for (FrontCacheClient client : fcCluster)
-//			response.put(client.getFrontCacheURL() ,client.removeFromCache(filter));
+		futureList.forEach(f -> 
+					{
+			            try {
+			            	InvalidationResponse result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			            		
+			            	if (null != result)
+			            		response.put(result.getName(), result.getResponse());
+			            		
+			            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+			                f.cancel(true);
+			                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for invalidation. Some cache instances may not invalidated ");
+			            }
+					}
+				);
 
 		return response;
 	}
@@ -203,14 +221,54 @@ public class FrontCacheCluster {
 	 */
 	public Map<String, String> removeFromCacheAll()
 	{
-		Map<String, String> response = new ConcurrentHashMap<String, String>();
-		fcCluster.forEach(client -> response.put(client.getFrontCacheURL() ,client.removeFromCacheAll()));
-		
-//		Map<String, String> response = new HashMap<String, String>();
-//		for (FrontCacheClient client : fcCluster)
-//			response.put(client.getFrontCacheURL() ,client.removeFromCacheAll());
-
-		return response;
+		return removeFromCache(null);
 	}
 	
 }
+
+
+/**
+ * 
+ */
+class InvalidationResponse {
+
+	private String name;
+	private String response;
+	
+	public InvalidationResponse(String name, String response) {
+		super();
+		this.name = name;
+		this.response = response;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public String getResponse() {
+		return response;
+	}
+
+}
+
+/**
+ * 
+ */
+class InvalidationCaller implements Callable<InvalidationResponse> {
+	
+	private FrontCacheClient fcClient;
+	private String filter;
+	
+	public InvalidationCaller(FrontCacheClient fcClient, String filter) {
+		super();
+		this.fcClient = fcClient;
+		this.filter = filter;
+	}
+	
+    @Override
+    public InvalidationResponse call() throws Exception {
+		String resp = (null == filter) ? fcClient.removeFromCacheAll() : fcClient.removeFromCache(filter); 
+		return new InvalidationResponse(fcClient.getFrontCacheURL(), resp); 
+    }
+}	
+
