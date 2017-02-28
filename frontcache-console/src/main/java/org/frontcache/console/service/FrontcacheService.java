@@ -7,9 +7,15 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
+import org.frontcache.console.model.BotConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
@@ -27,16 +33,22 @@ import com.typesafe.config.ConfigValue;
 @Service("frontcacheService")
 public class FrontcacheService {
 
-
 	private Config fcConsoleConfig = null;
 
-
 	private static final Logger logger = LoggerFactory.getLogger(FrontcacheService.class);
+
 	private ObjectMapper jsonMapper = new ObjectMapper();
 	
 	private Set<String> frontcacheAgentURLs = new LinkedHashSet<String>();
 	
 	private String siteKey = "default-site-key";
+	
+	private static final int THREAD_AMOUNT = 4;
+    
+	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_AMOUNT);
+	
+	private static final long FRONTCACHE_CLIENT_TIMEOUT = 5*1000; // 5 second
+	
 	
 	public FrontcacheService() {
 		loadConfigs();
@@ -93,50 +105,41 @@ public class FrontcacheService {
 		return available;
 	}
 
+
 	/**
 	 * 
 	 * @return
 	 */
 	public Map<String, FrontCacheStatus> getClusterStatus() {
-		List<FrontCacheClient> fcClients = getFrontCacheAgents();
-
-		Map<String, FrontCacheStatus> clusterStatus = new HashMap<String, FrontCacheStatus>();
-		// TODO: make requests to nodes concurrent
-		for (FrontCacheClient fcClient : fcClients)
-		{
-			FrontCacheStatus fcStatus = new FrontCacheStatus();
-			fcStatus.setName(fcClient.getName());
-			long cachedAmount = -1;
-			boolean available = true;
-			try
-			{
-				Map<String, String> cacheState = fcClient.getCacheState();
-				if (null != cacheState)
-				{
-					String cacheAmountStr = cacheState.get(CacheProcessor.CACHED_ENTRIES);
-					
-					if (null != cacheAmountStr)
-					{
-						try
-						{
-							cachedAmount = Long.parseLong(cacheAmountStr);							
-						} catch (Exception e) {e.printStackTrace();}
-					}
-				} else {
-					available = false;
-				}
-			} catch (Exception ex) {
-				available = false;
-				ex.printStackTrace();
-			}
-			
-			fcStatus.setAvailable(available);
-			fcStatus.setCachedAmount(cachedAmount);
-			fcStatus.setUrl(fcClient.getFrontCacheURL());
-			
-			clusterStatus.put(fcClient.getName(), fcStatus);
-		}
 		
+        List<Future<FrontCacheStatus>> futureList = new ArrayList<Future<FrontCacheStatus>>();
+		
+		Map<String, FrontCacheStatus> clusterStatus = new HashMap<String, FrontCacheStatus>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+            futureList.add(executor.submit(new FrontCacheStatusCaller(fcClient)));
+
+		// processing timeouts 
+        boolean timeoutReached = false;
+        for (Future<FrontCacheStatus> f : futureList)
+        {
+            try {
+            	FrontCacheStatus result = null;
+            	if (timeoutReached)
+            		result = f.get(1, TimeUnit.MILLISECONDS);
+            	else
+            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+            		
+            	if (null != result)
+            		clusterStatus.put(result.getName(), result);
+            		
+            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+                f.cancel(true);
+                timeoutReached =  true;
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some statuses may not be retrieved ");
+            }
+        }
+
 		return clusterStatus;
 	}
 	
@@ -162,18 +165,34 @@ public class FrontcacheService {
 	}
 
 	public Map<String,  Map<String, Set<String>>> getBotConfigs() {
-		List<FrontCacheClient> fcClients = getFrontCacheAgents();
-
-		// Map <clusterNode, Map <domain, Set <BotConfgi>>>
-		Map<String,  Map<String, Set<String>>> clusterStatus = new HashMap<String,  Map<String, Set<String>>>();
-		// TODO: make requests to nodes concurrent
-		for (FrontCacheClient fcClient : fcClients)
-		{
-			 Map<String, Set<String>> botConfigs = fcClient.getBots(); 
-			if (null != botConfigs)
-				clusterStatus.put(fcClient.getName(), botConfigs);
-		}
+        List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
 		
+		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+            futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
+
+		// processing timeouts 
+        boolean timeoutReached = false;
+        for (Future<BotConfig> f : futureList)
+        {
+            try {
+            	BotConfig result = null;
+            	if (timeoutReached)
+            		result = f.get(1, TimeUnit.MILLISECONDS);
+            	else
+            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+            		
+            	if (null != result)
+            		clusterStatus.put(result.getName(), result.getConfig());
+            		
+            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+                f.cancel(true);
+                timeoutReached =  true;
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
+            }
+        }
+
 		return clusterStatus;
 	}
 	
