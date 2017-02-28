@@ -10,6 +10,8 @@ rm -rf ./frontcache-tests/FRONTCACHE_HOME_STANDALONE/cache/l2-lucene-index/*
 rm -rf ./frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/*
 # end cleanup cache dirs & logs
 
+# stop gradle daemons
+./gradlew -stop
 
 ./gradlew clean :frontcache-tests:startStandaloneFrontcache
 
