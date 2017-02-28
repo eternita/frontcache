@@ -64,7 +64,7 @@ public class FrontCacheClient {
 	private FrontCacheClient(String frontcacheURL) {
 		final RequestConfig requestConfig = RequestConfig.custom()
 				.setSocketTimeout(10000)
-				.setConnectTimeout(3000)
+				.setConnectTimeout(10000)
 				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
 				.build();
 		
