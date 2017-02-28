@@ -16,6 +16,8 @@ import java.util.concurrent.TimeoutException;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.BotConfig;
+import org.frontcache.console.model.DynamicURLsConfig;
+import org.frontcache.console.model.FallbackConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
@@ -153,18 +155,38 @@ public class FrontcacheService {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new HashMap<String, Map<String, Set<FallbackConfigEntry>>>();
-		// TODO: make requests to nodes concurrent
-		for (FrontCacheClient fcClient : fcClients)
-		{
-			Map<String, Set<FallbackConfigEntry>> fallbackConfigs = fcClient.getFallbackConfigs(); 
-			if (null != fallbackConfigs)
-				clusterStatus.put(fcClient.getName(), fallbackConfigs);
-		}
+
+        List<Future<FallbackConfig>> futureList = new ArrayList<Future<FallbackConfig>>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+            futureList.add(executor.submit(new FallbackConfigsCaller(fcClient)));
+
+		// processing timeouts 
+        boolean timeoutReached = false;
+        for (Future<FallbackConfig> f : futureList)
+        {
+            try {
+            	FallbackConfig result = null;
+            	if (timeoutReached)
+            		result = f.get(1, TimeUnit.MILLISECONDS);
+            	else
+            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+            		
+            	if (null != result)
+            		clusterStatus.put(result.getName(), result.getConfig());
+            		
+            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+                f.cancel(true);
+                timeoutReached =  true;
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
+            }
+        }
 		
 		return clusterStatus;
 	}
 
 	public Map<String,  Map<String, Set<String>>> getBotConfigs() {
+		
         List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
 		
 		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
@@ -197,16 +219,34 @@ public class FrontcacheService {
 	}
 	
 	public Map<String, Map<String, Set<String>>> getDynamicURLsConfigs() {
-		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
+        List<Future<DynamicURLsConfig>> futureList = new ArrayList<Future<DynamicURLsConfig>>();
+		
 		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
-		// TODO: make requests to nodes concurrent
-		for (FrontCacheClient fcClient : fcClients)
-		{
-			Map<String, Set<String>> dynamicURLs = fcClient.getDynamicURLs(); 
-			if (null != dynamicURLs)
-				clusterStatus.put(fcClient.getName(), dynamicURLs);
-		}
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+            futureList.add(executor.submit(new DynamicURLsConfigsCaller(fcClient)));
+
+		// processing timeouts 
+        boolean timeoutReached = false;
+        for (Future<DynamicURLsConfig> f : futureList)
+        {
+            try {
+            	DynamicURLsConfig result = null;
+            	if (timeoutReached)
+            		result = f.get(1, TimeUnit.MILLISECONDS);
+            	else
+            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+            		
+            	if (null != result)
+            		clusterStatus.put(result.getName(), result.getConfig());
+            		
+            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+                f.cancel(true);
+                timeoutReached =  true;
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
+            }
+        }
 		
 		return clusterStatus;
 	}
