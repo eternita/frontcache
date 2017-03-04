@@ -26,31 +26,41 @@ public class IncludeProcessorManager {
 	private static IncludeProcessor getIncludeProcessor()
 	{
 		String implStr = FCConfig.getProperty("front-cache.include-processor.impl");
-		try
+		IncludeProcessor includeProcessor = null;
+		if (null != implStr)
 		{
-
-			@SuppressWarnings("rawtypes")
-			Class clazz = Class.forName(implStr);
-			Object obj = clazz.newInstance();
-			if (null != obj && obj instanceof IncludeProcessor)
+			try
 			{
-				logger.info("IncludeProcessor implementation loaded: " + implStr);
-				IncludeProcessor cacheProcessor = (IncludeProcessor) obj;
 
-				cacheProcessor.init(FCConfig.getProperties());
-				logger.info("IncludeProcessor implementation initialized: " + implStr);
-				
-				return cacheProcessor;
+				@SuppressWarnings("rawtypes")
+				Class clazz = Class.forName(implStr);
+				Object obj = clazz.newInstance();
+				if (null != obj && obj instanceof IncludeProcessor)
+				{
+					logger.info("IncludeProcessor implementation loaded: " + implStr);
+					includeProcessor = (IncludeProcessor) obj;
+
+					includeProcessor.init(FCConfig.getProperties());
+					logger.info("IncludeProcessor implementation initialized: " + implStr);
+					
+					return includeProcessor;
+				}
+			} catch (Exception ex) {
+				logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + ConcurrentIncludeProcessor.class.getCanonicalName());
 			}
-		} catch (Exception ex) {
-			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + ConcurrentIncludeProcessor.class.getCanonicalName());
-			
-			// 
-			return new ConcurrentIncludeProcessor();
 		}
 		
+		logger.info("Default include implementation is loaded: " + ConcurrentIncludeProcessor.class.getCanonicalName());
+		includeProcessor = new ConcurrentIncludeProcessor();
+		try
+		{
+			// init with properties from config file
+			includeProcessor.init(FCConfig.getProperties());
+		} catch (Exception ex) {
+			logger.error("Cant initalize default include processor. ", ex);
+		}
 		
-		return null;
+		return includeProcessor;
 	}
 
 }
