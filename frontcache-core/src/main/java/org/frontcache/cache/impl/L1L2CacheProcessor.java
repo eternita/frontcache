@@ -67,7 +67,7 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		String ehCacheConfigFile = properties.getProperty(EHCACHE_CONFIG_FILE_KEY);
 		if (null == ehCacheConfigFile)
 		{
-			logger.info(EHCACHE_CONFIG_FILE_KEY + " is required for " + getClass().getName() + " but not defined in config. Default is used: " + DEFAULT_EHCACHE_CONFIG_FILE);
+			logger.info("L1 cache: default ehCache config is used: " + DEFAULT_EHCACHE_CONFIG_FILE);
 			ehCacheConfigFile = DEFAULT_EHCACHE_CONFIG_FILE;
 		}
 		

@@ -246,7 +246,7 @@ public class FrontCacheEngine {
 					return;
 				}
 				PoolStats poolStats = connectionManager.getTotalStats();
-				logger.info("HTTP connection manager pool stats - " + poolStats);
+				logger.debug("HTTP connection manager pool stats - " + poolStats);
 //				System.out.println("pool stats \n " + poolStats);
 			}
 		}, 1000, 60000);
