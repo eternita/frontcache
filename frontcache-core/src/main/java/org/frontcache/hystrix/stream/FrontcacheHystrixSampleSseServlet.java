@@ -104,7 +104,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 	}
 	
 	private static boolean isOwnerGroup(HystrixCommandMetrics commandMetrics, final String siteKey) {
-		logger.info("HystrixCommandMetrics {}", commandMetrics.getCommandGroup().name());
+		logger.debug("HystrixCommandMetrics {}", commandMetrics.getCommandGroup().name());
 
 		if (commandMetrics.getCommandGroup().name().equals(siteKey)) {
 			return true;

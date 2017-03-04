@@ -514,7 +514,6 @@ public class FCUtils {
 	 */
 	public static String buildRequestURI(String urlStr) {
 		
-		logger.info("IN URL " + urlStr);
 		String outStr = urlStr;
 		int idx = urlStr.indexOf("//");
 		if (-1 < idx)
@@ -558,7 +557,6 @@ public class FCUtils {
 			outStr = uri + queryParams;
 		} 
 		
-		logger.info("IN URL encoded " + outStr);
 		return outStr;
 	}
 	

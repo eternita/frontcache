@@ -33,7 +33,7 @@ import com.netflix.hystrix.exception.HystrixRuntimeException;
  */
 public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements IncludeProcessor {
 
-	private int threadAmount = 1; // default 1 thread
+	private int threadAmount = 10; // default 10 thread
 	private long timeout = 6*1000; // default 6 second
 	
     ExecutorService executor = null;
