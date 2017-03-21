@@ -40,12 +40,27 @@ buildscript {
 	}
   }
   
+plugins {
+    id "com.github.hierynomus.license" version "0.13.1"
+}
+
+license {
+    ignoreFailures true
+    strictCheck true
+    include '**/*.java'
+    mapping {
+        java = 'SLASHSTAR_STYLE'
+    }
+}
+
+//build.dependsOn licenseFormat
+
 subprojects {
     apply plugin: 'java'
 	apply plugin: 'maven'
 	apply plugin: 'jacoco'
 	apply plugin: 'com.github.kt3k.coveralls'
-	
+//	apply plugin: 'license'
     version = '1.2.0'
     group = 'org.frontcache'
 	
