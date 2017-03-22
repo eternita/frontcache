@@ -25,4 +25,4 @@ It's ready:
 
 
 
-more info: http://www.frontcache.org/get-started
+more info: http://www.frontcache.io/get-started
