@@ -65,7 +65,7 @@ public class FrontcacheService {
     
 	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_AMOUNT);
 	
-	private static final long FRONTCACHE_CLIENT_TIMEOUT = 5*1000; // 5 second
+	private static final long FRONTCACHE_CLIENT_TIMEOUT = FrontCacheClient.CONNECTION_TIMEOUT + 1000; // slightly more then frontcache client timeout
 	
 	
 	public FrontcacheService() {

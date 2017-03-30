@@ -16,6 +16,10 @@
  */
 package org.frontcache.console.web.controllers;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
@@ -36,12 +40,14 @@ public class EdgesController {
 
 	@RequestMapping(value = "/edges", method = RequestMethod.GET)
 	public String domainRealtimeMonitor(ModelMap model) {
-
-		
 		
 		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
-		model.put("edges", clusterStatus.values());
-
+		List<FrontCacheStatus> edges = new ArrayList<FrontCacheStatus>(clusterStatus.values());
+		Collections.sort(edges, new Comparator<FrontCacheStatus>(){
+		    public int compare(FrontCacheStatus t1, FrontCacheStatus t2) {
+	    		return t1.getName().compareTo(t2.getName());
+		    }});
+		model.put("edges", edges);
 
 		return "edges";
 	}
