@@ -1,6 +1,6 @@
 # Frontcache with Docker
-
-## Update frontcache settings in /FRONTCACHE_HOME/conf/frontcache.properties
+## Update settings
+Update settings in /frontcache-server/FRONTCACHE_HOME/conf/frontcache.properties
 
 ## Build docker image
 run ./build.sh
