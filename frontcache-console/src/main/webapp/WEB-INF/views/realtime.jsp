@@ -225,7 +225,7 @@
 
 	<hr>
 	<footer>
-		<p><a href="http://www.frontcache.org" target="_blank">www.frontcache.org</a></p>
+		<p><a href="http://www.frontcache.io" target="_blank">www.frontcache.io</a></p>
 	</footer>
 </div>
 
