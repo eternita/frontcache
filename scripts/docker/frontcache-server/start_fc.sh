@@ -19,5 +19,5 @@ if [ -n "$CONTAINER_ID" ]; then
 else
 
   echo "FC container does not exists.. Running container"
-  docker run --memory="1g"  -p 8080:8080  --name=frontcache-server frontcache/server
+  docker run --memory="1g"  -p 9080:9080   --name=frontcache-server frontcache/server
 fi
