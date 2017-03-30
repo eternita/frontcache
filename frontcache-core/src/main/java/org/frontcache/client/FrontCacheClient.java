@@ -75,12 +75,14 @@ public class FrontCacheClient {
 	private HttpClient client;
 	
 	private Logger logger = LoggerFactory.getLogger(FrontCacheClient.class);
+	
+	public static int CONNECTION_TIMEOUT = 5000;
 
 
 	private FrontCacheClient(String frontcacheURL) {
 		final RequestConfig requestConfig = RequestConfig.custom()
-				.setSocketTimeout(10000)
-				.setConnectTimeout(10000)
+				.setSocketTimeout(CONNECTION_TIMEOUT)
+				.setConnectTimeout(CONNECTION_TIMEOUT)
 				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
 				.build();
 		

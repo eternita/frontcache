@@ -56,7 +56,7 @@ public class FrontCacheStatusCaller implements Callable<FrontCacheStatus> {
 			} else {
 				available = false;
 			}
-		} catch (Exception ex) {
+		} catch (Throwable ex) {
 			available = false;
 			ex.printStackTrace();
 		}
