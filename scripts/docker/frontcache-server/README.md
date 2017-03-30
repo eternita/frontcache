@@ -9,7 +9,7 @@ run ./build.sh
 run ./start_fc.sh
 
 ## Open in Browser
-http://localhost:8080/en/welcome.htm
+http://localhost:9080/en/welcome.htm
  
 
 
