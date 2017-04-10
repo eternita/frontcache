@@ -12,7 +12,7 @@
 
     <filter-mapping>
         <filter-name>FrontCacheFilter</filter-name>
-        <url-pattern>*</url-pattern>
+        <url-pattern>/example/*</url-pattern>
     </filter-mapping>
   
  		
