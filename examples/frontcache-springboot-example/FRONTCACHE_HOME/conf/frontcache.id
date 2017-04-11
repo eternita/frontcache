@@ -1,0 +1,4 @@
+#Value in 'front-cache.id' is stored in "X-FrontCache-id" HTTP response header
+#The is used to determine which front cache processed request (e.g. forwarded by GEO Load Balancer e.g. route53 AWS)
+# default value is "auto-gen-..." 
+front-cache.id=frontcache-localhost-1
