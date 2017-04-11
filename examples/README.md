@@ -10,6 +10,16 @@ Example project path: ./examples/frontcache-jsp
 
 point browser to http://localhost:8080/example/index.jsp
 
+### Check logs to HTTP header for the first and second requests ###
+
+**For the first request all includes are dynamic (from origin)**
+
+![Alt](https://raw.githubusercontent.com/eternita/frontcache/master/examples/images/frontcache-jsp/headers-1-request.png "first request")
+
+**For the second request 'User Profile' section is dynamic and all other includes are from cache**
+
+![Alt](https://raw.githubusercontent.com/eternita/frontcache/master/examples/images/frontcache-jsp/headers-2-request.png "second request")
+
 ### Development steps ###
 
 **Create regular JSP-based web application project**
