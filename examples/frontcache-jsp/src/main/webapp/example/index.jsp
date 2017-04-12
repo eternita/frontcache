@@ -11,8 +11,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon"/> 
   <link rel="stylesheet" href="/bootstrap/css/bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
-  <script src="/bootstrap/js/bootstrap.min.js"></script>
   <style type="text/css">
 	       .demo-header {height: 120px; background-color:lavender;}
 	       .demo-content {height: 250px; background-color:lavenderblush; padding-top: 100px; padding-left: 200px; }
