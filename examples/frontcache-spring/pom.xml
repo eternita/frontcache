@@ -3,10 +3,10 @@
 	<modelVersion>4.0.0</modelVersion>
     <groupId>org.neuro4j.workflow.tutorial</groupId>
     <version>1.1-SNAPSHOT</version>
-	<artifactId>frontcache-springboot-example</artifactId>
+	<artifactId>frontcache-spring</artifactId>
 	<packaging>war</packaging>
-	<name>frontcache-springboot-example</name>
-	<description>frontcache-springboot-example</description>
+	<name>frontcache-spring</name>
+	<description>frontcache-spring</description>
 	<parent>
          <groupId>org.springframework.boot</groupId>
          <artifactId>spring-boot-starter-parent</artifactId>
