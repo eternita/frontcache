@@ -198,6 +198,12 @@ project(':frontcache-server') {
 	dependencies {
 		compile project(':frontcache-core')
 	}
+	task copyWar(type: Copy, overwrite: true) {
+		  from 'build/libs'
+		  into 'server/frontcache-base/webapps'
+		  rename '(.*).war', 'ROOT.war'
+	}
+	build.finalizedBy(copyWar)
 }
 
 
@@ -235,6 +241,13 @@ project(':frontcache-console') {
 		testCompile 'org.mockito:mockito-all:2.0.2-beta'
         provided 'javax.servlet:javax.servlet-api:3.1.0'
 	}
+	task copyWar(type: Copy, overwrite: true) {
+			from 'build/libs'
+			into '../frontcache-server/server/frontcache-base/webapps'
+			rename '(.*).war', 'frontcache-console.war'
+	}
+
+	build.finalizedBy(copyWar)
 }
 
 
