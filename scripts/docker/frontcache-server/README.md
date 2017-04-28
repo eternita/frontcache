@@ -1,4 +1,8 @@
 # Frontcache with Docker
+## Build Frontcache
+got to `frontcache`
+run `./gradlew build`
+
 ## Update settings
 Update settings in /frontcache-server/FRONTCACHE_HOME/conf/frontcache.properties
 
