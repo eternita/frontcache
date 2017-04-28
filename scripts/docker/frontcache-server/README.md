@@ -7,9 +7,11 @@ run `./gradlew build`
 Update settings in /frontcache-server/FRONTCACHE_HOME/conf/frontcache.properties
 
 ## Build docker image
+in `frontcache/scripts/docker/frontcache-server/`
 run ./build.sh
 
 ## Start Docker container
+in `frontcache/scripts/docker/frontcache-server/`
 run ./start_fc.sh
 
 ## Open in Browser
