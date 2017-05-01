@@ -1,6 +1,7 @@
 # Frontcache with PHP
 ## Update settings
 Update settings in /frontcache-server/FRONTCACHE_HOME/conf/frontcache.properties
+
     front-cache.http-port=9080
     front-cache.https-port=9443
 
