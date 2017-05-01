@@ -11,7 +11,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   if [ $counter -gt $start_line ]
   then
     echo "crawling $line"
-    curl -H "Accept: text/html" -H "Accept-Encoding: gzip, deflate" -H "user-agent: Googlebot" -o output.log $line
+    curl -H "Accept: text/html" -H "Accept-Encoding: gzip, deflate" -H "User-Agent: Googlebot" -o output.log $line
   fi 
   
 done < "$1"
