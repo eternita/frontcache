@@ -1,3 +1,5 @@
+![Alt](images/frontcache-logo.png "Frontcache Logo")
+
 [![Build Status](https://secure.travis-ci.org/eternita/frontcache.png?branch=master)](https://travis-ci.org/eternita/frontcache)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.frontcache/frontcache/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.frontcache/frontcache)
 
