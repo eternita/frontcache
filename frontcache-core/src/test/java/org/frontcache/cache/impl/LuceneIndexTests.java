@@ -266,6 +266,42 @@ public class LuceneIndexTests {
 		return;
 	}
 
+	@Test
+	public void readWriteToClosedWriter() throws Exception {
+
+		String baseDir = "/tmp/lucene-text-index-l2-" + System.currentTimeMillis();
+		LuceneIndexManager luceneIndexManager1 = new LuceneIndexManager(baseDir); 
+
+
+		String url = UUID.randomUUID().toString();
+		luceneIndexManager1.delete(DOMAIN, url);
+
+		WebResponse response = new WebResponse(url, null);
+		response.setDomain(DOMAIN);
+		List<String> list = new ArrayList<>();
+		list.add(UUID.randomUUID().toString());
+		response.getHeaders().put("Accept", list);
+		Set<String> set = new HashSet<>();
+		set.add("banana");
+		response.setTags(set);
+		response.setStatusCode(55);
+		
+		luceneIndexManager1.indexDoc(response);
+		WebResponse fromFile = luceneIndexManager1.getResponse(url);
+		assertNotNull(fromFile);
+		assertEquals(url, fromFile.getUrl());
+
+		luceneIndexManager1.close();
+		
+
+		fromFile = luceneIndexManager1.getResponse(url);
+		
+		assertNotNull(fromFile);
+		assertEquals(url, fromFile.getUrl());
+		
+		return;
+	}
+
 	
 	@Before
 	public void setUp() {
