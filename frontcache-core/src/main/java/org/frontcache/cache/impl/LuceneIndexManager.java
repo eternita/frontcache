@@ -148,17 +148,20 @@ public class LuceneIndexManager {
 	 * @throws IOException
 	 */
 	private IndexWriter getIndexWriter() throws IOException {
-		if (indexWriter == null) {
-			synchronized (IndexWriter.class) {
-                logger.info("Trying to get indexWriter...");
-				Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
-				Analyzer analyzer = new StandardAnalyzer();
-				IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
-
-				iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
-				iwc.setRAMBufferSizeMB(250.0);
-				indexWriter = new IndexWriter(dir, iwc);
-				logger.info("IndexWriter initialized");
+		if (indexWriter == null || !indexWriter.isOpen()) {
+			synchronized (this) {
+				if (indexWriter == null || !indexWriter.isOpen()) {
+					indexWriter = null;
+	                logger.info("Trying to get indexWriter...");
+					Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
+					Analyzer analyzer = new StandardAnalyzer();
+					IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
+	
+					iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+					iwc.setRAMBufferSizeMB(250.0);
+					indexWriter = new IndexWriter(dir, iwc);
+					logger.info("IndexWriter initialized");
+				}
 			}
 		}
 
