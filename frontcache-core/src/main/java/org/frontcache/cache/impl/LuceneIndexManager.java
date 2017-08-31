@@ -152,7 +152,7 @@ public class LuceneIndexManager {
 			synchronized (this) {
 				if (indexWriter == null || !indexWriter.isOpen()) {
 					indexWriter = null;
-                    logger.info("Trying to get indexWriter...");
+					logger.info("Trying to get indexWriter...");
 					Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
 					Analyzer analyzer = new StandardAnalyzer();
 					IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
