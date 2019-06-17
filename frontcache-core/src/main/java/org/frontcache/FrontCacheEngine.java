@@ -22,6 +22,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +38,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -45,7 +58,13 @@ import org.apache.http.client.RedirectStrategy;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClients;
@@ -54,6 +73,7 @@ import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.pool.PoolStats;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
+import org.apache.http.ssl.TrustStrategy;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.DomainContext;
@@ -73,7 +93,7 @@ import org.slf4j.LoggerFactory;
 
 public class FrontCacheEngine {
 
-
+    
 	private Map<String, DomainContext> domainConfigMap = new ConcurrentHashMap<String, DomainContext>(); // <DomainStr, DomainConfig>
 	
 	private String frontcacheHttpPort = null;
@@ -370,51 +390,56 @@ public class FrontCacheEngine {
 	            return 10 * 1000;
 	        }
 	    };
-	    
-		return HttpClients.custom()
-				.setConnectionManager(newConnectionManager())
-				.setDefaultRequestConfig(requestConfig)
-//				.setSSLHostnameVerifier(new NoopHostnameVerifier()) // for SSL do not verify certificate's host 
-				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
-				.setKeepAliveStrategy(keepAliveStrategy)
-				.setRedirectStrategy(new RedirectStrategy() {
-					@Override
-					public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
-						return false;
-					}
 
-					@Override
-					public HttpUriRequest getRedirect(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
-						return null;
-					}
-				})
-				.build();
+                
+        return HttpClients.custom()
+                .setConnectionManager(newConnectionManager())
+                .setDefaultRequestConfig(requestConfig)
+                .setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
+                .setKeepAliveStrategy(keepAliveStrategy)
+                .setRedirectStrategy(new RedirectStrategy() {
+                    @Override
+                    public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
+                        return false;
+                    }
+
+                    @Override
+                    public HttpUriRequest getRedirect(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
+                        return null;
+                    }
+                })
+                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                .build();
 	}
 
 	private PoolingHttpClientConnectionManager newConnectionManager() {
-		try {
-//		        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-//		        trustStore.load(new FileInputStream(keyStorePath), keyStorePassword.toCharArray());
+	    
+	    if (connectionManager == null){
+	        
+	        try {
+	            
+	            TrustStrategy acceptingTrustStrategy = (X509Certificate[] chain, String authType) -> true;
+	            
+	            SSLContext sslContext = org.apache.http.ssl.SSLContexts.custom().loadTrustMaterial(null, acceptingTrustStrategy).build();
 
-//		        MySSLSocketFactory sf = new MySSLSocketFactory(trustStore);
-//		        sf.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
-				
+	            SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext);
 
-//			final Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
-//					.register("http", PlainConnectionSocketFactory.INSTANCE)
-//					.register("https", sf)
-//					.build();
+	            final Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
+	                    .register("http", PlainConnectionSocketFactory.INSTANCE)
+	                    .register("https", csf)
+	                    .build();
 
-//			connectionManager = new PoolingHttpClientConnectionManager(registry);
-			connectionManager = new PoolingHttpClientConnectionManager();
-			
-			connectionManager.setMaxTotal(fcConnectionsMaxTotal);
-			connectionManager.setDefaultMaxPerRoute(fcConnectionsMaxPerRoute);
-			
-			return connectionManager;
-		} catch (Exception ex) {
-			throw new RuntimeException(ex);
-		}
+	            connectionManager = new PoolingHttpClientConnectionManager(registry);
+	            
+	            connectionManager.setMaxTotal(fcConnectionsMaxTotal);
+	            connectionManager.setDefaultMaxPerRoute(fcConnectionsMaxPerRoute);
+	            
+	        } catch (Exception ex) {
+	            throw new RuntimeException(ex);
+	        }     
+	    }
+		
+        return connectionManager;
 	}
 	
 	/**
