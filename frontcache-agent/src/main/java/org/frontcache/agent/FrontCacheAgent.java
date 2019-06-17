@@ -19,8 +19,11 @@ package org.frontcache.agent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.net.ssl.SSLContext;
 
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
@@ -36,15 +39,20 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
+import org.apache.http.ssl.TrustStrategy;
+
 
 public class FrontCacheAgent {
 
+    
 	private String frontCacheURL;
 	
 	private String frontCacheURI;
@@ -82,6 +90,20 @@ public class FrontCacheAgent {
 	        }
 	    };
 	    
+	    
+        TrustStrategy acceptingTrustStrategy = (X509Certificate[] chain, String authType) -> true;
+
+        SSLContext sslContext = null;
+        try {
+            sslContext = org.apache.http.ssl.SSLContexts.custom()
+                            .loadTrustMaterial(null, acceptingTrustStrategy)
+                            .build();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext);
+	    
 	    client = HttpClients.custom()
 				.setDefaultRequestConfig(requestConfig)
 				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
@@ -97,6 +119,8 @@ public class FrontCacheAgent {
 						return null;
 					}
 				})
+                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                .setSSLSocketFactory(csf)
 				.build();
 		
 		this.frontCacheURL = frontcacheURL;
