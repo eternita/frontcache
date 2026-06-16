@@ -13,7 +13,7 @@
 		<jmh.version>1.11.2</jmh.version>
 		<uberjar.name>benchmarks</uberjar.name>
 		<pebble.version>2.2.0</pebble.version>
-		<junit.version>4.12</junit.version>
+		<junit.version>4.13.1</junit.version>
 		<trimou.version>1.8.2.Final</trimou.version>
 		<rocker.version>0.10.3</rocker.version>
 		<frontcache.version>1.1.4</frontcache.version>
