@@ -1,22 +1,24 @@
-
-import org.akhikhl.gretty.AppBeforeIntegrationTestTask
+plugins {
+	id 'com.github.hierynomus.license' version '0.16.1'
+	id 'org.gretty' version '3.1.0' apply false // gretty 3.1.x still supports Jetty 9.4 (servlet 3.1.0 / javax); 4.x is Jakarta-only
+}
 
 class ExecWait extends DefaultTask {
-	String command
-	String ready
-	String directory
- 
+	@Internal String command
+	@Internal String ready
+	@Internal String directory
+
 	@TaskAction
 	def spawnProcess() {
- 
+
 		ProcessBuilder builder = new ProcessBuilder(command.split(' '))
 		builder.redirectErrorStream(true)
 		builder.directory(new File(directory))
 		Process process = builder.start()
- 
+
 		InputStream stdout = process.getInputStream()
 		BufferedReader reader = new BufferedReader(new InputStreamReader(stdout))
- 
+
 		def line
 		while ((line = reader.readLine()) != null) {
 			println line
@@ -25,23 +27,17 @@ class ExecWait extends DefaultTask {
 				break;
 			}
 		}
-	}
-}
 
-
-buildscript {
-	repositories {
-	  jcenter()
+		// Keep draining the spawned process' output in a background daemon thread.
+		// Otherwise its stdout pipe buffer fills up and the (long-running) server
+		// process blocks on its next log write, hanging it mid-test.
+		Thread.startDaemon {
+			def l
+			while ((l = reader.readLine()) != null) {
+				println l
+			}
+		}
 	}
-  
-	dependencies {
-	  classpath 'org.akhikhl.gretty:gretty:+' // use gretty to run Jetty9 (servlet 3.1.0 container)
-	  classpath 'org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.5.0'
-	}
-  }
-  
-plugins {
-    id "com.github.hierynomus.license" version "0.13.1"
 }
 
 license {
@@ -56,53 +52,48 @@ license {
 //build.dependsOn licenseFormat
 
 subprojects {
-    apply plugin: 'java'
-	apply plugin: 'maven'
+	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
 	apply plugin: 'jacoco'
-	apply plugin: 'com.github.kt3k.coveralls'
-//	apply plugin: 'license'
     version = '1.2.2'
     group = 'org.frontcache'
-	
-//	upload binaries to Maven repository.  $mavenLocalRepo (defined in gradle.properties)
-//  mavenLocalRepo = file:///Users/spa/.m2/repository
-//
-//	uploadArchives {
-//		repositories {
-//			mavenDeployer {
-//				repository(url: mavenLocalRepo)
-//			}
-//		}
-//	}
-	
-	configurations {
-		provided
-	}
-	 
-	sourceSets {
-		main {
-			compileClasspath += configurations.provided
-			test.compileClasspath += configurations.provided
-			test.runtimeClasspath += configurations.provided
+
+	// Build/test with Java 11 via a toolchain, so the JDK launching Gradle
+	// (e.g. 17) is decoupled from the project's target. Gradle auto-detects
+	// the installed JDK 11 (Zulu 11) for compilation and test execution.
+	java {
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(11)
 		}
 	}
 
-	jacoco.toolVersion = '0.7.7.201606060606'
-		
+	// 'provided' deps (e.g. servlet-api) are on compile & test classpaths but
+	// NOT on runtimeClasspath, so they are excluded from the assembled WAR.
+	configurations {
+		provided
+	}
+
+	sourceSets {
+		main.compileClasspath += configurations.provided
+		test.compileClasspath += configurations.provided
+		test.runtimeClasspath += configurations.provided
+	}
+
+	jacoco.toolVersion = '0.8.11'
+
     dependencies {
-		testCompile 'junit:junit:4.12'
+		testImplementation 'junit:junit:4.12'
     }
-	
+
     repositories {
         mavenLocal()
         mavenCentral()
     }
-    
+
     jacocoTestReport {
         reports {
-            html.enabled = true
-            xml.enabled = true
-            csv.enabled = false
+            html.required = true
+            xml.required = true
+            csv.required = false
         }
     }
 	tasks.withType(Test) {
@@ -111,63 +102,53 @@ subprojects {
 			exceptionFormat 'full'
 		}
 	}
-	
+
 	test {
-		reports.html.destination = file("$reports.html.destination/unit")
-		reports.junitXml.destination = file("$reports.junitXml.destination/unit")
-		
+		reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/unit')
+		reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/unit')
+
+		jvmArgs '--add-opens=java.base/java.nio=ALL-UNNAMED' // Lucene 6.2.0 MMapDirectory unmap hack on Java 9+
+
 		if (System.getProperty('DEBUG', 'false') == 'true') {
 			jvmArgs '-Xdebug',
 				'-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8001'
 		}
-        jacoco {
-            append = true
-            destinationFile = file("$buildDir/jacoco/test.exec")
-            classDumpFile = file("$buildDir/classes/test")
-        }
 	}
-	
+
 	check.dependsOn jacocoTestReport
 }
 
 
-task wrapper(type: Wrapper) {
-    gradleVersion = '3.2'
-}
-
-
-
 project(':frontcache-core') {
-	
+
     dependencies {
         provided        'javax.servlet:javax.servlet-api:3.1.0'
 		provided        'javax.servlet.jsp:jsp-api:2.0'
-		
-		compile 		'com.fasterxml.jackson.core:jackson-databind:2.8.11.1'
-		compile         'com.fasterxml.jackson.core:jackson-annotations:2.7.5'		
-        compile         'org.apache.httpcomponents:httpclient:4.5.1'
-        compile         'commons-io:commons-io:2.4'
-        compile         'ch.qos.logback:logback-classic:1.1.3'
-		compile         'com.netflix.hystrix:hystrix-core:1.5.9'
-		compile         'com.netflix.hystrix:hystrix-metrics-event-stream:1.5.9'
-        compile         'net.sf.ehcache:ehcache:2.10.0'
-        compile         'com.google.code.gson:gson:2.5'
-        compile         'org.apache.lucene:lucene-core:6.2.0'
-        compile         'org.apache.lucene:lucene-queryparser:6.2.0'
-        compile         'com.typesafe:config:1.3.0'
-		
-        testCompile     'junit:junit:4.12'
-        testCompile     'com.squareup.okhttp:okhttp:2.5.0'
-        testCompile     'org.mockito:mockito-all:2.0.2-beta'
+
+		api 			'com.fasterxml.jackson.core:jackson-databind:2.8.11.1'
+		api         	'com.fasterxml.jackson.core:jackson-annotations:2.7.5'
+        api         	'org.apache.httpcomponents:httpclient:4.5.1'
+        api         	'commons-io:commons-io:2.4'
+        api         	'ch.qos.logback:logback-classic:1.1.3'
+		api         	'com.netflix.hystrix:hystrix-core:1.5.9'
+		api         	'com.netflix.hystrix:hystrix-metrics-event-stream:1.5.9'
+		api         	'com.netflix.hystrix:hystrix-serialization:1.5.9' // provides com.netflix.hystrix.serial.SerialHystrixDashboardData (not pulled transitively)
+        api         	'net.sf.ehcache:ehcache:2.10.0'
+        api         	'com.google.code.gson:gson:2.5'
+        api         	'org.apache.lucene:lucene-core:6.2.0'
+        api         	'org.apache.lucene:lucene-queryparser:6.2.0'
+        api         	'com.typesafe:config:1.3.0'
+
+        testImplementation     'junit:junit:4.12'
+        testImplementation     'com.squareup.okhttp:okhttp:2.5.0'
+        testImplementation     'org.mockito:mockito-core:4.11.0'
     }
-	
-//	build.dependsOn uploadArchives	
 }
 
 
 project(':frontcache-agent') {
 	dependencies {
-        compile         'org.apache.httpcomponents:httpclient:4.5.1'
+        api         'org.apache.httpcomponents:httpclient:4.5.1'
 	}
 }
 
@@ -175,18 +156,17 @@ project(':frontcache-agent') {
 
 project(':frontcache-server') {
 	apply plugin: 'war'
-	apply plugin: 'org.akhikhl.gretty'
-	
+	apply plugin: 'org.gretty'
+
 	// gretty for Frontcache (standalone)
 	gretty {
 		httpPort = 9080
 		httpsPort = 9443
 		httpsEnabled = true
-		servicePort = 9081
-		statusPort = 9082
 		contextPath = '/'
-		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
-		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dorg.frontcache.console.config=' + projectDir +'/FRONTCACHE_HOME/conf/frontcache-console.conf', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
+		servletContainer = 'jetty9.4' // jetty9.4 or jetty11 or tomcat9
+		// --add-opens lets Lucene 6.2.0 MMapDirectory's unmap hack reflect into java.nio on Java 9+
+		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dorg.frontcache.console.config=' + projectDir +'/FRONTCACHE_HOME/conf/frontcache-console.conf', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
 //		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
 	}
 
@@ -194,11 +174,11 @@ project(':frontcache-server') {
 		webapp ':frontcache-server'
 		webapp ':frontcache-console'
 	  }
-	
+
 	dependencies {
-		compile project(':frontcache-core')
+		implementation project(':frontcache-core')
 	}
-	task copyWar(type: Copy, overwrite: true) {
+	task copyWar(type: Copy) {
 		  from 'build/libs'
 		  into 'server/frontcache-base/webapps'
 		  rename '(.*).war', 'ROOT.war'
@@ -209,19 +189,17 @@ project(':frontcache-server') {
 
 project(':frontcache-console') {
 	apply plugin: 'war'
-	apply plugin: 'org.akhikhl.gretty'
-		
+	apply plugin: 'org.gretty'
+
 	ext {
 		springVersion = '4.2.6.RELEASE'
 	}
-	
+
 	gretty {
 		httpPort = 7080
 		httpsPort = 7443
 		httpsEnabled = true
-		servicePort = 7081
-		statusPort = 7082
-		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.conf']
+		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.conf']
 //		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.conf', '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002']
 	}
 
@@ -229,19 +207,19 @@ project(':frontcache-console') {
 		webapp ':frontcache-console'
 
 	  }
-	
-	dependencies {
-		compile project(':frontcache-core')
-		compile "org.springframework:spring-context:${springVersion}"
-		compile "org.springframework:spring-webmvc:${springVersion}"
-		compile 'jstl:jstl:1.2'
-		compile 'com.typesafe:config:1.3.0'
 
-		testCompile "org.springframework:spring-test:${springVersion}"
-		testCompile 'org.mockito:mockito-all:2.0.2-beta'
+	dependencies {
+		implementation project(':frontcache-core')
+		implementation "org.springframework:spring-context:${springVersion}"
+		implementation "org.springframework:spring-webmvc:${springVersion}"
+		implementation 'jstl:jstl:1.2'
+		implementation 'com.typesafe:config:1.3.0'
+
+		testImplementation "org.springframework:spring-test:${springVersion}"
+		testImplementation 'org.mockito:mockito-core:4.11.0'
         provided 'javax.servlet:javax.servlet-api:3.1.0'
 	}
-	task copyWar(type: Copy, overwrite: true) {
+	task copyWar(type: Copy) {
 			from 'build/libs'
 			into '../frontcache-server/server/frontcache-base/webapps'
 			rename '(.*).war', 'frontcache-console.war'
@@ -255,31 +233,30 @@ project(':frontcache-console') {
 // tests -> FC standalone (localhost:9080) -> FC webfilter (localhost:8080) -> web app (localhost:8080)
 // FC standalone is run in standalone Jetty in org.frontcache.tests.FrontcacheStandaloneServer
 // FC webfilter is run in Gretty
-// test & FC webfilter & web app   are share the same JVM process 
+// test & FC webfilter & web app   are share the same JVM process
 project(':frontcache-tests') {
 	apply plugin: 'war'
-	apply plugin: 'org.akhikhl.gretty'
+	apply plugin: 'org.gretty'
 
-		
+
 	// gretty for FC filter and web app
 	gretty {
 		httpPort = 8080
 		httpsPort = 8443
 		httpsEnabled = true
-		servicePort = 8081
-		statusPort = 8082
   		contextPath = '/'
-		servletContainer = 'jetty9' // jetty9 or tomcat7 or tomcat8
+		servletContainer = 'jetty9.4' // jetty9.4 or jetty11 or tomcat9
 		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
-		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
+		// --add-opens lets Lucene 6.2.0 MMapDirectory's unmap hack reflect into java.nio on Java 9+
+		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
 //		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
 	}
-	
+
 	sourceSets {
 		integrationTest {
 			java.srcDir file('src/test-integration/java')
 			resources.srcDir file('src/test-integration/resources')
-			compileClasspath = sourceSets.main.output + configurations.testRuntime
+			compileClasspath = sourceSets.main.output + configurations.testRuntimeClasspath + configurations.provided
 			runtimeClasspath = output + compileClasspath
 		}
 	}
@@ -289,13 +266,13 @@ project(':frontcache-tests') {
 		group = 'verification'
 		maxParallelForks = 1 // run all tests sequentially (due to cache cleanup befor every test)
 		forkEvery = 1 // run all tests sequentially (due to cache cleanup befor every test)
-		testClassesDir = sourceSets.integrationTest.output.classesDir
+		testClassesDirs = sourceSets.integrationTest.output.classesDirs
 		classpath = sourceSets.integrationTest.runtimeClasspath
-		reports.html.destination = file("$reports.html.destination/integration")
-		reports.junitXml.destination = file("$reports.junitXml.destination/integration")
-		
+		reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/integration')
+		reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/integration')
+
 		//		jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
-		jvmArgs '-Dfrontcache-tests.home=' + projectDir
+		jvmArgs '-Dfrontcache-tests.home=' + projectDir, '--add-opens=java.base/java.nio=ALL-UNNAMED'
 		//		'-Dlogback.configurationFile=' !! logs (because of same process) here: projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml'
 
 	}
@@ -307,39 +284,39 @@ project(':frontcache-tests') {
 
 	// for FC standalone
 	task standaloneFrontcacheJetty(type: JavaExec) {
-		main = 'org.frontcache.tests.FrontcacheStandaloneServer'
+		mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
 		classpath = sourceSets.main.runtimeClasspath
+		jvmArgs '--add-opens=java.base/java.nio=ALL-UNNAMED' // Lucene 6.2.0 MMapDirectory unmap hack on Java 9+
 		systemProperty 'frontcache.standalone.frontcache.web.dir', '' + projectDir + '/src/test-integration/webapp'
 		systemProperty 'frontcache.standalone.frontcache.port', '9080'
 		systemProperty 'frontcache.home', '' + projectDir + '/FRONTCACHE_HOME_STANDALONE'
 		systemProperty 'logback.configurationFile', '' + projectDir + '/FRONTCACHE_HOME_STANDALONE/conf/fc-logback.xml'
 	}
-	
+
 	task startStandaloneFrontcache(type: ExecWait) {
 		command './gradlew clean :frontcache-tests:standaloneFrontcacheJetty'
 		ready 'Frontcache Standalone Server has been started successfully ...'
 		directory '.'
 	}
-		
+
 //	task stopStandaloneFrontcacheByPort(type: Exec) {
 //		commandLine 'bash', '-c', "ps -e | grep standaloneFrontcacheJetty | cut -d' ' -f2 | xargs kill -9"
 //	}
-	
+
 	task end2endTests {
 		dependsOn integrationTest
 	}
-	
-	dependencies {
-		compile project(':frontcache-core')
-		compile project(':frontcache-agent')		
-		
-		compile 'net.sourceforge.htmlunit:htmlunit:2.18'
-		compile 'org.eclipse.jetty:jetty-server:9.3.6.v20151106'
-		compile 'org.eclipse.jetty:jetty-webapp:9.3.6.v20151106'
-		compile 'jstl:jstl:1.2'
-		
-		provided 'junit:junit:4.12' 		
-	}
-		
-}
 
+	dependencies {
+		implementation project(':frontcache-core')
+		implementation project(':frontcache-agent')
+
+		implementation 'net.sourceforge.htmlunit:htmlunit:2.18'
+		implementation 'org.eclipse.jetty:jetty-server:9.3.6.v20151106'
+		implementation 'org.eclipse.jetty:jetty-webapp:9.3.6.v20151106'
+		implementation 'jstl:jstl:1.2'
+
+		provided 'junit:junit:4.12'
+	}
+
+}
