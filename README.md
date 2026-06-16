@@ -1,11 +1,11 @@
-![Alt](images/frontcache-logo.png "Frontcache Logo")
-
-[![Build Status](https://secure.travis-ci.org/eternita/frontcache.png?branch=master)](https://travis-ci.org/eternita/frontcache)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.frontcache/frontcache/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.frontcache/frontcache)
-
 ## Frontcache - utility to increase Web App performance.
 
 ### [it's page fragment cache + remote includes + concurrent execution]
+
+- Licensing: https://www.eternita.co/frontcache-license.html
+
+Frontcache is a [source available](https://en.wikipedia.org/wiki/Source-available_software) product. Please refer to [www.eternita.co](https://www.eternita.co/frontcache-license.html) for details on licensing.
+
 
 #### Features
 
