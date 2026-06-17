@@ -26,11 +26,11 @@ public class TestUtils {
 	public static boolean isRequestFromCache(String headerLogStr)
 	{
 		boolean cached = false;
-		
+
 		if (-1 < headerLogStr.indexOf("from-cache"))
 			cached = true;
-		
+
 		return cached;
 	}
-	
+
 }

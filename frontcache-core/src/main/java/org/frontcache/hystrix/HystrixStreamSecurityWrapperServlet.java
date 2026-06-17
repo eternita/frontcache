@@ -34,7 +34,7 @@ public class HystrixStreamSecurityWrapperServlet extends FrontcacheHystrixMetric
 	private int managementPort = -1; // management port for security
 
 	private Logger logger = LoggerFactory.getLogger(getClass());
-	
+
 	public HystrixStreamSecurityWrapperServlet() {
 		super();
 	}
@@ -42,7 +42,7 @@ public class HystrixStreamSecurityWrapperServlet extends FrontcacheHystrixMetric
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
-		
+
 		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
 		if (null == managementPortStr || managementPortStr.trim().length() == 0)
 			logger.warn("Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
@@ -55,10 +55,10 @@ public class HystrixStreamSecurityWrapperServlet extends FrontcacheHystrixMetric
 				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
 			}
 		}
-		
+
 		return;
 	}
-	
+
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
@@ -73,5 +73,5 @@ public class HystrixStreamSecurityWrapperServlet extends FrontcacheHystrixMetric
 
 		super.doGet(request, response);
 	}
-	
+
 }

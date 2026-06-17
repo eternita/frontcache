@@ -63,19 +63,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class FrontCacheClient {
 
 	private String frontCacheURL;
-	
+
 	private String frontCacheURI;
-	
+
 	private String siteKey = "";
-	
+
 	private final static String IO_URI = "frontcache-io";
-	
+
 	private ObjectMapper jsonMapper = new ObjectMapper();
-	
+
 	private HttpClient client;
-	
+
 	private Logger logger = LoggerFactory.getLogger(FrontCacheClient.class);
-	
+
 	public static int CONNECTION_TIMEOUT = 5000;
 
 
@@ -85,7 +85,7 @@ public class FrontCacheClient {
 				.setConnectTimeout(CONNECTION_TIMEOUT)
 				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
 				.build();
-		
+
 	    ConnectionKeepAliveStrategy keepAliveStrategy = new ConnectionKeepAliveStrategy() {
 	        @Override
 	        public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
@@ -103,7 +103,7 @@ public class FrontCacheClient {
 	            return 10 * 1000;
 	        }
 	    };
-	    
+
 	    client = HttpClients.custom()
 				.setDefaultRequestConfig(requestConfig)
 				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
@@ -120,9 +120,9 @@ public class FrontCacheClient {
 					}
 				})
 				.build();
-		
+
 		this.frontCacheURL = frontcacheURL;
-		
+
 		if (frontcacheURL.endsWith("/"))
 			this.frontCacheURI = frontcacheURL + IO_URI;
 		else
@@ -130,17 +130,17 @@ public class FrontCacheClient {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param frontcacheURL
 	 * @param siteKey
 	 */
-	public FrontCacheClient(String frontcacheURL, String siteKey) {	
+	public FrontCacheClient(String frontcacheURL, String siteKey) {
 		this(frontcacheURL);
 		this.siteKey = siteKey;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param filter
 	 * @return
 	 */
@@ -149,17 +149,17 @@ public class FrontCacheClient {
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.INVALIDATE));
 		urlParameters.add(new BasicNameValuePair("filter", filter));
-		
+
 		try {
 			return requestFrontCache(urlParameters);
 		} catch (Exception e) {
 			e.printStackTrace();
-			return "ERROR " + e.getMessage(); 
+			return "ERROR " + e.getMessage();
 		}
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public String removeFromCacheAll()
@@ -167,28 +167,28 @@ public class FrontCacheClient {
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.INVALIDATE));
 		urlParameters.add(new BasicNameValuePair("filter", "*"));
-		
+
 		try {
 			return requestFrontCache(urlParameters);
 		} catch (Exception e) {
 			e.printStackTrace();
-			return "ERROR " + e.getMessage(); 
+			return "ERROR " + e.getMessage();
 		}
 	}
-	
+
 	public Map<String, String> getCacheState()
 	{
 		CacheStatusActionResponse actionResponse = getCacheStateActionResponse();
-		
+
 		if (null == actionResponse)
 			return null;
-		
+
 		return actionResponse.getCacheStatus();
-		
+
 	}
 
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public CacheStatusActionResponse getCacheStateActionResponse()
@@ -200,17 +200,17 @@ public class FrontCacheClient {
 			responseStr = requestFrontCache(urlParameters);
 			CacheStatusActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), CacheStatusActionResponse.class);
 			return actionResponse;
-			
+
 		} catch (Exception e) {
 			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
 		}
-		
+
 		return null;
 	}
-	
+
 	/**
 	 * Writes keys to provided output stream
-	 * 
+	 *
 	 * @param os
 	 * @return
 	 */
@@ -219,7 +219,7 @@ public class FrontCacheClient {
 		boolean success = true;
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_CACHED_KEYS));
-		
+
 		HttpPost post = new HttpPost(frontCacheURI);
 
 //    	post.addHeader("Accept-Encoding", "gzip");
@@ -231,7 +231,7 @@ public class FrontCacheClient {
 			is = response.getEntity().getContent();
 	        int bytesRead = 0;
 	        int bufferSize = 4000;
-	         byte[] byteBuffer = new byte[bufferSize];              
+	         byte[] byteBuffer = new byte[bufferSize];
 	         while ((bytesRead = is.read(byteBuffer)) != -1) {
 	             os.write(byteBuffer, 0, bytesRead);
 	         }
@@ -246,108 +246,108 @@ public class FrontCacheClient {
 				e.printStackTrace();
 			}
 		}
-		
+
 		return success;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public GetFallbackConfigActionResponse getFallbackConfigsActionResponse()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_FALLBACK_CONFIGS));
-		
+
 		try {
 			String responseStr = requestFrontCache(urlParameters);
 			GetFallbackConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFallbackConfigActionResponse.class);
 			return actionResponse;
-			
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
-	
+
 	public Map <String, Set<FallbackConfigEntry>> getFallbackConfigs()
 	{
 		GetFallbackConfigActionResponse actionResponse = getFallbackConfigsActionResponse();
-		
+
 		if (null == actionResponse)
 			return null;
-		
+
 		return actionResponse.getFallbackConfigs();
 	}
 
-	
+
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public GetBotsActionResponse getBotsActionResponse()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_BOTS));
-		
+
 		try {
 			String responseStr = requestFrontCache(urlParameters);
 			GetBotsActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetBotsActionResponse.class);
 			return actionResponse;
-			
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
-	
+
 	public Map<String, Set<String>> getBots()
 	{
 		GetBotsActionResponse actionResponse = getBotsActionResponse();
-		
+
 		if (null == actionResponse)
 			return null;
-		
+
 		return actionResponse.getBots();
 	}
-	
+
 
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public GetDynamicURLsActionResponse getDynamicURLsActionResponse()
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_DYNAMIC_URLS));
-		
+
 		try {
 			String responseStr = requestFrontCache(urlParameters);
 			GetDynamicURLsActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetDynamicURLsActionResponse.class);
 			return actionResponse;
-			
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
-	
+
 	public Map<String, Set<String>> getDynamicURLs()
 	{
 		GetDynamicURLsActionResponse actionResponse = getDynamicURLsActionResponse();
-		
+
 		if (null == actionResponse)
 			return null;
-		
+
 		return actionResponse.getDynamicURLs();
 	}
-	
-	
+
+
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public GetFromCacheActionResponse getFromCacheActionResponse(String key)
@@ -355,32 +355,32 @@ public class FrontCacheClient {
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_FROM_CACHE));
 		urlParameters.add(new BasicNameValuePair("key", key));
-		
+
 		try {
 			String responseStr = requestFrontCache(urlParameters);
 			logger.debug("getFromCache(" + this + ") -> done");
 			GetFromCacheActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFromCacheActionResponse.class);
 			return actionResponse;
-			
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
-	
+
 	public WebResponse getFromCache(String key)
 	{
 		GetFromCacheActionResponse actionResponse = getFromCacheActionResponse(key);
-		
+
 		if (null == actionResponse)
 			return null;
-		
+
 		return actionResponse.getValue();
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param urlParameters
 	 * @return
 	 * @throws IOException
@@ -390,7 +390,7 @@ public class FrontCacheClient {
 		HttpPost post = new HttpPost(frontCacheURI);
 
 //    	post.addHeader("Accept-Encoding", "gzip");
-		
+
 		if (null != siteKey)
 			post.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
 
@@ -404,33 +404,33 @@ public class FrontCacheClient {
 		while ((line = rd.readLine()) != null) {
 			result.append(line);
 		}
-		
+
 		return result.toString();
 	}
 
 	public String getFrontCacheURL() {
 		return frontCacheURL;
 	}
-	
+
 	/**
 	 *  http://localhost:8080/ -> localhost:8080
 	 * @return
 	 */
 	public String getName() {
 		String name = frontCacheURL.trim();
-		
+
 		int idx = name.indexOf("//");
 		if (-1 < idx)
 			name = name.substring(idx + "//".length());
-		
+
 		idx = name.indexOf(":"); // localhost:8080 -> localhost
 		if (-1 < idx)
 			name = name.substring(0, idx);
-		
-//		idx = name.indexOf("/"); // 
+
+//		idx = name.indexOf("/"); //
 //		if (-1 < idx)
 //			name = name.substring(0, idx);
-		
+
 		// e.g. localhost
 		return name;
 	}
@@ -464,5 +464,5 @@ public class FrontCacheClient {
 	public String toString() {
 		return "FrontCacheClient [" + frontCacheURL + "]";
 	}
-	
+
 }

@@ -40,7 +40,7 @@ public class EdgesController {
 
 	@RequestMapping(value = "/edges", method = RequestMethod.GET)
 	public String domainRealtimeMonitor(ModelMap model) {
-		
+
 		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
 		List<FrontCacheStatus> edges = new ArrayList<FrontCacheStatus>(clusterStatus.values());
 		Collections.sort(edges, new Comparator<FrontCacheStatus>(){
@@ -61,15 +61,15 @@ public class EdgesController {
 			if (edge.length() > 0)
 				frontcacheService.addEdge(edge);
 		}
-		
+
 		return "redirect:edges";
 	}
-	
+
 	@RequestMapping(value = "/remove-edge", method = RequestMethod.GET)
 	public String removeEdge(HttpServletRequest request) {
 		String edge = request.getParameter("edge");
 		frontcacheService.removeEdge(edge);
 		return "redirect:edges";
 	}
-	
+
 }

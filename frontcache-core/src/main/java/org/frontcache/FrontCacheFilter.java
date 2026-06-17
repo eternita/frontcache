@@ -29,19 +29,19 @@ import javax.servlet.http.HttpServletResponse;
 
 
 /**
- * 
+ *
  *
  */
 public class FrontCacheFilter implements Filter {
 
 	private FrontCacheEngine fcEngine = null;
-	
-	
+
+
 	@Override
 	public void init(FilterConfig arg0) throws ServletException {
 
 		fcEngine = FrontCacheEngine.getFrontCache();
-		
+
 		return;
 	}
 
@@ -63,11 +63,11 @@ public class FrontCacheFilter implements Filter {
         	e.printStackTrace();
         	// TODO: handle error
         }
-		
+
 		return;
 	}
 
-	
-	
+
+
 }
 

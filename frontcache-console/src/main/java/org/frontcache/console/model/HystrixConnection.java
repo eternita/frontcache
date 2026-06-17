@@ -22,7 +22,7 @@ public class HystrixConnection {
 	private String stream;
 	private String auth = "";
 	private String delay = "";
-	
+
 	public HystrixConnection() {
 		// TODO Auto-generated constructor stub
 	}
@@ -103,7 +103,7 @@ public class HystrixConnection {
 			return false;
 		return true;
 	}
-	
-	
-	
+
+
+
 }

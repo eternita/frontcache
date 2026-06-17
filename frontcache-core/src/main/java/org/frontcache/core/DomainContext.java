@@ -23,8 +23,8 @@ public class DomainContext {
 	private String host;
 	private String httpPort;
 	private String httpsPort;
-	
-		
+
+
 	public DomainContext(String domain, String siteKey, String host, String httpPort, String httpsPort) {
 		super();
 		this.domain = domain;
@@ -33,7 +33,7 @@ public class DomainContext {
 		this.httpPort = httpPort;
 		this.httpsPort = httpsPort;
 	}
-	
+
 	public String getDomain() {
 		return domain;
 	}
@@ -114,5 +114,5 @@ public class DomainContext {
 			return false;
 		return true;
 	}
-	
+
 }

@@ -39,7 +39,7 @@ import com.gargoylesoftware.htmlunit.TextPage;
 import com.gargoylesoftware.htmlunit.WebResponse;
 
 /**
- * 
+ *
  * Static read text, js, img, etc
  *
  */
@@ -55,50 +55,50 @@ public abstract class StaticReadTests extends TestsBase {
 	public void tearDown() throws Exception {
 		super.tearDown();
 	}
-	
-	public abstract String getFrontCacheBaseURLDomainFC1(); 
-	
+
+	public abstract String getFrontCacheBaseURLDomainFC1();
+
 	@Test
 	public void text1() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
 
 		TextPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/a.txt");
 		String pageAsText = page.getContent();
-		WebResponse webResponse = page.getWebResponse(); 
+		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
 		assertEquals("a", pageAsText);
 	}
-	
+
 	@Test
 	public void text2() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "*/*");
 
 		TextPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/a.txt");
 		String pageAsText = page.getContent();
-		WebResponse webResponse = page.getWebResponse(); 
+		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
 		assertEquals("a", pageAsText);
 	}
-	
+
 	@Test
 	public void js() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "*/*");
 
 		JavaScriptPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/jquery.js");
 		String pageAsText = page.getContent();
-		WebResponse webResponse = page.getWebResponse(); 
+		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
 		Assert.assertTrue(pageAsText.startsWith("(function(){var _jQuery=window.jQuery"));
 		Assert.assertTrue(pageAsText.endsWith("br):0);};});})();"));
-		
+
 	}
-	
+
 	@Test
 	public void img() throws Exception {
 
 		String urlStr = getFrontCacheBaseURLDomainFC1() + "common/static-read/image.jpg";
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		
+
 		HttpResponse response = null;
 
 		HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
@@ -106,13 +106,13 @@ public abstract class StaticReadTests extends TestsBase {
 		httpRequest.addHeader(FCHeaders.ACCEPT, "image/webp,image/*,*/*;q=0.8");
 
 		response = httpclient.execute(httpHost, httpRequest);
-		
+
 		byte[] data = getBytes(response.getEntity().getContent());
-		
+
 		assertEquals(167579, data.length);
 
 		((CloseableHttpResponse) response).close();
 		return;
 	}
-	
+
 }

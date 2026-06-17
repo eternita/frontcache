@@ -10,18 +10,18 @@ import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebResponse;
 
 /**
- * 
+ *
  * run tests defined in CommonTests through it
- * 
+ *
  *
  */
 public class StandaloneCommonTests extends CommonTests {
 
-	
+
 	@Test
 	public void frontcacheIdTest() throws Exception {
 		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/fc-headers/a.jsp");
-		WebResponse webResponse = page.getWebResponse(); 
+		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
 		String frontcacheId = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_ID);
 
@@ -32,5 +32,5 @@ public class StandaloneCommonTests extends CommonTests {
 	public String getFrontCacheBaseURLDomainFC1() {
 		return getStandaloneBaseURLDomainFC1();
 	}
-	
+
 }

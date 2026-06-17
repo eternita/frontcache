@@ -24,15 +24,15 @@ public class GetFromCacheActionResponse extends ActionResponse {
 	private WebResponse value;
 
 	public GetFromCacheActionResponse() { // for json mapper
-		
+
 	}
-	
+
 	public GetFromCacheActionResponse(String key) {
 		setAction("get from cache");
 		setResponseStatus(RESPONSE_STATUS_ERROR);
 		this.key = key;
 	}
-	
+
 	public GetFromCacheActionResponse(String key, WebResponse value) {
 		setAction("get from cache");
 		setResponseStatus(RESPONSE_STATUS_OK);

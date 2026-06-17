@@ -14,7 +14,7 @@ import com.gargoylesoftware.htmlunit.WebClient;
 public class StandaloneSpecificTest extends TestsBase {
 
 	WebClient webClient = null;
-	
+
 	@Before
 	public void setUp() throws Exception {
 		webClient = new WebClient();
@@ -25,15 +25,15 @@ public class StandaloneSpecificTest extends TestsBase {
 	public void tearDown() throws Exception {
 		webClient.close();
 	}
-	
 
-	
+
+
 	@Test
 	public void test2() throws Exception {
-		
+
 		TextPage page = webClient.getPage(getStandaloneBaseURLDomainFC1() + "standalone/2/a.txt");
 		assertEquals("ab", page.getContent());
 	}
-	
+
 }
 

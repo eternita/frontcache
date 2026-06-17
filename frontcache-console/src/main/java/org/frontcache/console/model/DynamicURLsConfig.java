@@ -23,7 +23,7 @@ public class DynamicURLsConfig {
 
 	private String name;
 	private Map<String, Set<String>> config;
-	
+
 	public DynamicURLsConfig(String name, Map<String, Set<String>> config) {
 		super();
 		this.name = name;

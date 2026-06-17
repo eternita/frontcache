@@ -28,7 +28,7 @@ import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
 
 /**
- * 
+ *
  * All GET requests which flows through cache (cached & not)
  *
  */
@@ -37,7 +37,7 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 	private final String originUrlStr;
 	private final CacheProcessorBase cacheProcessorBase;
 	private final RequestContext context;
-	
+
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache.class);
 
     public FC_ThroughCache(CacheProcessorBase cacheProcessorBase, String originUrlStr, RequestContext context) {
@@ -46,7 +46,7 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("coinshome.net"))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Hits"))
         		);
-        
+
         this.originUrlStr = originUrlStr;
         this.cacheProcessorBase = cacheProcessorBase;
         this.context = context;
@@ -56,18 +56,18 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
     protected WebResponse run() throws FrontCacheException {
     	return cacheProcessorBase.getFromCacheImpl(originUrlStr);
     }
-    
+
     @Override
     protected WebResponse getFallback() {
-    	
+
 		String failedExceptionMessage = "";
 		if (null != getFailedExecutionException())
 			failedExceptionMessage += getFailedExecutionException().getMessage();
-		
+
 		logger.error("FC_ThroughCache - ERROR FOR - " + originUrlStr + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
-		
+
 		return null;
     }
-    
-    
+
+
 }

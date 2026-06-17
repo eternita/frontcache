@@ -31,16 +31,16 @@ import org.slf4j.LoggerFactory;
 
 /**
  *  Log requests to file (slf4j) for statistics and further analysis
- * 
+ *
  * 	REQUEST LOGGING FORMAT
  *  1 - true
  *  0 - false
- *  
+ *
  *  cacheable_flag - true/1 if request is run through FrontCache engine (e.g. GET method, text data). false/0 - otherwise (request forwarded to origin)
- *  dynamic_flag{1|0} - true if origin has been requested. false/0 - otherwise (it's cacheable & cached). 
- *  
+ *  dynamic_flag{1|0} - true if origin has been requested. false/0 - otherwise (it's cacheable & cached).
+ *
  *	log-timestamp request-id    domain   http-method   is-hystrix-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache|dynamic-soft}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|browser}    user-agent
- *  
+ *
  *  EXAMPLE
  *  2016-06-03T15:06:35,092-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 coinshome.net GET success toplevel cacheable from-cache 0 50874 "http://myfc.coinshome.net:8080/en/coin_definition-1_Thaler-Silver-Kingdom_of_Prussia_(1701_1918)-c_sK.GJAIx4AAAEvnTTi7NnT.htm" 0:0:0:0:0:0:0:1 front-cache-local-1 browser
  *  2016-06-03T15:06:35,100-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 coinshome.net GET success include cacheable from-cache 0 1581 "http://myfc.coinshome.net:8080/fc/include-footer.htm?locale=en" 127.0.0.1 front-cache-local-1 browser
@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
 public class RequestLogger {
 
 	private final static String SEPARATOR = " ";
-	
+
 	private static final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss,SSSZ");
 
 	private static Logger logger = LoggerFactory.getLogger(RequestLogger.class);
@@ -64,12 +64,12 @@ public class RequestLogger {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param url - request URL
 	 * @param isCacheable - true if request is run through FrontCache engine (e.g. GET method, text data). false - otherwise (request forwarded to origin)
 	 * @param isCached - true if origin has been cached. false/0 - otherwise (origin is called).
 	 * @param runtimeMillis - runtime is milliseconds
-	 * @param lengthBytes - content length in bytes. 
+	 * @param lengthBytes - content length in bytes.
 	 */
 	public static void logRequest(String url, boolean isCacheable, boolean isCached, long runtimeMillis, long lengthBytes, RequestContext context) {
 
@@ -77,7 +77,7 @@ public class RequestLogger {
         HttpServletRequest request = context.getRequest();
         boolean isHystrixError = context.isHystrixFallback();
         String userAgent = request.getHeader("User-Agent");
-        
+
         String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
         if (!isCached && "true".equals(request.getHeader(FCHeaders.X_FRONTCACHE_SOFT_REFRESH)))
         	requestTypeDynamicCachedSoft = "dynamic-soft";
@@ -91,7 +91,7 @@ public class RequestLogger {
 		.append(SEPARATOR).append((isCacheable) ? "cacheable" : "direct")
 		.append(SEPARATOR).append(requestTypeDynamicCachedSoft)
 		.append(SEPARATOR).append(runtimeMillis)
-		.append(SEPARATOR).append(lengthBytes) 
+		.append(SEPARATOR).append(lengthBytes)
 		.append(SEPARATOR).append("\"").append(url).append("\"")
 		.append(SEPARATOR).append(FCUtils.getClientIP(request))
 		.append(SEPARATOR).append(context.getFrontCacheId())
@@ -103,7 +103,7 @@ public class RequestLogger {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param url
 	 * @param requestType
 	 * @param isCached
@@ -119,25 +119,25 @@ public class RequestLogger {
         String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
         if (!isCached && softRefresh)
         	requestTypeDynamicCachedSoft = "dynamic-soft";
-        
+
         if (context.getLogToHTTPHeaders())
         {
     		HttpServletResponse servletResponse = context.getResponse();
-    		
+
     		StringBuilder sb4header = new StringBuilder();
     		sb4header.append((isHystrixError) ? "error" : "success")
     		.append(SEPARATOR).append(requestType) // toplevel | include | include-async
     		.append(SEPARATOR).append(requestTypeDynamicCachedSoft)
     		.append(SEPARATOR).append(runtimeMillis)
-    		.append(SEPARATOR).append(lengthBytes) 
+    		.append(SEPARATOR).append(lengthBytes)
     		.append(SEPARATOR).append("\"").append(url).append("\"")
     		.append(SEPARATOR).append(context.getFrontCacheId())
 //    		.append(SEPARATOR).append(dummy)
     		.append(SEPARATOR).append(context.getClientType());
-    		
+
     		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + "." + includeLevel, sb4header.toString());
         }
-        
+
 	}
-	
+
 }

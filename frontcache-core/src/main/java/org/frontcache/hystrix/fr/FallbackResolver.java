@@ -24,7 +24,7 @@ import org.frontcache.core.DomainContext;
 import org.frontcache.core.WebResponse;
 
 public interface FallbackResolver {
-	
+
 	public void init(HttpClient client);
 
 	public WebResponse getFallback(DomainContext domain, String fallbackSource, String urlStr);

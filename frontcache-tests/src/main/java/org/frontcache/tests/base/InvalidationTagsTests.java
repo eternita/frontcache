@@ -27,7 +27,7 @@ import com.gargoylesoftware.htmlunit.WebResponse;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
 /**
- * 
+ *
  * Defined tests are run in filter & standalone modes
  *
  */
@@ -46,8 +46,8 @@ public abstract class InvalidationTagsTests extends TestsBase {
 	public void tearDown() throws Exception {
 		super.tearDown();
 	}
-	
-	public abstract String getFrontCacheBaseURLDomainFC1(); 
+
+	public abstract String getFrontCacheBaseURLDomainFC1();
 
 
 
@@ -56,15 +56,15 @@ public abstract class InvalidationTagsTests extends TestsBase {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/invalidation-tags/a.jsp");
 		assertEquals("a", page.getPage().asText());
-		
-		WebResponse webResponse = page.getWebResponse(); 
+
+		WebResponse webResponse = page.getWebResponse();
 
 		String maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("-1", maxage);
 
 		String tags = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS);
 		assertEquals("apple|banana|orange", tags);
-		
+
 	}
 
 	@Test
@@ -72,15 +72,15 @@ public abstract class InvalidationTagsTests extends TestsBase {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/invalidation-tags/b.jsp");
 		assertEquals("a", page.getPage().asText());
-		
-		WebResponse webResponse = page.getWebResponse(); 
+
+		WebResponse webResponse = page.getWebResponse();
 
 		String maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("-1", maxage);
 
 		String tags = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS);
 		assertEquals("apple|banana|orange", tags);
-		
+
 	}
-	
+
 }

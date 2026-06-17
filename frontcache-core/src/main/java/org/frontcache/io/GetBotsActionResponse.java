@@ -26,7 +26,7 @@ public class GetBotsActionResponse extends ActionResponse {
 	public GetBotsActionResponse() { // for JSON mapper
 		setResponseStatus(RESPONSE_STATUS_OK);
 	}
-	
+
 	public Map<String, Set<String>> getBots() {
 		return bots;
 	}
@@ -34,5 +34,5 @@ public class GetBotsActionResponse extends ActionResponse {
 	public void setBots(Map<String, Set<String>> bots) {
 		this.bots = bots;
 	}
-	
+
 }

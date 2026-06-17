@@ -31,20 +31,20 @@ public abstract class HTTPResponseCodeTests extends TestsBase {
 		super.setUp();
 		webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
 	}
-	
+
 	@After
 	public void tearDown() throws Exception {
 		super.tearDown();
 	}
-	
-	public abstract String getFrontCacheBaseURLDomainFC1(); 
+
+	public abstract String getFrontCacheBaseURLDomainFC1();
 
 	@Test
 	public void code404() throws Exception {
 		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "something/what-doesnt-exist");
-		WebResponse webResponse = page.getWebResponse(); 
+		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
-		
+
 		Assert.assertEquals(404, webResponse.getStatusCode());
 	}
 
