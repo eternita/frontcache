@@ -41,40 +41,40 @@ import org.slf4j.LoggerFactory;
 public class FrontCacheCluster {
 
 	private Set<FrontCacheClient> fcCluster = new HashSet<FrontCacheClient>();
-	
+
 	private final static String DEFAULT_CLUSTER_CONFIG_NAME = "frontcache-cluster.conf";
-	
+
 	private final static String SITE_KEY_CONFIG_FILE = "frontcache-site-key.conf";
-	
+
 	private final static String DEFAULT_SITE_KEY = "";
-	
+
 	private Logger logger = LoggerFactory.getLogger(FrontCacheCluster.class);
-	
+
 	private static final int THREAD_AMOUNT = 4;
-    
+
 	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_AMOUNT);
-	
+
 	private static final long FRONTCACHE_CLIENT_TIMEOUT = 5*1000; // 5 second
-	
-	
-	public FrontCacheCluster(Collection<String> fcURLSet, String siteKey) 
+
+
+	public FrontCacheCluster(Collection<String> fcURLSet, String siteKey)
 	{
 		for (String url : fcURLSet)
 			fcCluster.add(new FrontCacheClient(url, siteKey));
 	}
-	
-	public FrontCacheCluster(Collection<FrontCacheClient> fcClients) 
+
+	public FrontCacheCluster(Collection<FrontCacheClient> fcClients)
 	{
 		for (FrontCacheClient fcClient : fcClients)
 			fcCluster.add(fcClient);
 	}
 
-	public FrontCacheCluster() 
+	public FrontCacheCluster()
 	{
 		this(DEFAULT_CLUSTER_CONFIG_NAME);
 	}
-	
-	public FrontCacheCluster(String configResourceName) 
+
+	public FrontCacheCluster(String configResourceName)
 	{
 		Set<String> fcURLSet = loadFrontcacheClusterNodes(configResourceName);
 		String siteKey = loadSiteKey();
@@ -82,7 +82,7 @@ public class FrontCacheCluster {
 		for (String url : fcURLSet)
 			fcCluster.add(new FrontCacheClient(url, siteKey));
 	}
-	
+
 	public void close()
 	{
 		executor.shutdown();
@@ -93,7 +93,7 @@ public class FrontCacheCluster {
 		String siteKey = DEFAULT_SITE_KEY;
 		BufferedReader confReader = null;
 		InputStream is = null;
-		try 
+		try
 		{
 			is = FrontCacheCluster.class.getClassLoader().getResourceAsStream(SITE_KEY_CONFIG_FILE);
 			if (null == is)
@@ -105,7 +105,7 @@ public class FrontCacheCluster {
 			siteKey = confReader.readLine();
 			if (null == siteKey)
 				siteKey = "";
-			
+
 		} catch (Exception e) {
 			// TODO: log ...
 //			throw new RuntimeException("Frontcache cluster nodes can't be loaded from " + configName, e);
@@ -123,16 +123,16 @@ public class FrontCacheCluster {
 				} catch (IOException e) { }
 			}
 		}
-		
+
 		return siteKey;
 	}
-	
-	
+
+
 	private Set<String> loadFrontcacheClusterNodes(String configName) {
 		Set<String> fcURLSet = new HashSet<String>();
 		BufferedReader confReader = null;
 		InputStream is = null;
-		try 
+		try
 		{
 			is = FrontCacheCluster.class.getClassLoader().getResourceAsStream(configName);
 			if (null == is)
@@ -141,16 +141,16 @@ public class FrontCacheCluster {
 			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
 			String clusterNodeURLStr;
 			while ((clusterNodeURLStr = confReader.readLine()) != null) {
-				
+
 				if (clusterNodeURLStr.trim().startsWith("#")) // handle comments
 					continue;
-				
+
 				if (0 == clusterNodeURLStr.trim().length()) // skip empty
 					continue;
-				
+
 				fcURLSet.add(clusterNodeURLStr);
 			}
-			
+
 		} catch (Exception e) {
 			logger.error("Frontcache cluster nodes can't be loaded from " + configName, e);
 			throw new RuntimeException("Frontcache cluster nodes can't be loaded from " + configName, e);
@@ -170,20 +170,20 @@ public class FrontCacheCluster {
 		}
 		return fcURLSet;
 	}
-	
+
 
 	public Set<String> getNodes()
 	{
 		Set<String> nodes = new HashSet<String>();
-		
+
 		for (FrontCacheClient client : fcCluster)
 			nodes.add(client.getFrontCacheURL());
-			
+
 		return nodes;
 	}
-	
+
 //	/**
-//	 * 
+//	 *
 //	 * @return
 //	 */
 //	public Map<FrontCacheClient, Map<String, String>> getCacheState()
@@ -202,7 +202,7 @@ public class FrontCacheCluster {
 //	}
 
 	/**
-	 * 
+	 *
 	 * @param filter
 	 * @return
 	 */
@@ -210,18 +210,18 @@ public class FrontCacheCluster {
 	{
 		Map<String, String> response = new ConcurrentHashMap<String, String>();
         List<Future<InvalidationResponse>> futureList = new ArrayList<Future<InvalidationResponse>>();
-        
+
 		fcCluster.forEach(client -> futureList.add(executor.submit(new InvalidationCaller(client, filter))));
 
-		futureList.forEach(f -> 
+		futureList.forEach(f ->
 					{
 			            try {
 			            	InvalidationResponse result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-			            		
+
 			            	if (null != result)
 			            		response.put(result.getName(), result.getResponse());
-			            		
-			            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+
+			            } catch (TimeoutException | InterruptedException | ExecutionException e) {
 			                f.cancel(true);
 			                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for invalidation. Some cache instances may not invalidated ");
 			            }
@@ -232,25 +232,25 @@ public class FrontCacheCluster {
 	}
 
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public Map<String, String> removeFromCacheAll()
 	{
 		return removeFromCache(null);
 	}
-	
+
 }
 
 
 /**
- * 
+ *
  */
 class InvalidationResponse {
 
 	private String name;
 	private String response;
-	
+
 	public InvalidationResponse(String name, String response) {
 		super();
 		this.name = name;
@@ -268,23 +268,23 @@ class InvalidationResponse {
 }
 
 /**
- * 
+ *
  */
 class InvalidationCaller implements Callable<InvalidationResponse> {
-	
+
 	private FrontCacheClient fcClient;
 	private String filter;
-	
+
 	public InvalidationCaller(FrontCacheClient fcClient, String filter) {
 		super();
 		this.fcClient = fcClient;
 		this.filter = filter;
 	}
-	
+
     @Override
     public InvalidationResponse call() throws Exception {
-		String resp = (null == filter) ? fcClient.removeFromCacheAll() : fcClient.removeFromCache(filter); 
-		return new InvalidationResponse(fcClient.getFrontCacheURL(), resp); 
+		String resp = (null == filter) ? fcClient.removeFromCacheAll() : fcClient.removeFromCache(filter);
+		return new InvalidationResponse(fcClient.getFrontCacheURL(), resp);
     }
-}	
+}
 

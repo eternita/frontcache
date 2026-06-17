@@ -56,48 +56,48 @@ public class FrontcacheService {
 	private static final Logger logger = LoggerFactory.getLogger(FrontcacheService.class);
 
 	private ObjectMapper jsonMapper = new ObjectMapper();
-	
+
 	private Set<String> frontcacheAgentURLs = new LinkedHashSet<String>();
-	
+
 	private String siteKey = "default-site-key";
-	
+
 	private static final int THREAD_AMOUNT = 4;
-    
+
 	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_AMOUNT);
-	
+
 	private static final long FRONTCACHE_CLIENT_TIMEOUT = FrontCacheClient.CONNECTION_TIMEOUT + 1000; // slightly more then frontcache client timeout
-	
-	
+
+
 	public FrontcacheService() {
 		loadConfigs();
 	}
 
 	private void loadConfigs() {
-		
+
 		String frontcacheConsoleConfPath = System.getProperty("org.frontcache.console.config");
-		
+
 		if (null == frontcacheConsoleConfPath)
 		{
-			logger.info("System property 'org.frontcache.console.config' is not defined");					
+			logger.info("System property 'org.frontcache.console.config' is not defined");
 			return;
 		}
-		
-		try 
+
+		try
 		{
 			File configFile = new File(frontcacheConsoleConfPath);
 			if (!configFile.exists())
 			{
-				logger.info("Console config file doesn't exist: " + configFile.getAbsolutePath());					
+				logger.info("Console config file doesn't exist: " + configFile.getAbsolutePath());
 				return;
 			}
-			
+
 			fcConsoleConfig = ConfigFactory.parseFile(configFile).getConfig("frontcache").getConfig("console");
-			
+
 		} catch (Exception e) {
 			logger.error("Console frontcacheAgentURLs are not loaded from " + frontcacheConsoleConfPath);
 			throw new RuntimeException("Can't initialize Frontcache Console", e);
 		}
-		
+
 		List<ConfigValue> urls = fcConsoleConfig.getList("urls");
 		for (ConfigValue urlValue : urls) {
 			String url = urlValue.unwrapped().toString();
@@ -106,38 +106,38 @@ public class FrontcacheService {
 		}
 		siteKey = fcConsoleConfig.getString("siteKey");
 		logger.info(" -- Loading siteKey {} from console config", siteKey);
-		
+
 	}
-	
+
 	public String getSiteKey(){
 		return siteKey;
 	}
-	
+
 	public boolean isFrontCacheEdgeAvailable(String frontcacheURL)
 	{
 		boolean available = false;
 		FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, siteKey);
 		if (null != fcClient.getCacheState()) // if get state work -> FC is active
 			available = true;
-		
+
 		return available;
 	}
 
 
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public Map<String, FrontCacheStatus> getClusterStatus() {
-		
+
         List<Future<FrontCacheStatus>> futureList = new ArrayList<Future<FrontCacheStatus>>();
-		
+
 		Map<String, FrontCacheStatus> clusterStatus = new HashMap<String, FrontCacheStatus>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new FrontCacheStatusCaller(fcClient)));
 
-		// processing timeouts 
+		// processing timeouts
         boolean timeoutReached = false;
         for (Future<FrontCacheStatus> f : futureList)
         {
@@ -147,11 +147,11 @@ public class FrontcacheService {
             		result = f.get(1, TimeUnit.MILLISECONDS);
             	else
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-            		
+
             	if (null != result)
             		clusterStatus.put(result.getName(), result);
-            		
-            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
                 logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some statuses may not be retrieved ");
@@ -160,10 +160,10 @@ public class FrontcacheService {
 
 		return clusterStatus;
 	}
-	
+
 
 	/**
-	 * 
+	 *
 	 * @param domain
 	 * @return
 	 */
@@ -177,7 +177,7 @@ public class FrontcacheService {
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new FallbackConfigsCaller(fcClient)));
 
-		// processing timeouts 
+		// processing timeouts
         boolean timeoutReached = false;
         for (Future<FallbackConfig> f : futureList)
         {
@@ -187,30 +187,30 @@ public class FrontcacheService {
             		result = f.get(1, TimeUnit.MILLISECONDS);
             	else
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-            		
+
             	if (null != result)
             		clusterStatus.put(result.getName(), result.getConfig());
-            		
-            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
                 logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
             }
         }
-		
+
 		return clusterStatus;
 	}
 
 	public Map<String,  Map<String, Set<String>>> getBotConfigs() {
-		
+
         List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
-		
+
 		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
 
-		// processing timeouts 
+		// processing timeouts
         boolean timeoutReached = false;
         for (Future<BotConfig> f : futureList)
         {
@@ -220,11 +220,11 @@ public class FrontcacheService {
             		result = f.get(1, TimeUnit.MILLISECONDS);
             	else
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-            		
+
             	if (null != result)
             		clusterStatus.put(result.getName(), result.getConfig());
-            		
-            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
                 logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
@@ -233,17 +233,17 @@ public class FrontcacheService {
 
 		return clusterStatus;
 	}
-	
+
 	public Map<String, Map<String, Set<String>>> getDynamicURLsConfigs() {
 
         List<Future<DynamicURLsConfig>> futureList = new ArrayList<Future<DynamicURLsConfig>>();
-		
+
 		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new DynamicURLsConfigsCaller(fcClient)));
 
-		// processing timeouts 
+		// processing timeouts
         boolean timeoutReached = false;
         for (Future<DynamicURLsConfig> f : futureList)
         {
@@ -253,33 +253,33 @@ public class FrontcacheService {
             		result = f.get(1, TimeUnit.MILLISECONDS);
             	else
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-            		
+
             	if (null != result)
             		clusterStatus.put(result.getName(), result.getConfig());
-            		
-            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
                 logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
             }
         }
-		
+
 		return clusterStatus;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param domain
 	 * @return
 	 */
 	public String getHystrixMonitorURLList()
 	{
 		// [{"name":"My Super App","stream":"http://sg.coinshome.net/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.coinshome.net/hystrix.stream","auth":"","delay":"2000"}]
-		
+
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		List<HystrixConnection> hystrixConnections = new ArrayList<HystrixConnection>();
-		
+
 		for (FrontCacheClient fcClient : fcClients)
 		{
 			String fcURL = fcClient.getFrontCacheURL();
@@ -287,7 +287,7 @@ public class FrontcacheService {
 				fcURL += "/";
 			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcURL + "hystrix.stream"));
 		}
-		
+
 		String urlListStr = "";
 		try {
 			urlListStr = jsonMapper.writeValueAsString(hystrixConnections);
@@ -295,30 +295,30 @@ public class FrontcacheService {
 			logger.error("Can't serialize array of Hystrix connections", e1);
 			urlListStr = e1.getMessage();
 			e1.printStackTrace();
-		} 
-		return urlListStr; 
+		}
+		return urlListStr;
 	}
 
 	public Set<String> getFrontCacheAgentURLs()
 	{
 		Set<String> urls = new LinkedHashSet<String>();
 		urls.addAll(frontcacheAgentURLs);
-		
+
 		return urls;
 	}
-	
+
 	public WebResponse getFromCache(String edgeURL, String key)
 	{
 		if (null == key)
 			return null;
-		
+
 		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
 		WebResponse webResponse = fcClient.getFromCache(key.trim());
-		
+
 		return webResponse;
 	}
-	
-	
+
+
 	private List<FrontCacheClient> getFrontCacheAgents()
 	{
 		return getFrontCacheAgents(false);
@@ -330,7 +330,7 @@ public class FrontcacheService {
 		for (String frontcacheURL : frontcacheAgentURLs)
 		{
 			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, siteKey);
-			
+
 			if (activeOnly)
 			{
 				if (null != fcClient.getCacheState()) // if get state work -> FC is active
@@ -346,20 +346,20 @@ public class FrontcacheService {
 	public int getEdgesAmount() {
 		return frontcacheAgentURLs.size();
 	}
-	
+
 	public void addEdge(String edge) {
 		if (null != edge)
 			frontcacheAgentURLs.add(edge);
 	}
-	
+
 	public void removeEdge(String edge) {
 		if (null != edge)
 			frontcacheAgentURLs.remove(edge);
 	}
-	
+
 	public void invalidateEdge(String edgeURL, String filter) {
 		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
 		fcClient.removeFromCache(filter);
 	}
-	
+
 }

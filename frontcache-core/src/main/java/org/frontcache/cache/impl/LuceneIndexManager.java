@@ -69,18 +69,18 @@ public class LuceneIndexManager {
 	private static final Logger logger = LoggerFactory.getLogger(LuceneIndexManager.class);
 
 	private static String INDEX_PATH;
-	
+
 	public static final String JSON_FIELD = "json";
 	public static final String BIN_FIELD = "bin";
 
 	// searchable fields
 	public static final String TAGS_FIELD = "tags"; // for invalidation
-	public static final String URL_FIELD = "url"; 
-	public static final String DOMAIN_FIELD = "domain"; // for shared / multidomain mode 
-	public static final String EXPIRE_DATE_FIELD = "expire_date"; 
-	
+	public static final String URL_FIELD = "url";
+	public static final String DOMAIN_FIELD = "domain"; // for shared / multidomain mode
+	public static final String EXPIRE_DATE_FIELD = "expire_date";
+
 	private IndexWriter indexWriter = null;
-	
+
 	public final static FieldType JSON_TYPE;
 	static {
 	    JSON_TYPE = new FieldType();
@@ -89,9 +89,9 @@ public class LuceneIndexManager {
 	    JSON_TYPE.setTokenized(false);
 	    JSON_TYPE.freeze();
 	}
-	
+
 	/**
-	 *  
+	 *
 	 */
 	final Gson gson = new GsonBuilder().addSerializationExclusionStrategy(new ExclusionStrategy() {
 
@@ -106,7 +106,7 @@ public class LuceneIndexManager {
 		}
 	}).create();
 
-	
+
 	/**
 	 * Constructor
 	 * @param indexPath
@@ -118,7 +118,7 @@ public class LuceneIndexManager {
 			try {
 				if (path.getParent().toFile().isDirectory() && !path.getParent().toFile().exists())
 					Files.createDirectories(path.getParent());
-				
+
 				// create dummy index
 				{
 					String url = UUID.randomUUID().toString();
@@ -156,7 +156,7 @@ public class LuceneIndexManager {
 					Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
 					Analyzer analyzer = new StandardAnalyzer();
 					IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
-	
+
 					iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
 					iwc.setRAMBufferSizeMB(250.0);
 					indexWriter = new IndexWriter(dir, iwc);
@@ -180,7 +180,7 @@ public class LuceneIndexManager {
 		Document doc = new Document();
 
 		String url = response.getUrl();
-		
+
 		if (null == url)
 		{
 			logger.error("URL can't be null during index time for " + response);
@@ -188,19 +188,19 @@ public class LuceneIndexManager {
 		}
 
 		doc.add(new StringField(URL_FIELD, url, Field.Store.YES));
-		
+
 		doc.add(new StringField(DOMAIN_FIELD, response.getDomain(), Field.Store.YES));
-		
+
 		if (null != response.getContent())
 			doc.add(new StoredField(BIN_FIELD, response.getContent()));
-		
+
 //		doc.add(new NumericDocValuesField(EXPIRE_DATE_FIELD, response.getExpireTimeMillis())); // TODO: store map ?
-		
+
 		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), JSON_TYPE));
-		
+
 		for (String tag : response.getTags())
 			doc.add(new StringField(TAGS_FIELD, tag, Field.Store.NO)); // tag is StringField to exact match
-			
+
 		try {
 			iWriter.updateDocument(new Term(URL_FIELD, url), doc);
 		} catch (IOException e) {
@@ -215,7 +215,7 @@ public class LuceneIndexManager {
 		}
 
 	}
-	
+
 	public void close() {
 		if (indexWriter != null && indexWriter.isOpen()) {
 			try {
@@ -241,7 +241,7 @@ public class LuceneIndexManager {
 			logger.debug("Error during getting indexWriter. " + e1.getMessage());
 			return null;
 		}
-		
+
 		Document doc = null;
 		IndexReader reader = null;
 		try {
@@ -251,7 +251,7 @@ public class LuceneIndexManager {
 
 			Term term = new Term(URL_FIELD, url);
 			Query query = new TermQuery(term);
-			
+
 			TopDocs results = searcher.search(query, 1);
 
 			if (results.scoreDocs != null) {
@@ -267,12 +267,12 @@ public class LuceneIndexManager {
 
 		return doc;
 	}
-	
+
 
 	public long getDocumentsCount(String domain) {
 
 		long count = -1;
-		
+
 		IndexWriter iWriter = null;
 		try {
 			iWriter = getIndexWriter();
@@ -283,7 +283,7 @@ public class LuceneIndexManager {
 			logger.debug("Error during getting indexWriter. " + e1.getMessage());
 			return count;
 		}
-		
+
 		IndexReader reader = null;
 		try {
 			reader = DirectoryReader.open(iWriter);
@@ -306,13 +306,13 @@ public class LuceneIndexManager {
 
 		return count;
 	}
-	
+
 	/**
 	 * Removes documents by url or tags
 	 * @param urlOrTag
 	 */
 	public void delete(String domain, String urlOrTag) {
-		
+
 		IndexWriter iWriter = null;
 		try {
 			iWriter = getIndexWriter();
@@ -324,18 +324,18 @@ public class LuceneIndexManager {
 			return;
 		}
 
-		
+
 		try {
 //			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
 			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
 			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
-			
+
 			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
-			
+
 //			booleanQuery.add(domainQuery, Occur.MUST);
 			booleanQuery.add(urlQuery, Occur.SHOULD);
 			booleanQuery.add(tagsQuery, Occur.SHOULD);
-			
+
 			long count = iWriter.deleteDocuments(booleanQuery.build());
 			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
 		} catch (IOException e) {
@@ -350,7 +350,7 @@ public class LuceneIndexManager {
 	}
 
 	public void delete(String urlOrTag) {
-		
+
 		IndexWriter iWriter = null;
 		try {
 			iWriter = getIndexWriter();
@@ -361,16 +361,16 @@ public class LuceneIndexManager {
 			logger.debug("Error during getting indexWriter. " + e1.getMessage());
 			return;
 		}
-		
+
 		try {
 			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
 			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
-			
+
 			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
-			
+
 			booleanQuery.add(urlQuery, Occur.SHOULD);
 			booleanQuery.add(tagsQuery, Occur.SHOULD);
-			
+
 			long count = iWriter.deleteDocuments(booleanQuery.build());
 			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
 		} catch (IOException e) {
@@ -383,19 +383,19 @@ public class LuceneIndexManager {
 			}
 		}
 	}
-	
+
 	/**
 	 * Removes documents by url or tags
 	 * @param urlOrTag
 	 */
 	public void deleteAll(String domain) {
-		
+
 		if (null == domain)
 		{
 			logger.error("Cant delete all with null domain");
 			return;
 		}
-			
+
 		IndexWriter iWriter = null;
 		try {
 			iWriter = getIndexWriter();
@@ -407,12 +407,12 @@ public class LuceneIndexManager {
 			return;
 		}
 
-		
+
 		try {
 			logger.debug("Removing all documents for {}.", domain);
-			
+
 			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
-			
+
 			long count = iWriter.deleteDocuments(domainQuery);
 			logger.debug("Removed  {} documents for {}.", count, domain);
 		} catch (IOException e) {
@@ -425,18 +425,18 @@ public class LuceneIndexManager {
 			}
 		}
 	}
-	
+
 	public void deleteExpired() {
 		// TODO: implement me : query EXPIRE_DATE_FIELD and delete
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @return
 	 */
-	public List<String> getKeys() 
+	public List<String> getKeys()
 	{
-		
+
 		IndexWriter iWriter = null;
 		try {
 			iWriter = getIndexWriter();
@@ -447,13 +447,13 @@ public class LuceneIndexManager {
 			logger.debug("Error during getting indexWriter. " + e1.getMessage());
 			return Collections.emptyList();
 		}
-		
+
 		List<String> keys = new ArrayList<String>();
 
 		IndexReader reader = null;
 		try {
 			reader = DirectoryReader.open(iWriter);
-			
+
 			for (int i=0; i<reader.numDocs(); i++) {
 			    Document doc = reader.document(i);
 			    if (null != doc)
@@ -463,7 +463,7 @@ public class LuceneIndexManager {
 				    else
 				    	logger.error("URL is null for doc (probably corrupted after/during index time) " + doc);
 			    }
-			    
+
 
 			}
 		} catch (Exception e) {
@@ -477,7 +477,7 @@ public class LuceneIndexManager {
 				}
 			}
 		}
-		
+
 		return keys;
 	}
 
@@ -503,7 +503,7 @@ public class LuceneIndexManager {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Returns index size
 	 * @return
@@ -512,16 +512,16 @@ public class LuceneIndexManager {
 		int n = -1;
 		IndexReader reader = null;
 		try {
-			
+
 			Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
 			reader = DirectoryReader.open(dir);
 			n = reader.numDocs();
 
 		} catch (IOException e) {
-			
+
 			logger.error(e.getMessage(), e);
 		} finally {
-			
+
 			if (null != reader)
 			{
 				try {
@@ -531,9 +531,9 @@ public class LuceneIndexManager {
 				}
 			}
 		}
-		
+
 		return n;
 	}
-	
+
 
 }

@@ -26,11 +26,11 @@ public class WebComponentTag extends WebComponentSupport {
 	public void setTags(String tags) {
 		super.tags = tags;
 	}
-	
+
 	public void setRefresh(String refresh) {
 		super.refresh = refresh;
 	}
-	
+
 	public void setLevel(String level) {
 		super.level = level;
 	}

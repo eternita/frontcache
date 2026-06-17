@@ -9,3 +9,5 @@ CLAUDE.md
 /**/target/
 /**/build/
 /frontcache-server/server/
+/frontcache-tests/FRONTCACHE_HOME_**/cache/
+/frontcache-tests/FRONTCACHE_HOME_**/logs/

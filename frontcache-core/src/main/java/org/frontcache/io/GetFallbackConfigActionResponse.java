@@ -24,7 +24,7 @@ import org.frontcache.hystrix.fr.FallbackConfigEntry;
 public class GetFallbackConfigActionResponse extends ActionResponse {
 
 	private Map <String, Set<FallbackConfigEntry>> fallbackConfigs;
-	
+
 	public GetFallbackConfigActionResponse() { // for JSON mapper
 		setResponseStatus(RESPONSE_STATUS_OK);
 	}

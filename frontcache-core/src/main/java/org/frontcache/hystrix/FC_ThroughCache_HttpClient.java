@@ -49,14 +49,14 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 	private final HttpClient client;
 	private final RequestContext context;
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache_HttpClient.class);
-	
+
     public FC_ThroughCache_HttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
-        
+
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
                 .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("Origin-Hits-Pool")));
-        
+
         this.originRequestURL = urlStr;
         this.currentRequestURL = context.getCurrentRequestURL();
         this.requestHeaders = requestHeaders;
@@ -77,7 +77,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 			Header[] httpHeaders = FCUtils.convertHeaders(requestHeaders);
 			for (Header header : httpHeaders)
 				httpRequest.addHeader(header);
-			
+
 			response = client.execute(httpHost, httpRequest);
 			WebResponse webResp = FCUtils.httpResponse2WebComponent(originRequestURL, response, context);
 			return webResp;
@@ -91,11 +91,11 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 					((CloseableHttpResponse) response).close();
 				} catch (IOException e) {
 					e.printStackTrace();
-				} 
+				}
 		}
-		
+
     }
-    
+
     @Override
     protected WebResponse getFallback() {
 		context.setHystrixFallback();
@@ -103,17 +103,17 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 		String failedExceptionMessage = "";
 		if (null != getFailedExecutionException())
 			failedExceptionMessage += getFailedExecutionException().getMessage();
-			
+
 		String includeCurrentURL = getIncludeCurrentURL(currentRequestURL, originRequestURL);
 		logger.error("FC_ThroughCache_HttpClient - ERROR FOR - " + includeCurrentURL + " / " + originRequestURL + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
-		
+
 		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), includeCurrentURL);
-		
+
 		return webResponse;
     }
 
     /**
-     * 
+     *
      * @param currentRequestURL
      * @param originRequestURL
      * @return
@@ -124,17 +124,17 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     	// uri from original http://origin.coinshome.net:1234/common/hystrix/inc12.jsp
     	// ->
     	// includeCurrentURL http://www.coinshome.net/common/hystrix/inc12.jsp
-    	
+
     	String includeCurrentURL = null;
-    			
+
 		int idx1 = currentRequestURL.indexOf("//");
 		int idx2 = originRequestURL.indexOf("//");
-		
+
 		if (-1 < idx1 && -1 < idx2)
 		{
-			int idx11 = currentRequestURL.indexOf("/", idx1 + "//".length()); 
+			int idx11 = currentRequestURL.indexOf("/", idx1 + "//".length());
 			int idx21 = originRequestURL.indexOf("/", idx2 + "//".length());
-			
+
 			if (-1 < idx11 && -1 < idx21)
 			{
 				includeCurrentURL = currentRequestURL.substring(0, idx11) + originRequestURL.substring(idx21);
@@ -142,10 +142,10 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 		}
 		if (null == includeCurrentURL)
 			includeCurrentURL = "can't get includeCurrentURL from " + currentRequestURL + " and " + originRequestURL;
-			
+
 		logger.debug("fallback includeCurrentURL " + includeCurrentURL + " based on currentRequestURL " + currentRequestURL + " and originRequestURL " + originRequestURL);
-		
+
     	return includeCurrentURL;
     }
-    
+
 }

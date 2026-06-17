@@ -23,26 +23,26 @@ import org.openjdk.jmh.annotations.Warmup;
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Benchmark)
 public class BaseBenchmark {
-	
+
 
 
     private static Random r = new Random();
-    
+
     protected String getRandomUrl() {
         return random(getfileMapping().keySet());
     }
 
     protected Map<String, String> getfileMapping(){
     	Map<String, String> map = new HashMap<>();
-    	
+
     	map.put("https://www.coinshome.net/en/welcome.htm", "welcome.html");
-    	
+
     	return map;
-    	
+
     }
-    
+
     public static <T> T random(Collection<T> items){
         return ((T[])items.toArray())[r.nextInt(items.size())];
     }
-    
+
 }

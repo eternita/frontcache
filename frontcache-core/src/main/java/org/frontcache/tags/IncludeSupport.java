@@ -62,7 +62,7 @@ public class IncludeSupport extends BodyTagSupport {
 	// *********************************************************************
 	// Tag logic
 
-	// evaluates 'value' 
+	// evaluates 'value'
 	public int doStartTag() throws JspException {
 
 		this.bodyContent = null; // clean-up body (just in case container is
@@ -90,7 +90,7 @@ public class IncludeSupport extends BodyTagSupport {
 
 	public static void out(PageContext pageContext, Object url, Object includeType, Object clientType) throws IOException {
 		JspWriter w = pageContext.getOut();
-		
+
 		w.write("<fc:include url=\"");
 		// write chars as is
 		if (url instanceof Reader) {
@@ -103,9 +103,9 @@ public class IncludeSupport extends BodyTagSupport {
 		} else {
 			w.write(url.toString());
 		}
-		
+
 		w.write("\"");
-		
+
 		if (null != includeType)
 		{
 			w.write(" call=\"");
@@ -119,7 +119,7 @@ public class IncludeSupport extends BodyTagSupport {
 			} else {
 				w.write(includeType.toString());
 			}
-			
+
 			w.write("\"");
 		}
 
@@ -136,10 +136,10 @@ public class IncludeSupport extends BodyTagSupport {
 			} else {
 				w.write(clientType.toString());
 			}
-			
+
 			w.write("\"");
 		}
-		
+
 		w.write(" />");
 	}
 }

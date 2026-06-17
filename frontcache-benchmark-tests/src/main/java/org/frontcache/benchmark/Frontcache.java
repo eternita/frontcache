@@ -34,7 +34,7 @@ public class Frontcache extends BaseBenchmark {
 	@Benchmark
 	public String benchmark() throws IOException {
 		WebResponse fromFile = indexManager.getFromCacheImpl(getRandomUrl());
-	
+
 		return new String(fromFile.getContent());
 	}
 
@@ -73,9 +73,9 @@ public class Frontcache extends BaseBenchmark {
 		f.setup();
 	    f.benchmark();
 		f.tearDown();
-		
+
 	}
-	
+
 	@TearDown
 	public void tearDown() throws IOException {
 

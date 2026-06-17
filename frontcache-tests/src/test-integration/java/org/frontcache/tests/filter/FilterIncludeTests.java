@@ -9,5 +9,5 @@ public class FilterIncludeTests extends IncludeTests {
 	public String getFrontCacheBaseURLDomainFC1() {
 		return getFilterBaseURLDomainFC1();
 	}
-	
+
 }

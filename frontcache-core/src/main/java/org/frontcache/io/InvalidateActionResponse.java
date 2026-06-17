@@ -19,7 +19,7 @@ package org.frontcache.io;
 public class InvalidateActionResponse extends ActionResponse {
 
 	private String filter;
-	
+
 	public InvalidateActionResponse(String filter) {
 		setAction("invalidate");
 		setResponseStatus(RESPONSE_STATUS_OK);
@@ -33,5 +33,5 @@ public class InvalidateActionResponse extends ActionResponse {
 	public void setFilter(String filter) {
 		this.filter = filter;
 	}
-	
+
 }

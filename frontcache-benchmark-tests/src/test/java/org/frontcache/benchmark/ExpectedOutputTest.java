@@ -23,8 +23,8 @@ public class ExpectedOutputTest {
         hbs.setup();
         assertNotNull(hbs.benchmark());
         hbs.tearDown();
-        
+
     }
 
-   
+
 }

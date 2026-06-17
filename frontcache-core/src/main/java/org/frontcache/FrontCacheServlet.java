@@ -34,18 +34,18 @@ public class FrontCacheServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
-	
+
 	FrontCacheEngine fcEngine = null;
-	
+
 	public FrontCacheServlet() {
 	}
-	
+
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
-		
+
 		fcEngine = FrontCacheEngine.getFrontCache();
-		
+
 		return;
 	}
 
@@ -54,7 +54,7 @@ public class FrontCacheServlet extends HttpServlet {
 		super.destroy();
 		FrontCacheEngine.destroy();
 		fcEngine = null;
-	}	
+	}
 
 
 	@Override
@@ -67,5 +67,5 @@ public class FrontCacheServlet extends HttpServlet {
         }
 	}
 
-	
+
 }
