@@ -38,51 +38,51 @@ import java.util.concurrent.TimeoutException;
 public class FrontCacheAgentCluster {
 
 	private Set<FrontCacheAgent> fcCluster = new HashSet<FrontCacheAgent>();
-	
+
 	private final static String DEFAULT_CLUSTER_CONFIG_NAME = "frontcache-cluster.conf";
-	
+
 	private final static String SITE_KEY_CONFIG_FILE = "frontcache-site-key.conf";
-	
+
 	private final static String DEFAULT_SITE_KEY = "";
-	
+
 	private static final int THREAD_AMOUNT = 4;
-    
+
 	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_AMOUNT);
-	
+
 	private static final long FRONTCACHE_CLIENT_TIMEOUT = 5*1000; // 5 second
-	
-	public FrontCacheAgentCluster(Collection<String> fcURLSet, String siteKey) 
+
+	public FrontCacheAgentCluster(Collection<String> fcURLSet, String siteKey)
 	{
 		for (String url : fcURLSet)
 			fcCluster.add(new FrontCacheAgent(url, siteKey));
 	}
-	
-	public FrontCacheAgentCluster(FrontCacheAgent ... fcClients) 
+
+	public FrontCacheAgentCluster(FrontCacheAgent ... fcClients)
 	{
 		for (FrontCacheAgent fcClient : fcClients)
 			fcCluster.add(fcClient);
 	}
 
-	public FrontCacheAgentCluster(Collection<FrontCacheAgent> fcClients) 
+	public FrontCacheAgentCluster(Collection<FrontCacheAgent> fcClients)
 	{
 		for (FrontCacheAgent fcClient : fcClients)
 			fcCluster.add(fcClient);
 	}
 
-	public FrontCacheAgentCluster() 
+	public FrontCacheAgentCluster()
 	{
 		this(DEFAULT_CLUSTER_CONFIG_NAME);
 	}
-	
-	public FrontCacheAgentCluster(String configResourceName) 
+
+	public FrontCacheAgentCluster(String configResourceName)
 	{
 		Set<String> fcURLSet = loadFrontcacheClusterNodes(configResourceName);
 		String siteKey = loadSiteKey();
-		
+
 		for (String url : fcURLSet)
 			fcCluster.add(new FrontCacheAgent(url, siteKey));
 	}
-	
+
 	public void close()
 	{
 		executor.shutdown();
@@ -93,7 +93,7 @@ public class FrontCacheAgentCluster {
 		String siteKey = DEFAULT_SITE_KEY;
 		BufferedReader confReader = null;
 		InputStream is = null;
-		try 
+		try
 		{
 			is = FrontCacheAgentCluster.class.getClassLoader().getResourceAsStream(SITE_KEY_CONFIG_FILE);
 			if (null == is)
@@ -105,7 +105,7 @@ public class FrontCacheAgentCluster {
 			siteKey = confReader.readLine();
 			if (null == siteKey)
 				siteKey = "";
-			
+
 		} catch (Exception e) {
 			// TODO: log ...
 //			throw new RuntimeException("Frontcache cluster nodes can't be loaded from " + configName, e);
@@ -123,15 +123,15 @@ public class FrontCacheAgentCluster {
 				} catch (IOException e) { }
 			}
 		}
-		
+
 		return siteKey;
 	}
-		
+
 	private Set<String> loadFrontcacheClusterNodes(String configName) {
 		Set<String> fcURLSet = new HashSet<String>();
 		BufferedReader confReader = null;
 		InputStream is = null;
-		try 
+		try
 		{
 			is = FrontCacheAgentCluster.class.getClassLoader().getResourceAsStream(configName);
 			if (null == is)
@@ -140,16 +140,16 @@ public class FrontCacheAgentCluster {
 			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
 			String clusterNodeURLStr;
 			while ((clusterNodeURLStr = confReader.readLine()) != null) {
-				
+
 				if (clusterNodeURLStr.trim().startsWith("#")) // handle comments
 					continue;
-				
+
 				if (0 == clusterNodeURLStr.trim().length()) // skip empty
 					continue;
-				
+
 				fcURLSet.add(clusterNodeURLStr);
 			}
-			
+
 		} catch (Exception e) {
 			throw new RuntimeException("Frontcache cluster nodes can't be loaded from " + configName, e);
 		} finally {
@@ -170,12 +170,12 @@ public class FrontCacheAgentCluster {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param filter
 	 * @return
 	 */
 	/**
-	 * 
+	 *
 	 * @param filter
 	 * @return
 	 */
@@ -183,18 +183,18 @@ public class FrontCacheAgentCluster {
 	{
 		Map<String, String> response = new ConcurrentHashMap<String, String>();
         List<Future<InvalidationResponse>> futureList = new ArrayList<Future<InvalidationResponse>>();
-        
+
 		fcCluster.forEach(client -> futureList.add(executor.submit(new InvalidationCaller(client, filter))));
 
-		futureList.forEach(f -> 
+		futureList.forEach(f ->
 					{
 			            try {
 			            	InvalidationResponse result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-			            		
+
 			            	if (null != result)
 			            		response.put(result.getName(), result.getResponse());
-			            		
-			            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+
+			            } catch (TimeoutException | InterruptedException | ExecutionException e) {
 			                f.cancel(true);
 			                System.out.println("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for invalidation. Some cache instances may not invalidated ");
 			            }
@@ -205,25 +205,25 @@ public class FrontCacheAgentCluster {
 	}
 
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	public Map<String, String> removeFromCacheAll()
 	{
 		return removeFromCache(null);
 	}
-	
+
 }
 
 
 /**
- * 
+ *
  */
 class InvalidationResponse {
 
 	private String name;
 	private String response;
-	
+
 	public InvalidationResponse(String name, String response) {
 		super();
 		this.name = name;
@@ -241,13 +241,13 @@ class InvalidationResponse {
 }
 
 /**
- * 
+ *
  */
 class InvalidationCaller implements Callable<InvalidationResponse> {
-	
+
 	private FrontCacheAgent fcClient;
 	private String filter;
-	
+
 	public InvalidationCaller(FrontCacheAgent fcClient, String filter) {
 		super();
 		this.fcClient = fcClient;
@@ -256,8 +256,8 @@ class InvalidationCaller implements Callable<InvalidationResponse> {
 
     @Override
     public InvalidationResponse call() throws Exception {
-		String resp = fcClient.removeFromCache(filter); 
-		return new InvalidationResponse(fcClient.getFrontCacheURL(), resp); 
+		String resp = fcClient.removeFromCache(filter);
+		return new InvalidationResponse(fcClient.getFrontCacheURL(), resp);
     }
-}	
+}
 
