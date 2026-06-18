@@ -173,14 +173,16 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		// don't cache pure dynamic components
 		if (!FCUtils.isWebComponentSubjectToCache(component.getExpireTimeMap()))
 		{
-			try {
-				throw new Exception("Debug call trace - component.getExpireTimeMap() shouldn't be like that " + component.getExpireTimeMap());
-			} catch (Exception e) {
-				logger.error("Debuging #202 (dynamic response caching) ", e);
-			}
-
+			logWithStackTrace("Dynamic response caching " + domain + " - " + url + "expireTimeMap shouldn't be like that " + component.getExpireTimeMap());
 			return;
 		}
+
+        // don't cache 0 length content
+        if (null == component.getContent() || 0 == component.getContent().length)
+        {
+            logWithStackTrace("don't cache 0 length content ");
+            return;
+        }
 
 		if (component.getStatusCode() >= 500)
 		{
@@ -204,6 +206,18 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		}
 
 		return;
+	}
+
+	/**
+	 * Logs an error message together with a synthetic stack trace, so the call
+	 * site that triggered the skipped caching can be identified in the logs.
+	 */
+	private void logWithStackTrace(String logMessage) {
+		try {
+			throw new Exception("synthetic stack trace");
+		} catch (Exception e) {
+			logger.error(logMessage, e);
+		}
 	}
 
 	/**
@@ -233,10 +247,7 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 			for(Object key : ehCache.getKeys())
 			{
-				String objDomain = ((WebResponse) ehCache.get(key).getObjectValue()).getDomain();
-
 				String str = key.toString();
-//				if (domain.equals(objDomain) && -1 < str.indexOf(filter))
 				if (-1 < str.indexOf(filter))
 					removeList.add(key);
 			}
@@ -329,58 +340,7 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 	@Override
 	public void patch() {
-
-		System.out.println("!!!!! start patching ");
-		logger.info("!!!!! start patching ");
-
-		final String domain = "coinshome.net";
-		long webResponseNullCounter = 0;
-		long webResponseDomainErrorCounter = 0;
-		long webResponseDomainNullErrorCounter = 0;
-
-		System.out.println("!!!!! start getting keys ... ");
-		logger.info("!!!!! start getting keys ... ");
-		List<String> urls = luceneIndexManager.getKeys();
-		System.out.println("" + urls.size() + " keys are found ... ");
-		logger.info("" + urls.size() + " keys are found ... ");
-
-		long counter = 0;
-		for (String url : urls)
-		{
-			counter++;
-			if (0 == counter % 1000)
-				logger.info("" + counter + " items processed");
-
-			WebResponse webResponse = getFromCacheImpl(url);
-
-			if (null == webResponse)
-			{
-				System.out.println("webResponse = null for " + url);
-				webResponseNullCounter++;
-				removeFromCache(domain, url);
-				continue;
-			}
-
-			if (null != webResponse.getDomain())
-			{
-				System.out.println("1. domain = " + webResponse.getDomain() + " should be null");
-				webResponseDomainErrorCounter++;
-			} else {
-				putToCache(domain, url, webResponse);
-			}
-
-			webResponse = getFromCache(url);
-			if (null == webResponse.getDomain())
-			{
-				System.out.println("1. domain = null, should be " + domain);
-				webResponseDomainNullErrorCounter++;
-			}
-
-		} // for (String url : luceneIndexManager.getKeys())
-
-		System.out.println("webResponseNullCounter = " + webResponseNullCounter + " webResponseDomainErrorCounter = " + webResponseDomainErrorCounter + ", webResponseDomainNullErrorCounter = " + webResponseDomainNullErrorCounter);
-
-		return;
+		// TODO Auto-generated method stub
 	}
 }
 
