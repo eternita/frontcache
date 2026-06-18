@@ -193,7 +193,12 @@ public class FCUtils {
 				return ip;
 			}
 		}
-		return request.getRemoteAddr();
+        try {
+            return request.getRemoteAddr();
+        } catch (Exception ex) {
+            logger.info(" Can't resolve IP from request");
+        }
+        return "unresolved";
 	}
 
 	/**
