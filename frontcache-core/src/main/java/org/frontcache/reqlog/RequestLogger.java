@@ -93,7 +93,7 @@ public class RequestLogger {
 		.append(SEPARATOR).append(runtimeMillis)
 		.append(SEPARATOR).append(lengthBytes)
 		.append(SEPARATOR).append("\"").append(url).append("\"")
-		.append(SEPARATOR).append(FCUtils.getClientIP(request))
+		.append(SEPARATOR).append("\"").append(FCUtils.getClientIP(request)).append("\"")
 		.append(SEPARATOR).append(context.getFrontCacheId())
 		.append(SEPARATOR).append(context.getClientType())
 		.append(SEPARATOR).append("\"").append(userAgent).append("\"");
