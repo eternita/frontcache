@@ -117,6 +117,11 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 
 		FallbackConfigEntryImpl currentFallbackConfigEntry = null;
 
+        if (null == fallbackConfig)
+        {
+            return getDefalut(fallbackSource, urlStr);
+        }
+
 		for (FallbackConfigEntryImpl fallbackConfigEntry : fallbackConfig)
 		{
     		if (fallbackConfigEntry.getUrlRegexpPattern().matcher(urlStr).matches())
