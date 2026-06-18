@@ -65,9 +65,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	public abstract WebResponse getFromCacheImpl(String url);
 
 	@Override
-	public final WebResponse getFromCache(String url)
+	public final WebResponse getFromCache(String url, RequestContext context)
 	{
-		WebResponse cachedWebResponse = new FC_ThroughCache(this, url, null).execute();
+		WebResponse cachedWebResponse = new FC_ThroughCache(this, url, context).execute();
 
 		return cachedWebResponse;
 	}

@@ -67,7 +67,7 @@ public class NoCacheProcessor implements CacheProcessor {
 	}
 
 	@Override
-	public WebResponse getFromCache(String url) {
+	public WebResponse getFromCache(String url, RequestContext context) {
 		// TODO Auto-generated method stub
 		return null;
 	}

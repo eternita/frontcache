@@ -249,7 +249,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		if (null == key)
 			return new GetFromCacheActionResponse(key);
 
-		WebResponse webResponse = CacheManager.getInstance().getFromCache(key);
+		WebResponse webResponse = CacheManager.getInstance().getFromCache(key, null); // admin lookup - no request context
 		GetFromCacheActionResponse actionResponse = new GetFromCacheActionResponse(key, webResponse);
 
 		return actionResponse;
