@@ -117,7 +117,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		}
 
 		if (!isCacheableForClientType || // call origin if request is dynamic for client type [bot|browser] or component is null
-				null == cachedWebResponse)
+				null == cachedWebResponse || 0 >= cachedWebResponse.getContentLenth())
 		{
 			try
 			{
@@ -134,7 +134,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				if (!context.isHystrixFallback() // don't cache hystrix fallbacks
 						&& isCacheableForClientType
 						&& isFreshDataCacheableForClientType
-						&& cachedWebResponse.isCacheable())
+						&& cachedWebResponse.isCacheable()
+                        && lengthBytes > 0 // don't cache empty responses
+                )
 				{
 					WebResponse copy4cache = cachedWebResponse.copy();
 					Map<String, List<String>> copyHeaders = copy4cache.getHeaders();
