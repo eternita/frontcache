@@ -43,11 +43,11 @@
 	<distributionManagement>
 	  <snapshotRepository>
 	    <id>eternita-s3-snapshots</id>
-	    <url>s3://www.eternita.co/snapshots</url>
+	    <url>s3://repo.eternita.co/snapshots</url>
 	  </snapshotRepository>
 	  <repository>
 	    <id>eternita-s3-releases</id>
-	    <url>s3://www.eternita.co/releases</url>
+	    <url>s3://repo.eternita.co/releases</url>
 	  </repository>
 	</distributionManagement>
 	
