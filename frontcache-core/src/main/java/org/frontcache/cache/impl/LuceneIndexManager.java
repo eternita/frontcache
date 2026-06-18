@@ -32,14 +32,8 @@ import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexOptions;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.*;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.index.TermContext;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
@@ -143,7 +137,6 @@ public class LuceneIndexManager {
 
 	/**
 	 * Returns instance of IndexManager
-	 * @param create
 	 * @return
 	 * @throws IOException
 	 */
@@ -289,7 +282,7 @@ public class LuceneIndexManager {
 			reader = DirectoryReader.open(iWriter);
 			Term domainTerm = new Term(DOMAIN_FIELD, domain);
 			IndexSearcher searcher = new IndexSearcher(reader);
-			TermStatistics termStat = searcher.termStatistics(domainTerm, TermContext.build(searcher.getIndexReader().getContext(), domainTerm));
+			TermStatistics termStat = searcher.termStatistics(domainTerm, TermStates.build(searcher.getIndexReader().getContext(), domainTerm, true));
 			count = termStat.docFreq();
 		} catch (Exception e1) {
 			logger.debug("Error during reader.totalTermFreq(domainTerm). " + e1.getMessage());
@@ -386,7 +379,7 @@ public class LuceneIndexManager {
 
 	/**
 	 * Removes documents by url or tags
-	 * @param urlOrTag
+	 * @param domain
 	 */
 	public void deleteAll(String domain) {
 
