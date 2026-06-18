@@ -226,7 +226,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		long start = System.currentTimeMillis();
 
 		CacheProcessor cacheProcessor = CacheManager.getInstance();
-		WebResponse webResponse = cacheProcessor.getFromCache(urlStr);
+		WebResponse webResponse = cacheProcessor.getFromCache(urlStr, context);
 
 		boolean isCacheableForClientType = true;
 

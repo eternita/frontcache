@@ -39,7 +39,7 @@ public interface CacheProcessor {
 
 	public void putToCache(String domain, String url, WebResponse component);
 
-	public WebResponse getFromCache(String url);
+	public WebResponse getFromCache(String url, RequestContext context);
 
 	public void removeFromCache(String domain, String filter);
 

@@ -16,6 +16,7 @@
  */
 package org.frontcache.hystrix;
 
+import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -41,9 +42,13 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache.class);
 
     public FC_ThroughCache(CacheProcessorBase cacheProcessorBase, String originUrlStr, RequestContext context) {
-        //TODO: replace wit hdomainContext
+        // group by domain (matches FC_Total / FC_BypassCache / RequestLogger).
+        // context can be null for admin (FrontCacheIOServlet) lookups -> fall back to default domain
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("coinshome.net"))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(
+                		null != context
+                                ? context.getDomainContext().getDomain()
+                                : FCConfig.getProperty("front-cache.origin-host", "localhost")))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Hits"))
         		);
 
