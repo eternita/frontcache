@@ -49,13 +49,28 @@ ssh "${SSH_OPTS[@]}" "$SSH_TARGET" '
   java -version
 '
 
+echo ">>> Cleaning up previous install on $SSH_TARGET ..."
+ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "
+  set -e
+  # stop the service if it exists
+  if systemctl list-unit-files | grep -q '^$SERVICE_NAME.service'; then
+    sudo systemctl stop $SERVICE_NAME || true
+  fi
+  # delete the target folder
+  rm -rf ~/$REMOTE_DIR/frontcache-server
+"
+
 echo ">>> Creating ~/$REMOTE_DIR on $SSH_TARGET ..."
 ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "mkdir -p ~/$REMOTE_DIR"
 
 echo ">>> Compressing frontcache-server ..."
 ARCHIVE="frontcache-server.tar.gz"
 LOCAL_ARCHIVE="$SCRIPT_DIR/$ARCHIVE"
-tar -czf "$LOCAL_ARCHIVE" -C "$SCRIPT_DIR" "$(basename "$LOCAL_SERVER_DIR")"
+# COPYFILE_DISABLE stops macOS bsdtar from emitting AppleDouble (._*) sidecars;
+# --exclude drops any that already exist on disk plus .DS_Store. Jetty globs
+# start.d/*.ini and would try to parse a stray ._http.ini as UTF-8 config and crash.
+COPYFILE_DISABLE=1 tar --exclude='._*' --exclude='.DS_Store' \
+  -czf "$LOCAL_ARCHIVE" -C "$SCRIPT_DIR" "$(basename "$LOCAL_SERVER_DIR")"
 
 echo ">>> Uploading $ARCHIVE to $SSH_TARGET:~/$REMOTE_DIR/ ..."
 scp "${SSH_OPTS[@]}" "$LOCAL_ARCHIVE" "$SSH_TARGET:~/$REMOTE_DIR/"
@@ -85,6 +100,9 @@ After=network.target
 
 [Service]
 Type=simple
+# allow the non-root service user to bind privileged ports 80/443 (see start.d/http.ini, ssl.ini)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 User=$REMOTE_USER
 WorkingDirectory=\$SERVER_DIR/server/bin
 ExecStart=\$SERVER_DIR/server/bin/frontcache

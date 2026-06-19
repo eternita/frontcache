@@ -234,6 +234,16 @@ flowchart LR
    produces `ROOT.war` + standalone Jetty), or download binaries and run `./bin/frontcache`.
    It listens on **:9080** (HTTP) / **:9443** (HTTPS).
 
+   > To provision a fresh AWS EC2 host (Ubuntu 24.04, in any region) from scratch — AMI,
+   > key pair, and a security group opening 22/80/443 — see
+   > [`create-frontcache-aws-ec2-instance.sh`](../create-frontcache-aws-ec2-instance.sh).
+   > To then deploy to a remote Ubuntu host as a `systemd` service, see
+   > [`install-frontcache-server-remote.sh`](../install-frontcache-server-remote.sh). For a
+   > worked example — including the real-world gotchas (privileged ports 80/443, Java-8 bytecode
+   > for Jetty 9.3.6's annotation scanner, macOS AppleDouble files breaking config parsing, AWS
+   > Security Group rules) — see the debugging log
+   > [`docs/log-frontcache-standalone-deployment.md`](log-frontcache-standalone-deployment.md).
+
 2. **Point it at your origin** in `$FRONTCACHE_HOME/conf/frontcache.properties`:
 
    ```properties
@@ -509,4 +519,7 @@ flowchart TD
 - Agent: `frontcache-agent/.../agent/{FrontCacheAgent,FrontCacheAgentCluster}.java`
 - web.xml example: `examples/frontcache-jsp/src/main/webapp/WEB-INF/web.xml`
 - Ports: `build.gradle` (Gretty configs)
+- Create EC2 host (any region): `create-frontcache-aws-ec2-instance.sh`
+- Remote install script: `install-frontcache-server-remote.sh`
+- Standalone deployment debugging log: [`docs/log-frontcache-standalone-deployment.md`](log-frontcache-standalone-deployment.md)
 - Wiki: https://github.com/eternita/frontcache/wiki
