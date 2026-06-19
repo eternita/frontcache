@@ -24,10 +24,10 @@ public class FrontCacheStatus {
 	private String url;
 	private long cachedAmount;
 	private boolean available;
-	
+
 	private static DecimalFormat formater = new DecimalFormat("###,###,###,###");
-	
-	
+
+
 	public String getName() {
 		return name;
 	}
@@ -56,7 +56,7 @@ public class FrontCacheStatus {
 	public void setAvailable(boolean available) {
 		this.available = available;
 	}
-	
+
 	public String getOnlineStatus()
 	{
 		return isAvailable() ? "ONLINE" : "OFFLINE";
@@ -75,5 +75,5 @@ public class FrontCacheStatus {
 	public void setUrl(String url) {
 		this.url = url;
 	}
-	
+
 }

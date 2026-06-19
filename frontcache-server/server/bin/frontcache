@@ -127,4 +127,5 @@ FRONTCACHE_URL_SCHEME=http
 FRONTCACHE_JETTY_CONFIG=()
 FRONTCACHE_SSL_OPTS=""
 
-exec "$JAVA" -jar "$FRONTCACHE_TIP/start.jar" "jetty.base=$FRONTCACHE_JETTY_BASE" "-Dfrontcache.home=$FRONTCACHE_HOME"  "-Dlogback.configurationFile=$FRONTCACHE_HOME/conf/fc-logback.xml"
+echo "$JAVA -jar $FRONTCACHE_TIP/start.jar jetty.base=$FRONTCACHE_JETTY_BASE -Dfrontcache.home=$FRONTCACHE_HOME -Dlogback.configurationFile=$FRONTCACHE_HOME/conf/fc-logback.xml"
+exec "$JAVA" -jar "$FRONTCACHE_TIP/start.jar" "jetty.base=$FRONTCACHE_JETTY_BASE" "-Dfrontcache.home=$FRONTCACHE_HOME" "-Dlogback.configurationFile=$FRONTCACHE_HOME/conf/fc-logback.xml"

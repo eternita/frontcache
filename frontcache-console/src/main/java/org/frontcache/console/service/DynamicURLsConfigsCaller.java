@@ -22,9 +22,9 @@ import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.DynamicURLsConfig;
 
 public class DynamicURLsConfigsCaller implements Callable<DynamicURLsConfig> {
-	
+
 	private FrontCacheClient fcClient;
-	
+
 	public DynamicURLsConfigsCaller(FrontCacheClient fcClient) {
 		super();
 		this.fcClient = fcClient;
@@ -32,7 +32,7 @@ public class DynamicURLsConfigsCaller implements Callable<DynamicURLsConfig> {
 
     @Override
     public DynamicURLsConfig call() throws Exception {
-		
-		 return new DynamicURLsConfig(fcClient.getName(), fcClient.getDynamicURLs()); 
+
+		 return new DynamicURLsConfig(fcClient.getName(), fcClient.getDynamicURLs());
     }
-}	
+}

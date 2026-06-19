@@ -43,7 +43,7 @@ public class WebConfig extends WebMvcConfigurerAdapter {
 			DefaultServletHandlerConfigurer configurer) {
 		configurer.enable();
 	}
-	
+
 	@Bean
 	public FilterRegistrationBean someFilterRegistration() {
 
@@ -53,7 +53,7 @@ public class WebConfig extends WebMvcConfigurerAdapter {
 	    registration.setName("FrontCacheFilter");
 	    registration.setOrder(1);
 	    return registration;
-	} 
+	}
 
 	@Bean(name = "FrontCacheFilter")
 	public Filter frontcacheFilter() {

@@ -32,31 +32,31 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebResponse;
 
 /**
- * 
+ *
  * Defined tests are run in filter & standalone modes
  *
  */
 public class TestsBase {
 
 	protected WebClient webClient = null;
-	
+
 	protected FrontCacheClient frontcacheClientStandalone = null;
 	protected FrontCacheClient frontcacheClientFilter = null;
-	
-	protected Logger logger = LoggerFactory.getLogger(TestsBase.class);  
+
+	protected Logger logger = LoggerFactory.getLogger(TestsBase.class);
 
 
 	@Before
 	public void setUp() throws Exception {
 		webClient = new WebClient();
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
-		
+
 		frontcacheClientStandalone = new FrontCacheClient(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_FC1, SiteKeys.TEST_SITE_KEY_1);
-		frontcacheClientStandalone.removeFromCacheAll(); // clean up		
-		
+		frontcacheClientStandalone.removeFromCacheAll(); // clean up
+
 		frontcacheClientFilter = new FrontCacheClient(TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_FC1, SiteKeys.TEST_SITE_KEY_1);
-		frontcacheClientFilter.removeFromCacheAll(); // clean up		
-		
+		frontcacheClientFilter.removeFromCacheAll(); // clean up
+
 	}
 
 	@After
@@ -64,24 +64,24 @@ public class TestsBase {
 		webClient.close();
 	}
 
-	
+
 	protected void printHeaders(WebResponse webResponse)
 	{
 		logger.info(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST));
 		return;
 	}
-	
+
 	protected byte[] getBytes(InputStream is) throws Exception {
-		
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
             int bytesRead = 0;
             int bufferSize = 4000;
-             byte[] byteBuffer = new byte[bufferSize];              
+             byte[] byteBuffer = new byte[bufferSize];
              while ((bytesRead = is.read(byteBuffer)) != -1) {
                  baos.write(byteBuffer, 0, bytesRead);
              }
-             
+
              return baos.toByteArray();
         } catch (Exception e) {
         	e.printStackTrace();
@@ -95,11 +95,11 @@ public class TestsBase {
                 }
             }
         }
-		
+
 		return null;
 	}
-	
-	
+
+
 	protected static String getFilterBaseURLLocalhost()
 	{
 		return TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST;
@@ -129,5 +129,5 @@ public class TestsBase {
 	{
 		return TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_FC2;
 	}
-	
+
 }

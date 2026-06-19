@@ -20,7 +20,7 @@ public class CacheViewForm {
 
 	private String edge;
 	private String key;
-	
+
 	public CacheViewForm() {
 	}
 
@@ -39,5 +39,5 @@ public class CacheViewForm {
 	public void setKey(String key) {
 		this.key = key;
 	}
-	
+
 }

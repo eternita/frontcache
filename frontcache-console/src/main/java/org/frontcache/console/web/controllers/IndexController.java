@@ -40,12 +40,12 @@ public class IndexController {
 
 	@RequestMapping(value = {"/", "/index"}, method = RequestMethod.GET)
 	public String index(HttpServletRequest request) {
-		
+
 		if (frontcacheService.getEdgesAmount() > 0)
 			return "redirect:realtime";
 		else {
 
-			// check if it's development / test mode 
+			// check if it's development / test mode
 			// edge and console started inside gretty farm
 			String localFrontcacheURL = (request.isSecure() ? "https" : "http") + "://localhost:" + request.getServerPort();
 			if (frontcacheService.isFrontCacheEdgeAvailable(localFrontcacheURL))
@@ -54,14 +54,14 @@ public class IndexController {
 				frontcacheService.addEdge(localFrontcacheURL);
 				return "redirect:realtime";
 			}
-			
+
 			return "no_edges";
 		}
-		
+
 	}
 
-	
-	
+
+
 	@RequestMapping(value = "/realtime", method = RequestMethod.GET)
 	public String domainRealtimeMonitor(ModelMap model) {
 

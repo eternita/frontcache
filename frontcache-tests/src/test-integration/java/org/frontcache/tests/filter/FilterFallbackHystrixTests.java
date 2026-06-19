@@ -14,15 +14,15 @@ public class FilterFallbackHystrixTests extends FallbackHystrixTests {
 	// 1. server started and fallfack files generated
 	// 2. file deleted from here (setUpClass())
 	// 3. tests failed because file deleted
-	
+
 	// clean up files after tests
-	
+
 	@BeforeClass
 	public static void setUpClass() throws Exception {
 		return;
 	}
 //*/
-	
+
 	@AfterClass
 	public static void tearDownClass() throws Exception {
 		//		 cleanup after customeFallbackTest2LoadFromURL()
@@ -34,7 +34,7 @@ public class FilterFallbackHystrixTests extends FallbackHystrixTests {
 		if (fallbackDataFile.exists())
 			fallbackDataFile.delete();
 	}
-	
+
 	@Override
 	public String getFrontCacheBaseURLDomainFC1() {
 		return getFilterBaseURLDomainFC1();
@@ -45,6 +45,6 @@ public class FilterFallbackHystrixTests extends FallbackHystrixTests {
 		return getFilterBaseURLLocalhost();
 	}
 
-	
+
 
 }

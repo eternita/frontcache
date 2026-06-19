@@ -20,7 +20,7 @@ public class CacheInvalidationForm {
 
 	private String edge;
 	private String filter;
-	
+
 	public CacheInvalidationForm() {
 	}
 
@@ -39,5 +39,5 @@ public class CacheInvalidationForm {
 	public void setFilter(String filter) {
 		this.filter = filter;
 	}
-	
+
 }

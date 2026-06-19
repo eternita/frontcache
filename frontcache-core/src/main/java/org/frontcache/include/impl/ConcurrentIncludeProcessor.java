@@ -43,7 +43,7 @@ import org.frontcache.include.IncludeProcessorBase;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 
 /**
- * 
+ *
  * Processing URL example <fc:include url="/some/url/here" />
  *
  */
@@ -51,7 +51,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	private int threadAmount = 10; // default 10 thread
 	private long timeout = 6*1000; // default 6 second
-	
+
     ExecutorService executor = null;
 
 	public ConcurrentIncludeProcessor() {
@@ -63,33 +63,33 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		{
 			String threadAmountStr = properties.getProperty("front-cache.include-processor.impl.concurrent.thread-amount");
 			if (null != threadAmountStr && threadAmountStr.trim().length() > 0)
-				threadAmount = Integer.parseInt(threadAmountStr); 
+				threadAmount = Integer.parseInt(threadAmountStr);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
 		logger.info("amount of threads: " + threadAmount);
-		
+
 		try
 		{
 			String timeoutStr = properties.getProperty("front-cache.include-processor.impl.concurrent.timeout");
 			if (null != timeoutStr && timeoutStr.trim().length() > 0)
-				timeout = Integer.parseInt(timeoutStr); 
+				timeout = Integer.parseInt(timeoutStr);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
 		logger.info("timeout: " + timeout);
-		
-	    executor = Executors.newFixedThreadPool(threadAmount); 
+
+	    executor = Executors.newFixedThreadPool(threadAmount);
 	}
 
 
 	@Override
 	public void destroy() {
 		executor.shutdown();
-	}	
-		
+	}
+
 	/**
-	 * 
+	 *
 	 * @param content
 	 * @param hostURL
 	 * @return
@@ -98,7 +98,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	{
 		String contentStr = new String(parentWebResponse.getContent());
 		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, requestHeaders, client, context);
-		
+
 		if (null == includes)
 			return parentWebResponse;
 
@@ -108,24 +108,24 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		{
         	IncludeResolutionPlaceholder inc = includes.get(i);
         	inc.includeLevel = "" + recursionLevel + "." + i;
-        	
+
 			boolean performInclude = false; // check for client specific include
 			if (null == inc.includeClientType)
 			{
 				performInclude = true;
-				
+
 			} else if (inc.includeClientType.equalsIgnoreCase(context.getClientType())) {
 
 				// client type specific include
 				performInclude = true;
 			} else {
-				
-				// client type for include and request doesnt match 
+
+				// client type for include and request doesnt match
 				performInclude = false;
 			}
-        	
+
         	inc.performInclude = performInclude; // save for include resolution
-        	
+
 			if (performInclude)
 			{
 				if (INCLUDE_TYPE_ASYNC.equals(inc.includeType))
@@ -133,7 +133,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					// run concurrent include resolution
 					// for Async includes - do NOT wait for response from Origin
 					// response from Origin is NOT included to response to client
-					// useful for counters - e.g. response totally from cache (fast) and async call to origin 
+					// useful for counters - e.g. response totally from cache (fast) and async call to origin
 					executor.submit(inc);
 				} else {
 					// run concurrent include resolution
@@ -143,8 +143,8 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				}
 			} // if (performInclude)
 		}
-      
-		// processing timeouts for Sync includes 
+
+		// processing timeouts for Sync includes
         boolean timeoutReached = false;
         for (Future<IncludeResolutionPlaceholder> f : futureList)
         {
@@ -153,22 +153,22 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
             		f.get(1, TimeUnit.MILLISECONDS);
             	else
             		f.get(timeout, TimeUnit.MILLISECONDS);
-            		
-            } catch (TimeoutException | InterruptedException | ExecutionException e) { 
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
                 logger.debug("timeout (" + timeout + ") reached for resolving includes. Some includes may not be resolved ");
             }
         }
-		
+
         // replace placeholders with content
 		WebResponse agregatedWebResponse = replaceIncludePlaceholders(contentStr, includes);
 
 		return agregatedWebResponse;
-	}	
+	}
 
 	/**
-	 * 
+	 *
 	 * @param content
 	 * @param hostURL
 	 * @return
@@ -176,7 +176,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
-		
+
 		int scanIdx = 0;
 		while(scanIdx < content.length())
 		{
@@ -190,7 +190,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					String includeTagStr = content.substring(startIdx, endIdx);
 					String includeURL = getIncludeURL(includeTagStr);
 					String includeType = getIncludeType(includeTagStr);
-					
+
 					Map<String, List<String>> includeRequestHeaders = requestHeaders;
 					if (INCLUDE_TYPE_ASYNC.equals(includeType))
 					{
@@ -199,30 +199,30 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 						includeRequestHeaders.putAll(requestHeaders);
 						includeRequestHeaders.put(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE, Arrays.asList(new String[]{"true"}));
 					}
-					
+
 					String includeClientType = getIncludeClientType(includeTagStr);
-					
+
 					if (null == includes)
 						includes = new ArrayList<IncludeResolutionPlaceholder>();
-					
+
 					// save placeholder
 					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, includeType, includeClientType, includeRequestHeaders, client, context));
-					
+
 					scanIdx = endIdx;
 				} else {
-					// can't find closing 
+					// can't find closing
 					scanIdx = content.length(); // scan complete
 				}
 			} else {
 				scanIdx = content.length(); // scan complete
 			}
 		}
-		
+
 		return includes;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param content
 	 * @param includes
 	 * @return
@@ -230,10 +230,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	private WebResponse replaceIncludePlaceholders(String content, List<IncludeResolutionPlaceholder> includes)
 	{
 		int scanIdx = 0;
-		
+
 		// paste content from includes to output doc
 		WebResponse webResponse = new WebResponse("aggregation in " + this.getClass().getName());
-		
+
 		StringBuffer outSb = new StringBuffer();
 		for (int i = 0; i < includes.size(); i++)
 		{
@@ -241,34 +241,34 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	        if (null != inc.webResponse) {
 	        	logger.debug("include "  + inc.includeURL + " has content");
-	        	
+
 	        } else if (!inc.performInclude) {
 	        	// it's client specific include and should not be performed -> replace include tag with blank string
-	        } else { 
+	        } else {
 				// dont get fallback for async calls
 				// when async call -> webResponse is null because we don't wait for response
-				// get fallback for SYNC includes only 
+				// get fallback for SYNC includes only
 				if (!INCLUDE_TYPE_ASYNC.equals(inc.includeType))
 				{
 		        	logger.debug("include detais "  + inc.includeURL + " content is not resolved due to timeout (" + timeout + ")  getting defaults");
 		        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(inc.context.getDomainContext(), this.getClass().getName(), inc.includeURL);
 				}
 	        }
-	        	
-			
+
+
 			outSb.append(content.substring(scanIdx, inc.startIdx));
 
 			if (INCLUDE_TYPE_SYNC.equals(inc.includeType))
 			{
 				if (FrontCacheEngine.debugComments)
 					outSb.append("<!-- start fc:include ").append(inc.includeURL).append(" -->");
-				
+
 				if (null != inc.webResponse)
 					outSb.append(new String(inc.webResponse.getContent()));
-				
+
 				if (FrontCacheEngine.debugComments)
 					outSb.append("<!-- end fc:include ").append(inc.includeURL).append(" -->");
-				
+
 				if (null != inc.webResponse)
 					mergeIncludeResponseHeaders(webResponse.getHeaders(), inc.webResponse.getHeaders());
 			}
@@ -279,10 +279,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		webResponse.setContent(outSb.toString().getBytes());
 		return webResponse;
 	}
-	
+
 	/**
-	 * 
-	 * 
+	 *
+	 *
 	 *
 	 */
 	class IncludeResolutionPlaceholder implements Callable<IncludeResolutionPlaceholder> {
@@ -292,12 +292,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		String includeType; // sync|async
 		String includeClientType; // bot|browser
 		WebResponse webResponse;
-		Map<String, List<String>> requestHeaders; 
+		Map<String, List<String>> requestHeaders;
 		HttpClient client;
 		RequestContext context;
 		boolean performInclude = true;
 		String includeLevel = null;
-		
+
 		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String includeType, String includeClientType, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
 			super();
 			this.startIdx = startIdx;
@@ -312,7 +312,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	    @Override
 	    public IncludeResolutionPlaceholder call() throws Exception {
-	    	
+
 			try {
 				this.webResponse = callInclude(this.includeURL, this.requestHeaders, this.client, this.context, this.includeLevel, this.includeType);
 
@@ -321,7 +321,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			} catch (HystrixRuntimeException e) {
 				logger.error("HystrixRuntimeException: unexpected error processing include " + includeURL, e);
 				// in multi threaded environment hystrix does not resolve fallback ??
-				// so, get fallback manually 
+				// so, get fallback manually
 			} catch (Throwable e) {
 				logger.error("Throwable: unexpected error processing include " + includeURL, e);
 			} finally {
@@ -329,16 +329,16 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				{
 					// dont get fallback for async calls
 					// when async call -> webResponse is null because we don't wait for response
-					// get fallback for SYNC includes only 
+					// get fallback for SYNC includes only
 					if (!INCLUDE_TYPE_ASYNC.equals(includeType))
 						this.webResponse = FallbackResolverFactory.getInstance().getFallback(this.context.getDomainContext(), this.getClass().getName(), includeURL);
 				}
 			}
-	    	
+
 	        return this;
 	    }
-		
-	}	
+
+	}
 }
 
 

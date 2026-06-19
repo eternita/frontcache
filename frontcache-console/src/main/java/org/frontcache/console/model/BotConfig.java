@@ -23,7 +23,7 @@ public class BotConfig {
 
 	private String name;
 	private Map<String, Set<String>> config;
-	
+
 	public BotConfig(String name, Map<String, Set<String>> config) {
 		super();
 		this.name = name;

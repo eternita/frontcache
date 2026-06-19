@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class WelcomeController {
 
   private static final Logger logger = LoggerFactory.getLogger(WelcomeController.class);
-  
+
   @RequestMapping("/example")
   public String download(Map<String, Object> model) {
     logger.info("Processing /example request");

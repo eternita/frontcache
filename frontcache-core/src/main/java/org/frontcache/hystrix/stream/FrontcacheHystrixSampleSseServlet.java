@@ -46,9 +46,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  */
 public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
-	
+
 	/**
-	 * 
+	 *
 	 */
 	private static final long serialVersionUID = 7939894788065973626L;
 
@@ -118,7 +118,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 		}
 
 	}
-	
+
 	private static boolean isOwnerGroup(HystrixCommandMetrics commandMetrics, final String siteKey) {
 		logger.debug("HystrixCommandMetrics {}", commandMetrics.getCommandGroup().name());
 
@@ -178,7 +178,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 	}
 
 
-	
+
 	/**
 	 * - maintain an open connection with the client - on initial connection
 	 * send latest data of each requested event type - subsequently send all
@@ -201,13 +201,13 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 			response.sendError(503, "Can't resolve domain from siteKey");
 			return;
 		}
-		
+
 		/* ensure we aren't allowing more connections than we want */
 		int numberConnections = incrementAndGetCurrentConcurrentConnections();
 		try {
-			
 
-			
+
+
 			int maxNumberConnectionsAllowed = getMaxNumberConcurrentConnectionsAllowed();
 			if (numberConnections > maxNumberConnectionsAllowed) {
 				response.sendError(503, "MaxConcurrentConnections reached: " + maxNumberConnectionsAllowed);
@@ -223,14 +223,14 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 				// events will get published on an RxComputation thread
 				// since writing to the servlet response is blocking, use the Rx
 				// IO thread for the write that occurs in the onNext
-				
+
 				originStream.concatMap(new Func1<HystrixDashboardStream.DashboardData, Observable<String>>() {
 					@Override
 					public Observable<String> call(HystrixDashboardStream.DashboardData dashboardData) {
 						return Observable.from(toMultipleJsonStrings(dashboardData, domain));
 					}
 				}).observeOn(Schedulers.io()).subscribe(new Subscriber<String>() {
-				
+
 					@Override
 					public void onCompleted() {
 						logger.error("HystrixSampleSseServlet: ({}) received unexpected OnCompleted from sample stream",

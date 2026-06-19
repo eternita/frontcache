@@ -28,7 +28,7 @@ public class IncludeProcessorManager {
 
 	private static Logger logger = LoggerFactory.getLogger(IncludeProcessorManager.class);
 	private IncludeProcessorManager() {}
-	
+
 	private static IncludeProcessor instance;
 
 	public static IncludeProcessor getInstance(){
@@ -37,8 +37,8 @@ public class IncludeProcessorManager {
 		}
 		return instance;
 	}
-	
-	
+
+
 	private static IncludeProcessor getIncludeProcessor()
 	{
 		String implStr = FCConfig.getProperty("front-cache.include-processor.impl");
@@ -58,14 +58,14 @@ public class IncludeProcessorManager {
 
 					includeProcessor.init(FCConfig.getProperties());
 					logger.info("IncludeProcessor implementation initialized: " + implStr);
-					
+
 					return includeProcessor;
 				}
 			} catch (Exception ex) {
 				logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + ConcurrentIncludeProcessor.class.getCanonicalName());
 			}
 		}
-		
+
 		logger.info("Default include implementation is loaded: " + ConcurrentIncludeProcessor.class.getCanonicalName());
 		includeProcessor = new ConcurrentIncludeProcessor();
 		try
@@ -75,7 +75,7 @@ public class IncludeProcessorManager {
 		} catch (Exception ex) {
 			logger.error("Cant initalize default include processor. ", ex);
 		}
-		
+
 		return includeProcessor;
 	}
 

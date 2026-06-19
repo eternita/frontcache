@@ -21,7 +21,7 @@ public class FallbackConfigEntry {
 	protected String fileName;
 	protected String urlPattern;
 	protected String initUrl;
-	
+
 	public FallbackConfigEntry() { // for JSON mapper
 	}
 

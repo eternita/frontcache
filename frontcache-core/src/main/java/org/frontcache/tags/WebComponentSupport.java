@@ -63,19 +63,19 @@ public class WebComponentSupport extends BodyTagSupport {
 			HttpServletResponse response = (HttpServletResponse) pageContext.getResponse();
 
 			response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT, "true");
-			
+
 			if (null != maxage)
 				response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE, maxage);
-			
+
 			if (null != tags)
 				response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS, tags);
-			
+
 			if (null != refresh)
 				response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_REFRESH_TYPE, refresh);
-			
+
 			if (null != level)
 				response.addHeader(FCHeaders.X_FRONTCACHE_COMPONENT_CACHE_LEVEL, level);
-			
+
 			return SKIP_BODY;
 		} catch (Exception ex) {
 			throw new JspException(ex.toString(), ex);

@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 public class FallbackConfigEntryImpl extends FallbackConfigEntry {
 
 	private Pattern urlRegexpPattern;
-	
+
 	public FallbackConfigEntryImpl() { // for JSON mapper
 		super();
 	}
@@ -34,5 +34,5 @@ public class FallbackConfigEntryImpl extends FallbackConfigEntry {
 		this.urlRegexpPattern = urlRegexpPattern;
 	}
 
-	
+
 }

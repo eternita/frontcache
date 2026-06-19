@@ -20,13 +20,13 @@ public class ActionResponse {
 
 	public static final String RESPONSE_STATUS_OK = "OK";
 	public static final String RESPONSE_STATUS_ERROR = "ERROR";
-	
+
 	private String responseStatus;
-	
+
 	private String errorDescription;
-	
+
 	private String action;
-	
+
 	public ActionResponse() {
 	}
 

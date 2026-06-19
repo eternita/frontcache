@@ -28,7 +28,7 @@ public class FallbackResolverFactory {
 
 	private static Logger logger = LoggerFactory.getLogger(FallbackResolverFactory.class);
 	private FallbackResolverFactory() {}
-	
+
 	private static FallbackResolver instance;
 
 	public static FallbackResolver getInstance(){
@@ -37,7 +37,7 @@ public class FallbackResolverFactory {
 		}
 		return instance;
 	}
-	
+
 	public static FallbackResolver init(HttpClient client){
 		if (null == instance) {
 			instance = getFallbackResolver();
@@ -45,9 +45,9 @@ public class FallbackResolverFactory {
 		}
 		return instance;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @return
 	 */
 	private static FallbackResolver getFallbackResolver()
@@ -58,7 +58,7 @@ public class FallbackResolverFactory {
 			logger.info("Default implementation is loaded: " + FileBasedFallbackResolver.class.getCanonicalName());
 			return new FileBasedFallbackResolver();
 		}
-		
+
 		try
 		{
 
@@ -76,7 +76,7 @@ public class FallbackResolverFactory {
 			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + FileBasedFallbackResolver.class.getCanonicalName());
 			return new FileBasedFallbackResolver();
 		}
-		
+
 		return new FileBasedFallbackResolver();
 	}
 

@@ -24,7 +24,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
 
 /**
- * 
+ *
  * Wrapper for response
  *
  */
@@ -39,7 +39,7 @@ public class HttpResponseWrapperImpl extends HttpServletResponseWrapper implemen
 	public PrintWriter getWriter() throws IOException {
 		return new PrintWriter(sw);
 	}
-	
+
 	public String getContentString() {
 		return sw.toString();
 	}

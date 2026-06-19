@@ -25,7 +25,7 @@ public class FallbackConfig {
 
 	private String name;
 	private Map <String, Set<FallbackConfigEntry>> config;
-	
+
 	public FallbackConfig(String name, Map <String, Set<FallbackConfigEntry>> config) {
 		super();
 		this.name = name;

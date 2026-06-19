@@ -18,7 +18,7 @@ https://origin.coinshome.net:443/
 ```
 
 
-* Run Frontcache console (in Jetty container)
+* Run Frontcache console (in Jetty container) with FRONTCACHE_CONFIG environment variable
 ```
-./gradlew clean :frontcache-console:jettyRun
+FRONTCACHE_CONFIG=/path/to/frontcache-console.conf ./gradlew clean :frontcache-console:jettyRun
 ```

@@ -43,12 +43,12 @@ public class LuceneIndexTests {
 	LuceneIndexManager luceneIndexManager = null;
 
 	private final static String DOMAIN = "test-domain";
-	
+
 	private final static String COINSHOME_DOMAIN = "coinshome.net";
-	
+
 	@Test
 	public void dummy() throws Exception {
-		
+
 	}
 
 	@Test
@@ -86,7 +86,7 @@ public class LuceneIndexTests {
 		assertEquals(size - 1, luceneIndexManager.getIndexSize());
 
 	}
-	
+
 	@Test
 	public void deleteTest() throws Exception {
 		String[] tags = { "apple", "limon", "banana", "chery", "peach" };
@@ -122,7 +122,7 @@ public class LuceneIndexTests {
 
 	}
 
-	
+
 	@Test
 	public void deleteByUrl() throws Exception {
 		String[] tags = { "apple", "limon", "banana", "chery", "peach" };
@@ -166,30 +166,30 @@ public class LuceneIndexTests {
 		}
 
 	}
-	
+
 	@Test
 	public void fileRemoveByTag() throws Exception {
 
 		String url = "https://www.coinshome.net/en/coin_definition-1_Escudo-Gold-Centralist_Republic_of_Mexico_(1835_1846)-E9AKbzbiOBIAAAFG0vnZjkvL.htm";
 
 		luceneIndexManager.delete(DOMAIN, url);
-		
+
 		WebResponse response = new WebResponse(url, "data".getBytes());
 		response.addTags(Arrays.asList(new String[]{"E9AKbzbiOBIAAAFG0vnZjkvL"}));
 		response.setDomain(COINSHOME_DOMAIN);
 		luceneIndexManager.indexDoc(response);
-		
+
 		WebResponse fromFile = luceneIndexManager.getResponse(url);
 		assertEquals(url, fromFile.getUrl());
 		assertEquals(new String("data".getBytes()), new String(fromFile.getContent()));
-		
+
 		luceneIndexManager.delete(DOMAIN, "E9AKbzbiOBIAAAFG0vnZjkvL");
-		
+
 		fromFile = luceneIndexManager.getResponse(url);
 		assertNull(fromFile);
-		
+
 	}
-	
+
 	@Test
 	public void fileEmptyByteTest() throws Exception {
 
@@ -209,22 +209,22 @@ public class LuceneIndexTests {
 
 			WebResponse fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
-			
+
 			response.setContent(new byte[0]);
 			luceneIndexManager.indexDoc(response);
-			
+
 			fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
-			
+
 			response.setContent(new byte[]{'a'});
 			luceneIndexManager.indexDoc(response);
-			
+
 			fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
 			return;
 	}
 
-	
+
 	@Test
 	public void multyWritersTest() throws Exception {
 
@@ -254,9 +254,9 @@ public class LuceneIndexTests {
 		}
 
 		luceneIndexManager1.close();
-		
+
 		luceneIndexManager2.indexDoc(response);
-		
+
 		// now second writer should have IndexWriter
 		WebResponse fromFile = luceneIndexManager2.getResponse(url);
 		assertNotNull(fromFile);
@@ -270,7 +270,7 @@ public class LuceneIndexTests {
 	public void readWriteToClosedWriter() throws Exception {
 
 		String baseDir = "/tmp/lucene-text-index-l2-" + System.currentTimeMillis();
-		LuceneIndexManager luceneIndexManager1 = new LuceneIndexManager(baseDir); 
+		LuceneIndexManager luceneIndexManager1 = new LuceneIndexManager(baseDir);
 
 
 		String url = UUID.randomUUID().toString();
@@ -285,36 +285,36 @@ public class LuceneIndexTests {
 		set.add("banana");
 		response.setTags(set);
 		response.setStatusCode(55);
-		
+
 		luceneIndexManager1.indexDoc(response);
 		WebResponse fromFile = luceneIndexManager1.getResponse(url);
 		assertNotNull(fromFile);
 		assertEquals(url, fromFile.getUrl());
 
 		luceneIndexManager1.close();
-		
+
 
 		fromFile = luceneIndexManager1.getResponse(url);
-		
+
 		assertNotNull(fromFile);
 		assertEquals(url, fromFile.getUrl());
-		
+
 		return;
 	}
 
-	
+
 	@Before
 	public void setUp() {
 		luceneIndexManager = new LuceneIndexManager("/tmp/lucene-text-index-l2-" + System.currentTimeMillis()); // INDEX_BASE_DIR
 		return;
 	}
 
-	
+
 	@After
 	public void cleanUp() {
 		luceneIndexManager.close();
 		return;
 	}
 
-	
+
 }
