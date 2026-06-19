@@ -74,11 +74,17 @@ public class FrontcacheService {
 
 	private void loadConfigs() {
 
-		String frontcacheConsoleConfPath = System.getProperty("org.frontcache.console.config");
+		String frontcacheConsoleConfPath = System.getenv("FRONTCACHE_CONFIG");
 
 		if (null == frontcacheConsoleConfPath)
 		{
-			logger.info("System property 'org.frontcache.console.config' is not defined");
+			// backward compatibility
+			frontcacheConsoleConfPath = System.getProperty("org.frontcache.console.config");
+		}
+
+		if (null == frontcacheConsoleConfPath)
+		{
+			logger.info("Neither environment variable 'FRONTCACHE_CONFIG' nor system property 'org.frontcache.console.config' is defined");
 			return;
 		}
 
