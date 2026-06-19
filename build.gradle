@@ -66,6 +66,14 @@ subprojects {
 		}
 	}
 
+	// Emit Java 8 bytecode (class major version 52) even though we build with the
+	// JDK 11 toolchain. The standalone server runs on Jetty 9.3.6, whose bundled
+	// ASM can only scan up to Java 8 classes — Java 11 bytecode (major 55) makes
+	// Jetty's AnnotationParser throw IllegalArgumentException on every class.
+	tasks.withType(JavaCompile).configureEach {
+		options.release = 8
+	}
+
 	// 'provided' deps (e.g. servlet-api) are on compile & test classpaths but
 	// NOT on runtimeClasspath, so they are excluded from the assembled WAR.
 	configurations {
