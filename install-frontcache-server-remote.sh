@@ -52,8 +52,24 @@ ssh "${SSH_OPTS[@]}" "$SSH_TARGET" '
 echo ">>> Creating ~/$REMOTE_DIR on $SSH_TARGET ..."
 ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "mkdir -p ~/$REMOTE_DIR"
 
-echo ">>> Copying frontcache-server to $SSH_TARGET:~/$REMOTE_DIR/ ..."
-scp "${SSH_OPTS[@]}" -r "$LOCAL_SERVER_DIR" "$SSH_TARGET:~/$REMOTE_DIR/"
+echo ">>> Compressing frontcache-server ..."
+ARCHIVE="frontcache-server.tar.gz"
+LOCAL_ARCHIVE="$SCRIPT_DIR/$ARCHIVE"
+tar -czf "$LOCAL_ARCHIVE" -C "$SCRIPT_DIR" "$(basename "$LOCAL_SERVER_DIR")"
+
+echo ">>> Uploading $ARCHIVE to $SSH_TARGET:~/$REMOTE_DIR/ ..."
+scp "${SSH_OPTS[@]}" "$LOCAL_ARCHIVE" "$SSH_TARGET:~/$REMOTE_DIR/"
+
+echo ">>> Extracting $ARCHIVE on $SSH_TARGET ..."
+ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "
+  set -e
+  cd ~/$REMOTE_DIR
+  tar -xzf $ARCHIVE
+  rm -f $ARCHIVE
+"
+
+echo ">>> Removing local $ARCHIVE ..."
+rm -f "$LOCAL_ARCHIVE"
 
 echo ">>> Installing and starting systemd service '$SERVICE_NAME' on $SSH_TARGET ..."
 ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "
