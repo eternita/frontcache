@@ -1,0 +1,25 @@
+<svg viewBox="0 0 820 400" width="820" height="400" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="12">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#475569"/></marker>
+  </defs>
+  <rect x="0" y="0" width="820" height="400" fill="#ffffff"/>
+  <ellipse cx="68" cy="120" rx="56" ry="30" fill="#f1f5f9" stroke="#475569"/><text x="68" y="116" text-anchor="middle">Browser /</text><text x="68" y="130" text-anchor="middle">Bot</text>
+  <rect x="190" y="40" width="290" height="240" rx="8" fill="#eef2ff" stroke="#4338ca"/>
+  <text x="335" y="62" text-anchor="middle" font-weight="bold" fill="#4338ca">Frontcache host (separate process)</text>
+  <rect x="215" y="80" width="240" height="48" rx="6" fill="#e0e7ff" stroke="#4338ca"/><text x="335" y="100" text-anchor="middle">FrontCacheServlet</text><text x="335" y="116" text-anchor="middle" fill="#64748b">(reverse proxy)</text>
+  <rect x="215" y="145" width="240" height="40" rx="6" fill="#e2e8f0" stroke="#475569"/><text x="335" y="170" text-anchor="middle">frontcache-console :7080</text>
+  <rect x="215" y="200" width="240" height="40" rx="6" fill="#e2e8f0" stroke="#475569"/><text x="335" y="225" text-anchor="middle">/frontcache-io (admin API)</text>
+  <rect x="560" y="60" width="240" height="120" rx="8" fill="#fef2f2" stroke="#dc2626"/>
+  <text x="680" y="82" text-anchor="middle" font-weight="bold" fill="#dc2626">Origin host (any language)</text>
+  <rect x="585" y="100" width="190" height="56" rx="6" fill="#fee2e2" stroke="#dc2626"/><text x="680" y="124" text-anchor="middle">Web app</text><text x="680" y="140" text-anchor="middle" fill="#64748b">PHP / Node / Python ...</text>
+  <!-- datastores -->
+  <path d="M200,318 v40 a60,10 0 0 0 120,0 v-40 a60,10 0 0 0 -120,0 z" fill="#dcfce7" stroke="#16a34a"/><ellipse cx="260" cy="318" rx="60" ry="10" fill="#dcfce7" stroke="#16a34a"/><text x="260" y="346" text-anchor="middle">L1 Ehcache</text>
+  <path d="M345,318 v40 a60,10 0 0 0 120,0 v-40 a60,10 0 0 0 -120,0 z" fill="#dcfce7" stroke="#16a34a"/><ellipse cx="405" cy="318" rx="60" ry="10" fill="#dcfce7" stroke="#16a34a"/><text x="405" y="346" text-anchor="middle">L2 Lucene</text>
+  <rect x="600" y="300" width="170" height="48" rx="6" fill="#fff7ed" stroke="#ca8a04"/><text x="685" y="320" text-anchor="middle">Origin app code</text><text x="685" y="336" text-anchor="middle" fill="#64748b">frontcache-agent</text>
+  <!-- edges -->
+  <line x1="124" y1="120" x2="186" y2="100" stroke="#475569" marker-end="url(#a)"/><text x="126" y="92">HTTP :9080</text>
+  <line x1="455" y1="104" x2="556" y2="120" stroke="#475569" marker-end="url(#a)"/><text x="455" y="96">cache miss → origin-host:port</text>
+  <line x1="260" y1="280" x2="260" y2="308" stroke="#16a34a" stroke-dasharray="4 3" marker-end="url(#a)"/><text x="225" y="300" fill="#16a34a">L1</text>
+  <line x1="400" y1="280" x2="405" y2="308" stroke="#16a34a" stroke-dasharray="4 3" marker-end="url(#a)"/><text x="412" y="300" fill="#16a34a">L2</text>
+  <line x1="598" y1="318" x2="467" y2="226" stroke="#ca8a04" stroke-dasharray="4 3" marker-end="url(#a)"/><text x="470" y="270" fill="#ca8a04">invalidate</text>
+</svg>
