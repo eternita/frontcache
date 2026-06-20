@@ -39,22 +39,38 @@ Key facts:
 
 ### 1.1 Test modes (the 2×2 ON/OFF matrix)
 
-The two Frontcache instances are **independently toggleable**: each can be **ON**
-(cache the response & process `<fc:include>` markers) or **OFF** (forward every request
-untouched). The four combinations are the four conceptual test modes. The arrows in
-`img/tests2.png` show how far a request travels in each mode — a request is served from
-the first ON cache it hits and never reaches the layers behind it.
+`img/tests2.png` presents four **conceptual** modes obtained by toggling each Frontcache
+instance **ON** (cache the response & process `<fc:include>` markers) or **OFF** (forward
+every request untouched). A request is served from the first ON cache it hits and never
+reaches the layers behind it:
 
-| # | Mode | FC1 standalone (:9080) | FC2 filter (:8080) | What it isolates |
-|---|------|------------------------|--------------------|------------------|
-| 1 | **off** | OFF (forward) | OFF (forward) | Baseline plumbing — request passes through both layers to the Web App with no caching. Proves the transport works so the other modes' behaviour is attributable to Frontcache. |
-| 2 | **filter** | OFF (forward) | ON (cache & includes) | Frontcache in **filter / embedded** mode. FC1 just forwards; FC2 (wrapping the Web App) does the work. → `Filter*Tests`. |
-| 3 | **standalone** | ON (cache & includes) | OFF (forward) | Frontcache in **standalone / reverse-proxy** mode. FC1 caches; FC2 just forwards to the Web App. → `Standalone*Tests`. |
-| 4 | **cache-by-cache** | ON (cache & includes) | ON (cache & includes) | Two Frontcache instances **chained**. A request can be served from FC1's cache without reaching FC2, or from FC2's cache without reaching the Web App. |
+| # | Mode | FC1 standalone (:9080) | FC2 filter (:8080) |
+|---|------|------------------------|--------------------|
+| 1 | **off** | OFF (forward) | OFF (forward) |
+| 2 | **filter** | OFF (forward) | ON (cache & includes) |
+| 3 | **standalone** | ON (cache & includes) | OFF (forward) |
+| 4 | **cache-by-cache** | ON (cache & includes) | ON (cache & includes) |
 
-The concrete test suites in this module target modes **2** (`Filter*Tests` → :8080) and
-**3** (`Standalone*Tests` → :9080); each suite drives the single ON instance for its mode.
-Modes 1 and 4 are the conceptual endpoints of the same matrix (both-off / both-on).
+#### What the harness actually exercises
+
+The current test setup does **not** realize all four modes. The FC2 filter is mapped to
+`*` (`src/main/webapp/WEB-INF/web.xml`), so it is **always ON** for anything hitting
+:8080, and the standalone server's origin (`origin.fc1-test.org:8080`, a loopback alias)
+points straight at it. So FC2 can never be switched off in this harness, and only two
+request paths exist:
+
+| Suite | Request path | Effective mode |
+|-------|--------------|----------------|
+| **`Filter*Tests`** | client → `:8080` (FC2 filter, ON) → Web App | **2 — filter** (FC1 not in the path) |
+| **`Standalone*Tests`** | client → `:9080` (FC1, ON) → `origin.fc1-test.org:8080` (FC2 filter, ON) → Web App | **4 — cache-by-cache** (FC1 chained in front of FC2) |
+
+Consequences:
+
+- **Cache-by-cache (mode 4) is covered by every `Standalone*Tests` suite** — a standalone
+  request traverses *both* caches. There is no separate "cache-by-cache" suite.
+- **Modes 1 (both off) and 3 (standalone-only, FC2 off) are not exercised** as drawn —
+  they would require the FC2 filter to forward instead of cache, which the `*` mapping
+  and the standalone origin routing prevent.
 
 ---
 
