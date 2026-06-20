@@ -5,6 +5,10 @@
 # - installs openjdk-11
 # - creates ~/opt on the remote server
 # - copies the local frontcache-server directory there
+# - runs Frontcache as a systemd service on 9080 (HTTP) / 9443 (HTTPS)
+# - installs nginx as the public front door on 80/443:
+#     * /                          -> local Frontcache (80->9080, 443->9443)
+#     * /images/ /fs/ /o9r/ /pi/   -> origin host ($ORIGIN_HOST)
 #
 # Example target:
 #   ec2-54-208-212-231.compute-1.amazonaws.com  (Ubuntu 24)
@@ -22,6 +26,12 @@ REMOTE_DIR="opt"   # relative to the remote user's home (~/opt)
 
 # systemd service name
 SERVICE_NAME="frontcache"
+
+# nginx reverse-proxy settings
+ORIGIN_HOST="${ORIGIN_HOST:-origin.hobbyray.com}"   # backend for the origin-served paths
+ORIGIN_PATHS="${ORIGIN_PATHS:-/images/ /fs/ /o9r/ /pi/}"  # space-separated; proxied to $ORIGIN_HOST
+FRONTCACHE_HTTP_PORT="${FRONTCACHE_HTTP_PORT:-9080}"  # local Frontcache HTTP port
+FRONTCACHE_HTTPS_PORT="${FRONTCACHE_HTTPS_PORT:-9443}" # local Frontcache HTTPS port
 
 # local frontcache-server directory to copy
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -100,9 +110,7 @@ After=network.target
 
 [Service]
 Type=simple
-# allow the non-root service user to bind privileged ports 80/443 (see start.d/http.ini, ssl.ini)
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+# Frontcache listens on unprivileged 9080/9443; nginx fronts 80/443 (no CAP_NET_BIND_SERVICE needed)
 User=$REMOTE_USER
 WorkingDirectory=\$SERVER_DIR/server/bin
 ExecStart=\$SERVER_DIR/server/bin/frontcache
@@ -121,9 +129,21 @@ EOF
   sudo systemctl --no-pager status $SERVICE_NAME || true
 "
 
+# ---- nginx front door (80/443) ----------------------------------------------
+# delegated to a dedicated script (also runnable standalone). It reads the same
+# env-overridable config, exported here so its defaults are overridden by ours.
+echo ">>> Configuring nginx front door via configure-nginx-remote.sh ..."
+REMOTE_HOST="$REMOTE_HOST" REMOTE_USER="$REMOTE_USER" PEM_FILE="$PEM_FILE" \
+REMOTE_DIR="$REMOTE_DIR" ORIGIN_HOST="$ORIGIN_HOST" ORIGIN_PATHS="$ORIGIN_PATHS" \
+FRONTCACHE_HTTP_PORT="$FRONTCACHE_HTTP_PORT" FRONTCACHE_HTTPS_PORT="$FRONTCACHE_HTTPS_PORT" \
+  "$SCRIPT_DIR/configure-nginx-remote.sh"
+
 echo ">>> Done."
 echo "    Frontcache server copied to ~/$REMOTE_DIR/frontcache-server on $REMOTE_HOST"
-echo "    Running as systemd service '$SERVICE_NAME'. Useful commands on the server:"
-echo "      sudo systemctl status $SERVICE_NAME"
-echo "      sudo systemctl restart $SERVICE_NAME"
+echo "    Frontcache (systemd '$SERVICE_NAME') on :$FRONTCACHE_HTTP_PORT / :$FRONTCACHE_HTTPS_PORT"
+echo "    nginx front door on :80 / :443  ->  / = Frontcache, $ORIGIN_PATHS = $ORIGIN_HOST"
+echo "    Useful commands on the server:"
+echo "      sudo systemctl status $SERVICE_NAME    # frontcache"
 echo "      sudo journalctl -u $SERVICE_NAME -f"
+echo "      sudo systemctl status nginx            # front door"
+echo "      sudo nginx -t && sudo systemctl reload nginx"
