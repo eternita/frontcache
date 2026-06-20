@@ -35,7 +35,7 @@ public class BaseBenchmark {
     protected Map<String, String> getfileMapping(){
     	Map<String, String> map = new HashMap<>();
 
-    	map.put("https://www.coinshome.net/en/welcome.htm", "welcome.html");
+    	map.put("https://www.hobbyray.com/en/welcome.htm", "welcome.html");
 
     	return map;
 
