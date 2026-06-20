@@ -267,12 +267,19 @@ tests are `@Ignore`d (they pass on Tomcat in production).
 
 ## 8. Constraints & gotchas
 
-- **Java 8** source level; Gradle wrapper pinned to Gradle 3.2 — always use `./gradlew`.
+- **Java 8** source level; Gradle wrapper pinned to **Gradle 8.7**
+  (`gradle/wrapper/gradle-wrapper.properties`) — always use `./gradlew`.
 - Tests **must** run sequentially; do not raise `maxParallelForks` — concurrent runs
   corrupt each other's cache because every test clears it on setup.
 - `/etc/hosts` must contain the entries in §5 or the domain-scoped tests fail.
-- Port conflicts on **8080/8443/9080/9443/7080** will break the run; stop other servers
-  first. `tests.sh` force-kills the standalone server by `grep`-ing the process list.
+- `./tests.sh` binds **9080** (standalone HTTP) and **8080 + 8443** (filter + web app via
+  Gretty, `httpsEnabled=true`); a conflict on any of these breaks the run, so stop other
+  servers first. The standalone server opens HTTP only — there is no `9443` — and the
+  console (`7080`) is not started by the integration run. After the suite, `tests.sh`
+  force-kills the standalone server with
+  `ps -e | grep standaloneFrontcacheJetty | ... | xargs kill -9`; this PID-by-grep cleanup
+  is fragile, so if a prior run crashed, check for a leftover process on :9080 before
+  re-running.
 - New behavioural tests go into the **abstract base classes** so they run in both modes;
   reserve the concrete subclasses for mode-specific assertions.
 - The filter and origin app share one JVM. Each Frontcache instance is independently
