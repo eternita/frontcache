@@ -28,8 +28,8 @@ REMOTE_DIR="opt"   # relative to the remote user's home (~/opt)
 SERVICE_NAME="frontcache"
 
 # nginx reverse-proxy settings
-ORIGIN_HOST="${ORIGIN_HOST:-origin.hobbyray.com}"   # backend for the origin-served paths
-ORIGIN_PATHS="${ORIGIN_PATHS:-/images/ /fs/ /o9r/ /pi/}"  # space-separated; proxied to $ORIGIN_HOST
+ORIGIN_HOST="${ORIGIN_HOST:-direct.hobbyray.com}"   # backend for the origin-served paths
+ORIGIN_PATHS="${ORIGIN_PATHS:-/o9r/ /fs/ /pi/ /st/ /images/ /css/ /js/ /page-cache/}"  # space-separated; proxied to $ORIGIN_HOST
 FRONTCACHE_HTTP_PORT="${FRONTCACHE_HTTP_PORT:-9080}"  # local Frontcache HTTP port
 FRONTCACHE_HTTPS_PORT="${FRONTCACHE_HTTPS_PORT:-9443}" # local Frontcache HTTPS port
 
