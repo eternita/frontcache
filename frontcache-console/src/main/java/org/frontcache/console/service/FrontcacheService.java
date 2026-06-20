@@ -280,7 +280,7 @@ public class FrontcacheService {
 	 */
 	public String getHystrixMonitorURLList()
 	{
-		// [{"name":"My Super App","stream":"http://sg.coinshome.net/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.coinshome.net/hystrix.stream","auth":"","delay":"2000"}]
+		// [{"name":"My Super App","stream":"http://sg.example-site.com/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.example-site.com/hystrix.stream","auth":"","delay":"2000"}]
 
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
