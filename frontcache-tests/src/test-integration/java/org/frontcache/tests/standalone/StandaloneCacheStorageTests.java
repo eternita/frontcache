@@ -25,6 +25,7 @@ import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.tests.TestConfig;
+import org.frontcache.tests.base.TestUtils;
 import org.frontcache.tests.base.TestsBase;
 import org.junit.After;
 import org.junit.Before;
@@ -80,9 +81,14 @@ public class StandaloneCacheStorageTests extends TestsBase {
 		assertEquals("FC1 (standalone) cache should start empty", 0, cachedEntries(frontcacheClientStandalone));
 		assertEquals("FC2 (filter) cache should start empty", 0, cachedEntries(frontcacheClientFilter));
 
-		// single request to the standalone node -> FC1 -> origin (FC2 filter) -> web app
+		// 1st request to the standalone node -> FC1 -> origin (FC2 filter) -> web app.
+		// FC1 cache is empty, so this request must be served dynamically.
 		HtmlPage page = webClient.getPage(getStandaloneBaseURLDomainFC1() + PATH);
 		assertEquals("a", page.getPage().asText());
+
+		String trace1 = page.getWebResponse().getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
+		assertEquals("1st request must be dynamic (FC1 cache miss): " + trace1,
+				false, TestUtils.isRequestFromCache(trace1));
 
 		// both nodes must now hold a cached entry
 		assertTrue("FC1 (standalone) should have cached the page", cachedEntries(frontcacheClientStandalone) > 0);
@@ -96,6 +102,14 @@ public class StandaloneCacheStorageTests extends TestsBase {
 		WebResponse fc2Cached = frontcacheClientFilter.getFromCache(FC2_KEY);
 		assertNotNull("FC2 (filter) should have the page in cache for key " + FC2_KEY, fc2Cached);
 		assertEquals("a", new String(fc2Cached.getContent()));
+
+		// 2nd request - FC1 now serves the page from its own cache.
+		page = webClient.getPage(getStandaloneBaseURLDomainFC1() + PATH);
+		assertEquals("a", page.getPage().asText());
+
+		String trace2 = page.getWebResponse().getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
+		assertEquals("2nd request must be served from cache: " + trace2,
+				true, TestUtils.isRequestFromCache(trace2));
 	}
 
 }
