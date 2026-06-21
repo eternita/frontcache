@@ -75,7 +75,23 @@ server {
     listen [::]:80 default_server;
     server_name _;
 
-${ORIGIN_LOCATIONS}    # everything else -> local Frontcache (HTTP)
+    # Frontcache headers (e.g. X-frontcache.site-key) contain a dot, which nginx
+    # treats as an invalid header name and drops by default — breaking site-key auth
+    # / domain resolution (e.g. the Hystrix stream). Allow them through.
+    ignore_invalid_headers off;
+
+${ORIGIN_LOCATIONS}    # Hystrix SSE metrics stream — must NOT be buffered or the
+    # console dashboard never receives events (proxy_buffering defaults to on)
+    location = /hystrix.stream {
+${PROXY_HDRS}
+        proxy_set_header Host \$host;
+        proxy_pass http://127.0.0.1:${FRONTCACHE_HTTP_PORT};
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+    }
+
+    # everything else -> local Frontcache (HTTP)
     location / {
 ${PROXY_HDRS}
         proxy_set_header Host \$host;
@@ -88,10 +104,27 @@ server {
     listen [::]:443 ssl default_server;
     server_name _;
 
+    # Frontcache headers (e.g. X-frontcache.site-key) contain a dot, which nginx
+    # treats as an invalid header name and drops by default — breaking site-key auth
+    # / domain resolution (e.g. the Hystrix stream). Allow them through.
+    ignore_invalid_headers off;
+
     ssl_certificate     /etc/nginx/ssl/frontcache.crt;
     ssl_certificate_key /etc/nginx/ssl/frontcache.key;
 
-${ORIGIN_LOCATIONS}    # everything else -> local Frontcache (HTTPS)
+${ORIGIN_LOCATIONS}    # Hystrix SSE metrics stream — must NOT be buffered or the
+    # console dashboard never receives events (proxy_buffering defaults to on)
+    location = /hystrix.stream {
+${PROXY_HDRS}
+        proxy_set_header Host \$host;
+        proxy_ssl_verify off;
+        proxy_pass https://127.0.0.1:${FRONTCACHE_HTTPS_PORT};
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+    }
+
+    # everything else -> local Frontcache (HTTPS)
     location / {
 ${PROXY_HDRS}
         proxy_set_header Host \$host;
