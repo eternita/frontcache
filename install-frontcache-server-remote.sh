@@ -51,6 +51,22 @@ if [ ! -d "$LOCAL_SERVER_DIR" ]; then
   exit 1
 fi
 
+# ---- always build a fresh WAR so we never ship a stale artifact --------------
+# The installer ships $LOCAL_SERVER_DIR/.../ROOT.war. Always rebuild it first so
+# source changes reach the server. Done before any remote change, so a build
+# failure aborts without stopping the live service.
+ROOT_WAR="$LOCAL_SERVER_DIR/server/frontcache-base/webapps/ROOT.war"
+
+echo ">>> Building fresh WAR (./gradlew :frontcache-server:build) ..."
+( cd "$SCRIPT_DIR" && ./gradlew :frontcache-server:build )
+
+if [ ! -f "$ROOT_WAR" ]; then
+  echo "ERROR: build did not produce $ROOT_WAR" >&2
+  exit 1
+fi
+echo ">>> WAR is fresh: $ROOT_WAR"
+# ------------------------------------------------------------------------------
+
 echo ">>> Installing openjdk-11 on $SSH_TARGET ..."
 ssh "${SSH_OPTS[@]}" "$SSH_TARGET" '
   set -e
