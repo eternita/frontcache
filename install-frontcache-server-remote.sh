@@ -17,9 +17,9 @@
 set -euo pipefail
 
 # ---- configuration -----------------------------------------------------------
-REMOTE_HOST="${REMOTE_HOST:-ec2-54-208-212-231.compute-1.amazonaws.com}"
+REMOTE_HOST="${REMOTE_HOST:-ec2-123-456-789-123.compute-1.amazonaws.com}"
 REMOTE_USER="${REMOTE_USER:-ubuntu}"
-PEM_FILE="${PEM_FILE:-$HOME/.ssh/coins-2023.pem}"
+PEM_FILE="${PEM_FILE:-$HOME/.ssh/your-keys.pem}"
 
 # directory created on the remote server
 REMOTE_DIR="opt"   # relative to the remote user's home (~/opt)
