@@ -120,10 +120,10 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
      */
     private String getIncludeCurrentURL(String currentRequestURL, String originRequestURL)
     {
-    	// host from current http://www.coinshome.net/common/hystrix/top1.jsp
-    	// uri from original http://origin.coinshome.net:1234/common/hystrix/inc12.jsp
+    	// host from current http://www.hobbyray.com/common/hystrix/top1.jsp
+    	// uri from original http://origin.hobbyray.com:1234/common/hystrix/inc12.jsp
     	// ->
-    	// includeCurrentURL http://www.coinshome.net/common/hystrix/inc12.jsp
+    	// includeCurrentURL http://www.hobbyray.com/common/hystrix/inc12.jsp
 
     	String includeCurrentURL = null;
 
