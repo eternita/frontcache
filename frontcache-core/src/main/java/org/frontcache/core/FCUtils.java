@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -247,7 +248,10 @@ public class FCUtils {
 		webResponse.setStatusCode(originWrappedResponse.getStatus());
 
 		// get headers
-    	Map<String, List<String>> headers = new HashMap<String, List<String>>();
+		// case-insensitive: HTTP header names are case-insensitive (RFC 7230) and
+		// intermediaries (e.g. Cloudflare) may re-case them - so component directives
+		// like X-frontcache.component.maxage must resolve regardless of wire casing
+    	Map<String, List<String>> headers = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 		for (String headerName : originWrappedResponse.getHeaderNames())
 		if (isIncludedHeaderToResponse(headerName))
 		{
@@ -360,7 +364,10 @@ public class FCUtils {
      * @return
      */
     public static Map<String, List<String>> revertHeaders(Header[] headers) {
-    	Map<String, List<String>> map = new HashMap<String, List<String>>();
+    	// case-insensitive map - HTTP header names are case-insensitive (RFC 7230);
+    	// intermediaries (e.g. Cloudflare) may re-case them, so X-frontcache.* directives
+    	// must resolve regardless of wire casing
+    	Map<String, List<String>> map = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 		for (Header header : headers) {
 			String name = header.getName();
 
@@ -379,7 +386,8 @@ public class FCUtils {
 	}
 
     public static Map<String, List<String>> revertHeaders(HttpServletResponse response) {
-    	Map<String, List<String>> map = new HashMap<String, List<String>>();
+    	// case-insensitive map - see revertHeaders(Header[]) above
+    	Map<String, List<String>> map = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 		for (String name : response.getHeaderNames())
 		{
 			if (isIncludedHeaderToResponse(name))
