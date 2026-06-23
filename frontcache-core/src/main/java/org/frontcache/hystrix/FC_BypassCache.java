@@ -28,7 +28,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -227,12 +226,8 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 
 
 		try {
+			// Accept-Encoding to origin is normalized to gzip centrally in FCUtils.buildRequestHeaders()
 			httpRequest.setHeaders(FCUtils.convertHeaders(headers));
-			Header acceptEncoding = httpRequest.getFirstHeader("accept-encoding");
-			if (acceptEncoding != null && acceptEncoding.getValue().contains("gzip"))
-			{
-				httpRequest.setHeader("accept-encoding", "gzip");
-			}
 			HttpResponse originResponse = httpclient.execute(httpHost, httpRequest);
 			return originResponse;
 		} finally {

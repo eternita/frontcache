@@ -649,6 +649,15 @@ public class FCUtils {
 			}
 		}
 
+		// Normalize the encoding we advertise to the origin to gzip only.
+		// Our HttpClient transparently decodes gzip/deflate but NOT brotli (br) or zstd - if the
+		// origin returned br we would cache that blob and serve it to clients that never requested
+		// it (ignoring Vary), and the include processor couldn't parse the compressed body.
+		// Forcing gzip means FC always holds plaintext; compression to the client is (re)applied
+		// at the edge (nginx / CDN).
+		headers.keySet().removeIf(name -> FCHeaders.ACCEPT_ENCODING.equalsIgnoreCase(name));
+		headers.put(FCHeaders.ACCEPT_ENCODING, new ArrayList<String>(Arrays.asList("gzip")));
+
 		return headers;
 	}
 
