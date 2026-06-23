@@ -72,8 +72,8 @@ public class FC_Total extends HystrixCommand<Object> {
 			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
 			if (null != webResponse)
 			{
+				FCUtils.applyFallbackHeaders(httpResponse, webResponse);
 				httpResponse.getOutputStream().write(webResponse.getContent());
-				httpResponse.setContentType(webResponse.getHeader(FCHeaders.CONTENT_TYPE));
 			}
 
 			String failedExceptionMessage = "";

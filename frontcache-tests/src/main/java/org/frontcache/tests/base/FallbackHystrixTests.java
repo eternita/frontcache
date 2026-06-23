@@ -35,6 +35,9 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
+		// Fallbacks are now served with a 503 status (so downstream caches/CDNs don't retain them).
+		// Tell HtmlUnit not to throw on non-2xx so we can inspect the fallback response.
+		webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
 	}
 
 	@After
@@ -64,6 +67,10 @@ public abstract class FallbackHystrixTests extends TestsBase {
 		String respStr = webResponse.getContentAsString();
 		assertNotEquals(-1, respStr.indexOf("Default Fallback"));
 		assertNotEquals(-1, respStr.indexOf("/common/hystrix/b.jsp"));
+
+		// fallback must be a non-cacheable 503 so downstream caches/CDNs don't pin it
+		assertEquals(503, webResponse.getStatusCode());
+		assertNotEquals(-1, webResponse.getResponseHeaderValue("Cache-Control").indexOf("no-store"));
 	}
 
 	@Test
@@ -90,6 +97,9 @@ public abstract class FallbackHystrixTests extends TestsBase {
 		assertNotEquals(-1, respStr.indexOf("inc11")); // successful include #1
 		assertNotEquals(-1, respStr.indexOf("Default Fallback")); // default fallback for include #2
 		assertNotEquals(-1, respStr.indexOf("/common/hystrix/inc12.jsp")); // default fallback for include #2
+
+		// a fallback on a nested include must NOT turn the parent page into a 503 - the page rendered fine
+		assertEquals(200, webResponse.getStatusCode());
 	}
 
 	@Test
@@ -100,6 +110,8 @@ public abstract class FallbackHystrixTests extends TestsBase {
 		printHeaders(webResponse);
 
 		assertEquals("Hi from custom fallback localhost", webResponse.getContentAsString());
+		// custom (file-based) fallbacks are non-cacheable 503 too
+		assertEquals(503, webResponse.getStatusCode());
 	}
 
 	@Test

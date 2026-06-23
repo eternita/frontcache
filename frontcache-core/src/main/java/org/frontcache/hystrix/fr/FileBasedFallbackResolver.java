@@ -58,6 +58,13 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 
 	private static final String CONTENT_TYPE_DEFAULT = "text/html";
 
+	// Fallbacks are a degraded response served when origin/circuit fails.
+	// They must NOT be cached by any downstream cache (browser, CDN, e.g. Cloudflare) -
+	// otherwise a transient origin failure gets pinned at the edge for the cached URL's TTL.
+	// 503 keeps CDNs from caching the error; the no-store headers forbid it explicitly.
+	public static final int FALLBACK_HTTP_STATUS = 503; // Service Unavailable
+	public static final String FALLBACK_CACHE_CONTROL = "no-store, no-cache, max-age=0, must-revalidate";
+
 	private static Logger logger = LoggerFactory.getLogger(FileBasedFallbackResolver.class);
 
 	private static Logger fallbackLogger = LoggerFactory.getLogger(FallbackLogger.class);
@@ -228,10 +235,22 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		WebResponse webResponse = new WebResponse(urlStr, fallbackContent.getBytes());
 
 		webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType);
-		int httpResponseCode = 200;
-		webResponse.setStatusCode(httpResponseCode);
+		markNonCacheable(webResponse);
 
 		return webResponse;
+	}
+
+	/**
+	 * Mark a fallback response so no downstream cache (browser, CDN) retains it.
+	 * Sets a 503 status and explicit no-store cache headers.
+	 *
+	 * @param webResponse fallback response to stamp
+	 */
+	private void markNonCacheable(WebResponse webResponse)
+	{
+		webResponse.setStatusCode(FALLBACK_HTTP_STATUS);
+		webResponse.addHeader(FCHeaders.CACHE_CONTROL, FALLBACK_CACHE_CONTROL);
+		webResponse.addHeader(FCHeaders.PRAGMA, "no-cache");
 	}
 
 	/**
@@ -245,9 +264,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 
 		WebResponse webResponse = new WebResponse(urlStr, outContentBody);
 		webResponse.addHeader(FCHeaders.CONTENT_TYPE, CONTENT_TYPE_DEFAULT);
-
-		int httpResponseCode = 200;
-		webResponse.setStatusCode(httpResponseCode);
+		markNonCacheable(webResponse);
 
 		return webResponse;
 	}

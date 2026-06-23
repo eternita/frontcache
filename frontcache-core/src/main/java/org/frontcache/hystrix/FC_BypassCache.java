@@ -94,8 +94,8 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 
 			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
 
+			FCUtils.applyFallbackHeaders(httpResponse, webResponse);
 			httpResponse.getOutputStream().write(webResponse.getContent());
-			httpResponse.setContentType(webResponse.getHeader(FCHeaders.CONTENT_TYPE));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

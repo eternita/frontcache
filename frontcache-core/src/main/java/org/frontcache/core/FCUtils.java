@@ -705,5 +705,36 @@ public class FCUtils {
 		return domain;
 	}
 
+	/**
+	 * Apply a fallback {@link WebResponse}'s status code and headers (content type plus the
+	 * non-cacheable Cache-Control/Pragma markers) to the servlet response.
+	 *
+	 * Used by the Hystrix commands that stream the fallback body directly, so that the 503 status
+	 * and no-store headers set on the fallback actually reach the client / downstream caches.
+	 * Must be called before the body is written.
+	 *
+	 * @param servletResponse target response
+	 * @param webResponse fallback response carrying status and headers
+	 */
+	public static void applyFallbackHeaders(HttpServletResponse servletResponse, WebResponse webResponse)
+	{
+		if (null == webResponse)
+			return;
+
+		servletResponse.setStatus(webResponse.getStatusCode());
+
+		String contentType = webResponse.getHeader(FCHeaders.CONTENT_TYPE);
+		if (null != contentType)
+			servletResponse.setContentType(contentType);
+
+		String cacheControl = webResponse.getHeader(FCHeaders.CACHE_CONTROL);
+		if (null != cacheControl)
+			servletResponse.setHeader(FCHeaders.CACHE_CONTROL, cacheControl);
+
+		String pragma = webResponse.getHeader(FCHeaders.PRAGMA);
+		if (null != pragma)
+			servletResponse.setHeader(FCHeaders.PRAGMA, pragma);
+	}
+
 
 }
