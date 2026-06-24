@@ -195,7 +195,8 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 	 * @return
 	 * @throws Exception
 	 */
-	private HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
+	// package-private (not private) so unit tests in this package can drive the origin call directly
+	HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
 			Map<String, List<String>> headers, InputStream requestEntity)
 					throws Exception {
 
@@ -226,8 +227,12 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 
 
 		try {
-			// Accept-Encoding to origin is normalized to gzip centrally in FCUtils.buildRequestHeaders()
 			httpRequest.setHeaders(FCUtils.convertHeaders(headers));
+			// Always advertise gzip (and only gzip) to the origin. Our HttpClient transparently
+			// decodes gzip, so Frontcache always receives plaintext it can parse/cache and never an
+			// encoding it cannot handle (e.g. br/zstd). buildRequestHeaders() normalizes this too;
+			// setting it here makes the origin call self-contained, independent of the inbound headers.
+			httpRequest.setHeader(FCHeaders.ACCEPT_ENCODING, "gzip");
 			HttpResponse originResponse = httpclient.execute(httpHost, httpRequest);
 			return originResponse;
 		} finally {

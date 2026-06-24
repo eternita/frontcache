@@ -28,6 +28,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -77,6 +78,13 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 			Header[] httpHeaders = FCUtils.convertHeaders(requestHeaders);
 			for (Header header : httpHeaders)
 				httpRequest.addHeader(header);
+
+			// Always advertise gzip (and only gzip) to the origin. Our HttpClient transparently
+			// decodes gzip, so the cached content is always plaintext we can parse for includes and
+			// never an encoding we can't handle (e.g. br) that would be cached and served wrongly.
+			// buildRequestHeaders() normalizes this too; setting it here makes the cacheable origin
+			// call self-contained, independent of the inbound headers.
+			httpRequest.setHeader(FCHeaders.ACCEPT_ENCODING, "gzip");
 
 			response = client.execute(httpHost, httpRequest);
 			WebResponse webResp = FCUtils.httpResponse2WebComponent(originRequestURL, response, context);
