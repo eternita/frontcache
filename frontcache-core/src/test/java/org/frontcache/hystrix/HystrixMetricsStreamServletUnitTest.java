@@ -83,7 +83,7 @@ public class HystrixMetricsStreamServletUnitTest {
 
 	        verify(mockResp).sendError(503, "Service has been shut down.");
 	    }
-	    
+
 	    @Test
 	    @Ignore
 	    public void testOnGetNoSiteKeyHeader() throws ServletException, IOException {
@@ -93,11 +93,11 @@ public class HystrixMetricsStreamServletUnitTest {
 	        } catch (ServletException ex) {
 
 	        }
-	 
+
 
 	        servlet.service(mockReq, mockResp);
 
 	        verify(mockResp).sendError(503, "Can't resolve domain from siteKey");
 	    }
-	    
+
 	}

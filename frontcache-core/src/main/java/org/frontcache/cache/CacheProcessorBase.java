@@ -41,11 +41,11 @@ import org.slf4j.LoggerFactory;
 public abstract class CacheProcessorBase implements CacheProcessor {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
-	
+
     protected ExecutorService softInvalidationExecutor = null;
 
 	private static final String[] NON_PERSISTENT_HEADERS = new String[]{
-			"Set-Cookie", 
+			"Set-Cookie",
 			"Date",
 			FCHeaders.X_FRONTCACHE_ID,
 			FCHeaders.X_FRONTCACHE_COMPONENT,
@@ -61,14 +61,14 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			FCHeaders.X_FRONTCACHE_TRACE,
 			FCHeaders.X_FRONTCACHE_TRACE_REQUEST
 		};
-	
+
 	public abstract WebResponse getFromCacheImpl(String url);
 
 	@Override
-	public final WebResponse getFromCache(String url)
+	public final WebResponse getFromCache(String url, RequestContext context)
 	{
-		WebResponse cachedWebResponse = new FC_ThroughCache(this, url, null).execute();
-		
+		WebResponse cachedWebResponse = new FC_ThroughCache(this, url, context).execute();
+
 		return cachedWebResponse;
 	}
 
@@ -79,30 +79,30 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;
 		boolean isCached = false;
-		
+
 		long lengthBytes = -1;
-		
+
 		String currentRequestURL = context.getCurrentRequestURL();
-		
+
 		WebResponse cachedWebResponse = new FC_ThroughCache(this, currentRequestURL, context).execute();
-		
+
 		// isDynamicForClientType depends on clientType (bot|browser) - maxAge="[bot|browser:]30d"
 		// content is cached for bots and dynamic for browsers
 		// when dynamic - don't update cache
 		boolean isCacheableForClientType = true; // true - save/update to cache (default value is incorrect when include is pure dynamic);  false - don't save/update to cache
-		
+
 		if (null != cachedWebResponse)
 		{
 			String clientType = context.getClientType(); // bot | browser
 			Map<String, Long> expireTimeMap = cachedWebResponse.getExpireTimeMap();
-		
+
 			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);
-			
+
 			// if data is cacheable for client type -> check data for expiration (only)
 			// if data is dynamic for client type -> no expiration / invalidation check
 			if (isCacheableForClientType && FCUtils.isWebComponentExpired(expireTimeMap, clientType))
 			{
-				
+
 				String refreshType = cachedWebResponse.getRefreshType();
 				if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType))
 				{
@@ -117,29 +117,31 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		}
 
 		if (!isCacheableForClientType || // call origin if request is dynamic for client type [bot|browser] or component is null
-				null == cachedWebResponse)
+				null == cachedWebResponse || 0 >= cachedWebResponse.getContentLenth())
 		{
 			try
 			{
-				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context); // it can be pure dynamic include -> check if we need to save to cache 
-				
+				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context); // it can be pure dynamic include -> check if we need to save to cache
+
 				String clientType = context.getClientType(); // bot | browser
 				Map<String, Long> expireTimeMap = cachedWebResponse.getExpireTimeMap();
-				
+
 				boolean isFreshDataCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);
-				
+
 				lengthBytes = cachedWebResponse.getContentLenth();
 
 				// save to cache
-				if (!context.isHystrixFallback() // don't cache hystrix fallbacks 
-						&& isCacheableForClientType 
-						&& isFreshDataCacheableForClientType 
-						&& cachedWebResponse.isCacheable())
+				if (!context.isHystrixFallback() // don't cache hystrix fallbacks
+						&& isCacheableForClientType
+						&& isFreshDataCacheableForClientType
+						&& cachedWebResponse.isCacheable()
+                        && lengthBytes > 0 // don't cache empty responses
+                )
 				{
 					WebResponse copy4cache = cachedWebResponse.copy();
-					Map<String, List<String>> copyHeaders = copy4cache.getHeaders(); 
+					Map<String, List<String>> copyHeaders = copy4cache.getHeaders();
 					cleanupNonPersistentHeaders(copyHeaders);
-					
+
 					copy4cache.setUrl(currentRequestURL);
 					putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
 				}
@@ -149,24 +151,24 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				ex.printStackTrace();
 				throw new FrontCacheException(ex);
 			}
-				
+
 		} else {
-			
+
 			cachedWebResponse = cachedWebResponse.copy(); //to avoid modification instance in cache
 			isCached = true;
 			context.setToplevelCached();
-			lengthBytes = cachedWebResponse.getContentLenth();			
+			lengthBytes = cachedWebResponse.getContentLenth();
 		}
-		
-		
+
+
 		RequestLogger.logRequest(currentRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
-		
+
 		return cachedWebResponse;
 	}
-	
+
 	/**
 	 * perform async invalidation
-	 * 
+	 *
 	 * @param currentRequestURL
 	 * @param originUrlStr
 	 * @param requestHeaders
@@ -181,43 +183,43 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			@Override
 			public void run() {
 				try {
-					
+
 //					logger.info("Soft invalidation: removing form cache: " + currentRequestURL);
 					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
-					
+
 					RequestContext ctxCopy = context.copy();
-					ctxCopy.setFilterChain(null); // async calls for ServletFilter doesnt works (some objects already disposed), so use http calls for soft resets 
+					ctxCopy.setFilterChain(null); // async calls for ServletFilter doesnt works (some objects already disposed), so use http calls for soft resets
 					Map<String, List<String>> requestHeadersCopy = new HashMap<String, List<String>>();
 					requestHeadersCopy.putAll(requestHeaders);
-					
+
 					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
 					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_SOFT_REFRESH, Arrays.asList(new String[]{"true"}));
-					
+
 					WebResponse copy4cache = FCUtils.dynamicCall(originUrlStr, requestHeadersCopy, client, ctxCopy);
-					Map<String, List<String>> copyHeaders = copy4cache.getHeaders(); 
+					Map<String, List<String>> copyHeaders = copy4cache.getHeaders();
 					cleanupNonPersistentHeaders(copyHeaders);
-					
+
 					copy4cache.setUrl(currentRequestURL);
 
 					if (!ctxCopy.isHystrixFallback()) // don't cache hystrix fallbacks
 						putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
-					
+
 				} catch (Exception e) {
-					
+
 					logger.error("Soft invalidation/refresh failed: " + originUrlStr, e);
-				}  
+				}
 			}
-			
+
 		});
-		
+
 		return;
 	}
 
-	
+
 	/**
 	 * remove header not supposed to be stored in cache
 	 * right before saving to cache
-	 * 
+	 *
 	 * @param headers
 	 */
 	private void cleanupNonPersistentHeaders(Map<String, List<String>> headers)
@@ -229,10 +231,10 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 		for (String removeKey : cleanupKeys)
 			headers.remove(removeKey);
-		
+
 		return;
 	}
-	
+
 	@Override
 	public Map<String, String> getCacheStatus() {
 		Map<String, String> status = new HashMap<String, String>();
@@ -240,15 +242,15 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 		return status;
 	}
-	
+
 	@Override
-	public void init(Properties properties) {		
+	public void init(Properties properties) {
 		Objects.requireNonNull(properties, "Properties should not be null");
 		int threadAmount = 2;
-		softInvalidationExecutor = Executors.newFixedThreadPool(threadAmount); 
+		softInvalidationExecutor = Executors.newFixedThreadPool(threadAmount);
 
 	}
-	
+
 	@Override
 	public void destroy() {
 		softInvalidationExecutor.shutdown();

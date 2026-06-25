@@ -54,7 +54,7 @@ license {
 subprojects {
 	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
 	apply plugin: 'jacoco'
-    version = '1.2.2'
+    version = '1.2.6-SNAPSHOT-2'
     group = 'org.frontcache'
 
 	// Build/test with Java 11 via a toolchain, so the JDK launching Gradle
@@ -64,6 +64,14 @@ subprojects {
 		toolchain {
 			languageVersion = JavaLanguageVersion.of(11)
 		}
+	}
+
+	// Emit Java 8 bytecode (class major version 52) even though we build with the
+	// JDK 11 toolchain. The standalone server runs on Jetty 9.3.6, whose bundled
+	// ASM can only scan up to Java 8 classes — Java 11 bytecode (major 55) makes
+	// Jetty's AnnotationParser throw IllegalArgumentException on every class.
+	tasks.withType(JavaCompile).configureEach {
+		options.release = 8
 	}
 
 	// 'provided' deps (e.g. servlet-api) are on compile & test classpaths but
@@ -119,6 +127,95 @@ subprojects {
 }
 
 
+// Resolve AWS credentials the way the old maven-s3-wagon did. Gradle's AwsCredentials —
+// unlike the wagon — does NOT consult the AWS default credential chain, so we parse the
+// shared credentials file (~/.aws/credentials, profile from $AWS_PROFILE or 'default')
+// as a fallback after -P properties and env vars.
+def awsSharedCreds() {
+	def file = new File(System.getProperty('user.home'), '.aws/credentials')
+	def profile = System.getenv('AWS_PROFILE') ?: 'default'
+	def creds = [:]
+	if (file.exists()) {
+		def current = null
+		file.eachLine { raw ->
+			def line = raw.trim()
+			if (line.startsWith('[') && line.endsWith(']')) {
+				current = line[1..-2].trim()
+			} else if (current == profile && line.contains('=')) {
+				def i = line.indexOf('=')
+				creds[line.substring(0, i).trim()] = line.substring(i + 1).trim()
+			}
+		}
+	}
+	creds
+}
+
+// Artifact deployment (was pom.xml). Publishes ONLY the two library modules to the
+// Eternita S3 repo. Gradle's maven-publish speaks s3:// natively (no maven-s3-wagon
+// equivalent needed). Run with: ./gradlew publish  (or publishToMavenLocal for a dry run)
+configure([project(':frontcache-core'), project(':frontcache-agent')]) {
+	apply plugin: 'maven-publish'
+
+	java {
+		withSourcesJar()   // replaces maven-source-plugin
+		withJavadocJar()   // replaces maven-javadoc-plugin
+	}
+
+	// -Xdoclint:none equivalent — don't fail the build on javadoc lint
+	tasks.withType(Javadoc).configureEach {
+		options.addStringOption('Xdoclint:none', '-quiet')
+	}
+
+	publishing {
+		publications {
+			mavenJava(MavenPublication) {
+				from components.java // emits api deps into the POM with 'compile' scope; 'provided' stays out
+				pom {
+					name = "${project.group}:${project.name}"
+					description = 'Web page/fragment cache with server side includes'
+					url = 'https://www.frontcache.org'
+					licenses {
+						license {
+							name = 'Frontcache license'
+							url  = 'https://www.eternita.co/frontcache-license.html'
+						}
+					}
+					developers {
+						developer {
+							name = 'Dmitriy Pavlikovskiy'
+							email = 'pdaviti@gmail.com'
+							organization = 'Eternita'
+							organizationUrl = 'https://www.eternita.co'
+						}
+						developer {
+							name = 'Serhiy Pavlikovskiy'
+							email = 'pavlikovskiy@gmail.com'
+							organization = 'Eternita'
+							organizationUrl = 'https://www.eternita.co'
+						}
+					}
+					scm {
+						connection = 'scm:git:git://github.com/eternita/frontcache.git'
+						developerConnection = 'scm:git:ssh://github.com:eternita/frontcache.git'
+						url = 'https://github.com/eternita/frontcache/tree/master'
+					}
+				}
+			}
+		}
+		repositories {
+			maven {
+				url = 's3://repo.eternita.co/maven2'
+				credentials(AwsCredentials) {
+					def shared = awsSharedCreds()
+					accessKey = project.findProperty('awsAccessKey') ?: System.getenv('AWS_ACCESS_KEY_ID') ?: shared['aws_access_key_id']
+					secretKey = project.findProperty('awsSecretKey') ?: System.getenv('AWS_SECRET_ACCESS_KEY') ?: shared['aws_secret_access_key']
+				}
+			}
+		}
+	}
+}
+
+
 project(':frontcache-core') {
 
     dependencies {
@@ -135,8 +232,8 @@ project(':frontcache-core') {
 		api         	'com.netflix.hystrix:hystrix-serialization:1.5.9' // provides com.netflix.hystrix.serial.SerialHystrixDashboardData (not pulled transitively)
         api         	'net.sf.ehcache:ehcache:2.10.0'
         api         	'com.google.code.gson:gson:2.5'
-        api         	'org.apache.lucene:lucene-core:6.2.0'
-        api         	'org.apache.lucene:lucene-queryparser:6.2.0'
+        api         	'org.apache.lucene:lucene-core:8.11.2'
+        api         	'org.apache.lucene:lucene-queryparser:8.11.2'
         api         	'com.typesafe:config:1.3.0'
 
         testImplementation     'junit:junit:4.12'

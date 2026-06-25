@@ -43,7 +43,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 public class RequestContext extends ConcurrentHashMap<String, Object> {
 
     private static final String FRONTCACHE_REQUEST_TYPE = "frontcacheRequestType"; // { toplevel | include }
-    private static final String FRONTCACHE_REQUEST_ID = "frontcacheRequestID"; // 
+    private static final String FRONTCACHE_REQUEST_ID = "frontcacheRequestID"; //
 
     public RequestContext() {
         super();
@@ -164,7 +164,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
     /**
-     * 
+     *
      * @param frontCacheProtocol
      */
     public void setFrontCacheProtocol(String frontCacheProtocol) {
@@ -172,13 +172,13 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
     /**
-     * 
+     *
      * @return
      */
     public String getFrontCacheProtocol() {
         return (String) get("frontCacheProtocol");
     }
-    
+
     public void setOriginURL(URL originURL) {
         set("originURL", originURL);
     }
@@ -187,7 +187,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return (URL) get("originURL");
     }
 
-    
+
     /**
      * sets the "responseBody" value as a String. This is the response sent back to the client.
      *
@@ -229,7 +229,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return getBoolean("responseGZipped", true);
     }
 
-    
+
     /**
      * @return the InputStream Response
      */
@@ -270,7 +270,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         }
         return (Map<String, List<String>>) get("originResponseHeaders");
     }
-    
+
     /**
      * check if response has "Content-Type" header with "text" inside
      * @return
@@ -278,10 +278,10 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public boolean isCacheableResponse()
     {
     	Map<String, List<String>> originResponseHeaders = getOriginResponseHeaders();
-		
+
 		for (String key : originResponseHeaders.keySet()) {
 			for (String value : originResponseHeaders.get(key)) {
-				if (FCHeaders.CONTENT_TYPE.equals(key) 
+				if (FCHeaders.CONTENT_TYPE.equals(key)
 						&& -1 < value.indexOf("text"))
 					return true;
 			}
@@ -290,27 +290,27 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
     /**
-     * 
+     *
      * @return
      */
     public boolean isCacheableRequest()
     {
-    	
+
     	if ("GET".equals(this.getRequest().getMethod().toUpperCase()))
     		return true;
-    	
+
     	if ("HEAD".equals(this.getRequest().getMethod().toUpperCase()))
     		return true;
-    	
+
 //    	if (-1 < this.getRequestURI().indexOf("jsessionid="))
 //    		return false;
-    	
+
     	return false;
     	//bot's send requests without header (accept=text/html) #36
 //        final String requestEncoding = this.getRequest().getHeader(FCHeaders.ACCEPT);
 //        return requestEncoding != null && requestEncoding.toLowerCase().contains("text");
     }
-    
+
     /**
      * adds a header to the origin response headers
      *
@@ -318,9 +318,9 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * @param value
      */
     public void addOriginResponseHeader(String name, String value) {
-    	
+
     	Map<String, List<String>> originResponseHeaders = getOriginResponseHeaders();
-    	
+
 		List<String> hValues = originResponseHeaders.get(name);
 		if(null == hValues)
 		{
@@ -347,12 +347,12 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public void setOriginContentLength(Long v) {
         set("originContentLength", v);
     }
-    
+
     public void setRequestURI(String uri)
     {
         set("requestURI", uri);
     }
-    
+
     public String getRequestURI()
     {
     	return (String) get("requestURI");
@@ -362,12 +362,12 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     {
         set("requestQueryString", requestQueryString);
     }
-    
+
     public String getRequestQueryString()
     {
     	return (String) get("requestQueryString");
     }
-    
+
     /**
      * sets the content-length from the origin response
      *
@@ -425,7 +425,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public CloseableHttpResponse getHttpClientResponse() {
         return (CloseableHttpResponse) get("httpClientResponse");
     }
-    
+
     public void setHttpClientResponse(CloseableHttpResponse response) {
     	this.set("httpClientResponse", response);
     }
@@ -445,7 +445,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public String getFrontCacheHttpsPort() {
         return (String) get("frontCacheHttpsPort");
     }
-    
+
     public void setFilterChain(FilterChain filterChain) {
         set("filterChain", filterChain);
     }
@@ -453,22 +453,22 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public FilterChain getFilterChain() {
         return (FilterChain) get("filterChain");
     }
-    
+
     /**
      * Check if run as ServletFilter
-     * 
+     *
      * @return
      */
     public boolean isFilterMode()
     {
     	if (null != getFilterChain())
     		return true;
-    	
+
     	return false;
     }
-    
+
     /**
-     * 
+     *
      * @param frontCacheId
      */
     public void setFrontCacheId(String frontCacheId) {
@@ -476,7 +476,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
     /**
-     * 
+     *
      * @return
      */
     public String getFrontCacheId() {
@@ -487,10 +487,25 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         set("hystrixError", true);
     }
 
+    public void setHystrixFallback(String reason) {
+        set("hystrixError", true);
+        if (null != reason)
+            set("hystrixErrorReason", reason);
+    }
+
     public boolean isHystrixFallback() {
         return getBoolean("hystrixError", false);
     }
-    
+
+    /**
+     * @return the hystrix failure category (short-circuited|timeout|rejected|bad-request|failure)
+     *         when known, otherwise "error". Only meaningful when {@link #isHystrixFallback()} is true.
+     */
+    public String getHystrixReason() {
+        Object reason = get("hystrixErrorReason");
+        return (null != reason) ? reason.toString() : "error";
+    }
+
     public void setRequestType(String frontcacheRequestType) {
         set(FRONTCACHE_REQUEST_TYPE, frontcacheRequestType);
     }
@@ -498,7 +513,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public String getRequestType() {
         return (String) get(FRONTCACHE_REQUEST_TYPE);
     }
-    
+
     public void setRequestId(String frontcacheRequestId) {
         set(FRONTCACHE_REQUEST_ID, frontcacheRequestId);
     }
@@ -534,17 +549,17 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 	public void setClientType(String currentClientType) {
         set("currentClientType", currentClientType);
 	}
-	
+
 	public RequestContext copy() {
 
 		RequestContext copy = new RequestContext();
-		
+
 		copy.putAll(this);
 		copy.setRequestId(UUID.randomUUID().toString());
-		
+
 		return copy;
 	}
-	
+
     public void setDomainContext(DomainContext domainContext) {
         set("domainContext", domainContext);
     }
@@ -552,7 +567,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public DomainContext getDomainContext() {
         return (DomainContext) get("domainContext");
     }
-	
+
     public void setLogToHTTPHeaders() {
         set("LogToHTTPHeaders", true);
     }
@@ -564,11 +579,11 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     public void setIncludeLevel(String includeLevel) {
         set("IncludeLevel", includeLevel);
     }
-    
+
     public String getIncludeLevel() {
         return get("IncludeLevel") != null ? (String) get("IncludeLevel") : "0";
     }
-    
+
     public void setToplevelCached() {
         set("ToplevelCached", true);
     }
@@ -584,6 +599,6 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 		str = str.replaceAll("(\\r|\\n|\\r\\n)+", " ");
 		return "RequestContext: " + str;
 	}
-    
-    
+
+
 }

@@ -32,19 +32,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 public class FallbackConfigController {
-	
+
 	@Autowired
 	private FrontcacheService frontcacheService;
-	
-	
-	
+
+
+
     @RequestMapping(value = "/fallbacks", method = RequestMethod.GET)
     public String fallbacks(ModelMap model) {
-    	
+
     	Map<String, Map<String, Set<FallbackConfigEntry>>> fallbackConfigs = frontcacheService.getFallbackConfigs();
 		model.put("fallbackConfigs", fallbackConfigs);
-    	
-    	
+
+
 		model.put("domainId", "domainIdStr");
 		model.put("url", "");
 		model.put("pattern", "");
@@ -52,14 +52,14 @@ public class FallbackConfigController {
 
         return "fallback_settings";
     }
-    
-    
-    
+
+
+
     @RequestMapping(value = "/fallbacks-urltest", method = RequestMethod.GET)
     public String urlTest(ModelMap model,
-    		@RequestParam("url") String url, 
+    		@RequestParam("url") String url,
     		@RequestParam("pattern") String pattern) {
-    	
+
     	System.out.println("param url " + url);
 
     	Pattern p = null;
@@ -69,7 +69,7 @@ public class FallbackConfigController {
     	} catch (Exception ex) {
     		model.put("matchResult", "Can't comptile pattern");
     	}
-    	
+
     	if (null != p)
     	{
         	if (p.matcher(url).matches())
@@ -84,6 +84,6 @@ public class FallbackConfigController {
 
         return "fallback_settings";
     }
- 
+
 
 }

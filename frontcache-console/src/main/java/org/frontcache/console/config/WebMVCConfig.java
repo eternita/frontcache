@@ -43,7 +43,7 @@ public class WebMVCConfig extends WebMvcConfigurerAdapter implements ServletCont
 
 	private static final Logger LOG = LoggerFactory.getLogger(WebMVCConfig.class);
 
-	
+
 	@Autowired
 	private ApplicationContext applicationContext;
 
@@ -53,7 +53,7 @@ public class WebMVCConfig extends WebMvcConfigurerAdapter implements ServletCont
 	public void setServletContext(ServletContext servletContext) {
 		this.servletContext = servletContext;
 	}
-	
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/**")
@@ -73,7 +73,7 @@ public class WebMVCConfig extends WebMvcConfigurerAdapter implements ServletCont
                 .favorParameter(true)
                 .ignoreAcceptHeader(false);
     }
-	
+
 
 	@Override
 	public void setApplicationContext(final ApplicationContext applicationContext) throws BeansException {
@@ -84,7 +84,7 @@ public class WebMVCConfig extends WebMvcConfigurerAdapter implements ServletCont
 	public void configureDefaultServletHandling(DefaultServletHandlerConfigurer configurer) {
 		configurer.enable();
 	}
-	
+
 	@Bean
 	public ViewResolver viewResolver() {
 		InternalResourceViewResolver viewResolver = new InternalResourceViewResolver();
@@ -94,5 +94,5 @@ public class WebMVCConfig extends WebMvcConfigurerAdapter implements ServletCont
 
 		return viewResolver;
 	}
-	
+
 }

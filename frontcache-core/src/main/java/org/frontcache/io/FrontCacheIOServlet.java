@@ -52,21 +52,21 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
 	private ObjectMapper jsonMapper = new ObjectMapper();
-	
+
 	FrontCacheEngine fcEngine = null;
 
 	private int managementPort = -1; // management port for security
 
-	
+
 	public FrontCacheIOServlet() {
 	}
-	
+
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
-		
+
 		fcEngine = FrontCacheEngine.getFrontCache();
-		
+
 		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
 		if (null == managementPortStr || managementPortStr.trim().length() == 0)
 			logger.warn("Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
@@ -79,7 +79,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
 			}
 		}
-		
+
 		return;
 	}
 
@@ -88,52 +88,52 @@ public class FrontCacheIOServlet extends HttpServlet {
 		super.destroy();
 		FrontCacheEngine.destroy();
 		fcEngine = null;
-	}	
-	
+	}
+
 	@Override
-	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException 
+	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException
 	{
 		process(req, resp);
 		return;
 	}
 
 
-	private void process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
+	private void process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
 	{
-		
+
 		if (-1 < managementPort && managementPort != request.getServerPort())
 		{
 			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
 			return;
 		}
-		
+
 		String action = request.getParameter("action");
 		if (null == action)
 			action = "";
-		
+
 		ActionResponse aResponse = null;
 		switch (action)
 		{
 		case FrontcacheAction.INVALIDATE:
 			aResponse = invalidate(request);
 			break;
-			
+
 		case FrontcacheAction.GET_CACHE_STATE:
 			aResponse = getCacheStatus(request);
 			break;
-			
+
 		case FrontcacheAction.GET_CACHED_KEYS:
 			getCachedKeys(request, response);
 			return;
-			
+
 		case FrontcacheAction.GET_FROM_CACHE:
 			aResponse = getFromCache(request);
 			break;
-			
+
 		case FrontcacheAction.DUMP_KEYS:
 			aResponse = startDumpKeys(request);
 			break;
-			
+
 		case "reload":
 			aResponse = reload(request);
 			break;
@@ -141,32 +141,32 @@ public class FrontCacheIOServlet extends HttpServlet {
 		case FrontcacheAction.RELOAD_FALLBACKS:
 			aResponse = reloadFallbacks(request);
 			break;
-			
+
 		case FrontcacheAction.GET_FALLBACK_CONFIGS:
 			aResponse = getFallbackConfigs(request);
 			break;
-			
+
 		case FrontcacheAction.GET_BOTS:
 			aResponse = getBots(request);
 			break;
-			
+
 		case FrontcacheAction.GET_DYNAMIC_URLS:
 			aResponse = getDynamicURLs(request);
 			break;
-			
+
 		case FrontcacheAction.PATCH:
 			aResponse = patch(request);
 			break;
-			
+
 			default:
 				aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
-			
+
 		}
 		response.getOutputStream().write(jsonMapper.writeValueAsBytes(aResponse));
 	}
 
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
@@ -179,25 +179,25 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 			return aResponse;
 		}
-	    
+
 		String siteKey = req.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
 		String domain = null;
-		
+
 		DomainContext domainContext = FrontCacheEngine.getFrontCache().getDomainContexBySiteKey(siteKey);
 		if (null != domainContext)
 			domain = domainContext.getDomain();
-		
+
 		if ("*".equals(filter))
 			CacheManager.getInstance().removeFromCacheAll(domain);
 		else
 			CacheManager.getInstance().removeFromCache(domain, filter);
-			
+
 		logger.info("Invalidation for filter: " + filter);
 		return aResponse;
 	}
 
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
@@ -205,12 +205,12 @@ public class FrontCacheIOServlet extends HttpServlet {
 	{
 		Map<String, String> state = CacheManager.getInstance().getCacheStatus();
 		ActionResponse aResponse = new CacheStatusActionResponse(state);
-			
+
 		return aResponse;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
@@ -230,15 +230,15 @@ public class FrontCacheIOServlet extends HttpServlet {
 		} finally {
 			try {
 				if (null != os)
-					os.close(); 
+					os.close();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
-		
+
 		return;
 	}
-	
+
 	/**
 	 * @param req
 	 * @return
@@ -248,15 +248,15 @@ public class FrontCacheIOServlet extends HttpServlet {
 		String key = req.getParameter("key");
 		if (null == key)
 			return new GetFromCacheActionResponse(key);
-		
-		WebResponse webResponse = CacheManager.getInstance().getFromCache(key);
+
+		WebResponse webResponse = CacheManager.getInstance().getFromCache(key, null); // admin lookup - no request context
 		GetFromCacheActionResponse actionResponse = new GetFromCacheActionResponse(key, webResponse);
-		
+
 		return actionResponse;
 	}
-		
+
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
@@ -267,9 +267,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 		final String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
 		final String filePath = "warmer/keys_" + logTimeDateFormat.format(new Date()) + ".txt";
 		Runnable r = new Runnable() {
-			
+
 			public void run() {
-				
+
 				File outputDir = new File(frontcacheHome);
 				File keysDumpFile = new  File(outputDir, filePath);
 				FileOutputStream fos = null;
@@ -285,39 +285,39 @@ public class FrontCacheIOServlet extends HttpServlet {
 				} finally {
 					try {
 						if (null != fos)
-							fos.close(); 
+							fos.close();
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
 				}
-				
+
 			}
 		};
-		
+
 		Thread t = new Thread(r);
-		t.start();				
+		t.start();
 
 		DumpKeysActionResponse aResponse = new DumpKeysActionResponse();
 		aResponse.setOutputFile(filePath);
-			
+
 		return aResponse;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
 	private ActionResponse reload(HttpServletRequest req)
 	{
 		FrontCacheEngine.reload();
-		
+
 		ActionResponse aResponse = new ReloadActionResponse();
 		return aResponse;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
@@ -325,13 +325,13 @@ public class FrontCacheIOServlet extends HttpServlet {
 	{
 		FallbackResolverFactory.destroy();
 		FallbackResolverFactory.init(FrontCacheEngine.getFrontCache().getHttpClient());
-		
+
 		ActionResponse aResponse = new ReloadFallbacksActionResponse();
 		return aResponse;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
@@ -339,15 +339,15 @@ public class FrontCacheIOServlet extends HttpServlet {
 	{
 		FallbackResolverFactory.init(FrontCacheEngine.getFrontCache().getHttpClient());
 		Map <String, Set<FallbackConfigEntry>> fallbackConfigs = FallbackResolverFactory.getInstance().getFallbackConfigs();
-		
+
 		GetFallbackConfigActionResponse aResponse = new GetFallbackConfigActionResponse();
 		aResponse.setFallbackConfigs(fallbackConfigs);
-		
+
 		return aResponse;
 	}
 
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
@@ -357,12 +357,12 @@ public class FrontCacheIOServlet extends HttpServlet {
 		bots.putAll(FCConfig.getBotUserAgentKeywords());
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
 		aResponse.setBots(bots);
-		
+
 		return aResponse;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
@@ -372,38 +372,38 @@ public class FrontCacheIOServlet extends HttpServlet {
 		dynamicURLs.putAll(FCConfig.getDynamicURLs());
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
 		aResponse.setDynamicURLs(dynamicURLs);
-		
+
 		return aResponse;
 	}
 
 	/**
-	 * 
+	 *
 	 * @param req
 	 * @return
 	 */
 	private ActionResponse patch(HttpServletRequest req)
 	{
-		
+
 		Runnable r = new Runnable() {
 			public void run() {
 				CacheManager.getInstance().patch();
 			}
 		};
-		
+
 		Thread t = new Thread(r);
-		t.start();				
-		
+		t.start();
+
 		PatchActionResponse aResponse = new PatchActionResponse();
 		return aResponse;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		process(req, resp);
 		return;
 	}
-	
+
 }

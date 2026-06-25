@@ -22,9 +22,9 @@ import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.FallbackConfig;
 
 public class FallbackConfigsCaller implements Callable<FallbackConfig> {
-	
+
 	private FrontCacheClient fcClient;
-	
+
 	public FallbackConfigsCaller(FrontCacheClient fcClient) {
 		super();
 		this.fcClient = fcClient;
@@ -32,7 +32,7 @@ public class FallbackConfigsCaller implements Callable<FallbackConfig> {
 
     @Override
     public FallbackConfig call() throws Exception {
-		
-		 return new FallbackConfig(fcClient.getName(), fcClient.getFallbackConfigs()); 
+
+		 return new FallbackConfig(fcClient.getName(), fcClient.getFallbackConfigs());
     }
-}	
+}

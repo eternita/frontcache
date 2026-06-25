@@ -22,9 +22,9 @@ import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.BotConfig;
 
 public class BotConfigsCaller implements Callable<BotConfig> {
-	
+
 	private FrontCacheClient fcClient;
-	
+
 	public BotConfigsCaller(FrontCacheClient fcClient) {
 		super();
 		this.fcClient = fcClient;
@@ -32,7 +32,7 @@ public class BotConfigsCaller implements Callable<BotConfig> {
 
     @Override
     public BotConfig call() throws Exception {
-		
-		 return new BotConfig(fcClient.getName(), fcClient.getBots()); 
+
+		 return new BotConfig(fcClient.getName(), fcClient.getBots());
     }
-}	
+}

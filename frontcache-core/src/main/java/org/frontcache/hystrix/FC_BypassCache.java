@@ -28,7 +28,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.http.Header;
+import com.netflix.hystrix.HystrixThreadPoolKey;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -58,12 +58,13 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 	private Logger logger = LoggerFactory.getLogger(FC_BypassCache.class);
 
     public FC_BypassCache(HttpClient client, RequestContext context) {
-        
+
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
+				.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool"))
         		);
-        
+
         this.client = client;
         this.context = context;
     }
@@ -72,105 +73,105 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     protected Object run() throws Exception {
 
     	forwardToOrigin();
-    	
+
     	return null;
     }
-    
+
     @Override
     protected Object getFallback() {
-    	
+
 		try {
 			HttpServletRequest httpRequest = context.getRequest();
 			String url = FCUtils.getRequestURL(httpRequest);
 			HttpServletResponse httpResponse = context.getResponse();
-			
-			context.setHystrixFallback();
-			
+
+			context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
+
 			String failedExceptionMessage = "";
 			if (null != getFailedExecutionException())
 				failedExceptionMessage += getFailedExecutionException().getMessage();
-			
+
 			logger.error("FC - ORIGIN ERROR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents());
-			
+
 			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
-			
+
+			FCUtils.applyFallbackHeaders(httpResponse, webResponse);
 			httpResponse.getOutputStream().write(webResponse.getContent());
-			httpResponse.setContentType(webResponse.getHeader(FCHeaders.CONTENT_TYPE));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
         return null;
     }
-    
-    
+
+
 	private void forwardToOrigin() throws IOException, ServletException
 	{
 		HttpServletRequest request = context.getRequest();
-		
+
 		if (context.isFilterMode())
 		{
 			HttpServletResponse response = context.getResponse();
 			FilterChain chain = context.getFilterChain();
 			chain.doFilter(request, response);
 		} else {
-			
+
 			// stand alone mode
-			
+
 			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request);
 			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{FCUtils.getClientIP(context.getRequest())}));
-			
+
 			String verb = request.getMethod();
 			InputStream requestEntity = getRequestBody(request);
 			String uri = context.getRequestURI();
 
 			try {
 				HttpResponse response = forward(client, verb, uri, request, headers, requestEntity);
-				
+
 				// response 2 context
 				setResponse(response);
-				
+
 			}
 			catch (Exception ex) {
 				ex.printStackTrace();
 				context.set("error.status_code", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 				context.set("error.exception", ex);
-				
+
 				context.setHystrixFallback();
 				logger.error("FC - ORIGIN ERROR - " + uri);
-				
+
 			}
 		}
-		
+
 		return;
 	}
-    
-	
+
+
 	private void setResponse(HttpResponse response) throws IOException {
-		
+
 		context.setHttpClientResponse((CloseableHttpResponse) response);
-		
+
 		setResponse(response.getStatusLine().getStatusCode(),
 				response.getEntity() == null ? null : response.getEntity().getContent(),
 				FCUtils.revertHeaders(response.getAllHeaders()));
 	}
 
-	
+
 	private void setResponse(int status, InputStream entity, Map<String, List<String>> headers) throws IOException {
-		
+
 		context.setResponseStatusCode(status);
-		
+
 		if (entity != null) {
 			context.setResponseDataStream(entity);
 		}
-		
+
 		for (String key : headers.keySet()) {
 			for (String value : headers.get(key)) {
 				context.addOriginResponseHeader(key, value);
 			}
 		}
 
-	}	
-	
+	}
+
 
 	private InputStream getRequestBody(HttpServletRequest request) {
 		InputStream requestEntity = null;
@@ -181,11 +182,11 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			// no requestBody is ok.
 		}
 		return requestEntity;
-	}	
-	
+	}
+
 	/**
 	 * forward all kind of requests (GET, POST, PUT, ...)
-	 * 
+	 *
 	 * @param httpclient
 	 * @param verb
 	 * @param uri
@@ -196,14 +197,15 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 	 * @return
 	 * @throws Exception
 	 */
-	private HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
+	// package-private (not private) so unit tests in this package can drive the origin call directly
+	HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
 			Map<String, List<String>> headers, InputStream requestEntity)
 					throws Exception {
 
 		URL host = context.getOriginURL();
 		HttpHost httpHost = FCUtils.getHttpHost(host);
 		uri = (host.getPath() + uri).replaceAll("/{2,}", "/");
-		
+
 		HttpRequest httpRequest;
 		switch (verb.toUpperCase()) {
 		case "POST":
@@ -224,15 +226,15 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 		default:
 			httpRequest = new BasicHttpRequest(verb, uri + context.getRequestQueryString());
 		}
-		
-		
+
+
 		try {
 			httpRequest.setHeaders(FCUtils.convertHeaders(headers));
-			Header acceptEncoding = httpRequest.getFirstHeader("accept-encoding");
-			if (acceptEncoding != null && acceptEncoding.getValue().contains("gzip"))
-			{
-				httpRequest.setHeader("accept-encoding", "gzip");
-			}
+			// Always advertise gzip (and only gzip) to the origin. Our HttpClient transparently
+			// decodes gzip, so Frontcache always receives plaintext it can parse/cache and never an
+			// encoding it cannot handle (e.g. br/zstd). buildRequestHeaders() normalizes this too;
+			// setting it here makes the origin call self-contained, independent of the inbound headers.
+			httpRequest.setHeader(FCHeaders.ACCEPT_ENCODING, "gzip");
 			HttpResponse originResponse = httpclient.execute(httpHost, httpRequest);
 			return originResponse;
 		} finally {
@@ -241,6 +243,6 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			// immediate deallocation of all system resources
 			// httpclient.getConnectionManager().shutdown();
 		}
-	}	
-    
+	}
+
 }

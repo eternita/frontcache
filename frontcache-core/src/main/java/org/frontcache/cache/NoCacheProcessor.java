@@ -38,7 +38,7 @@ public class NoCacheProcessor implements CacheProcessor {
 		boolean isRequestCacheable = true;
 		boolean isCached = false;
 		long lengthBytes = -1;
-		
+
 		WebResponse cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context);
 
 		lengthBytes = cachedWebResponse.getContentLenth();
@@ -67,7 +67,7 @@ public class NoCacheProcessor implements CacheProcessor {
 	}
 
 	@Override
-	public WebResponse getFromCache(String url) {
+	public WebResponse getFromCache(String url, RequestContext context) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -100,14 +100,14 @@ public class NoCacheProcessor implements CacheProcessor {
 	@Override
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr,
 			Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
-	
+
 		return;
 	}
 
 	@Override
 	public void patch() {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 }

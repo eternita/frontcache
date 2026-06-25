@@ -21,29 +21,29 @@ import java.util.TreeMap;
 
 public abstract class FrontcacheAction {
 
-	
+
 	public static final String INVALIDATE = "invalidate";
-	
+
 	public static final String DUMP_KEYS = "dump-keys";
-	
+
 	public static final String GET_FALLBACK_CONFIGS = "get-fallback-configs";
 
 	public static final String RELOAD_FALLBACKS = "reload-fallbacks";
-	
+
 	public static final String GET_CACHE_STATE = "get-cache-state";
 
 	public static final String GET_CACHED_KEYS = "get-cached-keys";
-	
+
 	public static final String GET_FROM_CACHE = "get-from-cache";
-	
+
 	public static final String GET_BOTS = "get-bots";
-	
+
 	public static final String GET_DYNAMIC_URLS = "get-dynamic-urls";
 
 	public static final String PATCH = "patch";
-	
+
 	public static Map<String, String> actionsDescriptionMap = new TreeMap<>();
-	
+
 	static {
 		actionsDescriptionMap.put(FrontcacheAction.GET_CACHE_STATE, "get cache state: cache processor, amount cached items");
 		actionsDescriptionMap.put(FrontcacheAction.GET_FALLBACK_CONFIGS, "get fallback configs from ./conf/fallbacks.conf");
@@ -55,5 +55,5 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get substring to determine bots based on User-Agent HTTP header from ./conf/bots.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
 	}
-	
+
 }

@@ -62,14 +62,14 @@ public class ProxyStreamServlet extends HttpServlet {
     private static final Logger logger = LoggerFactory.getLogger(ProxyStreamServlet.class);
 
     protected AutowireCapableBeanFactory ctx;
-    
+
 	@Autowired
 	private FrontcacheService frontcacheService;
-	
+
     public ProxyStreamServlet() {
         super();
     }
-    
+
     @Override
     public void init(ServletConfig config) throws ServletException {
        super.init(config);
@@ -93,9 +93,9 @@ public class ProxyStreamServlet extends HttpServlet {
             response.getWriter().println("Required parameter 'origin' missing. Example: 107.20.175.135:7001");
             return;
         }
-        
+
         String siteKey = frontcacheService.getSiteKey();
-        
+
         HttpGet httpget = null;
         InputStream is = null;
         boolean hasFirstParameter = false;
@@ -210,6 +210,6 @@ public class ProxyStreamServlet extends HttpServlet {
             threadSafeConnectionManager.setMaxTotal(400);
         }
     }
-    
-    
+
+
 }

@@ -6,3 +6,8 @@ CLAUDE.md
 /.DS_Store
 /target/
 /distribution/
+/**/target/
+/**/build/
+/frontcache-server/server/frontcache-base/webapps/
+/frontcache-tests/FRONTCACHE_HOME_**/cache/
+/frontcache-tests/FRONTCACHE_HOME_**/logs/

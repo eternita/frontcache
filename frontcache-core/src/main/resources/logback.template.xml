@@ -19,6 +19,23 @@
 		</layout>
 	</appender>
 	
+    <!-- FailedRequestLoggerFile for NON-SUCCESSFUL REQUEST LOGS ONLY (short-circuited/timeout/rejected/bad-request/failure) -->
+	<appender name="FailedRequestLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>TRACE</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+
+		<File>${frontcache.home}/logs/frontcache-failed-requests.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/frontcache-failed-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			  <Pattern>%msg%n</Pattern>
+		</layout>
+	</appender>
+
 	<appender name="Error" class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<filter class="ch.qos.logback.classic.filter.LevelFilter">
 			<level>ERROR</level>
@@ -70,6 +87,12 @@
 	    <level value="TRACE" />
 		<appender-ref ref="ReguestLoggerFile" />
 	</logger>
-	
+
+	<!-- for non-successful requests only (additivity=false -> kept out of the root/info logs) -->
+	<logger name="frontcache.failed-requests" additivity="false">
+	    <level value="TRACE" />
+		<appender-ref ref="FailedRequestLoggerFile" />
+	</logger>
+
 
 </configuration>

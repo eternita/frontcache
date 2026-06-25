@@ -19,10 +19,10 @@ package org.frontcache.core;
 import java.util.List;
 
 public class StringUtils {
-	
+
   /**
    * return in inputStr substring between first and second
-   * 
+   *
    * @param inputStr
    * @param first
    * @param second
@@ -32,7 +32,7 @@ public class StringUtils {
   {
 		String out = null;
 		int idx = inputStr.indexOf(first);
-		if (-1 < idx) 
+		if (-1 < idx)
 		{
 			String s = inputStr.substring(idx + first.length());
 			int idx2 = s.indexOf(second);
@@ -42,7 +42,7 @@ public class StringUtils {
 
 		return out;
   }
-  
+
   public static List<String> getListBetween(String inputStr, String first, String second, List<String> list)
   {
 		String str = inputStr;
@@ -59,5 +59,5 @@ public class StringUtils {
 	public static boolean isEmpty(Object str) {
 		return (str == null || "".equals(str));
 	}
-  
+
 }

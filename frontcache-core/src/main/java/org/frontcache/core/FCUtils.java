@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -56,9 +57,9 @@ public class FCUtils {
 
 	private FCUtils() {
 	}
-	
+
 	private static Logger logger = LoggerFactory.getLogger(FCUtils.class);
-		
+
     private static final String[] CLIENT_IP_SOURCE_HEADER_LIST = {
     		FCHeaders.X_FRONTCACHE_CLIENT_IP,
             "x-forwarded-for",
@@ -72,20 +73,20 @@ public class FCUtils {
             "HTTP_FORWARDED_FOR",
             "HTTP_FORWARDED",
             "HTTP_VIA",
-            "REMOTE_ADDR" 
+            "REMOTE_ADDR"
     };
-        
+
 	public static boolean isWebComponentSubjectToCache(Map<String, Long> expireTimeMap)
 	{
 		if (null == expireTimeMap)
 			return false;
-		
+
 		if (null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER))
 			return false;
-		
+
 		if (0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && 0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER))
 			return false;
-		
+
 		return true;
 	}
 
@@ -96,26 +97,26 @@ public class FCUtils {
 		{
 			// not a case -> log it
 			logger.error("isWebComponentCacheableForClientType() - expireTimeMap must not be empty for clientType=" + clientType);
-			return false; 
+			return false;
 		}
-		
+
 		Long expireTimeMillis = expireTimeMap.get(clientType);
 		if (null == expireTimeMillis)
 		{
 			// not a case -> log it
 			logger.error("isWebComponentCacheableForClientType() - expireTimeMillis must be in expireTimeMap for clientType=" + clientType);
-			return false; 			
+			return false;
 		}
-		
+
 		if (CacheProcessor.NO_CACHE == expireTimeMillis)
 			return false;
-		
+
 		return true;
 	}
 
 	/**
 	 * Check with current time if expired
-	 *  
+	 *
 	 * @param clientType {bot | browser}
 	 * @return
 	 */
@@ -125,34 +126,34 @@ public class FCUtils {
 		{
 			// not a case -> log it
 			logger.error("isWebComponentExpired() - expireTimeMap must not be empty for clientType=" + clientType);
-			return true; 
+			return true;
 		}
-		
+
 		Long expireTimeMillis = expireTimeMap.get(clientType);
 		if (null == expireTimeMillis)
 		{
 			// not a case -> log it
 			logger.error("isWebComponentExpired() - expireTimeMillis must be in expireTimeMap for clientType=" + clientType);
-			return true; 
+			return true;
 		}
-		
+
 		if (CacheProcessor.CACHE_FOREVER == expireTimeMillis)
 			return false;
-		
+
 		if (System.currentTimeMillis() > expireTimeMillis)
 			return true;
-		
+
 		return false;
 	}
 
-	
-	
-    
+
+
+
 	/**
 	 * GET method only for text requests
-	 * 
+	 *
 	 * for cache processor - it can use both (httpClient or filter)
-	 * 
+	 *
 	 * @param urlStr
 	 * @param httpRequest
 	 * @param httpResponse
@@ -160,12 +161,12 @@ public class FCUtils {
 	 */
 	public static WebResponse dynamicCall(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
-		// add include-level header - to trace include tree 
+		// add include-level header - to trace include tree
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL, "" + context.getIncludeLevel());
-		
-		// add request-id header - to distinguish if sent by frontcache or not (for include processing) 
+
+		// add request-id header - to distinguish if sent by frontcache or not (for include processing)
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
-		
+
 		if (context.isFilterMode())
 			 return new FC_ThroughCache_WebFilter(context).execute();
 		else
@@ -177,15 +178,15 @@ public class FCUtils {
 	 */
 	public static WebResponse includeDynamicCallHttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
     {
-		// add request-id header - to trace include tree 
+		// add request-id header - to trace include tree
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
-		
+
 		// add header with client IP
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, getClientIP(context.getRequest()));
-		
+
 		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }
-	
+
 	public static String getClientIP(HttpServletRequest request) {
 		for (String header : CLIENT_IP_SOURCE_HEADER_LIST) {
 			String ip = request.getHeader(header);
@@ -193,12 +194,17 @@ public class FCUtils {
 				return ip;
 			}
 		}
-		return request.getRemoteAddr();
+        try {
+            return request.getRemoteAddr();
+        } catch (Exception ex) {
+            logger.info(" Can't resolve IP from request");
+        }
+        return "unresolved";
 	}
-	
+
 	/**
-	 * Helper to work with Map<String, List<String>> 
-	 * 
+	 * Helper to work with Map<String, List<String>>
+	 *
 	 * @param requestHeaders
 	 * @param key
 	 * @param name
@@ -208,11 +214,11 @@ public class FCUtils {
 		requestHeaders.put(key, Arrays.asList(new String[]{name}));
 		return;
 	}
-	
+
 
 	/**
 	 * is used in ServletFilter mode
-	 * 
+	 *
 	 * @param url
 	 * @param originWrappedResponse
 	 * @return
@@ -222,7 +228,7 @@ public class FCUtils {
 	public static WebResponse httpResponse2WebComponent(String url, FrontCacheHttpResponseWrapper originWrappedResponse, RequestContext context) throws FrontCacheException, IOException
 	{
 		WebResponse webResponse = null;
-		
+
 		String contentType = originWrappedResponse.getContentType();
 		String dataStr = originWrappedResponse.getContentString();
 		byte[] data = null;
@@ -231,18 +237,21 @@ public class FCUtils {
 		else
 			logger.info(url + " has response with no data");
 
-		
+
 		if (null == contentType || -1 == contentType.indexOf("text"))
 		{
-			contentType = "text"; // 
+			contentType = "text"; //
 		}
-		
+
 		webResponse = parseWebComponent(url, data, FCUtils.revertHeaders(originWrappedResponse));
 
 		webResponse.setStatusCode(originWrappedResponse.getStatus());
 
 		// get headers
-    	Map<String, List<String>> headers = new HashMap<String, List<String>>();
+		// case-insensitive: HTTP header names are case-insensitive (RFC 7230) and
+		// intermediaries (e.g. Cloudflare) may re-case them - so component directives
+		// like X-frontcache.component.maxage must resolve regardless of wire casing
+    	Map<String, List<String>> headers = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 		for (String headerName : originWrappedResponse.getHeaderNames())
 		if (isIncludedHeaderToResponse(headerName))
 		{
@@ -255,40 +264,40 @@ public class FCUtils {
 			hValues.add(originWrappedResponse.getHeader(headerName));
 		}
 		webResponse.setHeaders(headers);
-		
-		// filter may not set up content type yet -> check and setup 
+
+		// filter may not set up content type yet -> check and setup
 		if (null != dataStr && null == headers.get(FCHeaders.CONTENT_TYPE))
 		{
-			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType); 
+			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType);
 		}
-		
+
 		if (null != headers.get(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED))
 			context.setHystrixFallback();
-		
+
 		return webResponse;
 	}
-	
+
 	public static WebResponse httpResponse2WebComponent(String url, HttpResponse response, RequestContext context) throws FrontCacheException, IOException
 	{
-		
-		
+
+
 		int httpResponseCode = response.getStatusLine().getStatusCode();
-			
-		
+
+
 		String contentType = "";
 		Header contentTypeHeader = response.getFirstHeader(FCHeaders.CONTENT_TYPE);
 		if (null != contentTypeHeader)
 			contentType = contentTypeHeader.getValue();
-		
+
 		WebResponse webResponse = null;
-		
+
 		byte[] respData = null;
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		InputStream is = response.getEntity().getContent();
 		try {
 			int bytesRead = 0;
             int bufferSize = 4000;
-	         byte[] byteBuffer = new byte[bufferSize];				
+	         byte[] byteBuffer = new byte[bufferSize];
 	         while ((bytesRead = is.read(byteBuffer)) != -1) {
 	             baos.write(byteBuffer, 0, bytesRead);
 	         }
@@ -296,14 +305,14 @@ public class FCUtils {
 			e.printStackTrace();
 		}
 		respData = baos.toByteArray();
-		
+
 		Map<String, List<String>> headers = revertHeaders(response.getAllHeaders());
 		webResponse = parseWebComponent(url, respData, headers);
 
 		webResponse.setHeaders(headers);
 		webResponse.setStatusCode(httpResponseCode);
 		if (null == headers.get(FCHeaders.CONTENT_TYPE))
-			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType); 
+			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType);
 
 		if (httpResponseCode < 200 || httpResponseCode > 499) // 2XX - OK, 3XX - REDIRECTS, 4XX - client error (e.g. page not found)
 		{
@@ -311,54 +320,57 @@ public class FCUtils {
 			// error
 			throw new FrontCacheException("Wrong response code " + httpResponseCode + " for " + url);
 		}
-		
+
 		// process redirects
 		Header locationHeader = response.getFirstHeader("Location");
 		if (null != locationHeader)
 		{
 			String originLocation = locationHeader.getValue();
-			
+
 			String fcLocation = transformRedirectURL(originLocation, context);
 			webResponse.getHeaders().remove("Location");
 			webResponse.addHeader("Location", fcLocation);
 		}
-		
+
 		Header hystrixFallbackHeader = response.getFirstHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED);
 		if (null != hystrixFallbackHeader)
 			context.setHystrixFallback();
-		
+
 		return webResponse;
 	}
-	
+
 	public static String transformRedirectURL(String originLocation, RequestContext context)
 	{
 		String fcLocation = null;
 		String protocol = getRequestProtocol(originLocation);
-		
+
 		if ("".equals(protocol)) // originLocation is relative path, so protocol is undefined
 			protocol = context.getFrontCacheProtocol(); // use current protocol from context
-		
+
 		if ("https".equalsIgnoreCase(protocol))
 			fcLocation = "https://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
 		else // http
 			fcLocation = "http://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpPort() + buildRequestURI(originLocation);
-		
+
 		return fcLocation;
 	}
-	
-	
-	
+
+
+
     /**
-     * revert header from HttpClient format (call to origin) to Map 
-     * 
+     * revert header from HttpClient format (call to origin) to Map
+     *
      * @param headers
      * @return
      */
     public static Map<String, List<String>> revertHeaders(Header[] headers) {
-    	Map<String, List<String>> map = new HashMap<String, List<String>>();
+    	// case-insensitive map - HTTP header names are case-insensitive (RFC 7230);
+    	// intermediaries (e.g. Cloudflare) may re-case them, so X-frontcache.* directives
+    	// must resolve regardless of wire casing
+    	Map<String, List<String>> map = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 		for (Header header : headers) {
 			String name = header.getName();
-			
+
 			if (isIncludedHeaderToResponse(name))
 			{
 				List<String> hValues = map.get(name);
@@ -374,7 +386,8 @@ public class FCUtils {
 	}
 
     public static Map<String, List<String>> revertHeaders(HttpServletResponse response) {
-    	Map<String, List<String>> map = new HashMap<String, List<String>>();
+    	// case-insensitive map - see revertHeaders(Header[]) above
+    	Map<String, List<String>> map = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 		for (String name : response.getHeaderNames())
 		{
 			if (isIncludedHeaderToResponse(name))
@@ -390,13 +403,13 @@ public class FCUtils {
 		}
 		return map;
 	}
-    
+
 	private static boolean isIncludedHeaderToResponse(String headerName) {
 		String name = headerName.toLowerCase();
 
 		switch (name) {
-			case "content-length": // do not use 'content-length' because 'transfer-encoding' is used 
-			case "transfer-encoding": // put it here to avoid duplicates 
+			case "content-length": // do not use 'content-length' because 'transfer-encoding' is used
+			case "transfer-encoding": // put it here to avoid duplicates
 				return false;
 			default:
 				return true;
@@ -412,43 +425,43 @@ public class FCUtils {
 		}
 		return list.toArray(new BasicHeader[0]);
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @param request
 	 * @return
 	 */
 	public static String getRequestURL(HttpServletRequest request)
 	{
         String requestURL = request.getRequestURL().toString();
-        
+
         if ("GET".equals(request.getMethod()))
         {
-        	// add parameters for storing 
+        	// add parameters for storing
         	// POST method parameters are not stored because they can be huge (e.g. file upload)
         	StringBuffer sb = new StringBuffer(requestURL);
         	if (!request.getParameterMap().isEmpty())
         		sb.append("?").append(request.getQueryString());
 
         	requestURL = sb.toString();
-        }	
+        }
         return requestURL;
 	}
 
     /**
      * return true if the client requested gzip content
      *
-     * @param contentEncoding 
+     * @param contentEncoding
      * @return true if the content-encoding containg gzip
      */
     public static boolean isGzipped(String contentEncoding) {
         return contentEncoding.contains("gzip");
     }
-    
+
 	/**
 	 * wrap String to WebResponse.
 	 * Check for header - extract caching options.
-	 * 
+	 *
 	 * @param contentStr
 	 * @return
 	 */
@@ -458,11 +471,11 @@ public class FCUtils {
 		String refreshTypeStr = null;
 		String cacheLevelStr = null;
 		byte[] outContentBody = content;
-		
+
 		Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		if (null != collStr && !collStr.isEmpty())
 			cacheMaxAgeSecStr = collStr.iterator().next();
-		
+
 		collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_REFRESH_TYPE);
 		if (null != collStr && !collStr.isEmpty())
 			refreshTypeStr = collStr.iterator().next();
@@ -470,21 +483,21 @@ public class FCUtils {
 		collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_CACHE_LEVEL);
 		if (null != collStr && !collStr.isEmpty())
 			cacheLevelStr = collStr.iterator().next();
-		
+
 		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSecStr, refreshTypeStr);
-		
+
 		if (null != cacheLevelStr)
 			component.setCacheLevel(cacheLevelStr);
-		
+
 		// set invalidation tags
 		Collection<String> tagsList = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS);
 		if (null != tagsList)
 			for (String tagsStr : tagsList)
 				component.addTags(Arrays.asList(tagsStr.split(FCHeaders.COMPONENT_TAGS_SEPARATOR)));
-		
+
 		return component;
 	}
-	
+
 	public static long maxAgeStr2Int(String maxAgeStr)
 	{
 		try
@@ -492,7 +505,7 @@ public class FCUtils {
 			int multiplyPrefix = 1;
 			if ("forever".equalsIgnoreCase(maxAgeStr.trim())) // forever
 			{
-				return CacheProcessor.CACHE_FOREVER;				
+				return CacheProcessor.CACHE_FOREVER;
 			} else if (maxAgeStr.endsWith("d")) { // days
 				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
 				multiplyPrefix = 86400; // 24 * 60 * 60
@@ -508,28 +521,28 @@ public class FCUtils {
 			} else {
 				// seconds
 			}
-			
+
 			return multiplyPrefix * Integer.parseInt(maxAgeStr); // time to live in cache in seconds
 		} catch (Exception e) {
 			logger.info("can't parse component maxage - " + maxAgeStr + " defalut is used (NO_CACHE)");
 			return CacheProcessor.NO_CACHE;
-		}		
+		}
 	}
 
 	public static String buildRequestURI(HttpServletRequest request) {
 		String uri = request.getRequestURI();
 		return uri;
-	}		
+	}
 
 
 	/**
 	 * http://localhost:8080/coin_instance_details.htm? -> /coin_instance_details.htm?
-	 * 
+	 *
 	 * @param urlStr
 	 * @return
 	 */
 	public static String buildRequestURI(String urlStr) {
-		
+
 		String outStr = urlStr;
 		int idx = urlStr.indexOf("//");
 		if (-1 < idx)
@@ -537,20 +550,20 @@ public class FCUtils {
 			idx = urlStr.indexOf("/", idx + "//".length());
 			if (-1 < idx)
 				outStr = urlStr.substring(idx);
-		} 
-		
+		}
+
 		idx = outStr.indexOf("?"); // has params
 		if (-1 < idx)
 		{
-			String uri = outStr.substring(0, idx + 1); 
+			String uri = outStr.substring(0, idx + 1);
 			String queryParams = outStr.substring(idx + 1);
 
 			// encode / decode params
 			try {
 				Map<String, List<String>> parameterMap = splitQueryParameters(queryParams);
-				
+
 				StringBuffer queryParamsSB = new StringBuffer("");
-				
+
 				for (String key : parameterMap.keySet())
 				{
 					for (String value : parameterMap.get(key))
@@ -559,24 +572,24 @@ public class FCUtils {
 						{
 							if (queryParamsSB.length() > 1)
 								queryParamsSB.append("&");
-							
+
 							queryParamsSB.append(key).append("=").append(URLEncoder.encode(value, "UTF-8"));
 						}
 					}
 				}
-				
+
 				queryParams = queryParamsSB.toString();
 			} catch (Exception e) {
 				logger.error("error buildRequestURI for " + urlStr, e);
 			}
-			
+
 			outStr = uri + queryParams;
-		} 
-		
+		}
+
 		return outStr;
 	}
-	
-	
+
+
 	public static Map<String, List<String>> splitQueryParameters(String paramsStr) throws UnsupportedEncodingException {
 		final Map<String, List<String>> queryPairs = new LinkedHashMap<String, List<String>>();
 		final String[] pairs = paramsStr.split("&");
@@ -592,26 +605,26 @@ public class FCUtils {
 		}
 		return queryPairs;
 	}
-	
+
 	/**
 	 * http://localhost:8080/coin_instance_details.htm? -> http
 	 * @param urlStr
 	 * @return
 	 */
 	private static String getRequestProtocol(String urlStr) {
-		
+
 		int idx = urlStr.indexOf(":");
 		if (-1 < idx)
 			return urlStr.substring(0, idx);
-		
+
 		return ""; // default
-	}		
-	
+	}
+
 	public static HttpHost getHttpHost(URL host) {
 		HttpHost httpHost = new HttpHost(host.getHost(), host.getPort(), host.getProtocol());
 		return httpHost;
 	}
-	
+
 	public static Map<String, List<String>> buildRequestHeaders(HttpServletRequest request) {
 
 		Map<String, List<String>> headers = new HashMap<String, List<String>>();
@@ -623,7 +636,7 @@ public class FCUtils {
 					Enumeration<String> values = request.getHeaders(name);
 					while (values.hasMoreElements()) {
 						String value = values.nextElement();
-						
+
 						List<String> hValues = headers.get(name);
 						if(null == hValues)
 						{
@@ -636,9 +649,18 @@ public class FCUtils {
 			}
 		}
 
+		// Normalize the encoding we advertise to the origin to gzip only.
+		// Our HttpClient transparently decodes gzip/deflate but NOT brotli (br) or zstd - if the
+		// origin returned br we would cache that blob and serve it to clients that never requested
+		// it (ignoring Vary), and the include processor couldn't parse the compressed body.
+		// Forcing gzip means FC always holds plaintext; compression to the client is (re)applied
+		// at the edge (nginx / CDN).
+		headers.keySet().removeIf(name -> FCHeaders.ACCEPT_ENCODING.equalsIgnoreCase(name));
+		headers.put(FCHeaders.ACCEPT_ENCODING, new ArrayList<String>(Arrays.asList("gzip")));
+
 		return headers;
 	}
-	
+
 	private static boolean isIncludedHeader(String headerName) {
 		String name = headerName.toLowerCase();
 
@@ -654,8 +676,8 @@ public class FCUtils {
 				return true;
 		}
 	}
-	
-	
+
+
 	public static void writeResponse(InputStream zin, OutputStream out) throws Exception {
 		byte[] bytes = new byte[1024];
 		int bytesRead = -1;
@@ -673,7 +695,7 @@ public class FCUtils {
 			}
 		}
 	}
-	
+
 	public static String getDomainFromSiteKeyHeader(HttpServletRequest request) {
 		String siteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
 		if (siteKey == null) {
@@ -686,11 +708,42 @@ public class FCUtils {
 		if (null != domainContext)
 			domain = domainContext.getDomain();
 
-		if (domain == null) 
+		if (domain == null)
 			return FCConfig.DEFAULT_DOMAIN;
 
 		return domain;
 	}
-	
-	
+
+	/**
+	 * Apply a fallback {@link WebResponse}'s status code and headers (content type plus the
+	 * non-cacheable Cache-Control/Pragma markers) to the servlet response.
+	 *
+	 * Used by the Hystrix commands that stream the fallback body directly, so that the 503 status
+	 * and no-store headers set on the fallback actually reach the client / downstream caches.
+	 * Must be called before the body is written.
+	 *
+	 * @param servletResponse target response
+	 * @param webResponse fallback response carrying status and headers
+	 */
+	public static void applyFallbackHeaders(HttpServletResponse servletResponse, WebResponse webResponse)
+	{
+		if (null == webResponse)
+			return;
+
+		servletResponse.setStatus(webResponse.getStatusCode());
+
+		String contentType = webResponse.getHeader(FCHeaders.CONTENT_TYPE);
+		if (null != contentType)
+			servletResponse.setContentType(contentType);
+
+		String cacheControl = webResponse.getHeader(FCHeaders.CACHE_CONTROL);
+		if (null != cacheControl)
+			servletResponse.setHeader(FCHeaders.CACHE_CONTROL, cacheControl);
+
+		String pragma = webResponse.getHeader(FCHeaders.PRAGMA);
+		if (null != pragma)
+			servletResponse.setHeader(FCHeaders.PRAGMA, pragma);
+	}
+
+
 }

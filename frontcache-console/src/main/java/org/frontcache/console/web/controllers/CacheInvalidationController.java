@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 @Controller
 @RequestMapping("/cache-invalidation")
 public class CacheInvalidationController {
-	
+
 	@Autowired
 	private FrontcacheService frontcacheService;
 
@@ -43,26 +43,26 @@ public class CacheInvalidationController {
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
-		
+
 		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
 		model.addAttribute("edges", clusterStatus.values());
-    	
+
 		return "cache_invalidation";
-	}	
-    
-	
+	}
+
+
 	@RequestMapping(method = RequestMethod.POST)
 	public String submitForm(Model model, CacheInvalidationForm cacheInvalidationForm) {
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
-		
+
 		frontcacheService.invalidateEdge(cacheInvalidationForm.getEdge(), cacheInvalidationForm.getFilter());
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
-		
+
 		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
 		model.addAttribute("edges", clusterStatus.values());
-		
+
 		return "cache_invalidation";
-	}	
+	}
 }

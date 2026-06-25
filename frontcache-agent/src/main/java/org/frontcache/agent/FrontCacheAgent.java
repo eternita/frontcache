@@ -46,24 +46,24 @@ import org.apache.http.protocol.HttpContext;
 public class FrontCacheAgent {
 
 	private String frontCacheURL;
-	
+
 	private String frontCacheURI;
 
 	private String siteKey = "";
-	
+
 	private final static String IO_URI = "frontcache-io";
 	private final static String INVALIDATE = "invalidate";
 
-	
+
 	private HttpClient client;
-	
+
 	public FrontCacheAgent(String frontcacheURL) {
 		final RequestConfig requestConfig = RequestConfig.custom()
 				.setSocketTimeout(10000)
 				.setConnectTimeout(3000)
 				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
 				.build();
-		
+
 	    ConnectionKeepAliveStrategy keepAliveStrategy = new ConnectionKeepAliveStrategy() {
 	        @Override
 	        public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
@@ -81,7 +81,7 @@ public class FrontCacheAgent {
 	            return 10 * 1000;
 	        }
 	    };
-	    
+
 	    client = HttpClients.custom()
 				.setDefaultRequestConfig(requestConfig)
 				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
@@ -98,23 +98,23 @@ public class FrontCacheAgent {
 					}
 				})
 				.build();
-		
+
 		this.frontCacheURL = frontcacheURL;
-		
+
 		if (frontcacheURL.endsWith("/"))
 			this.frontCacheURI = frontcacheURL + IO_URI;
 		else
 			this.frontCacheURI = frontcacheURL + "/" + IO_URI;
 	}
-	
+
 	public FrontCacheAgent(String frontcacheURL, String siteKey) {
 		this(frontcacheURL);
 		this.siteKey = siteKey;
 	}
 
-	
+
 	/**
-	 * 
+	 *
 	 * @param filter
 	 * @return
 	 */
@@ -123,17 +123,17 @@ public class FrontCacheAgent {
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", INVALIDATE));
 		urlParameters.add(new BasicNameValuePair("filter", filter));
-		
+
 		try {
 			return requestFrontCache(urlParameters);
 		} catch (Exception e) {
 			e.printStackTrace();
-			return "ERROR " + e.getMessage(); 
+			return "ERROR " + e.getMessage();
 		}
-	}	
-	
+	}
+
 	/**
-	 * 
+	 *
 	 * @param urlParameters
 	 * @return
 	 * @throws IOException
@@ -143,7 +143,7 @@ public class FrontCacheAgent {
 		HttpPost post = new HttpPost(frontCacheURI);
 
 //    	post.addHeader("Accept-Encoding", "gzip");
-		
+
 		if (null != siteKey)
 			post.addHeader("X-frontcache.site-key", siteKey);
 
@@ -157,18 +157,18 @@ public class FrontCacheAgent {
 		while ((line = rd.readLine()) != null) {
 			result.append(line);
 		}
-		
+
 		return result.toString();
 	}
 
 	public String getFrontCacheURL() {
 		return frontCacheURL;
 	}
-	
+
 
 	@Override
 	public String toString() {
 		return "FrontCacheAgent [" + frontCacheURL + "]";
 	}
-	
+
 }

@@ -21,15 +21,17 @@ public class FCHeaders {
     public static final String ACCEPT_ENCODING = "accept-encoding";
     public static final String ACCEPT = "Accept";
     public static final String CONTENT_TYPE = "Content-Type";
-    
+    public static final String CACHE_CONTROL = "Cache-Control";
+    public static final String PRAGMA = "Pragma";
+
     public static final String REQUEST_CLIENT_TYPE_BOT = "bot";
     public static final String REQUEST_CLIENT_TYPE_BROWSER = "browser";
-    
+
     public static final String COMPONENT_REFRESH_TYPE_REGULAR = "regular"; // for X_FRONTCACHE_COMPONENT_REFRESH_TYPE
     public static final String COMPONENT_REFRESH_TYPE_SOFT = "soft";
-    
+
     public static final String X_FRONTCACHE_ID = "X-frontcache.id";
-    
+
     public static final String X_FRONTCACHE_SITE_KEY = "X-frontcache.site-key"; // hardcoded in 'frontcache-agent' - remember to update when needed
 
     public static final String X_FRONTCACHE_FALLBACK_IS_USED = "X-frontcache.fallback-is-used";
@@ -40,25 +42,25 @@ public class FCHeaders {
 
     public static final String X_FRONTCACHE_TRACE = "X-frontcache.trace"; // request
 
-    public static final String X_FRONTCACHE_TRACE_REQUEST = "X-frontcache.trace.request"; // response 
+    public static final String X_FRONTCACHE_TRACE_REQUEST = "X-frontcache.trace.request"; // response
     public static final String X_FRONTCACHE_INCLUDE_LEVEL = "X-frontcache.include-level"; // response
-    
+
     public static final String X_FRONTCACHE_COMPONENT = "X-frontcache.component";
 
     public static final String COMPONENT_TOPLEVEL = "toplevel";
     public static final String COMPONENT_INCLUDE = "include";
     public static final String COMPONENT_ASYNC_INCLUDE = "include-async";
-    
+
     public static final String CACHE_LEVEL_L1 = "L1";
     public static final String CACHE_LEVEL_L2 = "L2";
-    
+
     public static final String X_FRONTCACHE_COMPONENT_CACHE_LEVEL = "X-frontcache.component.cache-level"; // [L1 | L2] default is L2 (if null); optional - used with some cache processors only (eg L1L2CacheProcessor)
     public static final String X_FRONTCACHE_COMPONENT_MAX_AGE = "X-frontcache.component.maxage";
     public static final String X_FRONTCACHE_COMPONENT_REFRESH_TYPE = "X-frontcache.component.refresh";
-    public static final String X_FRONTCACHE_COMPONENT_TAGS = "X-frontcache.component.tags"; // invalidation tags 
+    public static final String X_FRONTCACHE_COMPONENT_TAGS = "X-frontcache.component.tags"; // invalidation tags
     public static final String X_FRONTCACHE_REQUEST_ID = "X-frontcache.request-id";
     public static final String X_FRONTCACHE_CLIENT_IP = "X-frontcache.client-ip";
-    
-    public static final String COMPONENT_TAGS_SEPARATOR = "\\|"; // to split invalidation tags e.g. apple|banana|orange 
+
+    public static final String COMPONENT_TAGS_SEPARATOR = "\\|"; // to split invalidation tags e.g. apple|banana|orange
 
 }

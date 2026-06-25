@@ -36,10 +36,10 @@ import org.springframework.web.bind.annotation.RequestMethod;
 @Controller
 @RequestMapping("/cache-view")
 public class CacheViewController {
-	
+
 	@Autowired
 	private FrontcacheService frontcacheService;
-	
+
 	private static final DateFormat YYYY_MM_dd_HH_mm_ss_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
 
@@ -50,15 +50,15 @@ public class CacheViewController {
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
-		
+
 		return "cache_view";
-	}	
-    
-	
+	}
+
+
 	@RequestMapping(method = RequestMethod.POST)
 	public String submitForm(Model model, CacheViewForm cacheViewForm) {
 		model.addAttribute("cacheView", cacheViewForm);
-		
+
 		WebResponse webResponse = frontcacheService.getFromCache(cacheViewForm.getEdge(), cacheViewForm.getKey());
 		if (null != webResponse)
 		{
@@ -67,35 +67,35 @@ public class CacheViewController {
 			Map<String, List<String>> webRespHeaders = new TreeMap<String, List<String>>();
 			webRespHeaders.putAll(webResponse.getHeaders());
 			model.addAttribute("webResponseHeaders", webRespHeaders);
-			
+
 			model.addAttribute("invalidationTags", webResponse.getTags());
-			
+
 			Map<String, Long> expireTimeMap = webResponse.getExpireTimeMap();
 			StringBuffer expirationDateSb = new StringBuffer();
-			
+
 			for (String clientType : expireTimeMap.keySet())
 			{
 				long expirationDate = expireTimeMap.get(clientType);
-				
+
 				String expirationDateStr = "UNDEFINED";
 				if (-1 == expirationDate)
 					expirationDateStr = "DOES NOT EXPIRE";
 				else if (0 == expirationDate)
 					expirationDateStr = "DYNAMIC"; // never cached (should never happened)
-				else 
+				else
 					expirationDateStr = YYYY_MM_dd_HH_mm_ss_DF.format(new Date(expirationDate));
-				
+
 				expirationDateSb.append(expirationDateStr).append(" ");
-				
+
 			}
-			
+
 			model.addAttribute("expirationDateStr", expirationDateSb.toString());
-				
+
 		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
-		
+
 		return "cache_view";
-	}	
+	}
 }

@@ -8,5 +8,5 @@ public class FilterAgentTests extends AgentTests {
 	public String getFrontCacheBaseURLDomainFC1() {
 		return getFilterBaseURLDomainFC1();
 	}
-	
+
 }

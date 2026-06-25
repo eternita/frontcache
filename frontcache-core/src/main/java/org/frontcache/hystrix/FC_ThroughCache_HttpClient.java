@@ -28,6 +28,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -49,14 +50,14 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 	private final HttpClient client;
 	private final RequestContext context;
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache_HttpClient.class);
-	
+
     public FC_ThroughCache_HttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
-        
+
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
-                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("Origin-Hits-Pool")));
-        
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Origin-http"))
+                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool")));
+
         this.originRequestURL = urlStr;
         this.currentRequestURL = context.getCurrentRequestURL();
         this.requestHeaders = requestHeaders;
@@ -77,7 +78,14 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 			Header[] httpHeaders = FCUtils.convertHeaders(requestHeaders);
 			for (Header header : httpHeaders)
 				httpRequest.addHeader(header);
-			
+
+			// Always advertise gzip (and only gzip) to the origin. Our HttpClient transparently
+			// decodes gzip, so the cached content is always plaintext we can parse for includes and
+			// never an encoding we can't handle (e.g. br) that would be cached and served wrongly.
+			// buildRequestHeaders() normalizes this too; setting it here makes the cacheable origin
+			// call self-contained, independent of the inbound headers.
+			httpRequest.setHeader(FCHeaders.ACCEPT_ENCODING, "gzip");
+
 			response = client.execute(httpHost, httpRequest);
 			WebResponse webResp = FCUtils.httpResponse2WebComponent(originRequestURL, response, context);
 			return webResp;
@@ -91,50 +99,50 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 					((CloseableHttpResponse) response).close();
 				} catch (IOException e) {
 					e.printStackTrace();
-				} 
+				}
 		}
-		
+
     }
-    
+
     @Override
     protected WebResponse getFallback() {
-		context.setHystrixFallback();
+		context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
 
 		String failedExceptionMessage = "";
 		if (null != getFailedExecutionException())
 			failedExceptionMessage += getFailedExecutionException().getMessage();
-			
+
 		String includeCurrentURL = getIncludeCurrentURL(currentRequestURL, originRequestURL);
 		logger.error("FC_ThroughCache_HttpClient - ERROR FOR - " + includeCurrentURL + " / " + originRequestURL + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
-		
+
 		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), includeCurrentURL);
-		
+
 		return webResponse;
     }
 
     /**
-     * 
+     *
      * @param currentRequestURL
      * @param originRequestURL
      * @return
      */
     private String getIncludeCurrentURL(String currentRequestURL, String originRequestURL)
     {
-    	// host from current http://www.coinshome.net/common/hystrix/top1.jsp
-    	// uri from original http://origin.coinshome.net:1234/common/hystrix/inc12.jsp
+    	// host from current http://www.example-site.com/common/hystrix/top1.jsp
+    	// uri from original http://origin.example-site.com:1234/common/hystrix/inc12.jsp
     	// ->
-    	// includeCurrentURL http://www.coinshome.net/common/hystrix/inc12.jsp
-    	
+    	// includeCurrentURL http://www.example-site.com/common/hystrix/inc12.jsp
+
     	String includeCurrentURL = null;
-    			
+
 		int idx1 = currentRequestURL.indexOf("//");
 		int idx2 = originRequestURL.indexOf("//");
-		
+
 		if (-1 < idx1 && -1 < idx2)
 		{
-			int idx11 = currentRequestURL.indexOf("/", idx1 + "//".length()); 
+			int idx11 = currentRequestURL.indexOf("/", idx1 + "//".length());
 			int idx21 = originRequestURL.indexOf("/", idx2 + "//".length());
-			
+
 			if (-1 < idx11 && -1 < idx21)
 			{
 				includeCurrentURL = currentRequestURL.substring(0, idx11) + originRequestURL.substring(idx21);
@@ -142,10 +150,10 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 		}
 		if (null == includeCurrentURL)
 			includeCurrentURL = "can't get includeCurrentURL from " + currentRequestURL + " and " + originRequestURL;
-			
+
 		logger.debug("fallback includeCurrentURL " + includeCurrentURL + " based on currentRequestURL " + currentRequestURL + " and originRequestURL " + originRequestURL);
-		
+
     	return includeCurrentURL;
     }
-    
+
 }

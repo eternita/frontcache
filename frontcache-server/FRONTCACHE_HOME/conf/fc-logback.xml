@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
-<!-- 
-this config the same as in logback.xml in classpath. Use this one if you want to override default configuration. 
+<!--
+this config the same as in logback.xml in classpath. Use this one if you want to override default configuration.
 uncomment it in frontcache.properties:
 
 front-cache.request-logs-config=fc-logback.xml
 -->
 <configuration>
-    
+
     <!-- ReguestLoggerFile for REQUEST LOGS ONLY -->
 	<appender name="ReguestLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<filter class="ch.qos.logback.classic.filter.LevelFilter">
@@ -20,9 +20,26 @@ front-cache.request-logs-config=fc-logback.xml
 		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
 			<FileNamePattern>${frontcache.home}/logs/frontcache-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
 		</rollingPolicy>
-		<layout class="ch.qos.logback.classic.PatternLayout">
-			  <Pattern>%msg%n</Pattern>
-		</layout>
+		<encoder>
+			  <pattern>%msg%n</pattern>
+		</encoder>
+	</appender>
+
+    <!-- FailedRequestLoggerFile for NON-SUCCESSFUL REQUEST LOGS ONLY (short-circuited/timeout/rejected/bad-request/failure) -->
+	<appender name="FailedRequestLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>TRACE</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+
+		<File>${frontcache.home}/logs/frontcache-failed-requests.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/frontcache-failed-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<encoder>
+			  <pattern>%msg%n</pattern>
+		</encoder>
 	</appender>
 
     <!-- FallbackLoggerFile for FALLBACK LOGS ONLY -->
@@ -37,12 +54,12 @@ front-cache.request-logs-config=fc-logback.xml
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <FileNamePattern>${frontcache.home}/logs/fallback-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
         </rollingPolicy>
-        <layout class="ch.qos.logback.classic.PatternLayout">
-              <Pattern>%msg%n</Pattern>
-        </layout>
+        <encoder>
+              <pattern>%msg%n</pattern>
+        </encoder>
     </appender>
-    
-			
+
+
 	<appender name="Error" class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<filter class="ch.qos.logback.classic.filter.LevelFilter">
 			<level>ERROR</level>
@@ -54,11 +71,11 @@ front-cache.request-logs-config=fc-logback.xml
 		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
 			<FileNamePattern>${frontcache.home}/logs/error-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
 		</rollingPolicy>
-		<layout class="ch.qos.logback.classic.PatternLayout">
-			  <Pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>
-		</layout>
+		<encoder>
+			  <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</encoder>
 	</appender>
-		
+
 	<appender name="Info" class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<filter class="ch.qos.logback.classic.filter.LevelFilter">
 			<level>INFO</level>
@@ -69,16 +86,16 @@ front-cache.request-logs-config=fc-logback.xml
 		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
 			<FileNamePattern>${frontcache.home}/logs/info-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
 		</rollingPolicy>
-		<layout class="ch.qos.logback.classic.PatternLayout">
-             <Pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>
-		</layout>
-	</appender>	
-		
-	
+		<encoder>
+             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-    <layout class="ch.qos.logback.classic.PatternLayout">
-      <Pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>
-    </layout>
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
   </appender>
 
 
@@ -86,7 +103,7 @@ front-cache.request-logs-config=fc-logback.xml
 	<root>
         <level value="INFO" />
 		<appender-ref ref="Error" />
-		<appender-ref ref="Info" />	
+		<appender-ref ref="Info" />
 		<appender-ref ref="STDOUT" />
 	</root>
 
@@ -95,11 +112,17 @@ front-cache.request-logs-config=fc-logback.xml
 	    <level value="TRACE" />
 		<appender-ref ref="ReguestLoggerFile" />
 	</logger>
-	
+
+	<!-- for non-successful requests only (additivity=false -> kept out of the root/info logs) -->
+	<logger name="frontcache.failed-requests" additivity="false">
+	    <level value="TRACE" />
+		<appender-ref ref="FailedRequestLoggerFile" />
+	</logger>
+
     <!-- for fallback logger -->
     <logger name="org.frontcache.hystrix.FallbackLogger">
         <level value="TRACE" />
         <appender-ref ref="FallbackLoggerFile" />
     </logger>
-	
+
 </configuration>

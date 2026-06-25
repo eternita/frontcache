@@ -29,18 +29,18 @@ import org.springframework.web.bind.annotation.RequestMethod;
 
 @Controller
 public class DynamicURLConfigController {
-	
+
 	@Autowired
 	private FrontcacheService frontcacheService;
-	
+
     @RequestMapping(value = "/dynamic-urls-configs", method = RequestMethod.GET)
     public String getDynamicURLConfigs(ModelMap model) {
-    	
+
     	Map<String, Map<String, Set<String>>> dynamicURLsConfigs = frontcacheService.getDynamicURLsConfigs();
 		model.put("dynamicURLsConfigs", dynamicURLsConfigs);
-    	
+
         return "dynamic_urls_configs";
     }
-    
-    
+
+
 }

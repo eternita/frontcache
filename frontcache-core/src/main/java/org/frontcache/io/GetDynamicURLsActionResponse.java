@@ -34,5 +34,5 @@ public class GetDynamicURLsActionResponse extends ActionResponse {
 	public void setDynamicURLs(Map<String, Set<String>> dynamicURLs) {
 		this.dynamicURLs = dynamicURLs;
 	}
-	
+
 }

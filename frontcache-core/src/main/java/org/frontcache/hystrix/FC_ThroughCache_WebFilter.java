@@ -23,6 +23,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.netflix.hystrix.HystrixThreadPoolKey;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -43,14 +44,15 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 	String url = "open-circuit-default-key"; // when circuit is open - the value is not overriden during run() call
 	private final RequestContext context;
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache_WebFilter.class);
-	
+
     public FC_ThroughCache_WebFilter(RequestContext context) {
-        
+
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Origin-filter"))
+				.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool"))
         		);
-        
+
         this.context = context;
     }
 
@@ -62,33 +64,33 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 		FilterChain chain = context.getFilterChain();
 
 		FrontCacheHttpResponseWrapper wrappedResponse = new HttpResponseWrapperImpl(httpResponse);
-		
+
 		try {
 			chain.doFilter(httpRequest, wrappedResponse); // run request to origin
-			
+
 			WebResponse webResponse = FCUtils.httpResponse2WebComponent(url, wrappedResponse, context);
 			return webResponse;
-			
+
 		} catch (IOException | ServletException e) {
 			logger.error("Can't read from " + url, e);
 			throw new FrontCacheException("FilterChain exception", e);
-		} 
-		
+		}
+
     }
-    
+
     @Override
     protected WebResponse getFallback() {
-		context.setHystrixFallback();
-		
+		context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
+
 		String failedExceptionMessage = "";
 		if (null != getFailedExecutionException())
 			failedExceptionMessage += getFailedExecutionException().getMessage();
-			
+
 		logger.error("FC_ThroughCache_WebFilter - ERROR FOR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
-		
+
 		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
 		return webResponse;
     }
-    
-	
+
+
 }

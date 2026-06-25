@@ -28,7 +28,7 @@ public class CacheManager {
 
 	private static Logger logger = LoggerFactory.getLogger(CacheManager.class);
 	private CacheManager() {}
-	
+
 	private static CacheProcessor instance;
 
 	public static CacheProcessor getInstance(){
@@ -37,8 +37,8 @@ public class CacheManager {
 		}
 		return instance;
 	}
-	
-	
+
+
 	private static CacheProcessor getCacheProcessor()
 	{
 		String cacheImplStr = FCConfig.getProperty("front-cache.cache-processor.impl");
@@ -54,18 +54,18 @@ public class CacheManager {
 				{
 					logger.info("Cache implementation loaded: " + cacheImplStr);
 					cacheProcessor = (CacheProcessor) obj;
-					
+
 					// init with properties from config file
 					cacheProcessor.init(FCConfig.getProperties());
 					logger.info("Cache implementation initialized: " + cacheImplStr);
-					
+
 					return cacheProcessor;
 				}
 			} catch (Exception ex) {
 				logger.error("Cant instantiate " + cacheImplStr + " Fallback - " + L1L2CacheProcessor.class.getName(), ex);
 			}
 		}
-		
+
 		logger.info("Default cache implementation is loaded - " + L1L2CacheProcessor.class.getName());
 		cacheProcessor = new L1L2CacheProcessor();
 		try
@@ -75,7 +75,7 @@ public class CacheManager {
 		} catch (Exception ex) {
 			logger.error("Cant initalize default cache processor. ", ex);
 		}
-		
+
 		return cacheProcessor;
 	}
 

@@ -20,4 +20,7 @@ rm -rf ./frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/*
 
 echo "Stoping Standalone Frontcache Server ..."
 ps -e | grep standaloneFrontcacheJetty | cut -d' ' -f2 | xargs kill -9
-echo "Standalone Frontcache Server has been stoped"
+echo "Standalone Frontcache Server has been stopped"
+
+# cleanup / stop gradle daemons
+./gradlew -stop

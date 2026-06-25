@@ -36,7 +36,7 @@ public class FrontcacheHystrixMetricsStreamServlet extends FrontcacheHystrixSamp
     public FrontcacheHystrixMetricsStreamServlet() {
         this(HystrixDashboardStream.getInstance().observe());
     }
-    
+
     public FrontcacheHystrixMetricsStreamServlet(Observable<HystrixDashboardStream.DashboardData> sampleStream) {
         super(sampleStream, DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS);
     }
