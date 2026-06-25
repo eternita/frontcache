@@ -9,7 +9,7 @@
 	%>
 	
 	<div id="chart_CIRCUIT_<%= name + '_' + index %>" class="chart" style="position:absolute;top:0px;left:0; float:left; width:100%; height:100%;"></div>
-    <div style="position:absolute;top:0;width:100%;height:15px;opacity:0.8; background:white;">
+    <div style="position:absolute;top:0;width:100%;height:20px;opacity:0.8; background:white;">
     	<% if(includeDetailIcon) { %>
     	<p class="name" <%= toolTip %> style="padding-right:16px">
     		<%= displayName %>
@@ -19,10 +19,10 @@
     	<p class="name" <%= toolTip %>><%= displayName %></p>
     	<% }  %>
     </div>
-	<div style="position:absolute;top:15px;; opacity:0.8; background:white; width:100%; height:95%;">
+	<div style="position:absolute;top:20px;; opacity:0.8; background:white; width:100%; height:95%;">
 		<div class="monitor_data"></div>
 	</div>
-	<div id="graph_CIRCUIT_<%= name + '_' + index %>" class="graph" style="position:absolute;top:25px;left:0; float:left; width:140px; height:62px;"></div>
+	<div id="graph_CIRCUIT_<%= name + '_' + index %>" class="graph" style="position:absolute;top:30px;left:0; float:left; width:140px; height:62px;"></div>
 
 	<script>
 		var y = 200;
