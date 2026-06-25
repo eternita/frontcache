@@ -37,6 +37,19 @@
 	<script src="<c:url value='/static/js/bootstrap.js' />"></script>
 	<link href="<c:url value='/static/css/app.css' />" rel="stylesheet"></link>
 	<link href="<c:url value='/static/css/bootstrap.css' />" rel="stylesheet"></link>
+
+	<!-- show all circuit charts in a single horizontal row -->
+	<style type="text/css">
+		/* let the monitoring area use the full window width instead of bootstrap's fixed .container width */
+		#mainWrapper .container { width: auto; max-width: none; }
+		#monitor .container { width: 100%; max-width: none; height: auto; }
+		#monitor .row { width: 100%; }
+		/* drop the fixed row height that clips charts; let chart boxes wrap responsively */
+		.dependencies { height: auto; min-height: 200px; display: flex; flex-wrap: wrap; align-content: flex-start; }
+		/* the box content (chart overlay + latency table) is all position:absolute, so the box
+		   can't auto-size to it; give it enough height to contain everything plus a row gap */
+		.dependencies div.monitor { float: none; height: 250px; margin-bottom: 15px; }
+	</style>
 </head>
 
 	<body>
@@ -48,7 +61,7 @@
     <div class="">
         <div style="padding-left: 20px;">
         <p style="height: 10px">&nbsp;</p>
-        <h2 style="font-size: 22px;">Edges status</h2>  
+        <h2 style="font-size: 22px;">Edges status</h2> 
         <br/>
         
         <div style="font-size: 18px;">
@@ -83,7 +96,7 @@
 		        </c:forEach>
 		     </table>
 
-        </div>          
+        </div>         
         </div>
     </div>
     <hr>
@@ -225,7 +238,7 @@
 
 	<hr>
 	<footer>
-		<p><a href="http://www.frontcache.io" target="_blank">www.frontcache.io</a></p>
+		<p><a href="https://github.com/eternita/frontcache/wiki" target="_blank">Frontcache Docs</a></p>
 	</footer>
 </div>
 
