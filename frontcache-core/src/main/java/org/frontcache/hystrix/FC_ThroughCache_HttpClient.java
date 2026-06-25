@@ -55,8 +55,8 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
-                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("Origin-Hits-Pool")));
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Origin-http"))
+                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool")));
 
         this.originRequestURL = urlStr;
         this.currentRequestURL = context.getCurrentRequestURL();

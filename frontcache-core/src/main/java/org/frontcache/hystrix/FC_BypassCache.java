@@ -28,6 +28,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.netflix.hystrix.HystrixThreadPoolKey;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -61,6 +62,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
+				.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool"))
         		);
 
         this.client = client;

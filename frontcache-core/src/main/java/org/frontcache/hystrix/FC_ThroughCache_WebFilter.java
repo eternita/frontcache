@@ -23,6 +23,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.netflix.hystrix.HystrixThreadPoolKey;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -48,7 +49,8 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 
         super(Setter
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Origin-filter"))
+				.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool"))
         		);
 
         this.context = context;
