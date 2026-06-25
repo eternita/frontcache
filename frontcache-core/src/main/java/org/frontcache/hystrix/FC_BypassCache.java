@@ -85,7 +85,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 			String url = FCUtils.getRequestURL(httpRequest);
 			HttpServletResponse httpResponse = context.getResponse();
 
-			context.setHystrixFallback();
+			context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
 
 			String failedExceptionMessage = "";
 			if (null != getFailedExecutionException())

@@ -60,6 +60,10 @@ public class RequestLogger {
 
 	private static Logger logger = LoggerFactory.getLogger(RequestLogger.class);
 
+	// dedicated logger for non-successful requests (hystrix fallback: short-circuited / timeout /
+	// rejected / bad-request / failure). Routed to its own file via logback (frontcache-failed-requests.log).
+	private static Logger failedRequestLogger = LoggerFactory.getLogger("frontcache.failed-requests");
+
 	private RequestLogger() {
 	}
 
@@ -99,6 +103,15 @@ public class RequestLogger {
 		.append(SEPARATOR).append("\"").append(userAgent).append("\"");
 
 		logger.trace(sb4file.toString());
+
+		// also write non-successful requests to the dedicated failed-requests log, with the
+		// failure category appended as the last column for easy filtering.
+		if (isHystrixError)
+		{
+			sb4file.append(SEPARATOR).append("\"").append(context.getHystrixReason()).append("\"");
+			failedRequestLogger.trace(sb4file.toString());
+		}
+
 		return;
 	}
 

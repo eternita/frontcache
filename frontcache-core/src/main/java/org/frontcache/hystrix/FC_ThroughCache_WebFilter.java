@@ -80,7 +80,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 
     @Override
     protected WebResponse getFallback() {
-		context.setHystrixFallback();
+		context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
 
 		String failedExceptionMessage = "";
 		if (null != getFailedExecutionException())

@@ -487,8 +487,23 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         set("hystrixError", true);
     }
 
+    public void setHystrixFallback(String reason) {
+        set("hystrixError", true);
+        if (null != reason)
+            set("hystrixErrorReason", reason);
+    }
+
     public boolean isHystrixFallback() {
         return getBoolean("hystrixError", false);
+    }
+
+    /**
+     * @return the hystrix failure category (short-circuited|timeout|rejected|bad-request|failure)
+     *         when known, otherwise "error". Only meaningful when {@link #isHystrixFallback()} is true.
+     */
+    public String getHystrixReason() {
+        Object reason = get("hystrixErrorReason");
+        return (null != reason) ? reason.toString() : "error";
     }
 
     public void setRequestType(String frontcacheRequestType) {
