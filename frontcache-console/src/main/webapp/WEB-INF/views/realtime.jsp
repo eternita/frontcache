@@ -49,6 +49,15 @@
 		/* the box content (chart overlay + latency table) is all position:absolute, so the box
 		   can't auto-size to it; give it enough height to contain everything plus a row gap */
 		.dependencies div.monitor { float: none; height: 250px; margin-bottom: 15px; }
+
+		/* custom left-to-right order of the circuit charts (lower number = further left).
+		   matched by command name via the box id (CIRCUIT_<name>_<stream-index>).
+		   charts not listed here keep the default order (0) and appear before order:1. */
+		.dependencies [id^="CIRCUIT_Input-Requests_"]     { order: 1; }
+		.dependencies [id^="CIRCUIT_Cache-Hits_"]         { order: 2; }
+		.dependencies [id^="CIRCUIT_Cache-Origin-filter_"] { order: 3; }
+		.dependencies [id^="CIRCUIT_Cache-Origin-http_"]  { order: 4; }
+		.dependencies [id^="CIRCUIT_Origin-Hits_"]        { order: 5; }
 	</style>
 </head>
 
