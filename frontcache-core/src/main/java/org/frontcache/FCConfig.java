@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import org.apache.commons.configuration.AbstractConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +75,20 @@ public class FCConfig {
 		init();
 	}
 
+	/**
+	 * Force FCConfig initialization. Referencing this class already runs the static {@code init()}
+	 * block (which installs hystrix.properties into Archaius), so this method body is intentionally
+	 * empty — it exists to make that side effect explicit and callable from a startup hook.
+	 *
+	 * Call this at webapp startup (see FrontcacheConfigBootstrapListener) so the hystrix.properties
+	 * overrides are installed BEFORE the Hystrix metrics-stream servlet's static initializer touches
+	 * Archaius. Archaius accepts an install only once; whoever runs first wins.
+	 */
+	public static void ensureInitialized()
+	{
+		// no-op: class reference above triggered static init()
+	}
+
     private static void init()
     {
 
@@ -111,10 +126,19 @@ public class FCConfig {
 		// enable configuration from "hystrix.properties"
 		ConcurrentMapConfiguration systemProps = new ConcurrentMapConfiguration(hystrixConfigMap);
 
-		// you can install hystrix config one time only
-		// in case of reloading Frontcache - previous hystrix config is keeping
+		// Archaius (ConfigurationManager) accepts an install only once. If something touched
+		// Archaius/Hystrix before us (e.g. the /hystrix.stream servlet initialized at webapp
+		// startup, or a HystrixCommand was constructed), install() would be skipped and the whole
+		// hystrix.properties silently ignored -> every command falls back to Hystrix defaults
+		// (1000ms timeout, etc.).
 		if (!ConfigurationManager.isConfigurationInstalled())
+		{
 			ConfigurationManager.install(systemProps);
+		} else {
+			AbstractConfiguration installedConfig = ConfigurationManager.getConfigInstance();
+			for (Map.Entry<String, Object> entry : hystrixConfigMap.entrySet())
+				installedConfig.setProperty(entry.getKey(), entry.getValue());
+		}
 
 
 //    	System.getProperties().putAll(hystrixProperties);

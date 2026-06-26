@@ -6,6 +6,11 @@
 	<display-name>front-cache-filter-tests</display-name>
 	<description>Front Cache tests (filter mode)</description>
 
+	<!-- install Frontcache config (incl. hystrix.properties into Archaius) before any servlet/filter loads -->
+	<listener>
+		<listener-class>org.frontcache.FrontcacheConfigBootstrapListener</listener-class>
+	</listener>
+
 	<filter>
 		<description>Front Cache Filter</description>
 		<filter-name>FrontCacheFilter</filter-name>

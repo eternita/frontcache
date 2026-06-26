@@ -7,6 +7,11 @@
 	<display-name>frontcache-standalone</display-name>
 	<description>frontcache-standalone</description>
 
+    <!-- install Frontcache config (incl. hystrix.properties into Archaius) before any servlet loads -->
+    <listener>
+        <listener-class>org.frontcache.FrontcacheConfigBootstrapListener</listener-class>
+    </listener>
+
     <servlet>
         <servlet-name>FrontCacheServlet</servlet-name>
         <servlet-class>org.frontcache.FrontCacheServlet</servlet-class>
