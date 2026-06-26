@@ -69,7 +69,7 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
 		if (null != getFailedExecutionException())
 			failedExceptionMessage += getFailedExecutionException().getMessage();
 
-		logger.error("FC_ThroughCache - ERROR FOR - " + originUrlStr + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
+		logger.error("FC_ThroughCache - ERROR FOR - " + originUrlStr + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context, getFailedExecutionException());
 
 		return null;
     }
