@@ -86,7 +86,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 		if (null != getFailedExecutionException())
 			failedExceptionMessage += getFailedExecutionException().getMessage();
 
-		logger.error("FC_ThroughCache_WebFilter - ERROR FOR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
+		logger.error("FC_ThroughCache_WebFilter - ERROR FOR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context, getFailedExecutionException());
 
 		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
 		return webResponse;

@@ -39,6 +39,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.Header;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -293,18 +294,25 @@ public class FCUtils {
 
 		byte[] respData = null;
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		InputStream is = response.getEntity().getContent();
-		try {
-			int bytesRead = 0;
-            int bufferSize = 4000;
-	         byte[] byteBuffer = new byte[bufferSize];
-	         while ((bytesRead = is.read(byteBuffer)) != -1) {
-	             baos.write(byteBuffer, 0, bytesRead);
-	         }
-		} catch (Exception e) {
-			e.printStackTrace();
+		// entity is null for bodyless responses (e.g. 304 Not Modified from a conditional request,
+		// or 204 No Content). Guard it - dereferencing getContent() on null NPEs, which would escape
+		// run() as a Hystrix FAILURE and serve a fallback instead of relaying the bodyless response.
+		HttpEntity entity = response.getEntity();
+		if (null != entity)
+		{
+			InputStream is = entity.getContent();
+			try {
+				int bytesRead = 0;
+	            int bufferSize = 4000;
+		         byte[] byteBuffer = new byte[bufferSize];
+		         while ((bytesRead = is.read(byteBuffer)) != -1) {
+		             baos.write(byteBuffer, 0, bytesRead);
+		         }
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
-		respData = baos.toByteArray();
+		respData = baos.toByteArray(); // empty byte[] when there is no entity
 
 		Map<String, List<String>> headers = revertHeaders(response.getAllHeaders());
 		webResponse = parseWebComponent(url, respData, headers);

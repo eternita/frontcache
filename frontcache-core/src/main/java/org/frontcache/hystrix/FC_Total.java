@@ -80,7 +80,7 @@ public class FC_Total extends HystrixCommand<Object> {
 			if (null != getFailedExecutionException())
 				failedExceptionMessage += getFailedExecutionException().getMessage();
 
-			logger.error("FC-Total - ERROR FOR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context);
+			logger.error("FC-Total - ERROR FOR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context, getFailedExecutionException());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
