@@ -20,9 +20,14 @@
                <form:options items="${edgeList}" />
             </form:select>      
   </div>
-  <button type="submit" class="btn btn-success">View cache</button>
+  <button type="submit" name="viewCache" class="btn btn-success">View cache</button>
+  <button type="submit" name="dumpKeys" class="btn btn-primary">Dump keys</button>
   </form:form>
-  
+
+  <c:if test="${not empty dumpKeysResult}">
+      <div class="alert alert-info" style="margin-top: 15px;">${dumpKeysResult}</div>
+  </c:if>
+
   <table style="width: 100%;">
   <tbody>
     <c:choose>

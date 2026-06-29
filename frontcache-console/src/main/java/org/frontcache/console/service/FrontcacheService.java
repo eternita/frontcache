@@ -38,6 +38,7 @@ import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.io.DumpKeysActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -366,6 +367,22 @@ public class FrontcacheService {
 	public void invalidateEdge(String edgeURL, String filter) {
 		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
 		fcClient.removeFromCache(filter);
+	}
+
+	/**
+	 * Triggers FrontcacheAction.DUMP_KEYS on the given edge - cached keys are
+	 * dumped to a file in the edge's ./warmer dir.
+	 *
+	 * @param edgeURL
+	 * @return status message returned by the edge, or an error message if the edge is not available
+	 */
+	public String dumpKeys(String edgeURL) {
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
+		DumpKeysActionResponse response = fcClient.dumpKeys();
+		if (null == response)
+			return "ERROR - edge " + edgeURL + " is not available";
+
+		return response.getAction();
 	}
 
 }
