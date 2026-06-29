@@ -51,11 +51,28 @@ public class CacheInvalidationController {
 	}
 
 
-	@RequestMapping(method = RequestMethod.POST)
+	@RequestMapping(method = RequestMethod.POST, params = "invalidate")
 	public String submitForm(Model model, CacheInvalidationForm cacheInvalidationForm) {
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
 
 		frontcacheService.invalidateEdge(cacheInvalidationForm.getEdge(), cacheInvalidationForm.getFilter());
+
+    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	model.addAttribute("edgeList", agents);
+
+		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
+		model.addAttribute("edges", clusterStatus.values());
+
+		return "cache_invalidation";
+	}
+
+
+	@RequestMapping(method = RequestMethod.POST, params = "purge")
+	public String purge(Model model, CacheInvalidationForm cacheInvalidationForm) {
+		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
+
+		frontcacheService.purgeEdge(cacheInvalidationForm.getEdge());
+		model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheInvalidationForm.getEdge());
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);

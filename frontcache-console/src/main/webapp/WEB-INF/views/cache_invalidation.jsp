@@ -20,13 +20,18 @@
                <form:options items="${edgeList}" />
             </form:select>      
   </div>
-  <button type="submit" class="btn btn-success">Invalidate cache</button>
+  <button type="submit" name="invalidate" class="btn btn-success">Invalidate cache</button>
+  <button type="submit" name="purge" class="btn btn-warning">Purge</button>
   </form:form>
-  
+
+  <c:if test="${not empty purgeResult}">
+      <div class="alert alert-info" style="margin-top: 15px;">${purgeResult}</div>
+  </c:if>
+
     <div class="">
         <div style="padding-left: 20px;">
         <p style="height: 10px">&nbsp;</p>
-        <h2 style="font-size: 22px;">Edges status</h2>  
+        <h2 style="font-size: 22px;">Edges status</h2>ï¿½ 
         <br/>
         
     <hr>
@@ -38,7 +43,7 @@
               </c:if> 
                <br/>
             </c:forEach>
-        </div>          
+        </div>ï¿½         
         </div>
     </div>
 

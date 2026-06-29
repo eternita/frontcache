@@ -55,7 +55,7 @@ public class CacheViewController {
 	}
 
 
-	@RequestMapping(method = RequestMethod.POST)
+	@RequestMapping(method = RequestMethod.POST, params = "viewCache")
 	public String submitForm(Model model, CacheViewForm cacheViewForm) {
 		model.addAttribute("cacheView", cacheViewForm);
 
@@ -92,6 +92,34 @@ public class CacheViewController {
 			model.addAttribute("expirationDateStr", expirationDateSb.toString());
 
 		}
+
+    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	model.addAttribute("edgeList", agents);
+
+		return "cache_view";
+	}
+
+
+	@RequestMapping(method = RequestMethod.POST, params = "dumpKeys")
+	public String dumpKeys(Model model, CacheViewForm cacheViewForm) {
+		model.addAttribute("cacheView", cacheViewForm);
+
+		String dumpKeysResult = frontcacheService.dumpKeys(cacheViewForm.getEdge());
+		model.addAttribute("dumpKeysResult", dumpKeysResult);
+
+    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	model.addAttribute("edgeList", agents);
+
+		return "cache_view";
+	}
+
+
+	@RequestMapping(method = RequestMethod.POST, params = "purge")
+	public String purge(Model model, CacheViewForm cacheViewForm) {
+		model.addAttribute("cacheView", cacheViewForm);
+
+		frontcacheService.purgeEdge(cacheViewForm.getEdge());
+		model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheViewForm.getEdge());
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);

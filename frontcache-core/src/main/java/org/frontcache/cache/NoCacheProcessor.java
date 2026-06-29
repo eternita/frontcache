@@ -110,6 +110,11 @@ public class NoCacheProcessor implements CacheProcessor {
 
 	}
 
+	@Override
+	public void purge() {
+
+	}
+
 }
 
 

@@ -158,6 +158,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = patch(request);
 			break;
 
+		case FrontcacheAction.PURGE:
+			aResponse = purge(request);
+			break;
+
 			default:
 				aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
 
@@ -394,6 +398,28 @@ public class FrontCacheIOServlet extends HttpServlet {
 		t.start();
 
 		PatchActionResponse aResponse = new PatchActionResponse();
+		return aResponse;
+	}
+
+	/**
+	 * Purge expired entries from the cache. Runs asynchronously since it may scan
+	 * the whole cache (L1 + L2).
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse purge(HttpServletRequest req)
+	{
+		Runnable r = new Runnable() {
+			public void run() {
+				CacheManager.getInstance().purge();
+			}
+		};
+
+		Thread t = new Thread(r);
+		t.start();
+
+		PurgeActionResponse aResponse = new PurgeActionResponse();
 		return aResponse;
 	}
 

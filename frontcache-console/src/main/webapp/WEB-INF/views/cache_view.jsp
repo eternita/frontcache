@@ -20,9 +20,18 @@
                <form:options items="${edgeList}" />
             </form:select>      
   </div>
-  <button type="submit" class="btn btn-success">View cache</button>
+  <button type="submit" name="viewCache" class="btn btn-success">View cache</button>
+  <button type="submit" name="dumpKeys" class="btn btn-primary">Dump keys</button>
+  <button type="submit" name="purge" class="btn btn-warning">Purge</button>
   </form:form>
-  
+
+  <c:if test="${not empty dumpKeysResult}">
+      <div class="alert alert-info" style="margin-top: 15px;">${dumpKeysResult}</div>
+  </c:if>
+  <c:if test="${not empty purgeResult}">
+      <div class="alert alert-info" style="margin-top: 15px;">${purgeResult}</div>
+  </c:if>
+
   <table style="width: 100%;">
   <tbody>
     <c:choose>

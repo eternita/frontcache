@@ -50,6 +50,7 @@ import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.io.CacheStatusActionResponse;
+import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.io.FrontcacheAction;
 import org.frontcache.io.GetBotsActionResponse;
 import org.frontcache.io.GetDynamicURLsActionResponse;
@@ -176,6 +177,24 @@ public class FrontCacheClient {
 		}
 	}
 
+	/**
+	 * Triggers purge of expired entries on the edge.
+	 *
+	 * @return raw edge response, or an error message string
+	 */
+	public String purge()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.PURGE));
+
+		try {
+			return requestFrontCache(urlParameters);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return "ERROR " + e.getMessage();
+		}
+	}
+
 	public Map<String, String> getCacheState()
 	{
 		CacheStatusActionResponse actionResponse = getCacheStateActionResponse();
@@ -248,6 +267,28 @@ public class FrontCacheClient {
 		}
 
 		return success;
+	}
+
+	/**
+	 * Triggers dumping of cached keys to a file on the edge (./warmer dir).
+	 *
+	 * @return DumpKeysActionResponse with the status message, or null if the edge is not available
+	 */
+	public DumpKeysActionResponse dumpKeys()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.DUMP_KEYS));
+
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			DumpKeysActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), DumpKeysActionResponse.class);
+			return actionResponse;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
 	}
 
 	/**

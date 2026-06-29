@@ -155,6 +155,31 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 
 	}
 
+	/**
+	 * Removes entries whose effective expiration timestamp is in the past.
+	 * "Cache forever" entries are never removed.
+	 */
+	@Override
+	public void purge() {
+
+		long now = System.currentTimeMillis();
+		List<String> removeList = new ArrayList<String>();
+		for (Map.Entry<String, WebResponse> entry : cache.entrySet())
+		{
+			long expireTimeMillis = entry.getValue().getExpireTimeMillis();
+			if (CacheProcessor.CACHE_FOREVER == expireTimeMillis)
+				continue;
+
+			if (expireTimeMillis < now)
+				removeList.add(entry.getKey());
+		}
+
+		for (String key : removeList)
+			cache.remove(key);
+
+		logger.info("purge() removed {} expired entries", removeList.size());
+	}
+
 }
 
 

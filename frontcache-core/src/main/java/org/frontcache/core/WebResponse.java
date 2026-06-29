@@ -339,6 +339,30 @@ public class WebResponse implements Serializable {
         return copy;
     }
 
+	/**
+	 * Effective expiration timestamp (epoch millis) of this response across all
+	 * client types. Used for time-based purging of stale entries.
+	 *
+	 * An entry that is still serveable to bots until T1 and to browsers until T2
+	 * is fully expired only after max(T1, T2), so the latest expiration wins.
+	 *
+	 * @return CACHE_FOREVER (-1) if the response never expires;
+	 *         NO_CACHE (0) if it is not cacheable for any client type;
+	 *         otherwise the latest expiration timestamp among client types.
+	 */
+	public long getExpireTimeMillis() {
+		long latest = CacheProcessor.NO_CACHE; // 0
+		for (Long expireTime : expireTimeMap.values()) {
+			if (null == expireTime)
+				continue;
+			if (CacheProcessor.CACHE_FOREVER == expireTime)
+				return CacheProcessor.CACHE_FOREVER;
+			if (expireTime > latest)
+				latest = expireTime;
+		}
+		return latest;
+	}
+
 	public Map<String, Long> getExpireTimeMap() {
 		return expireTimeMap;
 	}
