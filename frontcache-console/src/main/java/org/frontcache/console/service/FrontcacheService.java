@@ -370,6 +370,16 @@ public class FrontcacheService {
 	}
 
 	/**
+	 * Triggers purge of expired entries on the given edge.
+	 *
+	 * @param edgeURL
+	 */
+	public void purgeEdge(String edgeURL) {
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
+		fcClient.purge();
+	}
+
+	/**
 	 * Triggers FrontcacheAction.DUMP_KEYS on the given edge - cached keys are
 	 * dumped to a file in the edge's ./warmer dir.
 	 *

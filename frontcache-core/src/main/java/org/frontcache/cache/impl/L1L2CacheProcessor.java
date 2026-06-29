@@ -342,5 +342,39 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	public void patch() {
 		// TODO Auto-generated method stub
 	}
+
+	/**
+	 * Removes expired entries from both cache tiers:
+	 * L1 (ehCache) is scanned in-memory; L2 (Lucene) is purged via a range query.
+	 * "Cache forever" entries are never removed.
+	 */
+	@Override
+	public void purge() {
+
+		// L1 - ehCache
+		long now = System.currentTimeMillis();
+		List<Object> removeList = new ArrayList<Object>();
+		for (Object key : ehCache.getKeys())
+		{
+			Element el = ehCache.get(key);
+			if (null == el || null == el.getObjectValue())
+				continue;
+
+			long expireTimeMillis = ((WebResponse) el.getObjectValue()).getExpireTimeMillis();
+			if (CacheProcessor.CACHE_FOREVER == expireTimeMillis)
+				continue;
+
+			if (expireTimeMillis < now)
+				removeList.add(key);
+		}
+
+		for (Object key : removeList)
+			ehCache.remove(key);
+
+		logger.info("purge() removed {} expired entries from L1 (ehCache)", removeList.size());
+
+		// L2 - Lucene
+		luceneIndexManager.deleteExpired();
+	}
 }
 

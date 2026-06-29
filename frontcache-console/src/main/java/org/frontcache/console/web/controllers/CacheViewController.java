@@ -112,4 +112,18 @@ public class CacheViewController {
 
 		return "cache_view";
 	}
+
+
+	@RequestMapping(method = RequestMethod.POST, params = "purge")
+	public String purge(Model model, CacheViewForm cacheViewForm) {
+		model.addAttribute("cacheView", cacheViewForm);
+
+		frontcacheService.purgeEdge(cacheViewForm.getEdge());
+		model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheViewForm.getEdge());
+
+    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	model.addAttribute("edgeList", agents);
+
+		return "cache_view";
+	}
 }

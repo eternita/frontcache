@@ -55,4 +55,5 @@ public interface CacheProcessor {
 
 	public void patch();
 
+	public void purge();
 }

@@ -30,6 +30,7 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
+import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.*;
@@ -45,6 +46,7 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
+import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,7 +189,12 @@ public class LuceneIndexManager {
 		if (null != response.getContent())
 			doc.add(new StoredField(BIN_FIELD, response.getContent()));
 
-//		doc.add(new NumericDocValuesField(EXPIRE_DATE_FIELD, response.getExpireTimeMillis())); // TODO: store map ?
+		// index the effective expiration timestamp as a searchable point so expired
+		// entries can be purged with a range query (see deleteExpired()).
+		// "cache forever" (-1) is stored as Long.MAX_VALUE so it never falls into the expired range.
+		long expireTimeMillis = response.getExpireTimeMillis();
+		long expireIndexValue = (CacheProcessor.CACHE_FOREVER == expireTimeMillis) ? Long.MAX_VALUE : expireTimeMillis;
+		doc.add(new LongPoint(EXPIRE_DATE_FIELD, expireIndexValue));
 
 		doc.add(new StoredField(JSON_FIELD, gson.toJson(response), JSON_TYPE));
 
@@ -419,8 +426,61 @@ public class LuceneIndexManager {
 		}
 	}
 
-	public void deleteExpired() {
-		// TODO: implement me : query EXPIRE_DATE_FIELD and delete
+	/**
+	 * Removes all documents whose effective expiration timestamp is in the past.
+	 *
+	 * "Cache forever" entries are indexed with Long.MAX_VALUE (see indexDoc()) so
+	 * they are never selected by the expired range. Documents indexed before the
+	 * EXPIRE_DATE_FIELD point existed carry no point value and are left untouched
+	 * until they are re-cached.
+	 *
+	 * @return number of expired documents removed from the index
+	 */
+	public long deleteExpired() {
+
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return 0;
+			}
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
+			return 0;
+		}
+
+		long count = 0;
+		IndexReader reader = null;
+		try {
+			// expired = expire_date in [MIN_VALUE, now] ; forever entries are Long.MAX_VALUE -> excluded
+			long now = System.currentTimeMillis();
+			Query expiredQuery = LongPoint.newRangeQuery(EXPIRE_DATE_FIELD, Long.MIN_VALUE, now);
+
+			// count matches first so we can report how many were purged
+			reader = DirectoryReader.open(iWriter);
+			IndexSearcher searcher = new IndexSearcher(reader);
+			count = searcher.count(expiredQuery);
+
+			iWriter.deleteDocuments(expiredQuery);
+			logger.info("deleteExpired() removed {} expired documents", count);
+		} catch (IOException e) {
+			logger.error(e.getMessage(), e);
+		} finally {
+			if (reader != null) {
+				try {
+					reader.close();
+				} catch (IOException e) {
+					logger.error(e.getMessage(), e);
+				}
+			}
+			try {
+				iWriter.commit();
+			} catch (IOException e) {
+				logger.error(e.getMessage(), e);
+			}
+		}
+
+		return count;
 	}
 
 	/**

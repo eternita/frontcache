@@ -177,6 +177,24 @@ public class FrontCacheClient {
 		}
 	}
 
+	/**
+	 * Triggers purge of expired entries on the edge.
+	 *
+	 * @return raw edge response, or an error message string
+	 */
+	public String purge()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.PURGE));
+
+		try {
+			return requestFrontCache(urlParameters);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return "ERROR " + e.getMessage();
+		}
+	}
+
 	public Map<String, String> getCacheState()
 	{
 		CacheStatusActionResponse actionResponse = getCacheStateActionResponse();
