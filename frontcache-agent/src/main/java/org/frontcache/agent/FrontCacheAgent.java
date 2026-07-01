@@ -145,7 +145,7 @@ public class FrontCacheAgent {
 //    	post.addHeader("Accept-Encoding", "gzip");
 
 		if (null != siteKey)
-			post.addHeader("X-frontcache.site-key", siteKey);
+			post.addHeader("x-frontcache-site-key", siteKey); // must match FCHeaders.X_FRONTCACHE_SITE_KEY (hyphenated, no dots)
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 

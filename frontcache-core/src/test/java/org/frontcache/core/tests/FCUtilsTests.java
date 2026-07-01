@@ -36,8 +36,8 @@ public class FCUtilsTests {
 
 	/**
 	 * HTTP header names are case-insensitive (RFC 7230). Intermediaries such as
-	 * Cloudflare re-case origin response headers (e.g. send "X-Frontcache.component.maxage"
-	 * while FCHeaders uses "X-frontcache.component.maxage"). revertHeaders() must build a
+	 * Cloudflare re-case origin response headers (e.g. send "X-Frontcache-Component-Maxage"
+	 * while FCHeaders uses "x-frontcache-component-maxage"). revertHeaders() must build a
 	 * case-insensitive map so component cache directives still resolve - otherwise the
 	 * edge node treats every response as NO_CACHE and serves it dynamic forever.
 	 *
@@ -47,8 +47,8 @@ public class FCUtilsTests {
 	public void revertHeadersIsCaseInsensitive() throws Exception {
 
 		Header[] headers = new Header[] {
-				new BasicHeader("X-Frontcache.component.maxage", "3h"),   // title-cased by proxy
-				new BasicHeader("X-Frontcache.component.tags", "welcome"),
+				new BasicHeader("X-Frontcache-Component-Maxage", "3h"),   // title-cased by proxy
+				new BasicHeader("X-Frontcache-Component-Tags", "welcome"),
 				new BasicHeader("Content-Type", "text/html;charset=UTF-8")
 		};
 

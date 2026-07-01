@@ -136,7 +136,7 @@ public abstract class CommonTests extends TestsBase {
 
 		WebResponse webResponse = page.getWebResponse();
 
-//		X-frontcache.debug.request.0: success toplevel from-cache 1 1 "http://localhost:9080/common/debug/a.jsp" frontcache-localhost-1 browser
+//		x-frontcache-trace-request.0: success toplevel from-cache 1 1 "http://localhost:9080/common/debug/a.jsp" frontcache-localhost-1 browser
 		String logStr = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
 
 		assertNotEquals(-1, logStr.indexOf("common/debug/a.jsp"));
@@ -377,8 +377,8 @@ public abstract class CommonTests extends TestsBase {
 
 	/**
 	 * An intermediary (e.g. Cloudflare) may re-case the component cache-directive header
-	 * on the origin response: the app emits "X-frontcache.component.maxage" but the edge
-	 * receives "X-Frontcache.Component.Maxage". FC must parse it case-insensitively and
+	 * on the origin response: the app emits "x-frontcache-component-maxage" but the edge
+	 * receives "X-Frontcache-Component-Maxage". FC must parse it case-insensitively and
 	 * cache the page. Regression for the case-sensitive header lookup that made every such
 	 * page dynamic. Runs in both filter and standalone modes.
 	 *
