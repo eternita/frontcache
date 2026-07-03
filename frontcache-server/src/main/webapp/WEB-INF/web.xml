@@ -43,5 +43,10 @@
         <servlet-name>HystrixMetricsStreamServlet</servlet-name>
         <url-pattern>/hystrix.stream</url-pattern>
     </servlet-mapping>
-        
+
+    <!-- session timeout: 1 year (365 * 24 * 60 = 525600 minutes) -->
+    <session-config>
+        <session-timeout>525600</session-timeout>
+    </session-config>
+
 </web-app>
