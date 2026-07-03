@@ -31,7 +31,7 @@
     <div class="">
         <div style="padding-left: 20px;">
         <p style="height: 10px">&nbsp;</p>
-        <h2 style="font-size: 22px;">Edges status</h2>� 
+        <h2 style="font-size: 22px;">Edges status</h2>
         <br/>
         
     <hr>
@@ -43,7 +43,7 @@
               </c:if> 
                <br/>
             </c:forEach>
-        </div>�         
+        </div>
         </div>
     </div>
 

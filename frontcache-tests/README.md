@@ -135,7 +135,7 @@ All of the following run in **both** filter and standalone modes unless noted.
 
 | Base class | Behaviours verified |
 |------------|---------------------|
-| **CommonTests** | Plain JSP read; `<fc:include>` stitching (`jspInclude`); include + cache (`6ci`, `7ci`); deep nested includes; redirects; **debug/trace mode** headers; `log-to-headers` (`X-frontcache-component-max-age`); **L1/L2 cache-level accounting** (entry counts per layer, impl names); **client-type-specific caching** (`bot:60` — bots cached, browsers dynamic); client-type-specific includes; sync includes with `maxage=0` (not cached); soft cache refresh (`@Ignore` — works on Tomcat, not the Jetty test container); **HTTP method caching** incl. `HEAD`. |
+| **CommonTests** | Plain JSP read; `<fc:include>` stitching (`jspInclude`); include + cache (`6ci`, `7ci`); deep nested includes; redirects; **debug/trace mode** headers; `log-to-headers` (`x-frontcache-component-maxage`); **L1/L2 cache-level accounting** (entry counts per layer, impl names); **client-type-specific caching** (`bot:60` — bots cached, browsers dynamic); client-type-specific includes; sync includes with `maxage=0` (not cached); soft cache refresh (`@Ignore` — works on Tomcat, not the Jetty test container); **HTTP method caching** incl. `HEAD`. |
 | **IncludeTests** | Async include resolution (`includeAsync1..3`); client-specific include behaviour (`includeClientSpecific1..4`). |
 | **ClientTests** | `FrontCacheClient` API: `getFromCache` (hit/null), deep-include caching, `getCacheStatus`; single-node and **cluster** invalidation; invalidate-all (single + cluster); **multi-domain** invalidate-all (fc1 vs fc2 isolation); response-header de-duplication. |
 | **AgentTests** | `FrontCacheAgent` / `FrontCacheAgentCluster` remote invalidation (single node + cluster). |
@@ -221,7 +221,7 @@ styles:
    (`assertEquals("abcdef", page.getPage().asText())`).
 2. **Trace-header assertions** — `TestsBase` sets `X-frontcache-trace: true` on every
    request; because `front-cache.log-to-headers=true`, Frontcache emits
-   `X-frontcache.debug.request.N` and `X-frontcache-component-max-age` headers.
+   `x-frontcache-trace-request.N` and `x-frontcache-component-maxage` headers.
    `TestUtils.isRequestFromCache(...)` parses the trace string to assert **cache hit vs
    dynamic**. This is how "first request dynamic, second request from cache" invariants
    are checked.

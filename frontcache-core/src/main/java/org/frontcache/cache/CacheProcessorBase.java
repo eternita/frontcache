@@ -224,10 +224,24 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	 */
 	private void cleanupNonPersistentHeaders(Map<String, List<String>> headers)
 	{
-		Set<String> cleanupKeys = new HashSet<String>(Arrays.asList(NON_PERSISTENT_HEADERS));
+		// HTTP header names are case-insensitive (RFC 7230) and intermediaries (e.g. Cloudflare)
+		// may re-case them - so match case-insensitively. Otherwise a downstream node's trace
+		// headers that arrive re-cased (e.g. "X-Frontcache-Trace-Request.1.0") slip past the strip,
+		// get cached and are replayed frozen on every cache hit instead of being (re)stamped live.
+		Set<String> nonPersistentLower = new HashSet<String>();
+		for (String name : NON_PERSISTENT_HEADERS)
+			nonPersistentLower.add(name.toLowerCase());
+
+		String traceRequestPrefixLower = FCHeaders.X_FRONTCACHE_TRACE_REQUEST.toLowerCase();
+
+		Set<String> cleanupKeys = new HashSet<String>();
 		for(String key : headers.keySet())
-			if (key.startsWith(FCHeaders.X_FRONTCACHE_TRACE_REQUEST)) // X-frontcache.debug.request.0, X-frontcache.debug.request.1.1.2.3.4.33, etc
+		{
+			String keyLower = key.toLowerCase();
+			if (nonPersistentLower.contains(keyLower)
+					|| keyLower.startsWith(traceRequestPrefixLower)) // x-frontcache-trace-request.0, x-frontcache-trace-request.1.1.2.3.4.33, etc
 				cleanupKeys.add(key);
+		}
 
 		for (String removeKey : cleanupKeys)
 			headers.remove(removeKey);

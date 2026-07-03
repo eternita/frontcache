@@ -54,7 +54,7 @@ license {
 subprojects {
 	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
 	apply plugin: 'jacoco'
-    version = '1.2.6-SNAPSHOT-3'
+    version = '1.2.6-SNAPSHOT-5'
     group = 'org.frontcache'
 
 	// Build/test with Java 11 via a toolchain, so the JDK launching Gradle

@@ -251,7 +251,7 @@ public class FCUtils {
 		// get headers
 		// case-insensitive: HTTP header names are case-insensitive (RFC 7230) and
 		// intermediaries (e.g. Cloudflare) may re-case them - so component directives
-		// like X-frontcache.component.maxage must resolve regardless of wire casing
+		// like x-frontcache-component-maxage must resolve regardless of wire casing
     	Map<String, List<String>> headers = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 		for (String headerName : originWrappedResponse.getHeaderNames())
 		if (isIncludedHeaderToResponse(headerName))
@@ -373,7 +373,7 @@ public class FCUtils {
      */
     public static Map<String, List<String>> revertHeaders(Header[] headers) {
     	// case-insensitive map - HTTP header names are case-insensitive (RFC 7230);
-    	// intermediaries (e.g. Cloudflare) may re-case them, so X-frontcache.* directives
+    	// intermediaries (e.g. Cloudflare) may re-case them, so x-frontcache-* directives
     	// must resolve regardless of wire casing
     	Map<String, List<String>> map = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 		for (Header header : headers) {
