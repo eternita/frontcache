@@ -1,12 +1,4 @@
 /**
- *        Copyright 2017 Eternita LLC
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -126,7 +118,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 
         if (null == fallbackConfig)
         {
-            return getDefalut(fallbackSource, urlStr);
+            return getDefault(fallbackSource, urlStr);
         }
 
 		for (FallbackConfigEntryImpl fallbackConfigEntry : fallbackConfig)
@@ -140,7 +132,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		if (null == currentFallbackConfigEntry)
 		{
 			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + "| default | URL doesn't match any pattern | " + urlStr);
-			return getDefalut(fallbackSource, urlStr);
+			return getDefault(fallbackSource, urlStr);
 		}
 
 
@@ -151,14 +143,14 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		if (null == fileName)
 		{
 			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + "| default | no file for pattern " + currentFallbackConfigEntry.urlPattern + " | " + urlStr);
-			return getDefalut(fallbackSource, urlStr);
+			return getDefault(fallbackSource, urlStr);
 		}
 
 		WebResponse webResponse = getFallbackFromFile(urlStr, fileName);
 
 		if (null == webResponse){
 			fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + "| default | can't read from file " + fileName + " | " + urlStr);
-			return getDefalut(fallbackSource, urlStr);
+			return getDefault(fallbackSource, urlStr);
 		}
 
 		fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + "| from file | " + fileName + " | " + urlStr);
@@ -258,7 +250,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	 * @param urlStr
 	 * @return
 	 */
-	private WebResponse getDefalut(String fallbackSource, String urlStr)
+	private WebResponse getDefault(String fallbackSource, String urlStr)
 	{
 		byte[] outContentBody = (fallbackSource + ": Default Fallback for " + urlStr).getBytes();
 

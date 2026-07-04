@@ -240,6 +240,15 @@ project(':frontcache-core') {
         testImplementation     'com.squareup.okhttp:okhttp:2.5.0'
         testImplementation     'org.mockito:mockito-core:4.11.0'
     }
+
+    test {
+        // FCConfig is a JVM-global singleton initialized once on first touch, and several core
+        // tests (L1L2 cache tests, FileBasedFallbackResolverTest) trigger that init. Without a
+        // valid frontcache.home the init throws and poisons FCConfig for the rest of the JVM
+        // (NoClassDefFoundError), making the failure depend on test-execution order. Pin a minimal
+        // fixture home so init always succeeds regardless of which test runs first.
+        systemProperty 'frontcache.home', "${projectDir}/src/test/resources/fallback-home"
+    }
 }
 
 
