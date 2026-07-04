@@ -59,6 +59,7 @@ public class FrontcacheService {
 	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_AMOUNT);
 
 	private static final long FRONTCACHE_CLIENT_TIMEOUT = FrontCacheClient.CONNECTION_TIMEOUT + 1000; // slightly more then frontcache client timeout
+	private static final long CONSOLE_TIMEOUT = 1000;
 
 
 	public FrontcacheService() {
@@ -143,7 +144,7 @@ public class FrontcacheService {
             try {
             	FrontCacheStatus result = null;
             	if (timeoutReached)
-            		result = f.get(1, TimeUnit.MILLISECONDS);
+            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
             	else
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 
@@ -153,7 +154,7 @@ public class FrontcacheService {
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some statuses may not be retrieved ");
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some statuses may not be retrieved ");
             }
         }
 
@@ -183,7 +184,7 @@ public class FrontcacheService {
             try {
             	FallbackConfig result = null;
             	if (timeoutReached)
-            		result = f.get(1, TimeUnit.MILLISECONDS);
+            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
             	else
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 
@@ -193,7 +194,7 @@ public class FrontcacheService {
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
             }
         }
 
@@ -216,7 +217,7 @@ public class FrontcacheService {
             try {
             	BotConfig result = null;
             	if (timeoutReached)
-            		result = f.get(1, TimeUnit.MILLISECONDS);
+            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
             	else
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 
@@ -226,7 +227,7 @@ public class FrontcacheService {
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
             }
         }
 
@@ -249,7 +250,7 @@ public class FrontcacheService {
             try {
             	DynamicURLsConfig result = null;
             	if (timeoutReached)
-            		result = f.get(1, TimeUnit.MILLISECONDS);
+            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
             	else
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 
@@ -259,7 +260,7 @@ public class FrontcacheService {
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for resolving includes. Some configs may not be retrieved ");
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
             }
         }
 
