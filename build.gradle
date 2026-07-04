@@ -115,8 +115,6 @@ subprojects {
 		reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/unit')
 		reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/unit')
 
-		jvmArgs '--add-opens=java.base/java.nio=ALL-UNNAMED' // Lucene 6.2.0 MMapDirectory unmap hack on Java 9+
-
 		if (System.getProperty('DEBUG', 'false') == 'true') {
 			jvmArgs '-Xdebug',
 				'-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8001'
@@ -271,8 +269,7 @@ project(':frontcache-server') {
 		httpsEnabled = true
 		contextPath = '/'
 		servletContainer = 'jetty9.4' // jetty9.4 or jetty11 or tomcat9
-		// --add-opens lets Lucene 6.2.0 MMapDirectory's unmap hack reflect into java.nio on Java 9+
-		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dorg.frontcache.console.config=' + projectDir +'/FRONTCACHE_HOME/conf/frontcache-console.conf', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
+		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dorg.frontcache.console.config=' + projectDir +'/FRONTCACHE_HOME/conf/frontcache-console.conf', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
 //		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
 	}
 
@@ -305,7 +302,7 @@ project(':frontcache-console') {
 		httpPort = 7080
 		httpsPort = 7443
 		httpsEnabled = true
-		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.conf']
+		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.conf']
 //		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.conf', '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002']
 	}
 
@@ -353,8 +350,7 @@ project(':frontcache-tests') {
   		contextPath = '/'
 		servletContainer = 'jetty9.4' // jetty9.4 or jetty11 or tomcat9
 		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
-		// --add-opens lets Lucene 6.2.0 MMapDirectory's unmap hack reflect into java.nio on Java 9+
-		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
+		jvmArgs = ['-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
 //		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
 	}
 
@@ -378,7 +374,7 @@ project(':frontcache-tests') {
 		reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/integration')
 
 		//		jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
-		jvmArgs '-Dfrontcache-tests.home=' + projectDir, '--add-opens=java.base/java.nio=ALL-UNNAMED'
+		jvmArgs '-Dfrontcache-tests.home=' + projectDir
 		//		'-Dlogback.configurationFile=' !! logs (because of same process) here: projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml'
 
 	}
@@ -392,7 +388,7 @@ project(':frontcache-tests') {
 	task standaloneFrontcacheJetty(type: JavaExec) {
 		mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
 		classpath = sourceSets.main.runtimeClasspath
-		jvmArgs '--add-opens=java.base/java.nio=ALL-UNNAMED' // Lucene 6.2.0 MMapDirectory unmap hack on Java 9+
+		jvmArgs
 		systemProperty 'frontcache.standalone.frontcache.web.dir', '' + projectDir + '/src/test-integration/webapp'
 		systemProperty 'frontcache.standalone.frontcache.port', '9080'
 		systemProperty 'frontcache.home', '' + projectDir + '/FRONTCACHE_HOME_STANDALONE'
