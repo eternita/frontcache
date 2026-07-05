@@ -3,7 +3,7 @@ CLAUDE.md
 /build/
 /.gradle/
 /gradle.properties
-/.DS_Store
+.DS_Store
 /target/
 /distribution/
 /**/target/

@@ -10,35 +10,60 @@ package org.frontcache.tests;
 
 import java.io.File;
 
+import org.eclipse.jetty.ee10.annotations.AnnotationConfiguration;
+import org.eclipse.jetty.ee10.webapp.MetaInfConfiguration;
+import org.eclipse.jetty.ee10.webapp.WebAppContext;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.webapp.WebAppContext;
 
+/**
+ * Embedded Jetty 12 (Jakarta EE10) launcher used by the e2e harness.
+ *
+ * Deploys a single exploded webapp at context "/" on a configurable port.
+ * Driven by system properties:
+ *   frontcache.jetty.port    - listen port (default 9080)
+ *   frontcache.jetty.webapp  - path to the exploded webapp directory (or war)
+ *
+ * Used for both the FC standalone reverse-proxy (:9080) and the FC webfilter +
+ * web app (:8080). Replaces the former raw Jetty 9.3.6 launcher / gretty run.
+ */
 public class FrontcacheStandaloneServer {
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 
-		System.out.println("Starting Frontcache Standalone Server ...");
+		int port = Integer.parseInt(System.getProperty("frontcache.jetty.port", "9080"));
+		String webDir = System.getProperty("frontcache.jetty.webapp");
 
-		int port = Integer.parseInt(System.getProperty("frontcache.standalone.frontcache.port"));
+		System.out.println("Starting Frontcache Jetty Server (port=" + port + ", webapp=" + webDir + ") ...");
+
 		Server server = new Server(port);
 
-        WebAppContext webapp = new WebAppContext();
-        webapp.setContextPath("/");
-        String frontcacheStandaloneTestWebDir = System.getProperty("frontcache.standalone.frontcache.web.dir");
-        File warFile = new File(frontcacheStandaloneTestWebDir);
-        webapp.setWar(warFile.getAbsolutePath());
+		WebAppContext webapp = new WebAppContext();
+		webapp.setContextPath("/");
+		webapp.setWar(new File(webDir).getAbsolutePath());
+		// Surface startup failures instead of silently serving 404s.
+		webapp.setThrowUnavailableOnStartupException(true);
 
-        server.setHandler(webapp);
-        try {
-			server.start();
+		// Enable annotation scanning so ServletContainerInitializers are discovered,
+		// including Jasper's JettyJasperInitializer (JSP) and the JSTL taglibs. The
+		// JSP/JSTL implementations ship inside container (parent-classloader) jars,
+		// not the webapp's WEB-INF/lib, so they must be named in the container-scan
+		// pattern for their META-INF TLDs (e.g. jakarta.tags.core) to be found.
+		webapp.addConfiguration(new AnnotationConfiguration());
+		webapp.setAttribute(MetaInfConfiguration.CONTAINER_JAR_PATTERN,
+				".*/jakarta\\.servlet\\.jsp\\.jstl-.*\\.jar$|"
+				+ ".*/org\\.glassfish\\.web\\..*\\.jar$|"
+				+ ".*/jetty-ee10-apache-jsp-.*\\.jar$|"
+				+ ".*/org\\.mortbay\\.jasper\\..*\\.jar$|"
+				+ ".*/jetty-ee10-glassfish-jstl-.*\\.jar$|"
+				+ ".*/taglibs.*\\.jar$");
 
-			System.out.println("Frontcache Standalone Server has been started successfully ...");
-			System.out.println("StandaloneFrontcache started");
-		} catch (Exception e1) {
-			e1.printStackTrace();
-		}
+		server.setHandler(webapp);
+		server.start();
 
-        return;
+		System.out.println("Frontcache Jetty Server has been started successfully ...");
+		System.out.println("StandaloneFrontcache started");
+
+		server.join();
 	}
 
 }

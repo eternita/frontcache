@@ -367,7 +367,12 @@ public class FrontCacheEngine {
 				.setConnectionManager(newConnectionManager())
 				.setDefaultRequestConfig(requestConfig)
 //				.setSSLHostnameVerifier(new NoopHostnameVerifier()) // for SSL do not verify certificate's host
-				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
+				// Retry idempotent (GET) origin calls once. Pooled keep-alive
+				// connections can be closed by the origin between requests; reusing a
+				// stale one throws NoHttpResponseException. A single retry transparently
+				// re-issues on a fresh connection. (Jetty 12's connection-reuse timing
+				// surfaces this stale-connection race that Jetty 9.4 masked.)
+				.setRetryHandler(new DefaultHttpRequestRetryHandler(1, false))
 				.setKeepAliveStrategy(keepAliveStrategy)
 				.setRedirectStrategy(new RedirectStrategy() {
 					@Override
