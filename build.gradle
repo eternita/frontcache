@@ -57,21 +57,20 @@ subprojects {
     version = '1.2.6-SNAPSHOT-5'
     group = 'org.frontcache'
 
-	// Build/test with Java 11 via a toolchain, so the JDK launching Gradle
-	// (e.g. 17) is decoupled from the project's target. Gradle auto-detects
-	// the installed JDK 11 (Zulu 11) for compilation and test execution.
+	// Build/test with Java 17 via a toolchain, so the JDK launching Gradle is
+	// decoupled from the project's target. Gradle auto-detects the installed
+	// JDK 17 for compilation and test execution. Jetty 12 / Jakarta EE10 require
+	// Java 17 as a baseline.
 	java {
 		toolchain {
-			languageVersion = JavaLanguageVersion.of(11)
+			languageVersion = JavaLanguageVersion.of(17)
 		}
 	}
 
-	// Emit Java 8 bytecode (class major version 52) even though we build with the
-	// JDK 11 toolchain. The standalone server runs on Jetty 9.3.6, whose bundled
-	// ASM can only scan up to Java 8 classes — Java 11 bytecode (major 55) makes
-	// Jetty's AnnotationParser throw IllegalArgumentException on every class.
+	// Emit Java 17 bytecode. (The former Java 8 bytecode workaround for Jetty
+	// 9.3.6's ASM annotation scanner is gone — Jetty 12 handles modern bytecode.)
 	tasks.withType(JavaCompile).configureEach {
-		options.release = 8
+		options.release = 17
 	}
 
 	// 'provided' deps (e.g. servlet-api) are on compile & test classpaths but
