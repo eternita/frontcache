@@ -8,8 +8,8 @@
  */
 package org.frontcache.hystrix;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FCHeaders;

@@ -25,10 +25,10 @@ import rx.Subscription;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -180,7 +180,7 @@ public abstract class FrontcacheHystrixSampleSseServlet extends HttpServlet {
 	 *            incoming HTTP Request
 	 * @param response
 	 *            outgoing HTTP Response (as a streaming response)
-	 * @throws javax.servlet.ServletException
+	 * @throws jakarta.servlet.ServletException
 	 * @throws java.io.IOException
 	 */
 	private void handleRequest(HttpServletRequest request, final HttpServletResponse response)
