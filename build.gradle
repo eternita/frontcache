@@ -350,6 +350,8 @@ project(':frontcache-console') {
 		classpath = sourceSets.main.runtimeClasspath + configurations.provided
 		systemProperty 'frontcache.jetty.port', '7080'
 		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+		// Console logging: only ERROR+ goes to stdout (see config/fc-logback.xml).
+		systemProperty 'logback.configurationFile', "${projectDir}/config/fc-logback.xml"
 	}
 }
 
