@@ -13,7 +13,11 @@ import java.io.File;
 import org.eclipse.jetty.ee10.annotations.AnnotationConfiguration;
 import org.eclipse.jetty.ee10.webapp.MetaInfConfiguration;
 import org.eclipse.jetty.ee10.webapp.WebAppContext;
+import org.eclipse.jetty.server.ForwardedRequestCustomizer;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 
 /**
  * Embedded Jetty 12 (Jakarta EE10) launcher for running Frontcache standalone
@@ -32,7 +36,17 @@ public class FrontcacheJettyServer {
 
 		System.out.println("Starting Frontcache Jetty Server (port=" + port + ", webapp=" + webDir + ") ...");
 
-		Server server = new Server(port);
+		// Honor X-Forwarded-* from the nginx front door so request.getScheme()/
+		// getServerPort() reflect the client-facing values (https/443), not the
+		// plain-HTTP backend hop. Without this the management-port security check
+		// (front-cache.management.port) and absolute-URL/redirect generation see
+		// port 80 and break behind a TLS-terminating proxy.
+		Server server = new Server();
+		HttpConfiguration httpConfig = new HttpConfiguration();
+		httpConfig.addCustomizer(new ForwardedRequestCustomizer());
+		ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
+		connector.setPort(port);
+		server.addConnector(connector);
 
 		WebAppContext webapp = new WebAppContext();
 		webapp.setContextPath("/");
