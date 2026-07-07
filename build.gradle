@@ -278,11 +278,24 @@ project(':frontcache-server') {
 	}
 
 	task copyWar(type: Copy) {
-		  from 'build/libs'
+		  from tasks.named('war')
 		  into 'server/frontcache-base/webapps'
 		  rename '(.*).war', 'ROOT.war'
 	}
 	build.finalizedBy(copyWar)
+
+	// Assemble the standalone launcher's runtime classpath into server/lib. The
+	// remote deployment runs `java -cp "server/lib/*" org.frontcache.server.FrontcacheJettyServer`
+	// (see server/bin/frontcache) — the modern embedded-Jetty-12 replacement for the
+	// old Jetty 9.4 start.jar distribution. The launcher only needs the Jetty EE10
+	// jars (in 'provided', deliberately kept out of the war) plus its own class; the
+	// war carries frontcache-core + its deps in WEB-INF/lib, so they stay out of here.
+	task copyServerLibs(type: Sync) {
+		from configurations.provided
+		from tasks.named('jar')
+		into 'server/lib'
+	}
+	build.finalizedBy(copyServerLibs)
 
 	// Run Frontcache standalone on embedded Jetty 12 (replaces the gretty appRun).
 	task appRun(type: JavaExec) {
