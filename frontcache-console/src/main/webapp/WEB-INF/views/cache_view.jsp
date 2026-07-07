@@ -9,7 +9,7 @@
 <p/> 
 <p/> 
 
-<form:form method="POST" class="form-inline" commandName="cacheView">
+<form:form method="POST" class="form-inline" modelAttribute="cacheView">
   <div class="form-group">
     <label for="URL">URL</label>
     <form:input class="form-control" placeholder="http://your.site.com" path="key" style="width: 500px;" />

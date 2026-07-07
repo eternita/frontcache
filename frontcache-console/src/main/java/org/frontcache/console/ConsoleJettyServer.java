@@ -43,7 +43,10 @@ public class ConsoleJettyServer {
 
 		// Scan container jars for ServletContainerInitializers (JSP/JSTL support).
 		// The JSP/JSTL impls live in container jars, so their META-INF TLDs are only
-		// found if the jars are named in the container-scan pattern.
+		// found if the jars are named in the container-scan pattern. When running from
+		// the exploded webapp (appRun) WEB-INF/lib is empty, so spring-webmvc (which
+		// carries META-INF/spring-form.tld + spring.tld) is a container-classpath jar
+		// too and must be listed here or the Spring form taglib URI won't resolve.
 		webapp.addConfiguration(new AnnotationConfiguration());
 		webapp.setAttribute(MetaInfConfiguration.CONTAINER_JAR_PATTERN,
 				".*/jakarta\\.servlet\\.jsp\\.jstl-.*\\.jar$|"
@@ -51,6 +54,7 @@ public class ConsoleJettyServer {
 				+ ".*/jetty-ee10-apache-jsp-.*\\.jar$|"
 				+ ".*/org\\.mortbay\\.jasper\\..*\\.jar$|"
 				+ ".*/jetty-ee10-glassfish-jstl-.*\\.jar$|"
+				+ ".*/spring-webmvc-.*\\.jar$|"
 				+ ".*/taglibs.*\\.jar$");
 
 		server.setHandler(webapp);
