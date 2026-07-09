@@ -8,7 +8,7 @@
  */
 package org.frontcache.wrapper;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 public interface FrontCacheHttpResponseWrapper extends HttpServletResponse {
 

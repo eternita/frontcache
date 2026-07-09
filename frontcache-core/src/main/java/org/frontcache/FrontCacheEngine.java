@@ -23,9 +23,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import javax.servlet.FilterChain;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.http.HeaderElement;
 import org.apache.http.HeaderElementIterator;
@@ -367,7 +367,12 @@ public class FrontCacheEngine {
 				.setConnectionManager(newConnectionManager())
 				.setDefaultRequestConfig(requestConfig)
 //				.setSSLHostnameVerifier(new NoopHostnameVerifier()) // for SSL do not verify certificate's host
-				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
+				// Retry idempotent (GET) origin calls once. Pooled keep-alive
+				// connections can be closed by the origin between requests; reusing a
+				// stale one throws NoHttpResponseException. A single retry transparently
+				// re-issues on a fresh connection. (Jetty 12's connection-reuse timing
+				// surfaces this stale-connection race that Jetty 9.4 masked.)
+				.setRetryHandler(new DefaultHttpRequestRetryHandler(1, false))
 				.setKeepAliveStrategy(keepAliveStrategy)
 				.setRedirectStrategy(new RedirectStrategy() {
 					@Override

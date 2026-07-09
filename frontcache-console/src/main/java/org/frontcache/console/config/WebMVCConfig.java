@@ -8,7 +8,7 @@
  */
 package org.frontcache.console.config;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,13 +25,13 @@ import org.springframework.web.servlet.config.annotation.ContentNegotiationConfi
 import org.springframework.web.servlet.config.annotation.DefaultServletHandlerConfigurer;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 import org.springframework.web.servlet.view.JstlView;
 
 @Configuration
 @EnableWebMvc
-public class WebMVCConfig extends WebMvcConfigurerAdapter implements ServletContextAware, ApplicationContextAware {
+public class WebMVCConfig implements WebMvcConfigurer, ServletContextAware, ApplicationContextAware {
 
 	private static final Logger LOG = LoggerFactory.getLogger(WebMVCConfig.class);
 
@@ -58,7 +58,6 @@ public class WebMVCConfig extends WebMvcConfigurerAdapter implements ServletCont
     @Override
     public void configureContentNegotiation(final ContentNegotiationConfigurer configurer) {
         configurer.defaultContentType(MediaType.TEXT_HTML)
-                .favorPathExtension(true)
                 .mediaType("json", MediaType.APPLICATION_JSON)
                 .mediaType("html", MediaType.TEXT_HTML)
                 .parameterName("view")

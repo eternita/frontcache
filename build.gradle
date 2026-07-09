@@ -1,7 +1,11 @@
 plugins {
 	id 'com.github.hierynomus.license' version '0.16.1'
-	id 'org.gretty' version '3.1.0' apply false // gretty 3.1.x still supports Jetty 9.4 (servlet 3.1.0 / javax); 4.x is Jakarta-only
 }
+
+// Jetty 12 (Jakarta EE10). Gretty has been dropped — it tops out at a Jetty 11
+// container, so local dev-runs and the e2e harness now embed Jetty 12 directly
+// (see :frontcache-server appRun and :frontcache-tests launcher tasks).
+ext.jettyVersion = '12.0.16'
 
 class ExecWait extends DefaultTask {
 	@Internal String command
@@ -54,24 +58,23 @@ license {
 subprojects {
 	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
 	apply plugin: 'jacoco'
-    version = '1.2.6-SNAPSHOT-5'
+    version = '2.0.0-SNAPSHOT-1'
     group = 'org.frontcache'
 
-	// Build/test with Java 11 via a toolchain, so the JDK launching Gradle
-	// (e.g. 17) is decoupled from the project's target. Gradle auto-detects
-	// the installed JDK 11 (Zulu 11) for compilation and test execution.
+	// Build/test with Java 17 via a toolchain, so the JDK launching Gradle is
+	// decoupled from the project's target. Gradle auto-detects the installed
+	// JDK 17 for compilation and test execution. Jetty 12 / Jakarta EE10 require
+	// Java 17 as a baseline.
 	java {
 		toolchain {
-			languageVersion = JavaLanguageVersion.of(11)
+			languageVersion = JavaLanguageVersion.of(17)
 		}
 	}
 
-	// Emit Java 8 bytecode (class major version 52) even though we build with the
-	// JDK 11 toolchain. The standalone server runs on Jetty 9.3.6, whose bundled
-	// ASM can only scan up to Java 8 classes — Java 11 bytecode (major 55) makes
-	// Jetty's AnnotationParser throw IllegalArgumentException on every class.
+	// Emit Java 17 bytecode. (The former Java 8 bytecode workaround for Jetty
+	// 9.3.6's ASM annotation scanner is gone — Jetty 12 handles modern bytecode.)
 	tasks.withType(JavaCompile).configureEach {
-		options.release = 8
+		options.release = 17
 	}
 
 	// 'provided' deps (e.g. servlet-api) are on compile & test classpaths but
@@ -114,8 +117,6 @@ subprojects {
 	test {
 		reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/unit')
 		reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/unit')
-
-		jvmArgs '--add-opens=java.base/java.nio=ALL-UNNAMED' // Lucene 6.2.0 MMapDirectory unmap hack on Java 9+
 
 		if (System.getProperty('DEBUG', 'false') == 'true') {
 			jvmArgs '-Xdebug',
@@ -219,8 +220,8 @@ configure([project(':frontcache-core'), project(':frontcache-agent')]) {
 project(':frontcache-core') {
 
     dependencies {
-        provided        'javax.servlet:javax.servlet-api:3.1.0'
-		provided        'javax.servlet.jsp:jsp-api:2.0'
+        provided        'jakarta.servlet:jakarta.servlet-api:6.0.0'
+		provided        'jakarta.servlet.jsp:jakarta.servlet.jsp-api:3.1.1'
 
 		api 			'com.fasterxml.jackson.core:jackson-databind:2.8.11.1'
 		api         	'com.fasterxml.jackson.core:jackson-annotations:2.7.5'
@@ -262,68 +263,86 @@ project(':frontcache-agent') {
 
 project(':frontcache-server') {
 	apply plugin: 'war'
-	apply plugin: 'org.gretty'
-
-	// gretty for Frontcache (standalone)
-	gretty {
-		httpPort = 9080
-		httpsPort = 9443
-		httpsEnabled = true
-		contextPath = '/'
-		servletContainer = 'jetty9.4' // jetty9.4 or jetty11 or tomcat9
-		// --add-opens lets Lucene 6.2.0 MMapDirectory's unmap hack reflect into java.nio on Java 9+
-		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME', '-Dorg.frontcache.console.config=' + projectDir +'/FRONTCACHE_HOME/conf/frontcache-console.conf', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
-//		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8003', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME/conf/fc-logback.xml']
-	}
-
-	farm {
-		webapp ':frontcache-server'
-		webapp ':frontcache-console'
-	  }
 
 	dependencies {
 		implementation project(':frontcache-core')
+
+		// Embedded Jetty 12 (EE10) for the standalone `appRun` task. Kept in the
+		// 'provided' configuration so these jars are NOT bundled into the
+		// deployable ROOT.war (it deploys to an external EE10 container), but are
+		// on the compile & appRun classpaths.
+		provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 	}
+
 	task copyWar(type: Copy) {
-		  from 'build/libs'
+		  from tasks.named('war')
 		  into 'server/frontcache-base/webapps'
 		  rename '(.*).war', 'ROOT.war'
 	}
 	build.finalizedBy(copyWar)
+
+	// Assemble the standalone launcher's runtime classpath into server/lib. The
+	// remote deployment runs `java -cp "server/lib/*" org.frontcache.server.FrontcacheJettyServer`
+	// (see server/bin/frontcache) — the modern embedded-Jetty-12 replacement for the
+	// old Jetty 9.4 start.jar distribution. The launcher only needs the Jetty EE10
+	// jars (in 'provided', deliberately kept out of the war) plus its own class; the
+	// war carries frontcache-core + its deps in WEB-INF/lib, so they stay out of here.
+	task copyServerLibs(type: Sync) {
+		from configurations.provided
+		from tasks.named('jar')
+		into 'server/lib'
+	}
+	build.finalizedBy(copyServerLibs)
+
+	// Run Frontcache standalone on embedded Jetty 12 (replaces the gretty appRun).
+	task appRun(type: JavaExec) {
+		group = 'application'
+		description = 'Run Frontcache standalone on embedded Jetty 12'
+		mainClass = 'org.frontcache.server.FrontcacheJettyServer'
+		classpath = sourceSets.main.runtimeClasspath + configurations.provided
+		systemProperty 'frontcache.jetty.port', '9080'
+		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+		systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME"
+		systemProperty 'org.frontcache.console.config', "${projectDir}/FRONTCACHE_HOME/conf/frontcache-console.conf"
+		systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME/conf/fc-logback.xml"
+	}
 }
 
 
 project(':frontcache-console') {
 	apply plugin: 'war'
-	apply plugin: 'org.gretty'
 
 	ext {
-		springVersion = '4.2.6.RELEASE'
+		springVersion = '6.1.14' // Spring 6 = first jakarta-native line; requires Java 17
 	}
-
-	gretty {
-		httpPort = 7080
-		httpsPort = 7443
-		httpsEnabled = true
-		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.conf']
-//		jvmArgs = ['-Dorg.frontcache.console.config=' + projectDir +'/config/frontcache-console.conf', '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002']
-	}
-
-	farm {
-		webapp ':frontcache-console'
-
-	  }
 
 	dependencies {
 		implementation project(':frontcache-core')
 		implementation "org.springframework:spring-context:${springVersion}"
 		implementation "org.springframework:spring-webmvc:${springVersion}"
-		implementation 'jstl:jstl:1.2'
+		implementation 'org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1' // Jakarta JSTL impl (was jstl:jstl:1.2)
+		implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0'
 		implementation 'com.typesafe:config:1.3.0'
+		// Spring 6.1's WebMVC (RouterFunctionMapping) needs Jackson >= 2.13; the
+		// transitive 2.8.11.1 pulled in via frontcache-core/Hystrix lacks classes
+		// like InvalidDefinitionException. Pin a compatible line for the console.
+		implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
 
 		testImplementation "org.springframework:spring-test:${springVersion}"
 		testImplementation 'org.mockito:mockito-core:4.11.0'
-        provided 'javax.servlet:javax.servlet-api:3.1.0'
+        provided 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+
+		// Embedded Jetty 12 (EE10) for the standalone `appRun` task, needed to
+		// compile+run the local ConsoleJettyServer launcher. In 'provided' so
+		// these jars stay out of the deployable frontcache-console.war (it
+		// deploys to an external EE10 container).
+		provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 	}
 	task copyWar(type: Copy) {
 			from 'build/libs'
@@ -332,31 +351,32 @@ project(':frontcache-console') {
 	}
 
 	build.finalizedBy(copyWar)
+
+	// Run the console standalone on embedded Jetty 12 (replaces the gretty jettyRun).
+	// Self-contained: uses this module's own ConsoleJettyServer launcher. Reuses the
+	// complete FRONTCACHE_HOME under frontcache-server (holds frontcache-console.conf
+	// + fc-logback.xml) so the console has a valid frontcache.home to boot against.
+	task appRun(type: JavaExec) {
+		group = 'application'
+		description = 'Run the Frontcache console on embedded Jetty 12'
+		mainClass = 'org.frontcache.console.ConsoleJettyServer'
+		classpath = sourceSets.main.runtimeClasspath + configurations.provided
+		systemProperty 'frontcache.jetty.port', '7080'
+		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+		// Console logging: only ERROR+ goes to stdout (see config/fc-logback.xml).
+		systemProperty 'logback.configurationFile', "${projectDir}/config/fc-logback.xml"
+	}
 }
 
 
 
 // tests -> FC standalone (localhost:9080) -> FC webfilter (localhost:8080) -> web app (localhost:8080)
-// FC standalone is run in standalone Jetty in org.frontcache.tests.FrontcacheStandaloneServer
-// FC webfilter is run in Gretty
-// test & FC webfilter & web app   are share the same JVM process
+// Both FC standalone (:9080, serving src/test-integration/webapp) and FC webfilter
+// + web app (:8080, serving src/main/webapp) now run in embedded Jetty 12 via the
+// org.frontcache.tests.FrontcacheStandaloneServer launcher. tests.sh starts both,
+// runs the integration suite, then kills them. (Was: gretty jetty9.4.)
 project(':frontcache-tests') {
 	apply plugin: 'war'
-	apply plugin: 'org.gretty'
-
-
-	// gretty for FC filter and web app
-	gretty {
-		httpPort = 8080
-		httpsPort = 8443
-		httpsEnabled = true
-  		contextPath = '/'
-		servletContainer = 'jetty9.4' // jetty9.4 or jetty11 or tomcat9
-		integrationTestTask = 'integrationTest' // existing gradle task (it will be surrounded with start/stop)
-		// --add-opens lets Lucene 6.2.0 MMapDirectory's unmap hack reflect into java.nio on Java 9+
-		jvmArgs = ['--add-opens=java.base/java.nio=ALL-UNNAMED', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER', '-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
-//		jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002', '-Dfrontcache.home=' + projectDir +'/FRONTCACHE_HOME_FILTER','-Dlogback.configurationFile=' + projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml']
-	}
 
 	sourceSets {
 		integrationTest {
@@ -378,36 +398,40 @@ project(':frontcache-tests') {
 		reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/integration')
 
 		//		jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
-		jvmArgs '-Dfrontcache-tests.home=' + projectDir, '--add-opens=java.base/java.nio=ALL-UNNAMED'
-		//		'-Dlogback.configurationFile=' !! logs (because of same process) here: projectDir +'/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml'
-
+		jvmArgs '-Dfrontcache-tests.home=' + projectDir
 	}
 
-	farm {
-		webapp ':frontcache-tests'
-		webapp ':frontcache-console'
-	  }
-
-	// for FC standalone
-	task standaloneFrontcacheJetty(type: JavaExec) {
+	// FC standalone (:9080) — embedded Jetty 12 serving the reverse-proxy webapp
+	task standaloneJetty(type: JavaExec) {
 		mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
-		classpath = sourceSets.main.runtimeClasspath
-		jvmArgs '--add-opens=java.base/java.nio=ALL-UNNAMED' // Lucene 6.2.0 MMapDirectory unmap hack on Java 9+
-		systemProperty 'frontcache.standalone.frontcache.web.dir', '' + projectDir + '/src/test-integration/webapp'
-		systemProperty 'frontcache.standalone.frontcache.port', '9080'
-		systemProperty 'frontcache.home', '' + projectDir + '/FRONTCACHE_HOME_STANDALONE'
-		systemProperty 'logback.configurationFile', '' + projectDir + '/FRONTCACHE_HOME_STANDALONE/conf/fc-logback.xml'
+		classpath = sourceSets.main.runtimeClasspath + configurations.provided
+		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/test-integration/webapp"
+		systemProperty 'frontcache.jetty.port', '9080'
+		systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_STANDALONE"
+		systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_STANDALONE/conf/fc-logback.xml"
+	}
+
+	// FC webfilter + web app (:8080) — embedded Jetty 12 serving the main webapp (was gretty)
+	task webfilterJetty(type: JavaExec) {
+		mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
+		classpath = sourceSets.main.runtimeClasspath + configurations.provided
+		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+		systemProperty 'frontcache.jetty.port', '8080'
+		systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_FILTER"
+		systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml"
 	}
 
 	task startStandaloneFrontcache(type: ExecWait) {
-		command './gradlew clean :frontcache-tests:standaloneFrontcacheJetty'
-		ready 'Frontcache Standalone Server has been started successfully ...'
+		command './gradlew :frontcache-tests:standaloneJetty'
+		ready 'has been started successfully'
 		directory '.'
 	}
 
-//	task stopStandaloneFrontcacheByPort(type: Exec) {
-//		commandLine 'bash', '-c', "ps -e | grep standaloneFrontcacheJetty | cut -d' ' -f2 | xargs kill -9"
-//	}
+	task startWebfilterFrontcache(type: ExecWait) {
+		command './gradlew :frontcache-tests:webfilterJetty'
+		ready 'has been started successfully'
+		directory '.'
+	}
 
 	task end2endTests {
 		dependsOn integrationTest
@@ -417,10 +441,23 @@ project(':frontcache-tests') {
 		implementation project(':frontcache-core')
 		implementation project(':frontcache-agent')
 
-		implementation 'net.sourceforge.htmlunit:htmlunit:2.18'
-		implementation 'org.eclipse.jetty:jetty-server:9.3.6.v20151106'
-		implementation 'org.eclipse.jetty:jetty-webapp:9.3.6.v20151106'
-		implementation 'jstl:jstl:1.2'
+		// HtmlUnit 2.18 drags in Jetty 9.2 (WebSocket client) which collides with
+		// the embedded Jetty 12 launcher. The tests fetch plain HTML/JSP (no
+		// WebSocket), so exclude the stale Jetty transitive deps.
+		implementation('net.sourceforge.htmlunit:htmlunit:2.18') {
+			exclude group: 'org.eclipse.jetty'
+			exclude group: 'org.eclipse.jetty.websocket'
+		}
+		// JSTL for the test JSP pages. Served from the exploded webapp dir (empty
+		// WEB-INF/lib), so it must be on the launcher's runtime classpath.
+		implementation 'org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1'
+		implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0'
+
+		// Embedded Jetty 12 launcher deps (compile + launcher runtime; not bundled in the war)
+		provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 
 		provided 'junit:junit:4.12'
 	}

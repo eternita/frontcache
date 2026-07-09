@@ -1,5 +1,5 @@
 <%@taglib uri="http://www.springframework.org/tags/form" prefix="form"%>
-<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+<%@ taglib prefix="c" uri="jakarta.tags.core"%>
 <%@ include file="/WEB-INF/views/inc/header.jsp"%>
 
 <%
@@ -9,7 +9,7 @@
 <p/> 
 <p/> 
 
-<form:form method="POST" class="form-inline" commandName="cacheInvalidation">
+<form:form method="POST" class="form-inline" modelAttribute="cacheInvalidation">
   <div class="form-group">
     <label for="URL">URL / tag</label>
     <form:input class="form-control" placeholder="URL  |  invalidation tag  |  * to remove all" path="filter" style="width: 500px;" />

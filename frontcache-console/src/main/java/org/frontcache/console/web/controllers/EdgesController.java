@@ -14,7 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.service.FrontcacheService;
