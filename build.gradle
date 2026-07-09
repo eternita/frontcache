@@ -344,13 +344,6 @@ project(':frontcache-console') {
 		provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
 		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 	}
-	task copyWar(type: Copy) {
-			from 'build/libs'
-			into '../frontcache-server/server/frontcache-base/webapps'
-			rename '(.*).war', 'frontcache-console.war'
-	}
-
-	build.finalizedBy(copyWar)
 
 	// Run the console standalone on embedded Jetty 12 (replaces the gretty jettyRun).
 	// Self-contained: uses this module's own ConsoleJettyServer launcher. Reuses the

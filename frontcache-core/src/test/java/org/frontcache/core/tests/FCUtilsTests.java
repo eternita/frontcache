@@ -59,11 +59,11 @@ public class FCUtilsTests {
 	@Test
 	public void buildRequestURITest() throws Exception {
 
-		assertEquals("/fc/include-footer.htm?locale=en", FCUtils.buildRequestURI("http://myfc.example-site.com:9080/fc/include-footer.htm?locale=en"));
+		assertEquals("/fc/include-footer.htm?locale=en", FCUtils.buildRequestURI("http://myfc.example.com:9080/fc/include-footer.htm?locale=en"));
 
-		assertEquals("/fc/include-footer.htm?locale=en", FCUtils.buildRequestURI("http://myfc.example-site.com/fc/include-footer.htm?locale=en"));
+		assertEquals("/fc/include-footer.htm?locale=en", FCUtils.buildRequestURI("http://myfc.example.com/fc/include-footer.htm?locale=en"));
 
-		assertEquals("/ccc/veiw-catref-groups.htm?catrefFQ=catRef%3AKM%5C-2", FCUtils.buildRequestURI("http://origin.example-site.com/ccc/veiw-catref-groups.htm?q=&catrefFQ=catRef:KM\\-2"));
+		assertEquals("/ccc/veiw-catref-groups.htm?catrefFQ=catRef%3AKM%5C-2", FCUtils.buildRequestURI("http://origin.example.com/ccc/veiw-catref-groups.htm?q=&catrefFQ=catRef:KM\\-2"));
 
 		return;
 	}

@@ -6,9 +6,9 @@
 #http://localhost:8080/
 #https://www.example.com/
 
-https://or.example-site.com:443/
-https://sg.example-site.com:443/
-https://origin.example-site.com:443/
+https://or.example.com:443/
+https://sg.example.com:443/
+https://origin.example.com:443/
 ```
 
 
