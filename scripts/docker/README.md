@@ -108,6 +108,6 @@ Logstash grok extracts: `domain`, `request_method`, `request_type` (`toplevel` /
 | `pull-logs.sh "<hosts>"` | rsync FC request logs into `fc-elk/logs` |
 
 `pull-logs.sh` env knobs: `HOSTS`, `REMOTE_LOG_DIR` (default
-`/home/ubuntu/opt/frontcache-server/FRONTCACHE_HOME/logs`),
+`/opt/frontcache/logs`),
 `DEST_DIR`, `RSYNC_SUDO` (default `1` — uses `sudo rsync` on the remote; set `0` if
 the ssh user can read the logs directly).
