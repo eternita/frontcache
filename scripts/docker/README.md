@@ -62,12 +62,15 @@ Then:
    indices. (`start-fc-elk.sh` applies an index template first so `geoip.location`
    is mapped as `geo_point` and numerics/enums get proper types.)
 
-2. **Import the dashboard**: Kibana → Stack Management → Saved Objects → Import →
-   `fc-elk/kibana/fc-dashboard.ndjson`. This creates the `frontcache-*` data view
-   plus the **"Frontcache Overview"** dashboard and its 20 panels.
+2. Open the dashboard: **http://localhost:5601/app/dashboards#/view/fc-overview**
+   (or Dashboard → **Frontcache Overview**; explore raw events in **Discover**).
 
-3. Open **Dashboard → Frontcache Overview** at `http://localhost:5601` (or explore
-   raw events in **Discover**).
+`start-fc-elk.sh` imports the `frontcache-*` data view + **"Frontcache Overview"**
+dashboard (20 panels) automatically on every start — including after a
+`stop-fc-elk.sh -v`, which drops the ES volume where Kibana stores saved objects.
+If you ever start the stack with raw `docker compose up` instead, import
+`fc-elk/kibana/fc-dashboard.ndjson` manually via Kibana → Stack Management → Saved
+Objects → Import.
 
 `./stop-fc-elk.sh` stops the stack (add `-v` to wipe indexed data and the Logstash
 read position).
