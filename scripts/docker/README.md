@@ -56,27 +56,41 @@ Then:
    ```sh
    ./pull-logs.sh "fc-edge fc-eu"
    ```
-   This rsyncs `frontcache-requests*.log(.zip)` from `/opt/frontcache/logs` on each
-   host, unzips rolled archives, prefixes each file with the host alias, and drops
-   them into `fc-elk/logs/` — which Logstash tails and indexes into
-   `frontcache-YYYY.MM.dd` indices.
+   This rsyncs `frontcache-requests*.log(.zip)` from the FC log dir on each host,
+   unzips rolled archives, prefixes each file with the host alias, and drops them
+   into `fc-elk/logs/` — which Logstash tails and indexes into `frontcache-YYYY.MM.dd`
+   indices. (`start-fc-elk.sh` applies an index template first so `geoip.location`
+   is mapped as `geo_point` and numerics/enums get proper types.)
 
-2. **Import the Kibana data view**: Kibana → Stack Management → Saved Objects →
-   Import → `fc-elk/kibana/fc-dashboard.ndjson`. This creates the `frontcache-*`
-   data view (time field `@timestamp`). Build visualizations/dashboards on top of
-   it in Kibana (the old ES 5.x dashboard format can't be imported into 8.x).
+2. **Import the dashboard**: Kibana → Stack Management → Saved Objects → Import →
+   `fc-elk/kibana/fc-dashboard.ndjson`. This creates the `frontcache-*` data view
+   plus the **"Frontcache Overview"** dashboard and its 20 panels.
 
-3. Browse in **Discover** / **Dashboard** at `http://localhost:5601`.
+3. Open **Dashboard → Frontcache Overview** at `http://localhost:5601` (or explore
+   raw events in **Discover**).
 
 `./stop-fc-elk.sh` stops the stack (add `-v` to wipe indexed data and the Logstash
 read position).
 
+### Dashboard: "Frontcache Overview"
+
+- **KPI tiles** — total requests, cache-hit ratio (toplevel), median & p95 latency,
+  error rate, bot share.
+- **Over time** — request volume by cache status (stacked), cache-hit ratio
+  (percentage-stacked), latency percentiles (p50/p90/p95/p99), bandwidth served.
+- **Breakdowns** — median latency cache-vs-origin and bot-vs-browser; requests by
+  FC node, by domain, and by country; cache-status / cacheable / client-type pies.
+- **Top-N tables** — 20 slowest URLs (by median latency) and 20 hottest URLs (with a
+  cache-hits column).
+
 ### Parsed fields
 
-Logstash grok extracts: `domain`, `request_method`, `request_type`, `is_cacheable`,
-`is_cached`, `hystrix_error`, `runtime_millis`, `length_bytes`, `url`, `clientip`,
-`server`, `browserBot`, `agent`, plus `geoip.*` from the client IP (Logstash's
-bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
+Logstash grok extracts: `domain`, `request_method`, `request_type` (`toplevel` /
+`include` / `include-async`), `is_cacheable` (`cacheable` / `direct`), `is_cached`
+(`from-cache` / `dynamic` / `dynamic-soft`), `hystrix_error` (`success` / `error`),
+`runtime_millis`, `length_bytes` (`-1` when unknown), `url`, `clientip`, `server`,
+`browserBot` (`bot` / `browser`), `agent`, plus flat `geoip.*` from the client IP
+(Logstash's bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
 
 ---
 
@@ -90,6 +104,7 @@ bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
 | `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes) |
 | `pull-logs.sh "<hosts>"` | rsync FC request logs into `fc-elk/logs` |
 
-`pull-logs.sh` env knobs: `HOSTS`, `REMOTE_LOG_DIR` (default `/opt/frontcache/logs`),
+`pull-logs.sh` env knobs: `HOSTS`, `REMOTE_LOG_DIR` (default
+`/home/ubuntu/opt/frontcache-server/FRONTCACHE_HOME/logs`),
 `DEST_DIR`, `RSYNC_SUDO` (default `1` — uses `sudo rsync` on the remote; set `0` if
 the ssh user can read the logs directly).
