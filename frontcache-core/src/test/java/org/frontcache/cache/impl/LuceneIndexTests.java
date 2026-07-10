@@ -36,7 +36,7 @@ public class LuceneIndexTests {
 
 	private final static String DOMAIN = "test-domain";
 
-	private final static String COINSHOME_DOMAIN = "example-site.com";
+	private final static String COINSHOME_DOMAIN = "example.com";
 
 	@Test
 	public void dummy() throws Exception {
@@ -162,7 +162,7 @@ public class LuceneIndexTests {
 	@Test
 	public void fileRemoveByTag() throws Exception {
 
-		String url = "https://www.example-site.com/en/coin_definition-1_Escudo-Gold-Centralist_Republic_of_Mexico_(1835_1846)-E9AKbzbiOBIAAAFG0vnZjkvL.htm";
+		String url = "https://www.example.com/en/coin_definition-1_Escudo-Gold-Centralist_Republic_of_Mexico_(1835_1846)-E9AKbzbiOBIAAAFG0vnZjkvL.htm";
 
 		luceneIndexManager.delete(DOMAIN, url);
 

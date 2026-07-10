@@ -58,7 +58,7 @@ license {
 subprojects {
 	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
 	apply plugin: 'jacoco'
-    version = '2.0.0-SNAPSHOT-1'
+    version = '2.0.0'
     group = 'org.frontcache'
 
 	// Build/test with Java 17 via a toolchain, so the JDK launching Gradle is
@@ -344,13 +344,6 @@ project(':frontcache-console') {
 		provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
 		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 	}
-	task copyWar(type: Copy) {
-			from 'build/libs'
-			into '../frontcache-server/server/frontcache-base/webapps'
-			rename '(.*).war', 'frontcache-console.war'
-	}
-
-	build.finalizedBy(copyWar)
 
 	// Run the console standalone on embedded Jetty 12 (replaces the gretty jettyRun).
 	// Self-contained: uses this module's own ConsoleJettyServer launcher. Reuses the
