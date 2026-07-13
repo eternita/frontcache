@@ -1,0 +1,36 @@
+# fc-server: nginx front door + Frontcache standalone in one container.
+#
+# Build context is the repo root so the Dockerfile can COPY the assembled
+# frontcache-server/ tree. Build that first with:
+#   ./gradlew :frontcache-server:build
+# (start-fc-server.sh does this and then `docker compose build`).
+services:
+  fc-server:
+    build:
+      context: ../../..
+      dockerfile: scripts/docker/fc-server/Dockerfile
+    image: frontcache/fc-server
+    container_name: fc-server
+    restart: unless-stopped
+    ports:
+      - "${FC_HTTP_PORT:-80}:80"
+      - "${FC_HTTPS_PORT:-443}:443"
+    environment:
+      # backend for the origin-served (non-cached) paths
+      ORIGIN_HOST: "${ORIGIN_HOST:-origin.example.com}"
+      ORIGIN_PATHS: "${ORIGIN_PATHS:-/o9r/ /fs/ /pi/ /st/ /images/ /css/ /js/ /page-cache/}"
+      FRONTCACHE_HTTP_PORT: "${FRONTCACHE_HTTP_PORT:-9080}"
+      # Jetty demo keystore creds (override if you swap in a real keystore)
+      KEYSTORE_STOREPASS: "${KEYSTORE_STOREPASS:-storepwd}"
+      KEYSTORE_KEYPASS: "${KEYSTORE_KEYPASS:-keypwd}"
+      KEYSTORE_ALIAS: "${KEYSTORE_ALIAS:-jetty}"
+    # Persist the L2 Lucene cache and logs across container restarts.
+    volumes:
+      - fc-conf:/opt/frontcache-server/FRONTCACHE_HOME/conf
+      - fc-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache
+      - fc-logs:/opt/frontcache-server/FRONTCACHE_HOME/logs
+
+volumes:
+  fc-conf:
+  fc-cache:
+  fc-logs:
