@@ -9,8 +9,6 @@ Two docker-compose projects and a set of control scripts.
 - **`fc-elk/`** — **Elasticsearch + Kibana + Logstash** (Elastic 8.x) for browsing
   Frontcache request logs pulled from your FC servers.
 
-The previous implementation is kept under `scripts/docker-old/` for reference.
-
 ## Requirements
 
 - Docker with the Compose plugin (`docker compose`)
