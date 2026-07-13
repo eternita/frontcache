@@ -26,9 +26,11 @@ services:
       KEYSTORE_ALIAS: "${KEYSTORE_ALIAS:-jetty}"
     # Persist the L2 Lucene cache and logs across container restarts.
     volumes:
+      - fc-conf:/opt/frontcache-server/FRONTCACHE_HOME/conf
       - fc-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache
       - fc-logs:/opt/frontcache-server/FRONTCACHE_HOME/logs
 
 volumes:
+  fc-conf:
   fc-cache:
   fc-logs:
