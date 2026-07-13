@@ -154,9 +154,12 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = purge(request);
 			break;
 
-			default:
-				aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
+		case FrontcacheAction.HELP:
+			aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
+			break;
 
+		default:
+			aResponse = new PingActionResponse();
 		}
 		response.getOutputStream().write(jsonMapper.writeValueAsBytes(aResponse));
 	}

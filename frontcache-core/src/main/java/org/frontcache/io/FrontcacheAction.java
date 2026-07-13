@@ -36,6 +36,10 @@ public abstract class FrontcacheAction {
 
 	public static final String PURGE = "purge";
 
+	public static final String PING = "ping";
+
+	public static final String HELP = "help";
+
 	public static Map<String, String> actionsDescriptionMap = new TreeMap<>();
 
 	static {
@@ -49,6 +53,8 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get substring to determine bots based on User-Agent HTTP header from ./conf/bots.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
 		actionsDescriptionMap.put(FrontcacheAction.PURGE, "purge expired entries from the cache (keeps non-expired and cache-forever entries)");
+		actionsDescriptionMap.put(FrontcacheAction.PING, "ping for GSLB");
+		actionsDescriptionMap.put(FrontcacheAction.HELP, "help");
 	}
 
 }
