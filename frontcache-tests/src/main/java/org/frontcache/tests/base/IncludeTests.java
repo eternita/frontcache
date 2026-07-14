@@ -59,27 +59,58 @@ public abstract class IncludeTests extends TestsBase {
 	@Test
 	public void includeAsync3() throws Exception {
 
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/a.jsp");
-		assertEquals("abcd", page.getPage().asText()); // no 'ef' in response because 'e' included in async mode
+		final String baseURL = getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/";
 
-		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache( getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/a.jsp");
+		// The 'e' fragment is pulled in via an async include: it is resolved fire-and-forget on a
+		// background thread (see ConcurrentIncludeProcessor - the Future is not awaited). In the Jetty
+		// test container that background resolution occasionally does not run before the request
+		// lifecycle ends, so 'e' never lands in the cache. It resolves within a few ms when it does run,
+		// and re-serving the (cached) page re-triggers include processing - so re-issue the request until
+		// 'e' is cached. This does NOT cache 'f': 'e's own include is never resolved (async includes
+		// don't recurse), which the assertion at the end verifies.
+		org.frontcache.core.WebResponse resp = null;
+		for (int attempt = 0; attempt < 20 && null == resp; attempt++)
+		{
+			HtmlPage page = webClient.getPage(baseURL + "a.jsp");
+			assertEquals("abcd", page.getPage().asText()); // no 'ef' in response because 'e' included in async mode
+			resp = getFromCacheWithWait(baseURL + "e.jsp", 1000);
+		}
+
+		// sync includes are cached during the page request
+		resp = frontcacheClient.getFromCache(baseURL + "a.jsp");
 		assertEquals("a<fc:include url=\"/common/deep-include-async/b.jsp\" />", new String(resp.getContent()));
 
-		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/b.jsp");
+		resp = frontcacheClient.getFromCache(baseURL + "b.jsp");
 		assertEquals("b<fc:include url=\"/common/deep-include-async/c.jsp\" />", new String(resp.getContent()));
 
-		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/c.jsp");
+		resp = frontcacheClient.getFromCache(baseURL + "c.jsp");
 		assertEquals("c<fc:include url=\"/common/deep-include-async/d.jsp\" />", new String(resp.getContent()));
 
-		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/d.jsp");
+		resp = frontcacheClient.getFromCache(baseURL + "d.jsp");
 		assertEquals("d<fc:include url=\"/common/deep-include-async/e.jsp\" call=\"async\" />", new String(resp.getContent()));
 
-		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/e.jsp");
+		// 'e' is cached by the async include resolution
+		resp = frontcacheClient.getFromCache(baseURL + "e.jsp");
 		assertEquals("e<fc:include url=\"/common/deep-include-async/f.jsp\" />", new String(resp.getContent()));
 
 		// !!! includes inside async includes are not called
-		resp = frontcacheClient.getFromCache(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/f.jsp");
+		resp = frontcacheClient.getFromCache(baseURL + "f.jsp");
 		assertEquals(null, resp);
+	}
+
+	/**
+	 * Polls the cache for a fragment cached asynchronously (async include), returning as soon
+	 * as it is present or null once the timeout elapses. Sync includes are cached before the
+	 * page response returns and don't need this.
+	 */
+	private org.frontcache.core.WebResponse getFromCacheWithWait(String url, long timeoutMs) throws InterruptedException {
+		final long deadline = System.currentTimeMillis() + timeoutMs;
+		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache(url);
+		while (null == resp && System.currentTimeMillis() < deadline) {
+			Thread.sleep(50);
+			resp = frontcacheClient.getFromCache(url);
+		}
+		return resp;
 	}
 
 	@Test

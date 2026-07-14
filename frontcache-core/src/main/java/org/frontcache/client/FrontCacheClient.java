@@ -235,6 +235,9 @@ public class FrontCacheClient {
 
 //    	post.addHeader("Accept-Encoding", "gzip");
 
+		if (null != siteKey)
+			post.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
+
 		InputStream is = null;
 		try {
 			post.setEntity(new UrlEncodedFormEntity(urlParameters));

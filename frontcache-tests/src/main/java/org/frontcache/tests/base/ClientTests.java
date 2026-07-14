@@ -146,6 +146,29 @@ public abstract class ClientTests extends TestsBase {
 		logger.debug("response " + response);
 	}
 
+	@Test
+	public void getCachedKeysClient() throws Exception {
+
+		final String TEST_URI = "common/fc-client/a.jsp";
+
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLDomainFC1(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient.removeFromCacheAll(); // clean up
+
+		// the request - response should be cached
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
+		assertEquals("a", page.getPage().asText());
+
+		java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+		boolean success = frontcacheClient.getCachedKeys(baos);
+		String keys = baos.toString();
+
+		// getCachedKeys must pass the site-key gate (send the X_FRONTCACHE_SITE_KEY header)
+		Assert.assertTrue(success);
+		Assert.assertEquals("getCachedKeys was denied - site key not sent: " + keys, -1, keys.indexOf("Access denied"));
+		Assert.assertNotEquals("cached key not listed: " + keys, -1, keys.indexOf(TEST_URI));
+		return;
+	}
+
 //	@Test
 //	public void getCacheStatusCluster() throws Exception {
 //

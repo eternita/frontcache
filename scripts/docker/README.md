@@ -37,6 +37,27 @@ WAR, builds the image, and starts the container. Then:
 **Config** (`fc-server/.env`): `ORIGIN_HOST`, `ORIGIN_PATHS` (paths proxied straight
 to the origin instead of being cached), published ports, keystore credentials.
 
+### Publish to a registry (run on a remote host)
+
+To ship the image to Docker Hub so a remote host can `docker pull` and run it
+(instead of building on the host), use `build-push-fc-server.sh`:
+
+```sh
+docker login                             # once, for the target registry
+./build-push-fc-server.sh v1.0           # build WAR + image, push :v1.0
+./build-push-fc-server.sh v1.0 --latest  # also tag + push :latest
+```
+
+It builds a fresh WAR, builds the image (context = repo root, `linux/amd64` by
+default so it runs on amd64 hosts), and pushes. Override the repo/platform with
+`IMAGE=` / `PLATFORM=`. Then on the remote host:
+
+```sh
+docker run -d --name fc-server --restart unless-stopped \
+  -p 80:80 -p 443:443 -e ORIGIN_HOST=origin.example.com \
+  pavlikovskiy/frontcache:v1.0
+```
+
 ---
 
 ## fc-elk (Elasticsearch + Kibana + Logstash)
@@ -101,6 +122,7 @@ Logstash grok extracts: `domain`, `request_method`, `request_type` (`toplevel` /
 | --- | --- |
 | `start-fc-server.sh` | Build WAR + image and start the fc-server container |
 | `stop-fc-server.sh` | Stop/remove fc-server (`-v` drops volumes) |
+| `build-push-fc-server.sh "<tag>"` | Build WAR + image and push to a registry (Docker Hub) |
 | `start-fc-elk.sh` | Start Elasticsearch + Kibana + Logstash |
 | `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes) |
 | `pull-logs.sh "<hosts>"` | rsync FC request logs into `fc-elk/logs` |

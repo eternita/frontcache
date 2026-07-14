@@ -14,6 +14,7 @@ set -euo pipefail
 # ---- configuration (env-overridable) ----------------------------------------
 SERVER_DIR="/opt/frontcache-server"
 FRONTCACHE_HTTP_PORT="${FRONTCACHE_HTTP_PORT:-9080}"
+FRONTCACHE_PROPERTIES="${FRONTCACHE_PROPERTIES:-$SERVER_DIR/FRONTCACHE_HOME/conf/frontcache.properties}"
 
 ORIGIN_HOST="${ORIGIN_HOST:-origin.example.com}"           # backend for origin-served paths
 ORIGIN_PATHS="${ORIGIN_PATHS:-/o9r/ /fs/ /pi/ /st/ /images/ /css/ /js/ /page-cache/}"
@@ -24,6 +25,18 @@ KEYSTORE_STOREPASS="${KEYSTORE_STOREPASS:-storepwd}"
 KEYSTORE_KEYPASS="${KEYSTORE_KEYPASS:-keypwd}"
 KEYSTORE_ALIAS="${KEYSTORE_ALIAS:-jetty}"
 # -----------------------------------------------------------------------------
+
+# ---- Frontcache origin: patch frontcache.properties from $ORIGIN_HOST --------
+# Frontcache forwards cache misses on `/` to its own configured origin-host (the
+# nginx origin-path blocks above are a separate, direct passthrough). Keep both
+# pointing at the same backend by rewriting the origin-host in the properties file
+# at startup, so one $ORIGIN_HOST env var drives the whole container.
+echo ">>> Setting Frontcache origin-host to $ORIGIN_HOST in $FRONTCACHE_PROPERTIES ..."
+if grep -qE '^[[:space:]]*front-cache\.origin-host[[:space:]]*=' "$FRONTCACHE_PROPERTIES"; then
+  sed -i -E "s|^[[:space:]]*front-cache\.origin-host[[:space:]]*=.*|front-cache.origin-host=${ORIGIN_HOST}|" "$FRONTCACHE_PROPERTIES"
+else
+  printf '\nfront-cache.origin-host=%s\n' "$ORIGIN_HOST" >> "$FRONTCACHE_PROPERTIES"
+fi
 
 # ---- TLS: extract the Jetty keystore into PEM for nginx ----------------------
 echo ">>> Extracting TLS cert from Jetty keystore ..."
