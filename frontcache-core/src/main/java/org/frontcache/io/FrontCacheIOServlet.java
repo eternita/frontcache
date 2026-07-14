@@ -48,6 +48,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	FrontCacheEngine fcEngine = null;
 
 	private int managementPort = -1; // management port for security
+	private String siteKey = "";
 
 
 	public FrontCacheIOServlet() {
@@ -60,6 +61,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		fcEngine = FrontCacheEngine.getFrontCache();
 
 		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
+		siteKey = FCConfig.getProperty("front-cache.site-key", "");
 		if (null == managementPortStr || managementPortStr.trim().length() == 0)
 			logger.warn("Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
 		else {
@@ -97,6 +99,21 @@ public class FrontCacheIOServlet extends HttpServlet {
 		{
 			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
 			return;
+		}
+
+		// site-key validation is active only when a site key is configured.
+		// A request is authorized when its X_FRONTCACHE_SITE_KEY header matches the
+		// global site key or any per-domain site key (the management API is multi-domain aware).
+		if (siteKey.length() > 0)
+		{
+			String requestSiteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
+			boolean authorized = null != requestSiteKey && requestSiteKey.length() > 0
+					&& (siteKey.equals(requestSiteKey) || null != fcEngine.getDomainContexBySiteKey(requestSiteKey));
+			if (!authorized)
+			{
+				response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
+				return;
+			}
 		}
 
 		String action = request.getParameter("action");
