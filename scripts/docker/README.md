@@ -118,6 +118,10 @@ Logstash grok extracts: `domain`, `request_method`, `request_type` (`toplevel` /
 
 ## Scripts
 
+Each script ships in two flavours: a Bash version (`*.sh`, macOS/Linux) and a
+PowerShell version (`*.ps1`, Windows — PowerShell 6+/`pwsh`). They are behaviourally
+equivalent; the table lists the Bash names.
+
 | Script | Purpose |
 | --- | --- |
 | `start-fc-server.sh` | Build WAR + image and start the fc-server container |
@@ -126,6 +130,27 @@ Logstash grok extracts: `domain`, `request_method`, `request_type` (`toplevel` /
 | `start-fc-elk.sh` | Start Elasticsearch + Kibana + Logstash |
 | `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes) |
 | `pull-logs.sh "<hosts>"` | rsync FC request logs into `fc-elk/logs` |
+
+### Windows (PowerShell)
+
+Run the `.ps1` equivalents from a PowerShell prompt. Env-var overrides use
+`$env:NAME="value"` and `--latest` becomes the `-Latest` switch:
+
+```powershell
+cd scripts\docker
+.\start-fc-server.ps1                      # gradle build -> image build -> up -d
+.\stop-fc-server.ps1 -v                    # stop + drop volumes
+.\build-push-fc-server.ps1 v1.0 -Latest    # build WAR + image, push :v1.0 and :latest
+.\start-fc-elk.ps1
+.\pull-logs.ps1 "fc-edge fc-eu"
+.\stop-fc-elk.ps1 -v
+```
+
+Requirements on Windows: Docker Desktop (with `docker compose`), a JDK on PATH for
+the Gradle build (`gradlew.bat`), and — for `pull-logs.ps1` — `rsync` + `ssh` on
+PATH (e.g. Git for Windows, MSYS2, or cwRsync; archive extraction uses PowerShell's
+built-in `Expand-Archive`, so `unzip` is not needed). If scripts are blocked by
+execution policy, launch them with `powershell -ExecutionPolicy Bypass -File .\start-fc-server.ps1`.
 
 `pull-logs.sh` env knobs: `HOSTS`, `REMOTE_LOG_DIR` (default
 `/opt/frontcache/logs`),
