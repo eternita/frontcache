@@ -1,6 +1,6 @@
 # fc-server: nginx front door + Frontcache standalone server in one container.
 #
-# Mirrors the AWS single-host install (scripts/aws/install-frontcache-server-remote.sh
+# Mirrors the AWS single-host install (scripts/bash/install-frontcache-server-remote.sh
 # + configure-nginx-remote.sh):
 #   * Frontcache runs on embedded Jetty 12 (HTTP only) on 9080
 #   * nginx terminates TLS on 443, serves 80, proxies / -> Frontcache and the
