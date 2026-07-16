@@ -156,3 +156,18 @@ execution policy, launch them with `powershell -ExecutionPolicy Bypass -File .\s
 `/opt/frontcache/logs`),
 `DEST_DIR`, `RSYNC_SUDO` (default `1` — uses `sudo rsync` on the remote; set `0` if
 the ssh user can read the logs directly).
+
+The PowerShell version (`pull-logs.ps1`) adds `RSYNC_RSH` (rsync's `-e`), defaulting
+to `ssh -o StrictHostKeyChecking=accept-new`. On Windows the rsync you install
+(cwRsync / MSYS2 / Git-Bash) usually ships its own `ssh` that doesn't share Windows
+OpenSSH's `known_hosts`; an untrusted host key then aborts the transfer with
+`rsync: connection unexpectedly closed (0 bytes received so far) [sender]`. The
+default auto-accepts the key on first connect. To force a specific ssh instead:
+
+```powershell
+$env:RSYNC_RSH = "C:\Windows\System32\OpenSSH\ssh.exe"
+.\pull-logs.ps1 "fc-edge fc-eu"
+```
+
+If it still closes at 0 bytes, first confirm plain ssh works from the same shell
+(`ssh fc-edge`) — that both trusts the host key and proves key-based auth is set up.
