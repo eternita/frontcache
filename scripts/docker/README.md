@@ -147,27 +147,33 @@ cd scripts\docker
 ```
 
 Requirements on Windows: Docker Desktop (with `docker compose`), a JDK on PATH for
-the Gradle build (`gradlew.bat`), and — for `pull-logs.ps1` — `rsync` + `ssh` on
-PATH (e.g. Git for Windows, MSYS2, or cwRsync; archive extraction uses PowerShell's
-built-in `Expand-Archive`, so `unzip` is not needed). If scripts are blocked by
-execution policy, launch them with `powershell -ExecutionPolicy Bypass -File .\start-fc-server.ps1`.
+the Gradle build (`gradlew.bat`), and — for `pull-logs.ps1` — `ssh`, `scp`, and
+`tar`, all of which ship with Windows 10+ (OpenSSH client + bsdtar). No rsync or
+`unzip` is needed. If scripts are blocked by execution policy, launch them with
+`powershell -ExecutionPolicy Bypass -File .\start-fc-server.ps1`.
+
+> **Note:** `pull-logs.ps1` uses `ssh` + `scp` + `tar` instead of rsync. On Windows
+> the various rsync builds (cwRsync / MSYS2 / Git-Bash) can't drive Windows' OpenSSH
+> pipes cleanly and abort with `connection unexpectedly closed (0 bytes received so
+> far)`, so the Windows script pulls a tarball over the ssh transport that already
+> works for you. It is otherwise behaviourally equivalent to `pull-logs.sh`.
 
 `pull-logs.sh` env knobs: `HOSTS`, `REMOTE_LOG_DIR` (default
 `/opt/frontcache/logs`),
 `DEST_DIR`, `RSYNC_SUDO` (default `1` — uses `sudo rsync` on the remote; set `0` if
 the ssh user can read the logs directly).
 
-The PowerShell version (`pull-logs.ps1`) adds `RSYNC_RSH` (rsync's `-e`), defaulting
-to `ssh -o StrictHostKeyChecking=accept-new`. On Windows the rsync you install
-(cwRsync / MSYS2 / Git-Bash) usually ships its own `ssh` that doesn't share Windows
-OpenSSH's `known_hosts`; an untrusted host key then aborts the transfer with
-`rsync: connection unexpectedly closed (0 bytes received so far) [sender]`. The
-default auto-accepts the key on first connect. To force a specific ssh instead:
+The PowerShell version (`pull-logs.ps1`) shares `HOSTS`, `REMOTE_LOG_DIR`,
+`DEST_DIR`, and `RSYNC_SUDO` (here it controls whether the *remote* `tar`/`chmod`
+run under `sudo`). Because it uses ssh/scp rather than rsync, it drops `RSYNC_RSH`
+and adds `SSH_CMD` / `SCP_CMD` to force a specific OpenSSH binary:
 
 ```powershell
-$env:RSYNC_RSH = "C:\Windows\System32\OpenSSH\ssh.exe"
+$env:SSH_CMD = "C:\Windows\System32\OpenSSH\ssh.exe"
+$env:SCP_CMD = "C:\Windows\System32\OpenSSH\scp.exe"
 .\pull-logs.ps1 "fc-edge fc-eu"
 ```
 
-If it still closes at 0 bytes, first confirm plain ssh works from the same shell
-(`ssh fc-edge`) — that both trusts the host key and proves key-based auth is set up.
+If a pull fails, first confirm plain `ssh <host>` works from the same shell — that
+both trusts the host key and proves key-based auth is set up. Passwordless `sudo`
+on the remote is required unless you set `$env:RSYNC_SUDO="0"`.
