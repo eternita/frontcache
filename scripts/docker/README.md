@@ -118,6 +118,10 @@ Logstash grok extracts: `domain`, `request_method`, `request_type` (`toplevel` /
 
 ## Scripts
 
+Each script ships in two flavours: a Bash version (`*.sh`, macOS/Linux) and a
+PowerShell version (`*.ps1`, Windows — PowerShell 6+/`pwsh`). They are behaviourally
+equivalent; the table lists the Bash names.
+
 | Script | Purpose |
 | --- | --- |
 | `start-fc-server.sh` | Build WAR + image and start the fc-server container |
@@ -127,7 +131,49 @@ Logstash grok extracts: `domain`, `request_method`, `request_type` (`toplevel` /
 | `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes) |
 | `pull-logs.sh "<hosts>"` | rsync FC request logs into `fc-elk/logs` |
 
+### Windows (PowerShell)
+
+Run the `.ps1` equivalents from a PowerShell prompt. Env-var overrides use
+`$env:NAME="value"` and `--latest` becomes the `-Latest` switch:
+
+```powershell
+cd scripts\docker
+.\start-fc-server.ps1                      # gradle build -> image build -> up -d
+.\stop-fc-server.ps1 -v                    # stop + drop volumes
+.\build-push-fc-server.ps1 v1.0 -Latest    # build WAR + image, push :v1.0 and :latest
+.\start-fc-elk.ps1
+.\pull-logs.ps1 "fc-edge fc-eu"
+.\stop-fc-elk.ps1 -v
+```
+
+Requirements on Windows: Docker Desktop (with `docker compose`), a JDK on PATH for
+the Gradle build (`gradlew.bat`), and — for `pull-logs.ps1` — `ssh`, `scp`, and
+`tar`, all of which ship with Windows 10+ (OpenSSH client + bsdtar). No rsync or
+`unzip` is needed. If scripts are blocked by execution policy, launch them with
+`powershell -ExecutionPolicy Bypass -File .\start-fc-server.ps1`.
+
+> **Note:** `pull-logs.ps1` uses `ssh` + `scp` + `tar` instead of rsync. On Windows
+> the various rsync builds (cwRsync / MSYS2 / Git-Bash) can't drive Windows' OpenSSH
+> pipes cleanly and abort with `connection unexpectedly closed (0 bytes received so
+> far)`, so the Windows script pulls a tarball over the ssh transport that already
+> works for you. It is otherwise behaviourally equivalent to `pull-logs.sh`.
+
 `pull-logs.sh` env knobs: `HOSTS`, `REMOTE_LOG_DIR` (default
 `/opt/frontcache/logs`),
 `DEST_DIR`, `RSYNC_SUDO` (default `1` — uses `sudo rsync` on the remote; set `0` if
 the ssh user can read the logs directly).
+
+The PowerShell version (`pull-logs.ps1`) shares `HOSTS`, `REMOTE_LOG_DIR`,
+`DEST_DIR`, and `RSYNC_SUDO` (here it controls whether the *remote* `tar`/`chmod`
+run under `sudo`). Because it uses ssh/scp rather than rsync, it drops `RSYNC_RSH`
+and adds `SSH_CMD` / `SCP_CMD` to force a specific OpenSSH binary:
+
+```powershell
+$env:SSH_CMD = "C:\Windows\System32\OpenSSH\ssh.exe"
+$env:SCP_CMD = "C:\Windows\System32\OpenSSH\scp.exe"
+.\pull-logs.ps1 "fc-edge fc-eu"
+```
+
+If a pull fails, first confirm plain `ssh <host>` works from the same shell — that
+both trusts the host key and proves key-based auth is set up. Passwordless `sudo`
+on the remote is required unless you set `$env:RSYNC_SUDO="0"`.
