@@ -295,6 +295,44 @@ public class LuceneIndexTests {
 	}
 
 
+	@Test
+	public void mergeTuningDefaultsTest() {
+		// the single-arg constructor delegates to the tuned defaults
+		assertEquals(LuceneIndexManager.DEFAULT_MAX_MERGED_SEGMENT_MB, luceneIndexManager.getMaxMergedSegmentMB(), 0.0001);
+		assertEquals(LuceneIndexManager.DEFAULT_DELETES_PCT_ALLOWED, luceneIndexManager.getDeletesPctAllowed(), 0.0001);
+	}
+
+	@Test
+	public void mergeTuningClampingTest() throws Exception {
+		// non-positive segment cap -> default; deletesPct below Lucene's minimum -> clamped up to 20
+		LuceneIndexManager m = new LuceneIndexManager("/tmp/lucene-tuning-" + System.currentTimeMillis(), -1, 5);
+		try {
+			assertEquals(LuceneIndexManager.DEFAULT_MAX_MERGED_SEGMENT_MB, m.getMaxMergedSegmentMB(), 0.0001);
+			assertEquals(20.0, m.getDeletesPctAllowed(), 0.0001);
+		} finally {
+			m.close();
+		}
+
+		// valid custom cap is honoured; deletesPct above Lucene's max -> clamped down to 50;
+		// and the tuned writer still indexes/reads a (parenthesised) url correctly
+		LuceneIndexManager m2 = new LuceneIndexManager("/tmp/lucene-tuning2-" + System.currentTimeMillis(), 64, 99);
+		try {
+			assertEquals(64.0, m2.getMaxMergedSegmentMB(), 0.0001);
+			assertEquals(50.0, m2.getDeletesPctAllowed(), 0.0001);
+
+			String url = "https://www.example.com/en/country_coins-Ottoman_Empire_(1299_1923)-x.htm";
+			WebResponse wr = new WebResponse(url, "hello".getBytes());
+			wr.setDomain(COINSHOME_DOMAIN);
+			m2.indexDoc(wr);
+
+			WebResponse back = m2.getResponse(url);
+			assertNotNull(back);
+			assertEquals(url, back.getUrl());
+		} finally {
+			m2.close();
+		}
+	}
+
 	@Before
 	public void setUp() {
 		luceneIndexManager = new LuceneIndexManager("/tmp/lucene-text-index-l2-" + System.currentTimeMillis()); // INDEX_BASE_DIR

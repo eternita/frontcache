@@ -17,7 +17,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -69,6 +68,31 @@ public class LuceneIndexManager {
 
 	private IndexWriter indexWriter = null;
 
+	// The index directory is opened once and reused for the lifetime of this manager.
+	// Reopening a fresh FSDirectory on every writer reopen (the previous behaviour) leaked
+	// the NativeFSLock held by a broken-but-not-closed writer: the stale lock stayed in the
+	// JVM's static lock set, so every subsequent "new IndexWriter(freshDir)" failed forever
+	// with "LockObtainFailedException: Lock held by this virtual machine". Reusing one
+	// Directory + always closing the stale writer before reopening keeps the lock lifecycle clean.
+	private Directory directory = null;
+
+	// throttle the "writer wedged" ERROR so a permanently-broken writer can't flood the log
+	// (previously this produced a full stack trace on every request - GBs/day).
+	private volatile long lastReopenFailureLogMillis = 0;
+	private static final long REOPEN_FAILURE_LOG_INTERVAL_MILLIS = 60_000;
+
+	// Merge-policy tuning for a cache-style index (see buildIndexWriterConfig).
+	// Cap on the largest merged segment. Lucene's default is 5 GB; once a segment reaches
+	// that size it stops being merged, so its deleted docs are never reclaimed (prod grew a
+	// single 5.3 GB segment). A smaller cap keeps segments merge-eligible so churn is reclaimed.
+	static final double DEFAULT_MAX_MERGED_SEGMENT_MB = 512.0;
+	// % of the index allowed to be deleted docs before merges reclaim them. Lucene default 33;
+	// 20 (the minimum) reclaims sooner, which suits the heavy updateDocument()/delete churn here.
+	static final double DEFAULT_DELETES_PCT_ALLOWED = 20.0;
+
+	private final double maxMergedSegmentMB;
+	private final double deletesPctAllowed;
+
 	public final static FieldType JSON_TYPE;
 	static {
 	    JSON_TYPE = new FieldType();
@@ -96,10 +120,24 @@ public class LuceneIndexManager {
 
 
 	/**
-	 * Constructor
+	 * Constructor - uses default merge tuning.
 	 * @param indexPath
 	 */
 	public LuceneIndexManager(String indexPath) {
+		this(indexPath, DEFAULT_MAX_MERGED_SEGMENT_MB, DEFAULT_DELETES_PCT_ALLOWED);
+	}
+
+	/**
+	 * Constructor
+	 * @param indexPath index directory
+	 * @param maxMergedSegmentMB cap on largest merged segment (MB); &lt;=0 -&gt; default
+	 * @param deletesPctAllowed % deleted docs tolerated before reclaim; clamped to Lucene's [20,50]
+	 */
+	public LuceneIndexManager(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
+		this.maxMergedSegmentMB = (maxMergedSegmentMB > 0) ? maxMergedSegmentMB : DEFAULT_MAX_MERGED_SEGMENT_MB;
+		// TieredMergePolicy.setDeletesPctAllowed requires 20 <= value <= 50
+		this.deletesPctAllowed = Math.min(50.0, Math.max(20.0, deletesPctAllowed));
+
 		INDEX_PATH = indexPath;
 		Path path = Paths.get(INDEX_PATH);
 		if (!Files.exists(path)) {
@@ -129,30 +167,92 @@ public class LuceneIndexManager {
 		}
 	}
 
+	// package-private accessors for the effective (validated/clamped) merge-tuning values - for tests
+	double getMaxMergedSegmentMB() {
+		return maxMergedSegmentMB;
+	}
+
+	double getDeletesPctAllowed() {
+		return deletesPctAllowed;
+	}
+
 	/**
 	 * Returns instance of IndexManager
 	 * @return
 	 * @throws IOException
 	 */
 	private IndexWriter getIndexWriter() throws IOException {
-		if (indexWriter == null || !indexWriter.isOpen()) {
-			synchronized (this) {
-				if (indexWriter == null || !indexWriter.isOpen()) {
-					indexWriter = null;
-					logger.info("Trying to get indexWriter...");
-					Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
-					Analyzer analyzer = new StandardAnalyzer();
-					IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
+		// fast path - reuse the live writer without locking
+		if (indexWriter != null && indexWriter.isOpen())
+			return indexWriter;
 
-					iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
-					iwc.setRAMBufferSizeMB(250.0);
-					indexWriter = new IndexWriter(dir, iwc);
-					logger.info("IndexWriter initialized");
+		synchronized (this) {
+			if (indexWriter != null && indexWriter.isOpen())
+				return indexWriter;
+
+			// The current writer is broken (tragic event) or was never created. Close it first
+			// so its NativeFSLock is released from the JVM's static lock set; otherwise reopening
+			// throws "LockObtainFailedException: Lock held by this virtual machine" indefinitely.
+			if (indexWriter != null) {
+				try {
+					indexWriter.close();
+				} catch (Throwable t) {
+					logger.warn("Error closing stale IndexWriter before reopen (lock may be released on close): {}", t.getMessage());
 				}
+				indexWriter = null;
+			}
+
+			logger.debug("(re)opening Lucene IndexWriter...");
+
+			// open the Directory once and reuse it - a fresh Directory per reopen leaks stale locks
+			if (directory == null)
+				directory = FSDirectory.open(Paths.get(INDEX_PATH));
+
+			IndexWriterConfig iwc = buildIndexWriterConfig();
+
+			try {
+				indexWriter = new IndexWriter(directory, iwc);
+				logger.info("IndexWriter initialized");
+			} catch (IOException e) {
+				// reopen failed (e.g. a genuinely wedged lock we can't reclaim in-process).
+				// Log at most once per interval instead of a per-request stack-trace flood,
+				// and surface an actionable message. Recovery requires a JVM restart.
+				long now = System.currentTimeMillis();
+				if (now - lastReopenFailureLogMillis > REOPEN_FAILURE_LOG_INTERVAL_MILLIS) {
+					lastReopenFailureLogMillis = now;
+					logger.error("L2 Lucene IndexWriter is unavailable - cache reads/writes to L2 are failing. "
+							+ "If this persists, restart the Frontcache server (index dir: {}). Cause: {}",
+							INDEX_PATH, e.toString());
+				}
+				throw e;
 			}
 		}
 
 		return indexWriter;
+	}
+
+	/**
+	 * Builds the IndexWriterConfig with merge tuning appropriate for a cache-style index.
+	 *
+	 * This index is churn-heavy: every re-cache is an updateDocument() (delete + add) and
+	 * invalidation/expiry deletes docs. With Lucene's default TieredMergePolicy the largest
+	 * merged segment is capped at 5 GB; once a segment hits that size it is no longer merged,
+	 * so the deleted docs inside it are never reclaimed and the index grows without bound
+	 * (production reached a single 5.3 GB segment). Capping the max merged segment keeps
+	 * segments merge-eligible so deletes are reclaimed, and lowering the tolerated deletes
+	 * percentage makes the policy reclaim them sooner.
+	 */
+	private IndexWriterConfig buildIndexWriterConfig() {
+		IndexWriterConfig iwc = new IndexWriterConfig(new StandardAnalyzer());
+		iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+		iwc.setRAMBufferSizeMB(250.0);
+
+		TieredMergePolicy mergePolicy = new TieredMergePolicy();
+		mergePolicy.setMaxMergedSegmentMB(maxMergedSegmentMB);
+		mergePolicy.setDeletesPctAllowed(deletesPctAllowed);
+		iwc.setMergePolicy(mergePolicy);
+
+		return iwc;
 	}
 
 	/**
@@ -215,6 +315,16 @@ public class LuceneIndexManager {
 			} catch (Exception e) {
 				logger.error("Error:", e);
 			}
+		}
+		indexWriter = null;
+
+		if (directory != null) {
+			try {
+				directory.close();
+			} catch (Exception e) {
+				logger.error("Error closing Lucene directory:", e);
+			}
+			directory = null;
 		}
 	}
 
