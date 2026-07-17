@@ -60,6 +60,10 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 	private static final String CACHE_BASE_DIR_KEY = "front-cache.cache-processor.impl.cache-dir"; // to override path in configs
 
+	// L2 Lucene merge-policy tuning (optional; sensible defaults in LuceneIndexManager)
+	private static final String L2_MAX_MERGED_SEGMENT_MB_KEY = "front-cache.cache-processor.impl.l2.max-merged-segment-mb";
+	private static final String L2_DELETES_PCT_ALLOWED_KEY = "front-cache.cache-processor.impl.l2.deletes-pct-allowed";
+
 	private static String CACHE_RELATIVE_DIR = "cache/l2-lucene-index/";
 
 	private static String INDEX_BASE_DIR = CACHE_BASE_DIR_DEFAULT + CACHE_RELATIVE_DIR;
@@ -127,7 +131,26 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 		}
 
-		luceneIndexManager = new LuceneIndexManager(INDEX_BASE_DIR);
+		double maxMergedSegmentMB = getDoubleProperty(properties, L2_MAX_MERGED_SEGMENT_MB_KEY, LuceneIndexManager.DEFAULT_MAX_MERGED_SEGMENT_MB);
+		double deletesPctAllowed = getDoubleProperty(properties, L2_DELETES_PCT_ALLOWED_KEY, LuceneIndexManager.DEFAULT_DELETES_PCT_ALLOWED);
+
+		luceneIndexManager = new LuceneIndexManager(INDEX_BASE_DIR, maxMergedSegmentMB, deletesPctAllowed);
+	}
+
+	/**
+	 * Reads a double-valued property, falling back to the default (with a warning) if it is
+	 * absent or unparseable.
+	 */
+	private double getDoubleProperty(Properties properties, String key, double defaultValue) {
+		String raw = properties.getProperty(key);
+		if (null == raw)
+			return defaultValue;
+		try {
+			return Double.parseDouble(raw.trim());
+		} catch (NumberFormatException e) {
+			logger.warn("Can't parse {}='{}' as a number - using default {}", key, raw, defaultValue);
+			return defaultValue;
+		}
 	}
 
 	@Override
@@ -193,7 +216,10 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 			try {
 				luceneIndexManager.indexDoc(component);
 			} catch (IOException e) {
-				logger.error("Error during putting response to lucene cache", e);
+				// concise: LuceneIndexManager.getIndexWriter() already logs a throttled, actionable
+				// ERROR when the writer is unavailable. Logging a full stack per failed write here
+				// previously flooded the log (GBs/day) while the writer was wedged.
+				logger.error("Error during putting response to lucene cache for {}: {}", url, e.toString());
 			}
 		}
 
