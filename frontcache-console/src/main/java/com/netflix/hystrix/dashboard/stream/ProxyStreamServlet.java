@@ -17,18 +17,11 @@
 
 package com.netflix.hystrix.dashboard.stream;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URISyntaxException;
-import java.util.Map;
-
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
@@ -39,18 +32,19 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.PoolingClientConnectionManager;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
-import org.frontcache.FrontCacheEngine;
 import org.frontcache.console.service.FrontcacheService;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
-import org.frontcache.core.FCUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
-import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Map;
 
 
 /**
@@ -159,10 +153,11 @@ public class ProxyStreamServlet extends HttpServlet {
                             os.flush();
                         }
                     } catch (Exception e) {
-                        if (e.getClass().getSimpleName().equalsIgnoreCase("ClientAbortException")) {
-                            // don't throw an exception as this means the user closed the connection
-                            logger.debug("Connection closed by client. Will stop proxying ...");
-                            // break out of the while loop
+                        String exName = e.getClass().getSimpleName();
+                        if (exName.equalsIgnoreCase("ClientAbortException")
+                                || exName.equals("EofException")) {
+                            // client closed the connection — expected for SSE streams
+                            logger.debug("Connection closed by client ({}). Will stop proxying ...", exName);
                             break;
                         } else {
                             // received unknown error while writing so throw an exception
