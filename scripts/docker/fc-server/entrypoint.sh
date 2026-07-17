@@ -8,7 +8,7 @@
 #      $ORIGIN_PATHS -> $ORIGIN_HOST)
 #
 # The nginx site config and the TLS cert are generated here at startup from env vars,
-# mirroring scripts/aws/configure-nginx-remote.sh, so a single image serves any deployment.
+# mirroring scripts/bash/configure-nginx-remote.sh, so a single image serves any deployment.
 set -euo pipefail
 
 # ---- configuration (env-overridable) ----------------------------------------

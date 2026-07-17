@@ -5,7 +5,7 @@ Two docker-compose projects and a set of control scripts.
 - **`fc-server/`** — a single container running **nginx + Frontcache standalone**.
   nginx terminates TLS on 443, serves 80, proxies `/` to the embedded Frontcache
   (Jetty 12, HTTP on 9080) and the configured origin paths to your backend. This is
-  the containerized equivalent of `scripts/aws/install-frontcache-server-remote.sh`.
+  the containerized equivalent of `scripts/bash/install-frontcache-server-remote.sh`.
 - **`fc-elk/`** — **Elasticsearch + Kibana + Logstash** (Elastic 8.x) for browsing
   Frontcache request logs pulled from your FC servers.
 
