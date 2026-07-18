@@ -103,6 +103,30 @@ public class LuceneIndexManager {
 	}
 
 	/**
+	 * Strips scheme, host, and port from a full URL, returning only the path (and query string, if any).
+	 * Used to normalise cache keys so that the same resource reached via different hostnames or ports
+	 * maps to a single index entry. Non-URL strings (UUIDs, plain paths, tags) are returned unchanged.
+	 *
+	 * <pre>
+	 *   https://www.example.com:443/en/welcome.htm  →  /en/welcome.htm
+	 *   http://host/a/b?q=1                          →  /a/b?q=1
+	 *   /en/welcome.htm                              →  /en/welcome.htm
+	 *   some-uuid-string                             →  some-uuid-string
+	 * </pre>
+	 */
+	static String toPathKey(String url) {
+		if (url == null)
+			return null;
+		int schemeIdx = url.indexOf("://");
+		if (schemeIdx < 0)
+			return url; // not a full URL - return as-is
+		int pathStart = url.indexOf('/', schemeIdx + 3);
+		if (pathStart < 0)
+			return "/";
+		return url.substring(pathStart);
+	}
+
+	/**
 	 *
 	 */
 	final Gson gson = new GsonBuilder().addSerializationExclusionStrategy(new ExclusionStrategy() {
@@ -274,7 +298,8 @@ public class LuceneIndexManager {
 			return;
 		}
 
-		doc.add(new StringField(URL_FIELD, url, Field.Store.YES));
+		String urlKey = toPathKey(url);
+		doc.add(new StringField(URL_FIELD, urlKey, Field.Store.YES));
 
 		doc.add(new StringField(DOMAIN_FIELD, response.getDomain(), Field.Store.YES));
 
@@ -294,7 +319,7 @@ public class LuceneIndexManager {
 			doc.add(new StringField(TAGS_FIELD, tag, Field.Store.NO)); // tag is StringField to exact match
 
 		try {
-			iWriter.updateDocument(new Term(URL_FIELD, url), doc);
+			iWriter.updateDocument(new Term(URL_FIELD, urlKey), doc);
 		} catch (IOException e) {
 			logger.error("Error while in Lucene index operation: {}", e.getMessage(), e);
 
@@ -351,7 +376,7 @@ public class LuceneIndexManager {
 
 			IndexSearcher searcher = new IndexSearcher(reader);
 
-			Term term = new Term(URL_FIELD, url);
+			Term term = new Term(URL_FIELD, toPathKey(url));
 			Query query = new TermQuery(term);
 
 			TopDocs results = searcher.search(query, 1);
@@ -429,7 +454,7 @@ public class LuceneIndexManager {
 
 		try {
 //			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
-			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
+			Query urlQuery = new TermQuery(new Term(URL_FIELD, toPathKey(urlOrTag)));
 			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
 
 			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
@@ -465,7 +490,7 @@ public class LuceneIndexManager {
 		}
 
 		try {
-			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
+			Query urlQuery = new TermQuery(new Term(URL_FIELD, toPathKey(urlOrTag)));
 			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
 
 			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();

@@ -84,8 +84,9 @@ public class L1L2CacheProcessorGetCachedKeysTest {
 
 		List<String> keys = cacheProcessor.getCachedKeys();
 		assertEquals(2, keys.size());
-		assertTrue(keys.contains(url1));
-		assertTrue(keys.contains(url2));
+		// L2 (Lucene) keys are stored as paths only (scheme, host, port stripped)
+		assertTrue(keys.contains("/l2/page1.html"));
+		assertTrue(keys.contains("/l2/page2.html"));
 	}
 
 	@Test
@@ -111,7 +112,8 @@ public class L1L2CacheProcessorGetCachedKeysTest {
 		List<String> keys = cacheProcessor.getCachedKeys();
 		assertEquals("keys from both tiers must be present", 2, keys.size());
 		assertTrue("L1 (Ehcache) key missing", keys.contains(l1Url));
-		assertTrue("L2 (Lucene) key missing", keys.contains(l2Url));
+		// L2 (Lucene) keys are stored as paths only (scheme, host, port stripped)
+		assertTrue("L2 (Lucene) key missing", keys.contains("/l2/page.html"));
 	}
 
 	@Test
@@ -126,7 +128,8 @@ public class L1L2CacheProcessorGetCachedKeysTest {
 		cacheProcessor.removeFromCache(DOMAIN, l2Url);
 		List<String> keys = cacheProcessor.getCachedKeys();
 		assertEquals(1, keys.size());
-		assertFalse(keys.contains(l2Url));
+		// L2 key was stored as path, so the path form must be gone
+		assertFalse(keys.contains("/l2/page.html"));
 		assertTrue(keys.contains(l1Url));
 	}
 }

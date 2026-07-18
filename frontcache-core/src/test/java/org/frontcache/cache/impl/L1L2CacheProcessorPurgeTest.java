@@ -86,9 +86,10 @@ public class L1L2CacheProcessorPurgeTest {
 
 		List<String> keys = cacheProcessor.getCachedKeys();
 		assertEquals(2, keys.size());
-		assertFalse("expired entry must be purged", keys.contains(expired));
-		assertTrue("fresh entry must survive", keys.contains(fresh));
-		assertTrue("cache-forever entry must survive", keys.contains(forever));
+		// L2 (Lucene) keys are stored as paths only (scheme, host, port stripped)
+		assertFalse("expired entry must be purged", keys.contains("/l2/expired.html"));
+		assertTrue("fresh entry must survive", keys.contains("/l2/fresh.html"));
+		assertTrue("cache-forever entry must survive", keys.contains("/l2/forever.html"));
 	}
 
 	@Test
@@ -127,9 +128,9 @@ public class L1L2CacheProcessorPurgeTest {
 
 		List<String> keys = cacheProcessor.getCachedKeys();
 		assertEquals(2, keys.size());
-		assertTrue(keys.contains(l1Fresh));
-		assertTrue(keys.contains(l2Fresh));
+		assertTrue(keys.contains(l1Fresh));       // L1 keys are full URLs
+		assertTrue(keys.contains("/l2/fresh.html")); // L2 keys are paths
 		assertFalse(keys.contains(l1Expired));
-		assertFalse(keys.contains(l2Expired));
+		assertFalse(keys.contains("/l2/expired.html"));
 	}
 }

@@ -9,8 +9,10 @@
 package org.frontcache.cache.impl;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -294,6 +296,87 @@ public class LuceneIndexTests {
 		return;
 	}
 
+
+	@Test
+	public void indexStoresPathOnly() throws Exception {
+		// full URL with scheme, host, and port → only the path is stored in URL_FIELD
+		String fullUrl = "https://www.example-site.com:443/en/welcome.htm";
+		String expectedPath = "/en/welcome.htm";
+
+		luceneIndexManager.delete(DOMAIN, fullUrl);
+
+		WebResponse response = new WebResponse(fullUrl, "data".getBytes());
+		response.setDomain(DOMAIN);
+		luceneIndexManager.indexDoc(response);
+
+		// getKeys() returns the normalised path, not the full URL
+		List<String> keys = luceneIndexManager.getKeys();
+		assertTrue("expected path key " + expectedPath + " but got " + keys, keys.contains(expectedPath));
+		assertFalse("full URL should not appear in keys", keys.contains(fullUrl));
+
+		// getResponse works with the full URL (normalised internally)
+		WebResponse fromFile = luceneIndexManager.getResponse(fullUrl);
+		assertNotNull(fromFile);
+		assertEquals(fullUrl, fromFile.getUrl()); // WebResponse preserves original URL from JSON
+
+		// getResponse also works with a different port for the same host
+		WebResponse fromOtherPort = luceneIndexManager.getResponse("https://www.example-site.com:9090/en/welcome.htm");
+		assertNotNull(fromOtherPort);
+		assertEquals(fullUrl, fromOtherPort.getUrl());
+
+		// getResponse also works when called with the bare path
+		WebResponse fromPath = luceneIndexManager.getResponse(expectedPath);
+		assertNotNull(fromPath);
+		assertEquals(fullUrl, fromPath.getUrl());
+
+		// delete works with the full URL
+		luceneIndexManager.delete(DOMAIN, fullUrl);
+		assertNull(luceneIndexManager.getResponse(fullUrl));
+	}
+
+	@Test
+	public void samePathDifferentHostResolvesToSameEntry() throws Exception {
+		// same path on different hosts maps to the same cache key (host is stripped)
+		String url1 = "http://fc1-test.org/common/page.html";
+		String url2 = "http://fc2.test.org/common/page.html";
+
+		luceneIndexManager.delete(DOMAIN, url1);
+
+		WebResponse r1 = new WebResponse(url1, "from-fc1".getBytes());
+		r1.setDomain(DOMAIN);
+		luceneIndexManager.indexDoc(r1);
+
+		// looking up via a different host returns the same entry
+		WebResponse back = luceneIndexManager.getResponse(url2);
+		assertNotNull(back);
+		assertEquals("from-fc1", new String(back.getContent()));
+
+		// only one entry in the index (same path = same key)
+		assertEquals(1, luceneIndexManager.getIndexSize());
+
+		luceneIndexManager.delete(DOMAIN, url1);
+	}
+
+	@Test
+	public void indexStoresPathWithQueryString() throws Exception {
+		String fullUrl = "http://example.com:8080/search?q=coin&page=2";
+		String expectedPath = "/search?q=coin&page=2";
+
+		luceneIndexManager.delete(DOMAIN, fullUrl);
+
+		WebResponse response = new WebResponse(fullUrl, "results".getBytes());
+		response.setDomain(DOMAIN);
+		luceneIndexManager.indexDoc(response);
+
+		List<String> keys = luceneIndexManager.getKeys();
+		assertTrue(keys.contains(expectedPath));
+
+		// same path+query with a different port/host resolves to the same entry
+		WebResponse same = luceneIndexManager.getResponse("http://other.host:9999/search?q=coin&page=2");
+		assertNotNull(same);
+
+		luceneIndexManager.delete(DOMAIN, fullUrl);
+	}
 
 	@Test
 	public void mergeTuningDefaultsTest() {
