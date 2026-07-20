@@ -7,7 +7,7 @@ Two docker-compose projects and a set of control scripts.
   (Jetty 12, HTTP on 9080) and the configured origin paths to your backend. This is
   the containerized equivalent of `scripts/bash/install-frontcache-server-remote.sh`.
 - **`fc-elk/`** — **Elasticsearch + Kibana + Logstash** (Elastic 8.x) for browsing
-  Frontcache request logs pulled from your FC servers.
+  Frontcache request, error, and fallback logs pulled from your FC servers.
 
 ## Requirements
 
@@ -75,21 +75,27 @@ Then:
    ```sh
    ./pull-logs.sh "fc-edge fc-eu"
    ```
-   This rsyncs `frontcache-requests*.log(.zip)` from the FC log dir on each host,
-   unzips rolled archives, prefixes each file with the host alias, and drops them
-   into `fc-elk/logs/` — which Logstash tails and indexes into `frontcache-YYYY.MM.dd`
-   indices. (`start-fc-elk.sh` applies an index template first so `geoip.location`
-   is mapped as `geo_point` and numerics/enums get proper types.)
+   This rsyncs `frontcache-requests*.log(.zip)`, `error*.log(.zip)`, and
+   `fallback*.log(.zip)` from the FC log dir on each host, unzips rolled archives,
+   prefixes each file with the host alias, and drops them into `fc-elk/logs/` —
+   which Logstash tails and indexes into `frontcache-YYYY.MM.dd`,
+   `frontcache-errors-YYYY.MM.dd`, and `frontcache-fallbacks-YYYY.MM.dd` indices.
+   (`start-fc-elk.sh` applies index templates first so `geoip.location` is mapped
+   as `geo_point` and numerics/enums get proper types.)
 
-2. Open the dashboard: **http://localhost:5601/app/dashboards#/view/fc-overview**
-   (or Dashboard → **Frontcache Overview**; explore raw events in **Discover**).
+2. Open the dashboards:
+   - **Overview**: http://localhost:5601/app/dashboards#/view/fc-overview
+   - **Errors**: http://localhost:5601/app/dashboards#/view/fc-errors
+   - **Fallbacks**: http://localhost:5601/app/dashboards#/view/fc-fallbacks
 
-`start-fc-elk.sh` imports the `frontcache-*` data view + **"Frontcache Overview"**
-dashboard (20 panels) automatically on every start — including after a
-`stop-fc-elk.sh -v`, which drops the ES volume where Kibana stores saved objects.
-If you ever start the stack with raw `docker compose up` instead, import
-`fc-elk/kibana/fc-dashboard.ndjson` manually via Kibana → Stack Management → Saved
-Objects → Import.
+   (or Dashboard → **Frontcache Overview** / **Frontcache Errors** /
+   **Frontcache Fallbacks**; explore raw events in **Discover**).
+
+`start-fc-elk.sh` imports the data views + all three dashboards automatically on
+every start — including after a `stop-fc-elk.sh -v`, which drops the ES volume
+where Kibana stores saved objects. If you ever start the stack with raw
+`docker compose up` instead, import the `.ndjson` files from `fc-elk/kibana/`
+manually via Kibana → Stack Management → Saved Objects → Import.
 
 `./stop-fc-elk.sh` stops the stack (add `-v` to wipe indexed data and the Logstash
 read position).
@@ -105,14 +111,40 @@ read position).
 - **Top-N tables** — 20 slowest URLs (by median latency) and 20 hottest URLs (with a
   cache-hits column).
 
+### Dashboard: "Frontcache Errors"
+
+- **KPI tiles** — total error count.
+- **Over time** — error volume (area chart), error volume by FC node (stacked area).
+- **Breakdowns** — errors by logger (top 10), errors by FC node (top 10), log level pie.
+- **Top-N** — top exception classes (bar chart).
+- **Table** — recent errors (time, logger, message).
+
+### Dashboard: "Frontcache Fallbacks"
+
+- **KPI tiles** — total fallbacks, fallback file hit ratio, default fallback rate.
+- **Over time** — fallback volume by resolution type (stacked area).
+- **Breakdowns** — resolution type pie (from file vs default), fallbacks by source
+  (top 10), top fallback URLs (top 20 bar chart).
+- **Table** — top fallback URLs with count and last resolution status.
+
 ### Parsed fields
 
-Logstash grok extracts: `domain`, `request_method`, `request_type` (`toplevel` /
-`include` / `include-async`), `is_cacheable` (`cacheable` / `direct`), `is_cached`
-(`from-cache` / `dynamic` / `dynamic-soft`), `hystrix_error` (`success` / `error`),
-`runtime_millis`, `length_bytes` (`-1` when unknown), `url`, `clientip`, `server`,
-`browserBot` (`bot` / `browser`), `agent`, plus flat `geoip.*` from the client IP
-(Logstash's bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
+**Request logs** (`frontcache-requests*.log`) — Logstash grok extracts: `domain`,
+`request_method`, `request_type` (`toplevel` / `include` / `include-async`),
+`is_cacheable` (`cacheable` / `direct`), `is_cached` (`from-cache` / `dynamic` /
+`dynamic-soft`), `hystrix_error` (`success` / `error`), `runtime_millis`,
+`length_bytes` (`-1` when unknown), `url`, `clientip`, `server`, `browserBot`
+(`bot` / `browser`), `agent`, plus flat `geoip.*` from the client IP (Logstash's
+bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
+
+**Error logs** (`error*.log`) — Logstash grok extracts: `log_level`, `thread`,
+`logger`, `msg`, plus optionally `exception_class` (when the message starts with a
+recognizable exception/error class name) and `error_url` (when a URL appears in the
+message). The `@timestamp` is reconstructed from the time in the log line and the
+date in the filename (rolled files include the date, e.g. `error-2026-07-18.log`).
+
+**Fallback logs** (`fallback*.log`) — Logstash grok extracts: `fallback_source`,
+`fallback_status` (`default` / `from file`), `fallback_details`, `fallback_url`.
 
 ---
 
@@ -129,7 +161,7 @@ equivalent; the table lists the Bash names.
 | `build-push-fc-server.sh "<tag>"` | Build WAR + image and push to a registry (Docker Hub) |
 | `start-fc-elk.sh` | Start Elasticsearch + Kibana + Logstash |
 | `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes) |
-| `pull-logs.sh "<hosts>"` | rsync FC request logs into `fc-elk/logs` |
+| `pull-logs.sh "<hosts>"` | rsync FC request, error, and fallback logs into `fc-elk/logs` |
 
 ### Windows (PowerShell)
 
@@ -161,7 +193,8 @@ the Gradle build (`gradlew.bat`), and — for `pull-logs.ps1` — `ssh`, `scp`, 
 `pull-logs.sh` env knobs: `HOSTS`, `REMOTE_LOG_DIR` (default
 `/opt/frontcache/logs`),
 `DEST_DIR`, `RSYNC_SUDO` (default `1` — uses `sudo rsync` on the remote; set `0` if
-the ssh user can read the logs directly).
+the ssh user can read the logs directly). The script pulls three log types:
+`frontcache-requests*.log(.zip)`, `error*.log(.zip)`, and `fallback*.log(.zip)`.
 
 The PowerShell version (`pull-logs.ps1`) shares `HOSTS`, `REMOTE_LOG_DIR`,
 `DEST_DIR`, and `RSYNC_SUDO` (here it controls whether the *remote* `tar`/`chmod`
