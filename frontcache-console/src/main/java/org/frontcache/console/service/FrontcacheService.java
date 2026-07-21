@@ -31,6 +31,9 @@ import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.io.DumpKeysActionResponse;
+import org.frontcache.replication.CacheReplicator;
+import org.frontcache.replication.ReplicationProgressListener;
+import org.frontcache.replication.ReplicationResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -386,6 +389,82 @@ public class FrontcacheService {
 			return "ERROR - edge " + edgeURL + " is not available";
 
 		return response.getAction();
+	}
+
+	// --- Cache Replication ---
+
+	private ExecutorService replicationExecutor = Executors.newSingleThreadExecutor();
+	private volatile CacheReplicator activeReplicator = null;
+
+	/**
+	 * Starts a cache replication from source edge to target edge.
+	 * Runs in a background thread. Only one replication can be active at a time.
+	 *
+	 * @param sourceUrl the source edge URL
+	 * @param targetUrl the target edge URL
+	 * @return the initial ReplicationResult (status RUNNING)
+	 * @throws IllegalStateException if a replication is already in progress
+	 */
+	public ReplicationResult startReplication(String sourceUrl, String targetUrl) {
+		if (activeReplicator != null && activeReplicator.isRunning()) {
+			throw new IllegalStateException("Replication already in progress from "
+					+ activeReplicator.getCurrentResult().getSourceUrl()
+					+ " to " + activeReplicator.getCurrentResult().getTargetUrl());
+		}
+
+		FrontCacheClient source = new FrontCacheClient(sourceUrl, siteKey);
+		FrontCacheClient target = new FrontCacheClient(targetUrl, siteKey);
+
+		CacheReplicator replicator = new CacheReplicator(source, target);
+		activeReplicator = replicator;
+
+		replicationExecutor.submit(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					replicator.run(new ReplicationProgressListener() {
+						@Override
+						public void onProgress(long transferred, long skipped, long errors, long totalRemaining) {
+							logger.debug("Replication progress: transferred={}, skipped={}, errors={}, remaining={}",
+									transferred, skipped, errors, totalRemaining);
+						}
+
+						@Override
+						public void onComplete(ReplicationResult result) {
+							logger.info("Replication completed: {}", result);
+						}
+
+						@Override
+						public void onError(String key, Exception e) {
+							logger.warn("Replication error for key {}: {}", key, e.getMessage());
+						}
+					});
+				} finally {
+					activeReplicator = null;
+				}
+			}
+		});
+
+		return replicator.getCurrentResult();
+	}
+
+	/**
+	 * Returns the current replication status, or null if no replication is active.
+	 */
+	public ReplicationResult getReplicationStatus() {
+		CacheReplicator r = activeReplicator;
+		return r != null ? r.getCurrentResult() : null;
+	}
+
+	/**
+	 * Requests cancellation of the running replication.
+	 * No-op if no replication is active.
+	 */
+	public void cancelReplication() {
+		CacheReplicator r = activeReplicator;
+		if (r != null) {
+			r.cancel();
+		}
 	}
 
 }

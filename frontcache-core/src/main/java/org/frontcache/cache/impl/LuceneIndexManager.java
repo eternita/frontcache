@@ -14,7 +14,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -30,7 +32,9 @@ import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TermStatistics;
 import org.apache.lucene.search.TopDocs;
@@ -100,6 +104,30 @@ public class LuceneIndexManager {
 	    JSON_TYPE.setIndexOptions(IndexOptions.NONE);
 	    JSON_TYPE.setTokenized(false);
 	    JSON_TYPE.freeze();
+	}
+
+	/**
+	 * Strips scheme, host, and port from a full URL, returning only the path (and query string, if any).
+	 * Used to normalise cache keys so that the same resource reached via different hostnames or ports
+	 * maps to a single index entry. Non-URL strings (UUIDs, plain paths, tags) are returned unchanged.
+	 *
+	 * <pre>
+	 *   https://www.example.com:443/en/welcome.htm  →  /en/welcome.htm
+	 *   http://host/a/b?q=1                          →  /a/b?q=1
+	 *   /en/welcome.htm                              →  /en/welcome.htm
+	 *   some-uuid-string                             →  some-uuid-string
+	 * </pre>
+	 */
+	static String toPathKey(String url) {
+		if (url == null)
+			return null;
+		int schemeIdx = url.indexOf("://");
+		if (schemeIdx < 0)
+			return url; // not a full URL - return as-is
+		int pathStart = url.indexOf('/', schemeIdx + 3);
+		if (pathStart < 0)
+			return "/";
+		return url.substring(pathStart);
 	}
 
 	/**
@@ -274,7 +302,8 @@ public class LuceneIndexManager {
 			return;
 		}
 
-		doc.add(new StringField(URL_FIELD, url, Field.Store.YES));
+		String urlKey = toPathKey(url);
+		doc.add(new StringField(URL_FIELD, urlKey, Field.Store.YES));
 
 		doc.add(new StringField(DOMAIN_FIELD, response.getDomain(), Field.Store.YES));
 
@@ -294,7 +323,7 @@ public class LuceneIndexManager {
 			doc.add(new StringField(TAGS_FIELD, tag, Field.Store.NO)); // tag is StringField to exact match
 
 		try {
-			iWriter.updateDocument(new Term(URL_FIELD, url), doc);
+			iWriter.updateDocument(new Term(URL_FIELD, urlKey), doc);
 		} catch (IOException e) {
 			logger.error("Error while in Lucene index operation: {}", e.getMessage(), e);
 
@@ -351,7 +380,7 @@ public class LuceneIndexManager {
 
 			IndexSearcher searcher = new IndexSearcher(reader);
 
-			Term term = new Term(URL_FIELD, url);
+			Term term = new Term(URL_FIELD, toPathKey(url));
 			Query query = new TermQuery(term);
 
 			TopDocs results = searcher.search(query, 1);
@@ -429,7 +458,7 @@ public class LuceneIndexManager {
 
 		try {
 //			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
-			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
+			Query urlQuery = new TermQuery(new Term(URL_FIELD, toPathKey(urlOrTag)));
 			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
 
 			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
@@ -465,7 +494,7 @@ public class LuceneIndexManager {
 		}
 
 		try {
-			Query urlQuery = new TermQuery(new Term(URL_FIELD, urlOrTag));
+			Query urlQuery = new TermQuery(new Term(URL_FIELD, toPathKey(urlOrTag)));
 			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
 
 			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
@@ -586,12 +615,16 @@ public class LuceneIndexManager {
 	}
 
 	/**
+	 * Returns all URL keys stored in the index.
+	 * <p>
+	 * Uses a paginated {@link MatchAllDocsQuery} with {@link IndexSearcher#searchAfter}
+	 * and loads only the {@link #URL_FIELD} stored field per document, avoiding the
+	 * cost of materialising large binary / JSON fields for every hit.
 	 *
-	 * @return
+	 * @return list of normalised URL keys (never {@code null})
 	 */
 	public List<String> getKeys()
 	{
-
 		IndexWriter iWriter = null;
 		try {
 			iWriter = getIndexWriter();
@@ -608,18 +641,36 @@ public class LuceneIndexManager {
 		IndexReader reader = null;
 		try {
 			reader = DirectoryReader.open(iWriter);
+			IndexSearcher searcher = new IndexSearcher(reader);
 
-			for (int i=0; i<reader.numDocs(); i++) {
-			    Document doc = reader.document(i);
-			    if (null != doc)
-			    {
-				    if (null != doc.get(URL_FIELD))
-				    	keys.add(doc.get(URL_FIELD));
-				    else
-				    	logger.error("URL is null for doc (probably corrupted after/during index time) " + doc);
-			    }
+			// only load the URL stored field — skip JSON, BIN, etc.
+			Set<String> urlFieldOnly = Collections.singleton(URL_FIELD);
 
+			int pageSize = 1024;
+			Query query = new MatchAllDocsQuery();
+			ScoreDoc lastHit = null;
 
+			while (true) {
+				TopDocs topDocs = (lastHit == null)
+						? searcher.search(query, pageSize)
+						: searcher.searchAfter(lastHit, query, pageSize);
+
+				if (topDocs.scoreDocs.length == 0)
+					break;
+
+				for (ScoreDoc hit : topDocs.scoreDocs) {
+					Document doc = reader.document(hit.doc, urlFieldOnly);
+					String url = doc.get(URL_FIELD);
+					if (url != null)
+						keys.add(url);
+					else
+						logger.error("URL is null for doc id {} (probably corrupted during index time)", hit.doc);
+				}
+
+				if (topDocs.scoreDocs.length < pageSize)
+					break; // last page
+
+				lastHit = topDocs.scoreDocs[topDocs.scoreDocs.length - 1];
 			}
 		} catch (Exception e) {
 			logger.error("Error during loading urls/keys from index", e);
@@ -628,7 +679,7 @@ public class LuceneIndexManager {
 				try {
 					reader.close();
 				} catch (IOException e) {
-					e.printStackTrace();
+					logger.error("Error closing reader", e);
 				}
 			}
 		}

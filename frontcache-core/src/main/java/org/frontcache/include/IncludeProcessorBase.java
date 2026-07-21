@@ -266,14 +266,15 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 						webResponse.getContentLenth(), // lengthBytes
 						contextCopy);
 
-				RequestLogger.logRequestToHeader(
-						urlStr,
-						includeType, // it's include (sync or asyn)   { toplevel | include | include-async }
-						true, // isCached
-						softRefresh,
-						System.currentTimeMillis() - start,
-						webResponse.getContentLenth(), // lengthBytes
-						contextCopy, includeLevel);
+				if (!INCLUDE_TYPE_ASYNC.equals(includeType))
+					RequestLogger.logRequestToHeader(
+							urlStr,
+							includeType, // it's include (sync or asyn)   { toplevel | include | include-async }
+							true, // isCached
+							softRefresh,
+							System.currentTimeMillis() - start,
+							webResponse.getContentLenth(), // lengthBytes
+							contextCopy, includeLevel);
 			}
 			return webResponse;
 		}
@@ -283,16 +284,20 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 
  		WebResponse outWebResponse =  FCUtils.includeDynamicCallHttpClient(urlStr, requestHeaders, client, context);
 
- 		// TODO: sometimes async includes are not logged to headers because response returned faster then async IncludeResolutionPlaceholder.call() is triggered
- 		// However async includes are always in log files
-		RequestLogger.logRequestToHeader(
-				urlStr,
-				includeType, // it's include (sync or asyn)   { toplevel | include | include-async }
-				false, // isCached
-				softRefresh,
-				System.currentTimeMillis() - start,
-				outWebResponse.getContentLenth(), // lengthBytes
-				context, includeLevel);
+ 		// Async includes are resolved fire-and-forget in a background thread and their content is
+ 		// never part of the client response. By the time this thread runs, the top-level response is
+ 		// usually already committed and recycled by the container, so setting a trace header here
+ 		// would throw "Response does not exist (likely recycled)". Skip it - async includes are still
+ 		// captured in the log files via logRequest().
+ 		if (!INCLUDE_TYPE_ASYNC.equals(includeType))
+			RequestLogger.logRequestToHeader(
+					urlStr,
+					includeType, // it's include (sync or asyn)   { toplevel | include | include-async }
+					false, // isCached
+					softRefresh,
+					System.currentTimeMillis() - start,
+					outWebResponse.getContentLenth(), // lengthBytes
+					context, includeLevel);
 
  		return outWebResponse;
     }

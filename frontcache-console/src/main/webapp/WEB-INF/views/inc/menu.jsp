@@ -20,6 +20,7 @@
                 <li><a href="dynamic-urls-configs">Dynamic URLs configs </a></li>
                 <li><a href="cache-view">Cache view </a></li>
                 <li><a href="cache-invalidation">Cache invalidation </a></li>
+                <li><a href="cache-replication">Cache replication </a></li>
 				<li><a href="edges">Edges </a></li>
 			</ul>
 		</nav>

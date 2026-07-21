@@ -9,11 +9,14 @@
 package org.frontcache.client;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +44,7 @@ import org.apache.http.protocol.HttpContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.io.ActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.io.FrontcacheAction;
@@ -48,6 +52,7 @@ import org.frontcache.io.GetBotsActionResponse;
 import org.frontcache.io.GetDynamicURLsActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
+import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -413,6 +418,62 @@ public class FrontCacheClient {
 			return null;
 
 		return actionResponse.getValue();
+	}
+
+	/**
+	 * Pushes a WebResponse entry into the remote node's cache.
+	 * Used by the replication engine to write entries from a source edge to a target edge.
+	 *
+	 * @param domain      the domain to store under
+	 * @param key         the cache key (normalised path)
+	 * @param webResponse the entry to store
+	 * @return true if the entry was stored successfully
+	 */
+	public boolean putToCache(String domain, String key, WebResponse webResponse)
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.PUT_TO_CACHE));
+		urlParameters.add(new BasicNameValuePair("key", key));
+		urlParameters.add(new BasicNameValuePair("domain", domain));
+
+		try {
+			String json = jsonMapper.writeValueAsString(webResponse);
+			urlParameters.add(new BasicNameValuePair("webResponse", json));
+
+			String responseStr = requestFrontCache(urlParameters);
+			PutToCacheActionResponse actionResponse =
+					jsonMapper.readValue(responseStr.getBytes(), PutToCacheActionResponse.class);
+			return ActionResponse.RESPONSE_STATUS_OK.equals(actionResponse.getResponseStatus());
+		} catch (Exception e) {
+			logger.error("putToCache failed: domain={}, key={}", domain, key, e);
+			return false;
+		}
+	}
+
+	/**
+	 * Fetches all cached keys from the remote node and returns them as a Set.
+	 * Used by the replication engine to compute the diff between source and target.
+	 *
+	 * @return set of cached keys, or empty set on error
+	 */
+	public Set<String> getCachedKeysSet()
+	{
+		Set<String> keys = new HashSet<String>();
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		if (getCachedKeys(baos)) {
+			try {
+				String[] lines = baos.toString("UTF-8").split("\n");
+				for (String line : lines) {
+					String trimmed = line.trim();
+					if (!trimmed.isEmpty()) {
+						keys.add(trimmed);
+					}
+				}
+			} catch (UnsupportedEncodingException e) {
+				logger.error("Failed to parse keys", e);
+			}
+		}
+		return keys;
 	}
 
 	/**

@@ -139,6 +139,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = getFromCache(request);
 			break;
 
+		case FrontcacheAction.PUT_TO_CACHE:
+			aResponse = putToCache(request);
+			break;
+
 		case FrontcacheAction.DUMP_KEYS:
 			aResponse = startDumpKeys(request);
 			break;
@@ -269,6 +273,45 @@ public class FrontCacheIOServlet extends HttpServlet {
 		GetFromCacheActionResponse actionResponse = new GetFromCacheActionResponse(key, webResponse);
 
 		return actionResponse;
+	}
+
+	/**
+	 * Stores a WebResponse entry into the local cache.
+	 * Used by the index-replication feature to push entries from a source edge
+	 * to a target edge.
+	 *
+	 * @param req must carry {@code key}, {@code domain}, and {@code webResponse} (JSON) parameters
+	 * @return PutToCacheActionResponse with OK or ERROR status
+	 */
+	private ActionResponse putToCache(HttpServletRequest req)
+	{
+		String key = req.getParameter("key");
+		String domain = req.getParameter("domain");
+		String webResponseJson = req.getParameter("webResponse");
+
+		PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key, domain);
+
+		if (key == null || domain == null || webResponseJson == null)
+		{
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription("Required parameters: key, domain, webResponse");
+			return aResponse;
+		}
+
+		try
+		{
+			WebResponse webResponse = jsonMapper.readValue(webResponseJson, WebResponse.class);
+			CacheManager.getInstance().putToCache(domain, key, webResponse);
+			logger.info("put-to-cache: domain={}, key={}", domain, key);
+		}
+		catch (Exception e)
+		{
+			logger.error("put-to-cache failed: domain={}, key={}", domain, key, e);
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription(e.getMessage());
+		}
+
+		return aResponse;
 	}
 
 	/**

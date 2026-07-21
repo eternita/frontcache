@@ -363,6 +363,7 @@ public abstract class ClientTests extends TestsBase {
 		return;
 	}
 
+	// cache store path only (no domains and full URLs)
 	@Test
 	public void invalidationAllMultidomainTestCluster() throws Exception {
 
@@ -406,19 +407,11 @@ public abstract class ClientTests extends TestsBase {
 		assertEquals("b", page.getPage().asText());
 
 		cacheState = frontcacheClient1.getCacheState();
-		Assert.assertEquals("4", cacheState.get(CacheProcessor.CACHED_ENTRIES));
+		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES)); // both domains have the same keys
 
 
 		// cache invalidation - remove all for fc1-test.org
 		response = frontcacheClient1.removeFromCacheAll();
-		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
-
-		cacheState = frontcacheClient1.getCacheState();
-		Assert.assertEquals("2", cacheState.get(CacheProcessor.CACHED_ENTRIES)); // pages from fc2.test.org remain in cache
-
-		FrontCacheClient frontcacheClient2 = new FrontCacheClient(getFrontCacheBaseURLDomainFC2(), SiteKeys.TEST_SITE_KEY_2);
-		// fc2 cache invalidation - remove all for fc2.test.org
-		response = frontcacheClient2.removeFromCacheAll();
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 
 		cacheState = frontcacheClient1.getCacheState();

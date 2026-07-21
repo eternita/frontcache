@@ -140,7 +140,16 @@ public class RequestLogger {
 //    		.append(SEPARATOR).append(dummy)
     		.append(SEPARATOR).append(context.getClientType());
 
-    		servletResponse.setHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + "." + includeLevel, sb4header.toString());
+    		// Trace headers are best-effort. When an include is resolved on a background thread the
+    		// top-level response may already be committed/recycled by the container, so setHeader()
+    		// would throw "Response does not exist (likely recycled)". Skip/ignore in that case - the
+    		// request is still captured in the log files via logRequest().
+    		try {
+    			if (null != servletResponse && !servletResponse.isCommitted())
+    				servletResponse.setHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + "." + includeLevel, sb4header.toString());
+    		} catch (IllegalStateException e) {
+    			logger.debug("skipped trace header for {} - response already committed/recycled", url);
+    		}
         }
 
 	}
