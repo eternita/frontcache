@@ -117,7 +117,7 @@ read position).
 - **Over time** — error volume (area chart), error volume by FC node (stacked area).
 - **Breakdowns** — errors by logger (top 10), errors by FC node (top 10), log level pie.
 - **Top-N** — top exception classes (bar chart).
-- **Table** — recent errors (time, logger, message).
+- **Table** — top error messages with count.
 
 ### Dashboard: "Frontcache Fallbacks"
 
@@ -125,7 +125,7 @@ read position).
 - **Over time** — fallback volume by resolution type (stacked area).
 - **Breakdowns** — resolution type pie (from file vs default), fallbacks by source
   (top 10), top fallback URLs (top 20 bar chart).
-- **Table** — top fallback URLs with count and last resolution status.
+- **Table** — top fallback URLs with total count and "from file" count.
 
 ### Parsed fields
 
@@ -137,11 +137,16 @@ read position).
 (`bot` / `browser`), `agent`, plus flat `geoip.*` from the client IP (Logstash's
 bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
 
-**Error logs** (`error*.log`) — Logstash grok extracts: `log_level`, `thread`,
-`logger`, `msg`, plus optionally `exception_class` (when the message starts with a
-recognizable exception/error class name) and `error_url` (when a URL appears in the
-message). The `@timestamp` is reconstructed from the time in the log line and the
-date in the filename (rolled files include the date, e.g. `error-2026-07-18.log`).
+**Error logs** (`error*.log`) — each ERROR entry is multi-line (header + exception
+stack trace); a Logstash multiline codec joins them so one error = one document
+(with the full stack trace in `msg`). Grok extracts: `log_level`, `thread`,
+`logger`, `msg`, `server` (from the host-alias filename prefix, feeding the
+"by FC node" panels), plus optionally `exception_class` (first class name ending in
+Exception/Error/Throwable) and `error_url` (when a URL appears in the message). The
+error log line carries only a time (logback `%d{HH:mm:ss.SSS}`), so `@timestamp` is
+reconstructed by combining that time with a date: the date parsed from the filename
+for rolled archives (e.g. `error-2026-07-18.log`), or the ingest date for the
+current day's `error.log` (which has no date in its name).
 
 **Fallback logs** (`fallback*.log`) — Logstash grok extracts: `fallback_source`,
 `fallback_status` (`default` / `from file`), `fallback_details`, `fallback_url`.
