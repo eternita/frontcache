@@ -108,20 +108,10 @@
 
 <p/>
 
+<hr>
 <div class="">
     <div style="padding-left: 20px;">
-        <h2 style="font-size: 22px;">Edges status</h2>
-        <br/>
-        <hr>
-        <div style="font-size: 18px;">
-            <c:forEach var="edge" items="${edges}">
-              <c:out value="${edge.name}"/> - ${edge.onlineStatus}
-              <c:if test="${edge.available}">
-              - <c:out value="${edge.cachedAmountString}"/> items cached
-              </c:if>
-               <br/>
-            </c:forEach>
-        </div>
+        <%@ include file="/WEB-INF/views/inc/edges_status.jsp"%>
     </div>
 </div>
 

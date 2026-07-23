@@ -16,7 +16,7 @@
 			<ul class="nav navbar-nav">
 				<li><a href="realtime">Realtime monitor </a></li>
                 <li><a href="fallbacks">Configs </a></li>
-                <li><a href="cache-view">Cache view </a></li>
+                <li><a href="cache-view">Cache </a></li>
 				<li><a href="edges">Edges </a></li>
 			</ul>
 		</nav>

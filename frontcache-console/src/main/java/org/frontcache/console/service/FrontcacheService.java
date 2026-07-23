@@ -10,7 +10,6 @@ package org.frontcache.console.service;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -136,7 +135,9 @@ public class FrontcacheService {
 
         List<Future<FrontCacheStatus>> futureList = new ArrayList<Future<FrontCacheStatus>>();
 
-		Map<String, FrontCacheStatus> clusterStatus = new HashMap<String, FrontCacheStatus>();
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order).
+		Map<String, FrontCacheStatus> clusterStatus = new LinkedHashMap<String, FrontCacheStatus>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new FrontCacheStatusCaller(fcClient)));
@@ -163,6 +164,14 @@ public class FrontcacheService {
         }
 
 		return clusterStatus;
+	}
+
+	/**
+	 * Cluster statuses as a list in console-config edge order - the order used
+	 * by the "Edges status" block across the console pages.
+	 */
+	public List<FrontCacheStatus> getClusterStatusList() {
+		return new ArrayList<FrontCacheStatus>(getClusterStatus().values());
 	}
 
 
