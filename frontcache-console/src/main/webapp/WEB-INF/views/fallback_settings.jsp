@@ -1,11 +1,9 @@
 <%@taglib uri="http://www.springframework.org/tags/form" prefix="form"%>
 <%@ include file="/WEB-INF/views/inc/header.jsp"%>
 
-<p/>
-<p/>
+<c:set var="activeConfig" value="fallbacks"/>
+<%@ include file="/WEB-INF/views/inc/config_menu.jsp"%>
 
-    <hr>
-    <h2 align="center">Fallback Configs</h2>
     <hr>
 
     <!-- one tab per edge; tab order follows the edge order from the console config -->
@@ -86,9 +84,5 @@
       </c:forEach>
       <!-- end loop over edges -->
     </div>
-
-
-<p/>
-<p/>
 
 <%@ include file="/WEB-INF/views/inc/footer.jsp"%>

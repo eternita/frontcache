@@ -1,14 +1,10 @@
 <%@taglib uri="http://www.springframework.org/tags/form" prefix="form"%>
 <%@ include file="/WEB-INF/views/inc/header.jsp"%>
 
-<p/>
-<p/>
+<c:set var="activeConfig" value="dynamic"/>
+<%@ include file="/WEB-INF/views/inc/config_menu.jsp"%>
 
-
-    <hr>
-    <h2 align="center">Dynamic URLs Configs</h2>
-    <hr>
-
+   <hr>
     <!-- one tab per edge; tab order follows the edge order from the console config -->
     <ul class="nav nav-tabs" role="tablist">
       <c:forEach var="edge" items="${dynamicURLsConfigs}" varStatus="status">
@@ -56,9 +52,5 @@
       </c:forEach>
       <!-- end loop over edges -->
     </div>
-
-
-<p/>
-<p/>
 
 <%@ include file="/WEB-INF/views/inc/footer.jsp"%>
