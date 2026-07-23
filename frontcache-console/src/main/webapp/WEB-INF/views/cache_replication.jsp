@@ -6,6 +6,9 @@
     response.setCharacterEncoding("UTF-8");
 %>
 
+<c:set var="activeCache" value="replication"/>
+<%@ include file="/WEB-INF/views/inc/cache_menu.jsp"%>
+
 <p/>
 <p/>
 
