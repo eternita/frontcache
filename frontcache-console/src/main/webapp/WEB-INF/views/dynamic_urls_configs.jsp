@@ -16,7 +16,7 @@
 	  <thead>
           <tr>
             <th>
-              <b>Edge: ${edge.key} - Dynamic URL pattern (mached URL goes directly to origin)</b>
+              <b>${edge.key}</b>
             </th>
           </tr>
         </thead>
@@ -25,35 +25,22 @@
         <!-- start loop over domain 
               first loop over default domain
         -->
+
+        <!--  the same loop for other domains (domain specific dynamic URLs)  -->
         <c:forEach var="dynamicURLDomain" items="${edge.value}">
-        
-            <c:if test="${'default-domain' == dynamicURLDomain.key}">
+          <c:if test="${'default-domain' != dynamicURLDomain.key}">
               <tr>
-                <td align="center"><b> Default settings  </b></td>
+                <td align="center"><b>
+                    ${dynamicURLDomain.key}
+                </b></td>
               </tr>
-              
-              <c:forEach var="dynamicURL" items="${dynamicURLDomain.value}">
-                  <tr>
-                    <td>${dynamicURL}  &nbsp;</td>
-                  </tr>
-              </c:forEach>
-            </c:if>
-        </c:forEach>
-        
-        <!--  the same loop for other domains (domain specific dynamic URLs)  -->        
-        <c:forEach var="dynamicURLDomain" items="${edge.value}">
-        
-            <c:if test="${'default-domain' != dynamicURLDomain.key}">
+          </c:if>
+
+          <c:forEach var="dynamicURL" items="${dynamicURLDomain.value}">
               <tr>
-                <td align="center"><b> ${dynamicURLDomain.key}  </b></td>
+                <td>${dynamicURL}  &nbsp;</td>
               </tr>
-              
-              <c:forEach var="dynamicURL" items="${dynamicURLDomain.value}">
-                  <tr>
-                    <td>${dynamicURL}  &nbsp;</td>
-                  </tr>
-              </c:forEach>
-            </c:if>
+          </c:forEach>
         </c:forEach>
         
 
