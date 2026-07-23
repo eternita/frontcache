@@ -27,6 +27,7 @@ import org.frontcache.console.model.BotConfig;
 import org.frontcache.console.model.DynamicURLsConfig;
 import org.frontcache.console.model.FallbackConfig;
 import org.frontcache.console.model.FrontCacheStatus;
+import org.frontcache.console.model.HystrixConfig;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
@@ -271,6 +272,42 @@ public class FrontcacheService {
         {
             try {
             	DynamicURLsConfig result = null;
+            	if (timeoutReached)
+            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
+            	else
+            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+
+            	if (null != result)
+            		clusterStatus.put(result.getName(), result.getConfig());
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                f.cancel(true);
+                timeoutReached =  true;
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
+            }
+        }
+
+		return clusterStatus;
+	}
+
+	public Map<String, String> getHystrixConfigs() {
+
+        List<Future<HystrixConfig>> futureList = new ArrayList<Future<HystrixConfig>>();
+
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+            futureList.add(executor.submit(new HystrixConfigsCaller(fcClient)));
+
+		// processing timeouts
+        boolean timeoutReached = false;
+        for (Future<HystrixConfig> f : futureList)
+        {
+            try {
+            	HystrixConfig result = null;
             	if (timeoutReached)
             		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
             	else

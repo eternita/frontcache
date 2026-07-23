@@ -34,6 +34,8 @@ public abstract class FrontcacheAction {
 
 	public static final String GET_DYNAMIC_URLS = "get-dynamic-urls";
 
+	public static final String GET_HYSTRIX_CONFIGS = "get-hystrix-configs";
+
 	public static final String PATCH = "patch";
 
 	public static final String PURGE = "purge";
@@ -55,6 +57,7 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.PUT_TO_CACHE, "store a WebResponse entry into the local cache (used for replication); accepts 'key', 'domain', and 'webResponse' (JSON) parameters");
 		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get substring to determine bots based on User-Agent HTTP header from ./conf/bots.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
+		actionsDescriptionMap.put(FrontcacheAction.GET_HYSTRIX_CONFIGS, "get raw hystrix configuration from ./conf/hystrix.properties");
 		actionsDescriptionMap.put(FrontcacheAction.PURGE, "purge expired entries from the cache (keeps non-expired and cache-forever entries)");
 		actionsDescriptionMap.put(FrontcacheAction.PING, "ping for GSLB");
 		actionsDescriptionMap.put(FrontcacheAction.HELP, "help");

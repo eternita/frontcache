@@ -11,7 +11,9 @@ package org.frontcache.io;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -165,6 +167,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.GET_DYNAMIC_URLS:
 			aResponse = getDynamicURLs(request);
+			break;
+
+		case FrontcacheAction.GET_HYSTRIX_CONFIGS:
+			aResponse = getHystrixConfigs(request);
 			break;
 
 		case FrontcacheAction.PATCH:
@@ -431,6 +437,35 @@ public class FrontCacheIOServlet extends HttpServlet {
 		dynamicURLs.putAll(FCConfig.getDynamicURLs());
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
 		aResponse.setDynamicURLs(dynamicURLs);
+
+		return aResponse;
+	}
+
+	/**
+	 * Reads the raw ./conf/hystrix.properties file (comments and empty lines
+	 * preserved) so it can be displayed as-is in the console.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getHystrixConfigs(HttpServletRequest req)
+	{
+		GetHystrixConfigActionResponse aResponse = new GetHystrixConfigActionResponse();
+
+		try (InputStream is = FCConfig.getConfigInputStream("hystrix.properties"))
+		{
+			if (null == is)
+			{
+				aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+				aResponse.setErrorDescription("hystrix.properties not found");
+			} else {
+				aResponse.setHystrixConfig(new String(is.readAllBytes(), StandardCharsets.UTF_8));
+			}
+		} catch (IOException e) {
+			logger.error("Can't read hystrix.properties", e);
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription(e.getMessage());
+		}
 
 		return aResponse;
 	}
