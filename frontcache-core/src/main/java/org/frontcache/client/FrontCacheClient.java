@@ -52,6 +52,7 @@ import org.frontcache.io.GetBotsActionResponse;
 import org.frontcache.io.GetDynamicURLsActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
+import org.frontcache.io.GetHystrixConfigActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -384,6 +385,37 @@ public class FrontCacheClient {
 			return null;
 
 		return actionResponse.getDynamicURLs();
+	}
+
+	/**
+	 *
+	 * @return
+	 */
+	public GetHystrixConfigActionResponse getHystrixConfigActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_HYSTRIX_CONFIGS));
+
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			GetHystrixConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetHystrixConfigActionResponse.class);
+			return actionResponse;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	public String getHystrixConfig()
+	{
+		GetHystrixConfigActionResponse actionResponse = getHystrixConfigActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getHystrixConfig();
 	}
 
 

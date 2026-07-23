@@ -10,7 +10,7 @@ package org.frontcache.console.service;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +27,7 @@ import org.frontcache.console.model.BotConfig;
 import org.frontcache.console.model.DynamicURLsConfig;
 import org.frontcache.console.model.FallbackConfig;
 import org.frontcache.console.model.FrontCacheStatus;
+import org.frontcache.console.model.HystrixConfig;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
@@ -135,7 +136,9 @@ public class FrontcacheService {
 
         List<Future<FrontCacheStatus>> futureList = new ArrayList<Future<FrontCacheStatus>>();
 
-		Map<String, FrontCacheStatus> clusterStatus = new HashMap<String, FrontCacheStatus>();
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order).
+		Map<String, FrontCacheStatus> clusterStatus = new LinkedHashMap<String, FrontCacheStatus>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new FrontCacheStatusCaller(fcClient)));
@@ -164,6 +167,14 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
+	/**
+	 * Cluster statuses as a list in console-config edge order - the order used
+	 * by the "Edges status" block across the console pages.
+	 */
+	public List<FrontCacheStatus> getClusterStatusList() {
+		return new ArrayList<FrontCacheStatus>(getClusterStatus().values());
+	}
+
 
 	/**
 	 *
@@ -173,7 +184,10 @@ public class FrontcacheService {
 	public Map<String, Map<String, Set<FallbackConfigEntry>>> getFallbackConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new HashMap<String, Map<String, Set<FallbackConfigEntry>>>();
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<FallbackConfigEntry>>>();
 
         List<Future<FallbackConfig>> futureList = new ArrayList<Future<FallbackConfig>>();
 
@@ -208,7 +222,10 @@ public class FrontcacheService {
 
         List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
 
-		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, Map<String, Set<String>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<String>>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
@@ -241,7 +258,10 @@ public class FrontcacheService {
 
         List<Future<DynamicURLsConfig>> futureList = new ArrayList<Future<DynamicURLsConfig>>();
 
-		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, Map<String, Set<String>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<String>>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new DynamicURLsConfigsCaller(fcClient)));
@@ -252,6 +272,42 @@ public class FrontcacheService {
         {
             try {
             	DynamicURLsConfig result = null;
+            	if (timeoutReached)
+            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
+            	else
+            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+
+            	if (null != result)
+            		clusterStatus.put(result.getName(), result.getConfig());
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                f.cancel(true);
+                timeoutReached =  true;
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
+            }
+        }
+
+		return clusterStatus;
+	}
+
+	public Map<String, String> getHystrixConfigs() {
+
+        List<Future<HystrixConfig>> futureList = new ArrayList<Future<HystrixConfig>>();
+
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+            futureList.add(executor.submit(new HystrixConfigsCaller(fcClient)));
+
+		// processing timeouts
+        boolean timeoutReached = false;
+        for (Future<HystrixConfig> f : futureList)
+        {
+            try {
+            	HystrixConfig result = null;
             	if (timeoutReached)
             		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
             	else

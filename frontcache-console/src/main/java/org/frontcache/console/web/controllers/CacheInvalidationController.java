@@ -8,10 +8,8 @@
  */
 package org.frontcache.console.web.controllers;
 
-import java.util.Map;
 import java.util.Set;
 
-import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -36,8 +34,7 @@ public class CacheInvalidationController {
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
 
-		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
-		model.addAttribute("edges", clusterStatus.values());
+		model.addAttribute("edges", frontcacheService.getClusterStatusList());
 
 		return "cache_invalidation";
 	}
@@ -52,8 +49,7 @@ public class CacheInvalidationController {
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
 
-		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
-		model.addAttribute("edges", clusterStatus.values());
+		model.addAttribute("edges", frontcacheService.getClusterStatusList());
 
 		return "cache_invalidation";
 	}
@@ -69,8 +65,7 @@ public class CacheInvalidationController {
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
 
-		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
-		model.addAttribute("edges", clusterStatus.values());
+		model.addAttribute("edges", frontcacheService.getClusterStatusList());
 
 		return "cache_invalidation";
 	}

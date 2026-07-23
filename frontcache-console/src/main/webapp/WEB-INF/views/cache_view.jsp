@@ -6,8 +6,11 @@
     response.setCharacterEncoding("UTF-8");
 %>
 
-<p/> 
-<p/> 
+<c:set var="activeCache" value="view"/>
+<%@ include file="/WEB-INF/views/inc/cache_menu.jsp"%>
+
+<p/>
+<p/>
 
 <form:form method="POST" class="form-inline" modelAttribute="cacheView">
   <div class="form-group">
