@@ -11,6 +11,7 @@ package org.frontcache.console.service;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -173,7 +174,10 @@ public class FrontcacheService {
 	public Map<String, Map<String, Set<FallbackConfigEntry>>> getFallbackConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new HashMap<String, Map<String, Set<FallbackConfigEntry>>>();
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<FallbackConfigEntry>>>();
 
         List<Future<FallbackConfig>> futureList = new ArrayList<Future<FallbackConfig>>();
 
@@ -208,7 +212,10 @@ public class FrontcacheService {
 
         List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
 
-		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, Map<String, Set<String>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<String>>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
@@ -241,7 +248,10 @@ public class FrontcacheService {
 
         List<Future<DynamicURLsConfig>> futureList = new ArrayList<Future<DynamicURLsConfig>>();
 
-		Map<String, Map<String, Set<String>>> clusterStatus = new HashMap<String, Map<String, Set<String>>>();
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, Map<String, Set<String>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<String>>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new DynamicURLsConfigsCaller(fcClient)));
