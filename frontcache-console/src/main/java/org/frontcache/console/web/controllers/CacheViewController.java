@@ -90,46 +90,4 @@ public class CacheViewController {
 
 		return "cache_view";
 	}
-
-
-	@RequestMapping(method = RequestMethod.POST, params = "dumpKeys")
-	public String dumpKeys(Model model, CacheViewForm cacheViewForm) {
-		model.addAttribute("cacheView", cacheViewForm);
-
-		String dumpKeysResult = frontcacheService.dumpKeys(cacheViewForm.getEdge());
-		model.addAttribute("dumpKeysResult", dumpKeysResult);
-
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
-    	model.addAttribute("edgeList", agents);
-
-		return "cache_view";
-	}
-
-
-	@RequestMapping(method = RequestMethod.POST, params = "purge")
-	public String purge(Model model, CacheViewForm cacheViewForm) {
-		model.addAttribute("cacheView", cacheViewForm);
-
-		frontcacheService.purgeEdge(cacheViewForm.getEdge());
-		model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheViewForm.getEdge());
-
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
-    	model.addAttribute("edgeList", agents);
-
-		return "cache_view";
-	}
-
-
-	@RequestMapping(method = RequestMethod.POST, params = "backupIndex")
-	public String backupIndex(Model model, CacheViewForm cacheViewForm) {
-		model.addAttribute("cacheView", cacheViewForm);
-
-		String backupResult = frontcacheService.backupEdge(cacheViewForm.getEdge());
-		model.addAttribute("backupResult", backupResult + " on " + cacheViewForm.getEdge());
-
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
-    	model.addAttribute("edgeList", agents);
-
-		return "cache_view";
-	}
 }
