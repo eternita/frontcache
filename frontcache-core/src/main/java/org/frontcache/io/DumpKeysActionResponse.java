@@ -21,4 +21,12 @@ public class DumpKeysActionResponse extends ActionResponse {
 		setAction("dumping keys is started - will be saved to " + outputFile);
 	}
 
+	/**
+	 * Marks this response as "rejected because a dump is already running" - no new dump was started.
+	 */
+	public void setAlreadyInProgress()
+	{
+		setAction("dumping keys is already in progress - request ignored");
+	}
+
 }

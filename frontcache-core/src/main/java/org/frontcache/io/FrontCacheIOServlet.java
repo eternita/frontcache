@@ -20,6 +20,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
@@ -51,6 +52,12 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	private int managementPort = -1; // management port for security
 	private String siteKey = "";
+
+	// guards against concurrent backups - only one index backup may run at a time
+	private final AtomicBoolean backupInProgress = new AtomicBoolean(false);
+
+	// guards against concurrent key dumps - only one dump-keys may run at a time
+	private final AtomicBoolean dumpKeysInProgress = new AtomicBoolean(false);
 
 
 	public FrontCacheIOServlet() {
@@ -325,12 +332,23 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 	/**
+	 * Dumps cached keys to a file under ./warmer asynchronously.
+	 * <p>
+	 * Only one dump may run at a time - if a dump is already in progress the request is
+	 * rejected and no new dump is started.
 	 *
 	 * @param req
 	 * @return
 	 */
 	private ActionResponse startDumpKeys(HttpServletRequest req)
 	{
+		// reject if a dump is already running (only flip false -> true wins)
+		if (!dumpKeysInProgress.compareAndSet(false, true))
+		{
+			DumpKeysActionResponse aResponse = new DumpKeysActionResponse();
+			aResponse.setAlreadyInProgress();
+			return aResponse;
+		}
 
 		final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
 		final String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
@@ -358,6 +376,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
+					dumpKeysInProgress.set(false);
 				}
 
 			}
@@ -518,21 +537,34 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 	/**
-	 * Backs up the on-disk (L2) index to a sibling directory at the edge. Runs asynchronously
-	 * since copying a large index may take a while; the created directory name is logged at the edge.
+	 * Backs up the on-disk (L2) index to a zip archive at the edge. Runs asynchronously
+	 * since archiving a large index may take a while; the created archive name is logged at the edge.
+	 * <p>
+	 * Only one backup may run at a time - if a backup is already in progress the request is
+	 * rejected and no new backup is started.
 	 *
 	 * @param req
 	 * @return
 	 */
 	private ActionResponse backupIndex(HttpServletRequest req)
 	{
+		// reject if a backup is already running (only flip false -> true wins)
+		if (!backupInProgress.compareAndSet(false, true))
+		{
+			BackupActionResponse aResponse = new BackupActionResponse();
+			aResponse.setAlreadyInProgress();
+			return aResponse;
+		}
+
 		Runnable r = new Runnable() {
 			public void run() {
 				try {
-					String backupDir = CacheManager.getInstance().backup();
-					logger.info("index backup completed: {}", backupDir);
+					String backupArchive = CacheManager.getInstance().backup();
+					logger.info("index backup completed: {}", backupArchive);
 				} catch (Exception e) {
 					logger.error("index backup failed", e);
+				} finally {
+					backupInProgress.set(false);
 				}
 			}
 		};

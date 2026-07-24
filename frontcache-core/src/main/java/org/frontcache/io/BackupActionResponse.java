@@ -21,4 +21,12 @@ public class BackupActionResponse extends ActionResponse {
 		setAction("index backup is started - will be saved to " + backupDir);
 	}
 
+	/**
+	 * Marks this response as "rejected because a backup is already running" - no new backup was started.
+	 */
+	public void setAlreadyInProgress()
+	{
+		setAction("index backup is already in progress - request ignored");
+	}
+
 }
