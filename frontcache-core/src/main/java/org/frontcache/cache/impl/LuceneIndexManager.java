@@ -305,7 +305,9 @@ public class LuceneIndexManager {
 	 * The current writer is committed and a {@link SnapshotDeletionPolicy} snapshot pins the
 	 * commit's files so they survive concurrent merges while they are streamed into the archive.
 	 * Each file is zipped on the fly (no intermediate copy on disk); entries are nested under a
-	 * top-level folder named after the backup so unzipping yields a ready-to-use index directory.
+	 * top-level folder that keeps the original index directory name (e.g. {@code l2-lucene-index}),
+	 * so unzipping yields a directory identical to the live index - only the archive file name
+	 * carries the {@code .backup-{yyyyMMdd_HHmmss}} suffix.
 	 * The snapshot is always released afterwards so the pinned files can be reclaimed.
 	 *
 	 * @return the name of the created backup archive
@@ -325,8 +327,9 @@ public class LuceneIndexManager {
 		iWriter.commit();
 
 		Path indexDir = Paths.get(INDEX_PATH).toAbsolutePath();
-		String backupName = "l2-lucene-index.backup-" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-		String archiveName = backupName + ".zip";
+		// keep the original index directory name inside the archive (e.g. l2-lucene-index)
+		String indexDirName = indexDir.getFileName().toString();
+		String archiveName = indexDirName + ".backup-" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".zip";
 		Path archiveFile = indexDir.getParent().resolve(archiveName);
 
 		IndexCommit commit = snapshotPolicy.snapshot();
@@ -334,7 +337,7 @@ public class LuceneIndexManager {
 				ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(fos))) {
 
 			for (String fileName : commit.getFileNames()) {
-				zos.putNextEntry(new ZipEntry(backupName + "/" + fileName));
+				zos.putNextEntry(new ZipEntry(indexDirName + "/" + fileName));
 				Files.copy(indexDir.resolve(fileName), zos); // does not close zos
 				zos.closeEntry();
 			}

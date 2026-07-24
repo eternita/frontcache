@@ -428,18 +428,20 @@ public class LuceneIndexTests {
 		}
 		assertEquals(size, luceneIndexManager.getIndexSize());
 
+		java.nio.file.Path indexDir = java.nio.file.Paths.get(baseDir).toAbsolutePath();
+		String indexDirName = indexDir.getFileName().toString();
+
 		String archiveName = luceneIndexManager.backup();
 		assertNotNull(archiveName);
-		assertTrue("backup archive name should follow the l2-lucene-index.backup-{date}.zip pattern, got " + archiveName,
-				archiveName.startsWith("l2-lucene-index.backup-") && archiveName.endsWith(".zip"));
+		// only the archive name carries the .backup-{date}.zip suffix; the index dir name is kept
+		assertTrue("backup archive name should follow the {indexDir}.backup-{date}.zip pattern, got " + archiveName,
+				archiveName.startsWith(indexDirName + ".backup-") && archiveName.endsWith(".zip"));
 
 		// the backup archive is a sibling of the index dir
-		java.nio.file.Path indexDir = java.nio.file.Paths.get(baseDir).toAbsolutePath();
 		java.nio.file.Path archiveFile = indexDir.getParent().resolve(archiveName);
 		assertTrue("backup archive should exist: " + archiveFile, java.nio.file.Files.isRegularFile(archiveFile));
 
-		// unzip it into a fresh dir; entries are nested under the backup name (without the .zip)
-		String backupName = archiveName.substring(0, archiveName.length() - ".zip".length());
+		// unzip it into a fresh dir; entries are nested under the original index dir name
 		java.nio.file.Path unzipRoot = indexDir.getParent().resolve("restored-" + System.currentTimeMillis());
 		try (java.util.zip.ZipInputStream zis =
 				new java.util.zip.ZipInputStream(java.nio.file.Files.newInputStream(archiveFile))) {
@@ -451,8 +453,8 @@ public class LuceneIndexTests {
 			}
 		}
 
-		// the unzipped index (under the nested backup-name folder) is valid with the same doc count
-		java.nio.file.Path restoredIndexDir = unzipRoot.resolve(backupName);
+		// the unzipped index (under the kept index dir name) is valid with the same doc count
+		java.nio.file.Path restoredIndexDir = unzipRoot.resolve(indexDirName);
 		assertTrue("unzipped index dir should exist: " + restoredIndexDir,
 				java.nio.file.Files.isDirectory(restoredIndexDir));
 		LuceneIndexManager restored = new LuceneIndexManager(restoredIndexDir.toString());
