@@ -416,9 +416,43 @@ public class LuceneIndexTests {
 		}
 	}
 
+	@Test
+	public void backupTest() throws Exception {
+		// index a few docs
+		int size = 3;
+		for (int i = 0; i < size; i++) {
+			String url = UUID.randomUUID().toString();
+			WebResponse response = new WebResponse(url, UUID.randomUUID().toString().getBytes());
+			response.setDomain(DOMAIN);
+			luceneIndexManager.indexDoc(response);
+		}
+		assertEquals(size, luceneIndexManager.getIndexSize());
+
+		String backupName = luceneIndexManager.backup();
+		assertNotNull(backupName);
+		assertTrue("backup dir name should follow the l2-lucene-index.backup-{date} pattern, got " + backupName,
+				backupName.startsWith("l2-lucene-index.backup-"));
+
+		// the backup dir is a sibling of the index dir
+		java.nio.file.Path indexDir = java.nio.file.Paths.get(baseDir).toAbsolutePath();
+		java.nio.file.Path backupDir = indexDir.getParent().resolve(backupName);
+		assertTrue("backup dir should exist: " + backupDir, java.nio.file.Files.isDirectory(backupDir));
+
+		// the backup is a valid, readable Lucene index with the same doc count
+		LuceneIndexManager restored = new LuceneIndexManager(backupDir.toString());
+		try {
+			assertEquals(size, restored.getIndexSize());
+		} finally {
+			restored.close();
+		}
+	}
+
+	private String baseDir;
+
 	@Before
 	public void setUp() {
-		luceneIndexManager = new LuceneIndexManager("/tmp/lucene-text-index-l2-" + System.currentTimeMillis()); // INDEX_BASE_DIR
+		baseDir = "/tmp/lucene-text-index-l2-" + System.currentTimeMillis(); // INDEX_BASE_DIR
+		luceneIndexManager = new LuceneIndexManager(baseDir);
 		return;
 	}
 

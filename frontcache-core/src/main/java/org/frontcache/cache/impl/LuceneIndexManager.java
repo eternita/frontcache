@@ -12,7 +12,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -79,6 +82,11 @@ public class LuceneIndexManager {
 	// with "LockObtainFailedException: Lock held by this virtual machine". Reusing one
 	// Directory + always closing the stale writer before reopening keeps the lock lifecycle clean.
 	private Directory directory = null;
+
+	// Snapshot deletion policy of the current writer. Lets backup() pin the files of a commit so
+	// a concurrent merge can't delete them mid-copy - the Lucene-canonical hot-backup mechanism.
+	// Rebuilt together with the writer config on every (re)open (see buildIndexWriterConfig).
+	private SnapshotDeletionPolicy snapshotDeletionPolicy = null;
 
 	// throttle the "writer wedged" ERROR so a permanently-broken writer can't flood the log
 	// (previously this produced a full stack trace on every request - GBs/day).
@@ -280,7 +288,53 @@ public class LuceneIndexManager {
 		mergePolicy.setDeletesPctAllowed(deletesPctAllowed);
 		iwc.setMergePolicy(mergePolicy);
 
+		// wrap the default deletion policy so backup() can take a consistent, merge-safe snapshot
+		snapshotDeletionPolicy = new SnapshotDeletionPolicy(new KeepOnlyLastCommitDeletionPolicy());
+		iwc.setIndexDeletionPolicy(snapshotDeletionPolicy);
+
 		return iwc;
+	}
+
+	/**
+	 * Takes a consistent, hot backup of the index into a sibling directory of the index dir,
+	 * named {@code l2-lucene-index.backup-{yyyyMMdd_HHmmss}}.
+	 * <p>
+	 * The current writer is committed and a {@link SnapshotDeletionPolicy} snapshot pins the
+	 * commit's files so they survive concurrent merges while they are copied. The snapshot is
+	 * always released afterwards so the pinned files can be reclaimed.
+	 *
+	 * @return the name of the created backup directory
+	 * @throws IOException if the index writer is unavailable or the copy fails
+	 */
+	public String backup() throws IOException {
+
+		IndexWriter iWriter = getIndexWriter();
+		if (iWriter == null)
+			throw new IOException("L2 Lucene index writer is unavailable - cannot back up");
+
+		SnapshotDeletionPolicy snapshotPolicy = this.snapshotDeletionPolicy;
+		if (snapshotPolicy == null)
+			throw new IOException("Snapshot deletion policy is not configured - cannot back up");
+
+		// flush pending changes so the snapshot reflects the current cache state
+		iWriter.commit();
+
+		Path indexDir = Paths.get(INDEX_PATH).toAbsolutePath();
+		String backupName = "l2-lucene-index.backup-" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+		Path backupDir = indexDir.getParent().resolve(backupName);
+
+		IndexCommit commit = snapshotPolicy.snapshot();
+		try {
+			Files.createDirectories(backupDir);
+			for (String fileName : commit.getFileNames())
+				Files.copy(indexDir.resolve(fileName), backupDir.resolve(fileName), StandardCopyOption.COPY_ATTRIBUTES);
+
+			logger.info("L2 index backup created: {} ({} files)", backupDir, commit.getFileNames().size());
+		} finally {
+			snapshotPolicy.release(commit);
+		}
+
+		return backupName;
 	}
 
 	/**

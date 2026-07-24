@@ -31,6 +31,7 @@ import org.frontcache.console.model.HystrixConfig;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.replication.CacheReplicator;
 import org.frontcache.replication.ReplicationProgressListener;
@@ -441,6 +442,22 @@ public class FrontcacheService {
 	public String dumpKeys(String edgeURL) {
 		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
 		DumpKeysActionResponse response = fcClient.dumpKeys();
+		if (null == response)
+			return "ERROR - edge " + edgeURL + " is not available";
+
+		return response.getAction();
+	}
+
+	/**
+	 * Triggers a backup of the on-disk (L2) index on the given edge. The backup is stored
+	 * in a sibling directory of the index dir at the edge (l2-lucene-index.backup-{yyyyMMdd_HHmmss}).
+	 *
+	 * @param edgeURL
+	 * @return status message returned by the edge, or an error message if the edge is not available
+	 */
+	public String backupEdge(String edgeURL) {
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
+		BackupActionResponse response = fcClient.backup();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
 

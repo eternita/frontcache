@@ -394,5 +394,21 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		// L2 - Lucene
 		luceneIndexManager.deleteExpired();
 	}
+
+	/**
+	 * Backs up the L2 (Lucene) index to a sibling directory of the index dir.
+	 * L1 (ehCache) is in-memory and not backed up.
+	 *
+	 * @return the name of the created backup directory
+	 */
+	@Override
+	public String backup() {
+		try {
+			return luceneIndexManager.backup();
+		} catch (IOException e) {
+			logger.error("L2 index backup failed", e);
+			throw new RuntimeException("L2 index backup failed: " + e.getMessage(), e);
+		}
+	}
 }
 

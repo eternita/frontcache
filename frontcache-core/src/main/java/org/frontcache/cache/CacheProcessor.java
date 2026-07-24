@@ -48,4 +48,14 @@ public interface CacheProcessor {
 	public void patch();
 
 	public void purge();
+
+	/**
+	 * Backs up the on-disk index (L2) to a sibling directory at the edge.
+	 * Cache processors without a persistent index (in-memory, no-cache) leave this a no-op.
+	 *
+	 * @return the name of the created backup directory, or {@code null} if the processor has nothing to back up
+	 */
+	public default String backup() {
+		return null;
+	}
 }

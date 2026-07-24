@@ -45,6 +45,7 @@ import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.io.ActionResponse;
+import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.io.FrontcacheAction;
@@ -191,6 +192,28 @@ public class FrontCacheClient {
 			e.printStackTrace();
 			return "ERROR " + e.getMessage();
 		}
+	}
+
+	/**
+	 * Triggers a backup of the on-disk (L2) index on the edge.
+	 *
+	 * @return BackupActionResponse with the status message, or null if the edge is not available
+	 */
+	public BackupActionResponse backup()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.BACKUP_INDEX));
+
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			BackupActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), BackupActionResponse.class);
+			return actionResponse;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
 	}
 
 	public Map<String, String> getCacheState()

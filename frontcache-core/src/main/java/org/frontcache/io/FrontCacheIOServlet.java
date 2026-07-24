@@ -181,6 +181,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = purge(request);
 			break;
 
+		case FrontcacheAction.BACKUP_INDEX:
+			aResponse = backupIndex(request);
+			break;
+
 		case FrontcacheAction.HELP:
 			aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
 			break;
@@ -510,6 +514,33 @@ public class FrontCacheIOServlet extends HttpServlet {
 		t.start();
 
 		PurgeActionResponse aResponse = new PurgeActionResponse();
+		return aResponse;
+	}
+
+	/**
+	 * Backs up the on-disk (L2) index to a sibling directory at the edge. Runs asynchronously
+	 * since copying a large index may take a while; the created directory name is logged at the edge.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse backupIndex(HttpServletRequest req)
+	{
+		Runnable r = new Runnable() {
+			public void run() {
+				try {
+					String backupDir = CacheManager.getInstance().backup();
+					logger.info("index backup completed: {}", backupDir);
+				} catch (Exception e) {
+					logger.error("index backup failed", e);
+				}
+			}
+		};
+
+		Thread t = new Thread(r);
+		t.start();
+
+		BackupActionResponse aResponse = new BackupActionResponse();
 		return aResponse;
 	}
 
