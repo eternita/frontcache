@@ -8,14 +8,17 @@
  */
 package org.frontcache.cache.impl;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -296,15 +299,17 @@ public class LuceneIndexManager {
 	}
 
 	/**
-	 * Takes a consistent, hot backup of the index into a sibling directory of the index dir,
-	 * named {@code l2-lucene-index.backup-{yyyyMMdd_HHmmss}}.
+	 * Takes a consistent, hot backup of the index into a {@code .zip} archive sibling to the index
+	 * dir, named {@code l2-lucene-index.backup-{yyyyMMdd_HHmmss}.zip}.
 	 * <p>
 	 * The current writer is committed and a {@link SnapshotDeletionPolicy} snapshot pins the
-	 * commit's files so they survive concurrent merges while they are copied. The snapshot is
-	 * always released afterwards so the pinned files can be reclaimed.
+	 * commit's files so they survive concurrent merges while they are streamed into the archive.
+	 * Each file is zipped on the fly (no intermediate copy on disk); entries are nested under a
+	 * top-level folder named after the backup so unzipping yields a ready-to-use index directory.
+	 * The snapshot is always released afterwards so the pinned files can be reclaimed.
 	 *
-	 * @return the name of the created backup directory
-	 * @throws IOException if the index writer is unavailable or the copy fails
+	 * @return the name of the created backup archive
+	 * @throws IOException if the index writer is unavailable or the archive can't be written
 	 */
 	public String backup() throws IOException {
 
@@ -321,20 +326,25 @@ public class LuceneIndexManager {
 
 		Path indexDir = Paths.get(INDEX_PATH).toAbsolutePath();
 		String backupName = "l2-lucene-index.backup-" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-		Path backupDir = indexDir.getParent().resolve(backupName);
+		String archiveName = backupName + ".zip";
+		Path archiveFile = indexDir.getParent().resolve(archiveName);
 
 		IndexCommit commit = snapshotPolicy.snapshot();
-		try {
-			Files.createDirectories(backupDir);
-			for (String fileName : commit.getFileNames())
-				Files.copy(indexDir.resolve(fileName), backupDir.resolve(fileName), StandardCopyOption.COPY_ATTRIBUTES);
+		try (OutputStream fos = Files.newOutputStream(archiveFile);
+				ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(fos))) {
 
-			logger.info("L2 index backup created: {} ({} files)", backupDir, commit.getFileNames().size());
+			for (String fileName : commit.getFileNames()) {
+				zos.putNextEntry(new ZipEntry(backupName + "/" + fileName));
+				Files.copy(indexDir.resolve(fileName), zos); // does not close zos
+				zos.closeEntry();
+			}
+
+			logger.info("L2 index backup created: {} ({} files)", archiveFile, commit.getFileNames().size());
 		} finally {
 			snapshotPolicy.release(commit);
 		}
 
-		return backupName;
+		return archiveName;
 	}
 
 	/**

@@ -61,7 +61,7 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_HYSTRIX_CONFIGS, "get raw hystrix configuration from ./conf/hystrix.properties");
 		actionsDescriptionMap.put(FrontcacheAction.PURGE, "purge expired entries from the cache (keeps non-expired and cache-forever entries)");
-		actionsDescriptionMap.put(FrontcacheAction.BACKUP_INDEX, "backup the L2 (Lucene) index to a sibling dir at the edge (l2-lucene-index.backup-{yyyyMMdd_HHmmss})");
+		actionsDescriptionMap.put(FrontcacheAction.BACKUP_INDEX, "backup the L2 (Lucene) index to a zip archive at the edge (l2-lucene-index.backup-{yyyyMMdd_HHmmss}.zip)");
 		actionsDescriptionMap.put(FrontcacheAction.PING, "ping for GSLB");
 		actionsDescriptionMap.put(FrontcacheAction.HELP, "help");
 	}
