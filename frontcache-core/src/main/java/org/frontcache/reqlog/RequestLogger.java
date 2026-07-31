@@ -60,6 +60,42 @@ public class RequestLogger {
 	}
 
 	/**
+	 * Logs a request that FrontCache rejected before touching cache or origin (e.g. a 400 for a
+	 * malformed query). Written to the dedicated failed-requests log with the reason as the last
+	 * column - NOT to error.log, so a high-volume bad-crawler flood stays filterable without drowning
+	 * real errors.
+	 *
+	 * @param url    request URL (host + URI + query)
+	 * @param reason short failure category, e.g. "bad-request"
+	 */
+	public static void logRejectedRequest(String url, String reason, RequestContext context)
+	{
+		HttpServletRequest request = context.getRequest();
+		String userAgent = (null != request) ? request.getHeader("User-Agent") : null;
+
+		StringBuilder sb = new StringBuilder();
+		sb.append(logTimeDateFormat.format(new Date()))
+			.append(SEPARATOR).append(context.getRequestId())
+			.append(SEPARATOR).append(context.getDomainContext().getDomain())
+			.append(SEPARATOR).append((null != request) ? request.getMethod() : "-")
+			.append(SEPARATOR).append("error")
+			.append(SEPARATOR).append(context.getRequestType())
+			.append(SEPARATOR).append("direct")
+			.append(SEPARATOR).append("rejected")
+			.append(SEPARATOR).append(0)   // runtimeMillis
+			.append(SEPARATOR).append(-1)  // lengthBytes
+			.append(SEPARATOR).append("\"").append(url).append("\"")
+			.append(SEPARATOR).append("\"").append(FCUtils.getClientIP(request)).append("\"")
+			.append(SEPARATOR).append(context.getFrontCacheId())
+			.append(SEPARATOR).append(context.getClientType())
+			.append(SEPARATOR).append("\"").append(userAgent).append("\"")
+			.append(SEPARATOR).append("\"").append(reason).append("\"");
+
+		failedRequestLogger.trace(sb.toString());
+		return;
+	}
+
+	/**
 	 *
 	 * @param url - request URL
 	 * @param isCacheable - true if request is run through FrontCache engine (e.g. GET method, text data). false - otherwise (request forwarded to origin)
