@@ -207,6 +207,50 @@ public class FCUtils {
 	}
 
 	/**
+	 * Detects a structurally-invalid request query string whose parameter <em>names</em> carry the
+	 * HTML-entity artifact {@code amp;} (raw, or percent-encoded as {@code amp%3B}).
+	 * <p>
+	 * A broken crawler that fails to decode {@code &amp;} in the origin's hrefs turns a real
+	 * parameter such as {@code &pagingPage_ci=2} into a bogus parameter named
+	 * {@code amp;pagingPage_ci}, and the {@code amp;} prefix compounds ({@code amp;amp;...}) on every
+	 * crawl hop. These are never legitimate parameters; worse, each unique permutation is a distinct
+	 * cache key, so left unchecked they all miss the cache and flood the origin (~26% of prod traffic
+	 * on fc-ap). Such requests are rejected with 400 before reaching cache or origin.
+	 *
+	 * @param queryString raw request query string, optionally starting with '?'; may be null/empty
+	 * @return true if any parameter name is or starts with {@code amp;}
+	 */
+	public static boolean hasMalformedQueryParams(String queryString)
+	{
+		if (null == queryString || queryString.isEmpty())
+			return false;
+
+		// strip the leading '?' (getRequestQueryString() prefixes one)
+		String qs = ('?' == queryString.charAt(0)) ? queryString.substring(1) : queryString;
+
+		for (String pair : qs.split("&"))
+		{
+			if (pair.isEmpty())
+				continue;
+
+			int eq = pair.indexOf('=');
+			String rawName = (-1 < eq) ? pair.substring(0, eq) : pair;
+
+			String name;
+			try {
+				name = URLDecoder.decode(rawName, "UTF-8"); // amp%3B... -> amp;...
+			} catch (Exception e) {
+				name = rawName; // not valid percent-encoding: check the raw form
+			}
+
+			if (name.startsWith("amp;"))
+				return true;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Helper to work with Map<String, List<String>>
 	 *
 	 * @param requestHeaders

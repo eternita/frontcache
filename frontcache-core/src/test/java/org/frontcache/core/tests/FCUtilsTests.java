@@ -9,7 +9,9 @@
 package org.frontcache.core.tests;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.List;
 import java.util.Map;
@@ -77,6 +79,34 @@ public class FCUtilsTests {
 	@Test
 	public void getClientIPIsNullSafe() throws Exception {
 		assertEquals("unresolved", FCUtils.getClientIP(null));
+	}
+
+	/**
+	 * The broken-crawler flood: query param names carry the &amp;-decoding artifact "amp;" (raw or
+	 * percent-encoded amp%3B), compounding on every hop. These must be flagged so the request is
+	 * rejected with 400 instead of cache-busting the origin.
+	 */
+	@Test
+	public void hasMalformedQueryParamsDetectsAmpArtifact() throws Exception {
+		// real samples from prod error.log (percent-encoded amp%3B == amp;)
+		assertTrue(FCUtils.hasMalformedQueryParams("?amp%3Bamp%3BpagingNumberPer_ci=2&amp%3Bamp%3Bamp%3BsortDirection_ci=1"));
+		assertTrue(FCUtils.hasMalformedQueryParams("?amp%3BpagingNumberPer_rs_tx=1&amp%3Bamp%3Bid=X"));
+		// raw (already-decoded) form
+		assertTrue(FCUtils.hasMalformedQueryParams("?amp;pagingPage_ci=2"));
+		// artifact anywhere in the param list, not only first
+		assertTrue(FCUtils.hasMalformedQueryParams("?id=abc&amp%3BsortDirection_ci=1"));
+	}
+
+	@Test
+	public void hasMalformedQueryParamsAllowsLegitQueries() throws Exception {
+		assertFalse(FCUtils.hasMalformedQueryParams(null));
+		assertFalse(FCUtils.hasMalformedQueryParams(""));
+		assertFalse(FCUtils.hasMalformedQueryParams("?"));
+		assertFalse(FCUtils.hasMalformedQueryParams("?pagingPage_ci=2&sortDirection_ci=1"));
+		assertFalse(FCUtils.hasMalformedQueryParams("?id=c_sK.GJAIx4AAAEvnTTi7NnT&activity=COIN_GROUP_UPDATE&cmd=check"));
+		assertFalse(FCUtils.hasMalformedQueryParams("?coinId=6krBwcI0jRQAAAErQ75bGgFV&ciid=6krBwcI0jRQAAAErQ75bGgFV&itemType=COIN"));
+		// a legit name that merely starts with "amp" (no semicolon) must NOT trip the check
+		assertFalse(FCUtils.hasMalformedQueryParams("?amplitude=5&ample=true"));
 	}
 
 	@Test

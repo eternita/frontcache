@@ -526,8 +526,40 @@ public class FrontCacheEngine {
 	public void processRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) throws Exception
 	{
 		RequestContext context = init(servletRequest, servletResponse, filterChain);
+
+		// Reject structurally-invalid requests (e.g. a broken crawler's &amp;-mangled query params)
+		// with 400 before they reach cache or origin. Each malformed permutation is a unique cache
+		// key that otherwise misses the cache and hits origin - the source of the origin overload.
+		if (FCUtils.hasMalformedQueryParams(context.getRequestQueryString()))
+		{
+			rejectBadRequest(context);
+			return;
+		}
+
 		new FC_Total(this, context).execute();
 //		processRequestInternal();
+		return;
+	}
+
+	/**
+	 * Sends a 400 Bad Request for a rejected (malformed) request, without touching cache or origin,
+	 * and records it in the failed-requests log (not error.log, to avoid a flood).
+	 */
+	private void rejectBadRequest(RequestContext context)
+	{
+		HttpServletResponse servletResponse = context.getResponse();
+		try {
+			servletResponse.setStatus(HttpServletResponse.SC_BAD_REQUEST); // 400
+			servletResponse.setContentType("text/plain; charset=UTF-8");
+			servletResponse.getWriter().write("400 Bad Request");
+		} catch (Exception e) {
+			logger.debug("Error writing 400 response: " + e);
+		}
+
+		RequestLogger.logRejectedRequest(
+				context.getFrontCacheHost() + context.getRequestURI() + context.getRequestQueryString(),
+				"bad-request",
+				context);
 		return;
 	}
 
