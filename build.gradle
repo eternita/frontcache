@@ -57,7 +57,6 @@ class ExecWait extends DefaultTask {
 apply plugin: 'java-library'
 apply plugin: 'jacoco'
 group = 'org.frontcache'
-version = '2.2.3'
 
 // Build/test with Java 21 via a toolchain (Jetty 12 / Jakarta EE10 need Java 17
 // as a baseline; we target the 21 LTS).
