@@ -1,1 +1,0 @@
-<%@ taglib uri="http://frontcache.org/core" prefix="fc" %>b

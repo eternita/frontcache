@@ -1,1 +1,0 @@
-<%@ taglib uri="http://frontcache.org/core" prefix="fc" %><fc:component maxage="60" level="L1" />b<fc:include url="/common/l1-l2-cache-level/c1.jsp" />
