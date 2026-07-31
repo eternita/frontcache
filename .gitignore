@@ -11,5 +11,3 @@ CLAUDE.md
 /**/build/
 /frontcache-server/server/frontcache-base/webapps/
 /frontcache-server/server/lib/
-/frontcache-tests/FRONTCACHE_HOME_**/cache/
-/frontcache-tests/FRONTCACHE_HOME_**/logs/

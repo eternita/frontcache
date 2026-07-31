@@ -5,43 +5,6 @@ plugins {
 // Jetty 12 (Jakarta EE10).
 ext.jettyVersion = '12.0.16'
 
-class ExecWait extends DefaultTask {
-	@Internal String command
-	@Internal String ready
-	@Internal String directory
-
-	@TaskAction
-	def spawnProcess() {
-
-		ProcessBuilder builder = new ProcessBuilder(command.split(' '))
-		builder.redirectErrorStream(true)
-		builder.directory(new File(directory))
-		Process process = builder.start()
-
-		InputStream stdout = process.getInputStream()
-		BufferedReader reader = new BufferedReader(new InputStreamReader(stdout))
-
-		def line
-		while ((line = reader.readLine()) != null) {
-			println line
-			if (line.contains(ready)) {
-				println "$command is ready"
-				break;
-			}
-		}
-
-		// Keep draining the spawned process' output in a background daemon thread.
-		// Otherwise its stdout pipe buffer fills up and the (long-running) server
-		// process blocks on its next log write, hanging it mid-test.
-		Thread.startDaemon {
-			def l
-			while ((l = reader.readLine()) != null) {
-				println l
-			}
-		}
-	}
-}
-
 license {
     ignoreFailures true
     strictCheck true
@@ -344,93 +307,8 @@ project(':frontcache-console') {
 	}
 }
 
-
-
-// tests -> FC standalone (localhost:9080) -> FC webfilter (localhost:8080) -> web app (localhost:8080)
-// Both FC standalone (:9080, serving src/test-integration/webapp) and FC webfilter
-// + web app (:8080, serving src/main/webapp) now run in embedded Jetty 12 via the
-// org.frontcache.tests.FrontcacheStandaloneServer launcher. tests.sh starts both,
-// runs the integration suite, then kills them.
-project(':frontcache-tests') {
-	apply plugin: 'war'
-
-	sourceSets {
-		integrationTest {
-			java.srcDir file('src/test-integration/java')
-			resources.srcDir file('src/test-integration/resources')
-			compileClasspath = sourceSets.main.output + configurations.testRuntimeClasspath + configurations.provided
-			runtimeClasspath = output + compileClasspath
-		}
-	}
-
-	task integrationTest(type: Test) {
-		description = 'Runs the integration tests.'
-		group = 'verification'
-		maxParallelForks = 1 // run all tests sequentially (due to cache cleanup befor every test)
-		forkEvery = 1 // run all tests sequentially (due to cache cleanup befor every test)
-		testClassesDirs = sourceSets.integrationTest.output.classesDirs
-		classpath = sourceSets.integrationTest.runtimeClasspath
-		reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/integration')
-		reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/integration')
-
-		//		jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
-		jvmArgs '-Dfrontcache-tests.home=' + projectDir
-	}
-
-	// FC standalone (:9080) — embedded Jetty 12 serving the reverse-proxy webapp
-	task standaloneJetty(type: JavaExec) {
-		mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
-		classpath = sourceSets.main.runtimeClasspath + configurations.provided
-		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/test-integration/webapp"
-		systemProperty 'frontcache.jetty.port', '9080'
-		systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_STANDALONE"
-		systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_STANDALONE/conf/fc-logback.xml"
-	}
-
-	// FC webfilter + web app (:8080) — embedded Jetty 12 serving the main webapp (was gretty)
-	task webfilterJetty(type: JavaExec) {
-		mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
-		classpath = sourceSets.main.runtimeClasspath + configurations.provided
-		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
-		systemProperty 'frontcache.jetty.port', '8080'
-		systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_FILTER"
-		systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml"
-	}
-
-	task startStandaloneFrontcache(type: ExecWait) {
-		command './gradlew :frontcache-tests:standaloneJetty'
-		ready 'has been started successfully'
-		directory '.'
-	}
-
-	task startWebfilterFrontcache(type: ExecWait) {
-		command './gradlew :frontcache-tests:webfilterJetty'
-		ready 'has been started successfully'
-		directory '.'
-	}
-
-	task end2endTests {
-		dependsOn integrationTest
-	}
-
-	dependencies {
-		implementation project(':frontcache-core')
-		implementation project(':frontcache-agent')
-
-		implementation('net.sourceforge.htmlunit:htmlunit:2.18') {
-			exclude group: 'org.eclipse.jetty'
-			exclude group: 'org.eclipse.jetty.websocket'
-		}
-		implementation 'org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1'
-		implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0'
-
-		// Embedded Jetty 12 launcher deps (compile + launcher runtime; not bundled in the war)
-		provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
-		provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
-		provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
-		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
-
-		provided 'junit:junit:4.12'
-	}
-
-}
+// The end-to-end / integration test suite (frontcache-tests) lives in its own
+// repository now: https://github.com/eternita/frontcache-tests (checked out as a
+// sibling ../frontcache-tests). It consumes frontcache-core / frontcache-agent
+// from this build via a Gradle composite build (includeBuild) and is run with its
+// own ./tests.sh.

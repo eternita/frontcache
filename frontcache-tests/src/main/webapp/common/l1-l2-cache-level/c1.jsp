@@ -1,1 +1,0 @@
-<%@ taglib uri="http://frontcache.org/core" prefix="fc" %><fc:component maxage="60" />c

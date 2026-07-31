@@ -1,1 +1,0 @@
-<%@ taglib uri="http://frontcache.org/core" prefix="fc" %>b<fc:include url="/common/deep-include/c.jsp" />
