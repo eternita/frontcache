@@ -82,6 +82,13 @@ public class FrontCacheEngine {
 
 	private static int fcConnectionsMaxPerRoute = 20;
 
+	// Requests whose URI (path + query) exceeds this length are rejected with 414 before touching
+	// cache or origin. Guards against absurdly long URLs (e.g. a crawler's compounding &amp;-mangled
+	// query) that would otherwise each be a unique cache key hitting origin. Tunable via
+	// front-cache.max-request-uri-length; <= 0 disables the check.
+	private static final int DEFAULT_MAX_REQUEST_URI_LENGTH = 4096;
+	private static int maxRequestURILength = DEFAULT_MAX_REQUEST_URI_LENGTH;
+
 	private IncludeProcessor includeProcessor = null;
 
 	private CacheProcessor cacheProcessor = null;
@@ -229,6 +236,13 @@ public class FrontCacheEngine {
 			fcHostId = DEFAULT_FRONTCACHE_HOST_NAME_VALUE;
 
         logToHeadersConfig = "true".equals(FCConfig.getProperty("front-cache.log-to-headers", "false")) ? true : false;
+
+        try {
+            maxRequestURILength = Integer.parseInt(FCConfig.getProperty("front-cache.max-request-uri-length", "" + DEFAULT_MAX_REQUEST_URI_LENGTH).trim());
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid front-cache.max-request-uri-length - using default " + DEFAULT_MAX_REQUEST_URI_LENGTH);
+            maxRequestURILength = DEFAULT_MAX_REQUEST_URI_LENGTH;
+        }
 
 		cacheProcessor = CacheManager.getInstance();
 
@@ -527,12 +541,23 @@ public class FrontCacheEngine {
 	{
 		RequestContext context = init(servletRequest, servletResponse, filterChain);
 
-		// Reject structurally-invalid requests (e.g. a broken crawler's &amp;-mangled query params)
-		// with 400 before they reach cache or origin. Each malformed permutation is a unique cache
-		// key that otherwise misses the cache and hits origin - the source of the origin overload.
-		if (FCUtils.hasMalformedQueryParams(context.getRequestQueryString()))
+		// Reject abusive/invalid requests before they reach cache or origin. Each such request is a
+		// unique cache key that otherwise misses the cache and hits origin - the source of the origin
+		// overload from a broken crawler's compounding &amp;-mangled query strings.
+		String requestURI = context.getRequestURI();
+		String queryString = context.getRequestQueryString();
+
+		// 1) URI too long (path + query) -> 414
+		if (0 < maxRequestURILength && (requestURI.length() + queryString.length()) > maxRequestURILength)
 		{
-			rejectBadRequest(context);
+			rejectRequest(context, HttpServletResponse.SC_REQUEST_URI_TOO_LONG, "414 Request-URI Too Long", "uri-too-long");
+			return;
+		}
+
+		// 2) structurally-invalid query params (amp;-mangled) -> 400
+		if (FCUtils.hasMalformedQueryParams(queryString))
+		{
+			rejectRequest(context, HttpServletResponse.SC_BAD_REQUEST, "400 Bad Request", "bad-request");
 			return;
 		}
 
@@ -542,23 +567,27 @@ public class FrontCacheEngine {
 	}
 
 	/**
-	 * Sends a 400 Bad Request for a rejected (malformed) request, without touching cache or origin,
-	 * and records it in the failed-requests log (not error.log, to avoid a flood).
+	 * Sends a rejection response (e.g. 400 / 414) for an abusive or invalid request, without touching
+	 * cache or origin, and records it in the failed-requests log (not error.log, to avoid a flood).
+	 *
+	 * @param status  HTTP status code to send
+	 * @param body    short plain-text response body
+	 * @param reason  short failure category for the failed-requests log (e.g. "bad-request", "uri-too-long")
 	 */
-	private void rejectBadRequest(RequestContext context)
+	private void rejectRequest(RequestContext context, int status, String body, String reason)
 	{
 		HttpServletResponse servletResponse = context.getResponse();
 		try {
-			servletResponse.setStatus(HttpServletResponse.SC_BAD_REQUEST); // 400
+			servletResponse.setStatus(status);
 			servletResponse.setContentType("text/plain; charset=UTF-8");
-			servletResponse.getWriter().write("400 Bad Request");
+			servletResponse.getWriter().write(body);
 		} catch (Exception e) {
-			logger.debug("Error writing 400 response: " + e);
+			logger.debug("Error writing " + status + " response: " + e);
 		}
 
 		RequestLogger.logRejectedRequest(
 				context.getFrontCacheHost() + context.getRequestURI() + context.getRequestQueryString(),
-				"bad-request",
+				reason,
 				context);
 		return;
 	}
