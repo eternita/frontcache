@@ -46,6 +46,8 @@ import org.apache.lucene.search.TermStatistics;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.LockObtainFailedException;
+import org.apache.lucene.store.SimpleFSLockFactory;
 import org.apache.lucene.util.BytesRef;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
@@ -85,6 +87,11 @@ public class LuceneIndexManager {
 	// with "LockObtainFailedException: Lock held by this virtual machine". Reusing one
 	// Directory + always closing the stale writer before reopening keeps the lock lifecycle clean.
 	private Directory directory = null;
+
+	// Index paths that currently have a live IndexWriter in THIS JVM. A stale write.lock is safe to
+	// auto-clear on reopen only when its path is absent here - i.e. no live writer owns it (see
+	// getIndexWriter). Static because the guard is against two managers in one process on one dir.
+	private static final Set<String> LIVE_WRITER_PATHS = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
 	// Snapshot deletion policy of the current writer. Lets backup() pin the files of a commit so
 	// a concurrent merge can't delete them mid-copy - the Lucene-canonical hot-backup mechanism.
@@ -229,9 +236,9 @@ public class LuceneIndexManager {
 			if (indexWriter != null && indexWriter.isOpen())
 				return indexWriter;
 
-			// The current writer is broken (tragic event) or was never created. Close it first
-			// so its NativeFSLock is released from the JVM's static lock set; otherwise reopening
-			// throws "LockObtainFailedException: Lock held by this virtual machine" indefinitely.
+			// Close the broken writer first so its lock is released; otherwise reopening fails. Its
+			// path leaves LIVE_WRITER_PATHS so the stale write.lock it may have left behind becomes
+			// eligible for auto-clearing below.
 			if (indexWriter != null) {
 				try {
 					indexWriter.close();
@@ -239,35 +246,108 @@ public class LuceneIndexManager {
 					logger.warn("Error closing stale IndexWriter before reopen (lock may be released on close): {}", t.getMessage());
 				}
 				indexWriter = null;
+				LIVE_WRITER_PATHS.remove(INDEX_PATH);
 			}
 
 			logger.debug("(re)opening Lucene IndexWriter...");
 
-			// open the Directory once and reuse it - a fresh Directory per reopen leaks stale locks
-			if (directory == null)
-				directory = FSDirectory.open(Paths.get(INDEX_PATH));
-
-			IndexWriterConfig iwc = buildIndexWriterConfig();
-
 			try {
-				indexWriter = new IndexWriter(directory, iwc);
+				indexWriter = openNewIndexWriter();
 				logger.info("IndexWriter initialized");
-			} catch (IOException e) {
-				// reopen failed (e.g. a genuinely wedged lock we can't reclaim in-process).
-				// Log at most once per interval instead of a per-request stack-trace flood,
-				// and surface an actionable message. Recovery requires a JVM restart.
-				long now = System.currentTimeMillis();
-				if (now - lastReopenFailureLogMillis > REOPEN_FAILURE_LOG_INTERVAL_MILLIS) {
-					lastReopenFailureLogMillis = now;
-					logger.error("L2 Lucene IndexWriter is unavailable - cache reads/writes to L2 are failing. "
-							+ "If this persists, restart the Frontcache server (index dir: {}). Cause: {}",
-							INDEX_PATH, e.toString());
+			} catch (LockObtainFailedException lofe) {
+				// The write lock could not be acquired. Recover ONLY when no live writer in this JVM
+				// owns the index (LIVE_WRITER_PATHS), which means the lock is stale - left by a writer
+				// that died on a tragic event (e.g. an OutOfMemoryError during commit/merge under load,
+				// the ~4h prod wedge at 16:23-20:35 that previously needed a restart), by a hard crash /
+				// kill of a prior JVM, or by an older build's NativeFSLockFactory (whose write.lock file
+				// persists on disk). Because the index uses SimpleFSLockFactory (see openNewIndexWriter)
+				// the lock is nothing but the write.lock file's existence, so deleting the stale file and
+				// retrying once lets L2 self-heal in-process.
+				//
+				// If a live writer IN THIS JVM does own it, we must NOT delete: that would put two
+				// writers on one index (corruption). That only arises from two managers on one dir in
+				// one process - unsupported in prod (single writer per FRONTCACHE_HOME).
+				if (!LIVE_WRITER_PATHS.contains(INDEX_PATH)) {
+					logger.warn("L2 Lucene write lock is stale ({}) - clearing it and retrying", lofe.getMessage());
+					deleteStaleWriteLock();
+					try {
+						indexWriter = openNewIndexWriter();
+						logger.warn("L2 Lucene IndexWriter recovered automatically after clearing a stale write lock");
+					} catch (IOException retryEx) {
+						logReopenFailureThrottled(retryEx);
+						throw retryEx;
+					}
+				} else {
+					logReopenFailureThrottled(lofe);
+					throw lofe;
 				}
+			} catch (IOException e) {
+				logReopenFailureThrottled(e);
 				throw e;
 			}
 		}
 
 		return indexWriter;
+	}
+
+	/**
+	 * Opens a fresh IndexWriter on the (lazily opened, reused) Directory with cache-tuned config.
+	 * A new IndexWriterConfig is built on every call because one config instance may back only a
+	 * single IndexWriter.
+	 */
+	private IndexWriter openNewIndexWriter() throws IOException {
+		// Open the Directory once and reuse it - a fresh Directory per reopen leaks stale locks.
+		//
+		// Use SimpleFSLockFactory instead of Lucene's default NativeFSLockFactory: here the write
+		// lock is just the write.lock FILE's existence - there is no OS file-channel lock and no
+		// process-global lock table. A writer that dies tragically (OOM during commit) or is killed
+		// (kill -9, crash) leaks the default's OS lock + static LOCK_HELD entry, both unreachable, so
+		// every reopen throws "Lock held by this virtual machine" until a JVM restart. The file-based
+		// lock instead leaves only a stale file, which we can delete and retry (see getIndexWriter),
+		// letting L2 self-heal. Safe because Frontcache is single-writer per index dir (each instance
+		// owns its FRONTCACHE_HOME), so the cross-process protection we give up is protection we never
+		// relied on.
+		if (directory == null)
+			directory = FSDirectory.open(Paths.get(INDEX_PATH), SimpleFSLockFactory.INSTANCE);
+		IndexWriter w = new IndexWriter(directory, buildIndexWriterConfig());
+		// Record that this JVM now holds a live writer on this index, so a concurrent manager on the
+		// same dir won't mistake our live lock for a stale one and delete it (see getIndexWriter).
+		LIVE_WRITER_PATHS.add(INDEX_PATH);
+		return w;
+	}
+
+	/**
+	 * Logs the "L2 writer unavailable" ERROR at most once per interval instead of a per-request
+	 * stack-trace flood (a permanently-broken writer previously produced GBs/day), with an
+	 * actionable restart hint for the case recovery genuinely can't fix (e.g. disk full).
+	 */
+	private void logReopenFailureThrottled(IOException e) {
+		long now = System.currentTimeMillis();
+		if (now - lastReopenFailureLogMillis > REOPEN_FAILURE_LOG_INTERVAL_MILLIS) {
+			lastReopenFailureLogMillis = now;
+			logger.error("L2 Lucene IndexWriter is unavailable - cache reads/writes to L2 are failing. "
+					+ "If this persists, restart the Frontcache server (index dir: {}). Cause: {}",
+					INDEX_PATH, e.toString());
+		}
+	}
+
+	/**
+	 * Deletes a stale {@code write.lock} left behind by a writer that died without releasing it,
+	 * so a fresh writer can reacquire the (file-based, SimpleFSLockFactory) lock.
+	 * <p>
+	 * Only called from the reopen path after a lock acquisition already failed, at which point our
+	 * own writer is closed/null - so no live writer's lock is being pulled out from under it.
+	 */
+	private void deleteStaleWriteLock() {
+		Path lockFile = Paths.get(INDEX_PATH).resolve(IndexWriter.WRITE_LOCK_NAME);
+		try {
+			if (Files.deleteIfExists(lockFile))
+				logger.warn("Deleted stale L2 write lock {}", lockFile);
+			else
+				logger.warn("No L2 write lock file to delete at {} (already gone?)", lockFile);
+		} catch (IOException e) {
+			logger.warn("Could not delete stale L2 write lock {} - a restart may still be required: {}", lockFile, e.toString());
+		}
 	}
 
 	/**
@@ -413,6 +493,9 @@ public class LuceneIndexManager {
 			}
 		}
 		indexWriter = null;
+		// SimpleFSLockFactory deletes write.lock on a clean close; drop our live-writer registration
+		// so a later reopen treats any leftover lock as stale.
+		LIVE_WRITER_PATHS.remove(INDEX_PATH);
 
 		if (directory != null) {
 			try {

@@ -174,25 +174,36 @@ public class FCUtils {
 		// add request-id header - to trace include tree
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 
-		// add header with client IP
-		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, getClientIP(context.getRequest()));
+		// add header with client IP - unless it was already resolved on the request thread (async
+		// includes pre-resolve it there, before the servlet request is recycled; see
+		// ConcurrentIncludeProcessor.parseIncludes). getClientIP is null/recycle-safe either way.
+		if (!requestHeaders.containsKey(FCHeaders.X_FRONTCACHE_CLIENT_IP))
+			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, getClientIP(context.getRequest()));
 
 		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }
 
 	public static String getClientIP(HttpServletRequest request) {
-		for (String header : CLIENT_IP_SOURCE_HEADER_LIST) {
-			String ip = request.getHeader(header);
-			if (ip != null && ip.length() != 0 && !"unknown".equalsIgnoreCase(ip)) {
-				return ip;
+		// request may be null or a container-recycled servlet request: async includes are resolved in
+		// a background thread after the top-level response has completed, so the original request is
+		// gone by then. Reading a header off it would throw (NPE / "request does not exist") - which
+		// used to abort the whole include before the origin call even ran (100k+ NPEs/day on
+		// coin-visit-counter). The client IP is a best-effort header, so degrade to "unresolved"
+		// instead of failing the include.
+		if (null == request)
+			return "unresolved";
+		try {
+			for (String header : CLIENT_IP_SOURCE_HEADER_LIST) {
+				String ip = request.getHeader(header);
+				if (ip != null && ip.length() != 0 && !"unknown".equalsIgnoreCase(ip)) {
+					return ip;
+				}
 			}
+			return request.getRemoteAddr();
+		} catch (Exception ex) {
+			logger.info("Can't resolve client IP from request (likely recycled): " + ex);
 		}
-        try {
-            return request.getRemoteAddr();
-        } catch (Exception ex) {
-            logger.info(" Can't resolve IP from request");
-        }
-        return "unresolved";
+		return "unresolved";
 	}
 
 	/**

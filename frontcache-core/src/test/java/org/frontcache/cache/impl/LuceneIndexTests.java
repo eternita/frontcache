@@ -465,6 +465,102 @@ public class LuceneIndexTests {
 		}
 	}
 
+	/**
+	 * Reproduces the production wedge: a writer that dies on a tragic event (e.g. OOM during commit)
+	 * or is killed leaves its write lock unreleased, so every reopen fails until a JVM restart. With
+	 * the file-based SimpleFSLockFactory the lock is just the {@code write.lock} file, so this is a
+	 * leftover lock file plus a dead writer. We simulate it by detaching the live writer's
+	 * {@code writeLock} field before closing it (so close() cannot delete the lock file), then assert
+	 * the manager reacquires a working writer on its own (self-heal) instead of staying dead.
+	 */
+	@Test
+	public void selfHealsAfterStaleWriteLock() throws Exception {
+
+		// baseline: the writer works
+		String url1 = UUID.randomUUID().toString();
+		WebResponse r1 = new WebResponse(url1, UUID.randomUUID().toString().getBytes());
+		r1.setDomain(DOMAIN);
+		luceneIndexManager.indexDoc(r1);
+		assertNotNull(luceneIndexManager.getResponse(url1));
+
+		// --- simulate a tragically-killed writer that left its lock file behind ---
+		java.lang.reflect.Field iwField = LuceneIndexManager.class.getDeclaredField("indexWriter");
+		iwField.setAccessible(true);
+		org.apache.lucene.index.IndexWriter liveWriter = (org.apache.lucene.index.IndexWriter) iwField.get(luceneIndexManager);
+		assertNotNull(liveWriter);
+
+		// detach the write lock so close() cannot delete the lock file -> stale write.lock stays on disk
+		java.lang.reflect.Field writeLockField = org.apache.lucene.index.IndexWriter.class.getDeclaredField("writeLock");
+		writeLockField.setAccessible(true);
+		writeLockField.set(liveWriter, null);
+		liveWriter.close();
+		assertFalse("writer must look dead to force the reopen path", liveWriter.isOpen());
+
+		// the lock file is now stale exactly as after a tragic death / kill
+		java.nio.file.Path lockFile = java.nio.file.Paths.get(baseDir)
+				.resolve(org.apache.lucene.index.IndexWriter.WRITE_LOCK_NAME);
+		assertTrue("precondition: a stale write.lock should be left behind", java.nio.file.Files.exists(lockFile));
+
+		// --- next cache write must self-heal (delete the stale lock + reopen) rather than wedge ---
+		String url2 = UUID.randomUUID().toString();
+		WebResponse r2 = new WebResponse(url2, UUID.randomUUID().toString().getBytes());
+		r2.setDomain(DOMAIN);
+		luceneIndexManager.indexDoc(r2);
+
+		WebResponse restored = luceneIndexManager.getResponse(url2);
+		assertNotNull("L2 writer should have recovered automatically after the stale lock", restored);
+		assertEquals(url2, restored.getUrl());
+		// the pre-leak entry is still readable too
+		assertNotNull(luceneIndexManager.getResponse(url1));
+	}
+
+	/**
+	 * A fresh manager - as after a server restart or an upgrade from the old NativeFSLockFactory build
+	 * whose write.lock file persists on disk - must clear a leftover lock left by a dead prior JVM and
+	 * come up working, rather than wedging on startup.
+	 */
+	@Test
+	public void selfHealsAtStartupWithLeftoverLockFromDeadJvm() throws Exception {
+
+		String dir = "/tmp/lucene-leftover-lock-" + System.currentTimeMillis();
+
+		// a first manager creates the index, then (simulating a hard crash) leaves write.lock behind
+		LuceneIndexManager crashed = new LuceneIndexManager(dir);
+		WebResponse r1 = new WebResponse(UUID.randomUUID().toString(), UUID.randomUUID().toString().getBytes());
+		r1.setDomain(DOMAIN);
+		crashed.indexDoc(r1);
+
+		java.lang.reflect.Field iwField = LuceneIndexManager.class.getDeclaredField("indexWriter");
+		iwField.setAccessible(true);
+		org.apache.lucene.index.IndexWriter w = (org.apache.lucene.index.IndexWriter) iwField.get(crashed);
+		java.lang.reflect.Field writeLockField = org.apache.lucene.index.IndexWriter.class.getDeclaredField("writeLock");
+		writeLockField.setAccessible(true);
+		writeLockField.set(w, null); // detach so close() cannot delete the lock file
+		w.close();
+
+		// simulate that the crashed JVM is gone: in a new JVM no live writer is registered for this dir
+		clearLiveWriterRegistration(dir);
+		java.nio.file.Path lockFile = java.nio.file.Paths.get(dir)
+				.resolve(org.apache.lucene.index.IndexWriter.WRITE_LOCK_NAME);
+		assertTrue("precondition: a stale write.lock should be left behind", java.nio.file.Files.exists(lockFile));
+
+		// a fresh manager must clear the leftover lock during startup and be able to write
+		LuceneIndexManager restarted = new LuceneIndexManager(dir);
+		String url2 = UUID.randomUUID().toString();
+		WebResponse r2 = new WebResponse(url2, UUID.randomUUID().toString().getBytes());
+		r2.setDomain(DOMAIN);
+		restarted.indexDoc(r2);
+		assertNotNull("fresh manager should have recovered from the leftover lock", restarted.getResponse(url2));
+		restarted.close();
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void clearLiveWriterRegistration(String path) throws Exception {
+		java.lang.reflect.Field f = LuceneIndexManager.class.getDeclaredField("LIVE_WRITER_PATHS");
+		f.setAccessible(true);
+		((Set<String>) f.get(null)).remove(path);
+	}
+
 	private String baseDir;
 
 	@Before

@@ -25,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.http.client.HttpClient;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -190,6 +191,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 						includeRequestHeaders = new HashMap<String, List<String>>();
 						includeRequestHeaders.putAll(requestHeaders);
 						includeRequestHeaders.put(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE, Arrays.asList(new String[]{"true"}));
+						// Resolve the client IP now, while we are still on the request thread and the
+						// servlet request is live. Async includes run later in a background thread, by
+						// which time the request is recycled and the IP is unrecoverable (see
+						// FCUtils.getClientIP / includeDynamicCallHttpClient).
+						includeRequestHeaders.put(FCHeaders.X_FRONTCACHE_CLIENT_IP,
+								Arrays.asList(new String[]{ FCUtils.getClientIP(context.getRequest()) }));
 					}
 
 					String includeClientType = getIncludeClientType(includeTagStr);
