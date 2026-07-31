@@ -67,4 +67,27 @@ public class FCUtilsTests {
 
 		return;
 	}
+
+	/**
+	 * getClientIP must never propagate an exception: async includes resolve it in a background thread
+	 * after the servlet request has been recycled, so the request is either null or throws on access.
+	 * This used to NPE and abort the include before the origin call ran (100k+/day on
+	 * coin-visit-counter). It must degrade to "unresolved" instead.
+	 */
+	@Test
+	public void getClientIPIsNullSafe() throws Exception {
+		assertEquals("unresolved", FCUtils.getClientIP(null));
+	}
+
+	@Test
+	public void getClientIPSurvivesRecycledRequest() throws Exception {
+		// a container-recycled request throws on any accessor
+		jakarta.servlet.http.HttpServletRequest recycled = (jakarta.servlet.http.HttpServletRequest)
+				java.lang.reflect.Proxy.newProxyInstance(
+						getClass().getClassLoader(),
+						new Class[]{ jakarta.servlet.http.HttpServletRequest.class },
+						(proxy, method, args) -> { throw new IllegalStateException("request does not exist (recycled)"); });
+
+		assertEquals("unresolved", FCUtils.getClientIP(recycled));
+	}
 }
