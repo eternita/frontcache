@@ -2,12 +2,12 @@
 
 # cleanup cache dirs & logs
 # for filter
-rm -rf ./frontcache-tests/FRONTCACHE_HOME_FILTER/cache/l2-lucene-index/*
-rm -rf ./frontcache-tests/FRONTCACHE_HOME_FILTER/logs/*
+rm -rf ./FRONTCACHE_HOME_FILTER/cache/l2-lucene-index/*
+rm -rf ./FRONTCACHE_HOME_FILTER/logs/*
 
 # for standalone test server
-rm -rf ./frontcache-tests/FRONTCACHE_HOME_STANDALONE/cache/l2-lucene-index/*
-rm -rf ./frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/*
+rm -rf ./FRONTCACHE_HOME_STANDALONE/cache/l2-lucene-index/*
+rm -rf ./FRONTCACHE_HOME_STANDALONE/logs/*
 # end cleanup cache dirs & logs
 
 # stop gradle daemons
@@ -17,10 +17,10 @@ rm -rf ./frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/*
 #   FC webfilter + web app (:8080)  <-  FC standalone reverse-proxy (:9080)
 # Each start task blocks until the server prints its "started successfully" line,
 # then leaves the server JVM running in the background.
-./gradlew clean :frontcache-tests:startWebfilterFrontcache
-./gradlew :frontcache-tests:startStandaloneFrontcache
+./gradlew clean startWebfilterFrontcache
+./gradlew startStandaloneFrontcache
 
-./gradlew :frontcache-tests:end2endTests
+./gradlew end2endTests
 
 echo "Stopping embedded Jetty servers ..."
 lsof -ti tcp:9080 | xargs kill -9 2>/dev/null
