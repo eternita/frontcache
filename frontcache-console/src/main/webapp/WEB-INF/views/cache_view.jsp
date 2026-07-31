@@ -86,8 +86,10 @@
     </c:when>
 
     <c:otherwise>
-        <p/><p/>
-        <b>Nothing Found</b>
+        <c:if test="${submitted}">
+            <p/><p/>
+            <b>Nothing Found</b>
+        </c:if>
     </c:otherwise>
   </c:choose>
 
