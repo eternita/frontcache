@@ -58,6 +58,14 @@
 		.dependencies [id^="CIRCUIT_Cache-Origin-filter_"] { order: 3; }
 		.dependencies [id^="CIRCUIT_Cache-Origin-http_"]  { order: 4; }
 		.dependencies [id^="CIRCUIT_Origin-Hits_"]        { order: 5; }
+
+		/* put "Edges status" and "Real time performance monitoring" side by side on
+		   large screens; stack them on smaller ones (flex-wrap handles the fallback). */
+		.fc-layout { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px 40px; }
+		.fc-edges  { flex: 0 0 auto; }
+		/* the monitoring column takes the remaining width; min-width:0 lets it shrink
+		   below its wide chart content instead of forcing horizontal overflow. */
+		.fc-monitor { flex: 1 1 600px; min-width: 0; }
 	</style>
 </head>
 
@@ -67,16 +75,17 @@
 		<div class="container">
 
 <div class="container">
-    <div class="">
-        <div style="padding-left: 20px;">
-        <p style="height: 10px">&nbsp;</p>
-        <%@ include file="/WEB-INF/views/inc/edges_status.jsp"%>
+    <div class="fc-layout">
+        <div class="fc-edges" style="padding-left: 20px;">
+            <p style="height: 10px">&nbsp;</p>
+            <%@ include file="/WEB-INF/views/inc/edges_status_stacked.jsp"%>
+        </div>
+
+        <div class="fc-monitor">
+            <div id="header"><h2 style="font-size: 22px; padding-left: 20px;">Real time performance monitoring</h2></div>
+            <div id="content"></div>
         </div>
     </div>
-    <hr>
-
-	<div id="header"><h2 style="font-size: 22px; padding-left: 20px;">Real time performance monitoring</h2></div>
-	<div id="content"></div>
 
 	<script>
 

@@ -50,6 +50,7 @@ public class CacheViewController {
 	@RequestMapping(method = RequestMethod.POST, params = "viewCache")
 	public String submitForm(Model model, CacheViewForm cacheViewForm) {
 		model.addAttribute("cacheView", cacheViewForm);
+		model.addAttribute("submitted", true);
 
 		WebResponse webResponse = frontcacheService.getFromCache(cacheViewForm.getEdge(), cacheViewForm.getKey());
 		if (null != webResponse)
