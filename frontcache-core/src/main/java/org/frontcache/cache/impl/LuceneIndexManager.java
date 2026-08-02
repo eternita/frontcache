@@ -34,7 +34,6 @@ import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.*;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
-import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
@@ -42,7 +41,6 @@ import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.TermStatistics;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -309,11 +307,54 @@ public class LuceneIndexManager {
 		// relied on.
 		if (directory == null)
 			directory = FSDirectory.open(Paths.get(INDEX_PATH), SimpleFSLockFactory.INSTANCE);
-		IndexWriter w = new IndexWriter(directory, buildIndexWriterConfig());
+		IndexWriter w;
+		try {
+			w = new IndexWriter(directory, buildIndexWriterConfig());
+		} catch (IndexFormatTooOldException tooOld) {
+			// Lucene reads only one major version back, so a Lucene 8 L2 index cannot be opened by
+			// Lucene 10 - IndexWriter construction throws IndexFormatTooOldException. L2 is a
+			// regenerable page-fragment cache, so we discard the incompatible index and rebuild it
+			// empty rather than letting the writer stay null and silently drop the whole app to
+			// dynamic/uncached (the wedge failure mode). The cache repopulates from origin on demand.
+			logger.warn("L2 Lucene index at {} is in an unreadable older format ({}) - discarding it and "
+					+ "rebuilding an empty index; it will repopulate from origin.", INDEX_PATH, tooOld.getMessage());
+			rebuildEmptyIndexDirectory();
+			w = new IndexWriter(directory, buildIndexWriterConfig());
+		}
 		// Record that this JVM now holds a live writer on this index, so a concurrent manager on the
 		// same dir won't mistake our live lock for a stale one and delete it (see getIndexWriter).
 		LIVE_WRITER_PATHS.add(INDEX_PATH);
 		return w;
+	}
+
+	/**
+	 * Deletes every file in the index directory and reopens a fresh Directory, discarding an index
+	 * whose on-disk format Lucene can no longer read (e.g. a Lucene 8 index after the upgrade to
+	 * Lucene 10). Safe because L2 is a regenerable cache - the dropped entries are re-fetched from
+	 * origin on demand. Any stale {@code write.lock} file is cleared along with the segment files.
+	 */
+	private void rebuildEmptyIndexDirectory() throws IOException {
+		if (directory != null) {
+			try {
+				directory.close();
+			} catch (IOException e) {
+				logger.warn("Error closing directory before rebuild: {}", e.getMessage());
+			}
+			directory = null;
+		}
+		Path dir = Paths.get(INDEX_PATH);
+		if (Files.isDirectory(dir)) {
+			try (java.util.stream.Stream<Path> files = Files.list(dir)) {
+				files.forEach(p -> {
+					try {
+						Files.deleteIfExists(p);
+					} catch (IOException e) {
+						logger.warn("Could not delete stale index file {}: {}", p, e.getMessage());
+					}
+				});
+			}
+		}
+		directory = FSDirectory.open(dir, SimpleFSLockFactory.INSTANCE);
 	}
 
 	/**
@@ -510,7 +551,7 @@ public class LuceneIndexManager {
 	/**
 	 * Returns document based on url
 	 */
-	private Document getDocByURL(String url) throws IOException, ParseException {
+	private Document getDocByURL(String url) throws IOException {
 
 		IndexWriter iWriter = null;
 		try {
@@ -537,7 +578,7 @@ public class LuceneIndexManager {
 
 			if (results.scoreDocs != null) {
 				if (results.scoreDocs.length == 1) {
-					doc = searcher.doc(results.scoreDocs[0].doc);
+					doc = searcher.storedFields().document(results.scoreDocs[0].doc);
 				}
 			}
 		} finally {
@@ -569,9 +610,9 @@ public class LuceneIndexManager {
 		try {
 			reader = DirectoryReader.open(iWriter);
 			Term domainTerm = new Term(DOMAIN_FIELD, domain);
-			IndexSearcher searcher = new IndexSearcher(reader);
-			TermStatistics termStat = searcher.termStatistics(domainTerm, TermStates.build(searcher.getIndexReader().getContext(), domainTerm, true));
-			count = termStat.docFreq();
+			// number of documents containing this domain term (Lucene 10 dropped the
+			// searcher.termStatistics(Term, TermStates) overload; docFreq gives the same value directly)
+			count = reader.docFreq(domainTerm);
 		} catch (Exception e1) {
 			logger.debug("Error during reader.totalTermFreq(domainTerm). " + e1.getMessage());
 		} finally {
@@ -792,6 +833,7 @@ public class LuceneIndexManager {
 		try {
 			reader = DirectoryReader.open(iWriter);
 			IndexSearcher searcher = new IndexSearcher(reader);
+			StoredFields storedFields = reader.storedFields();
 
 			// only load the URL stored field — skip JSON, BIN, etc.
 			Set<String> urlFieldOnly = Collections.singleton(URL_FIELD);
@@ -809,7 +851,7 @@ public class LuceneIndexManager {
 					break;
 
 				for (ScoreDoc hit : topDocs.scoreDocs) {
-					Document doc = reader.document(hit.doc, urlFieldOnly);
+					Document doc = storedFields.document(hit.doc, urlFieldOnly);
 					String url = doc.get(URL_FIELD);
 					if (url != null)
 						keys.add(url);
