@@ -271,7 +271,7 @@ project(':frontcache-console') {
 	apply plugin: 'war'
 
 	ext {
-		springVersion = '6.1.14'
+		springVersion = '6.2.19'   // 6.2.x bundles ASM that knows class v69, required to scan Java 25 bytecode (6.1.x ASM tops out at v67)
 	}
 
 	dependencies {
