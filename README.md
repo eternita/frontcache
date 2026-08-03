@@ -19,13 +19,13 @@ Tests  →  FC standalone (:9080)  →  FC web filter (:8080)  →  Web app (:80
 |------------------|------|----------------------------------|-----------------|---------------------------|
 | Test runner      | —    | Gradle `integrationTest` JVM     | n/a (client)    | n/a                       |
 | FC standalone    | 9080 | embedded Jetty (`FrontcacheStandaloneServer`) — separate JVM | `FrontCacheServlet` (reverse proxy) | `FRONTCACHE_HOME_STANDALONE` |
-| FC web filter    | 8080 | Gretty (`jetty9.4`)              | `FrontCacheFilter` | `FRONTCACHE_HOME_FILTER`  |
-| Web app (origin) | 8080 | same Gretty JVM as the filter    | n/a (plain JSP/static app) | n/a              |
-| Console          | 7080 | Gretty farm (optional)           | n/a             | n/a                       |
+| FC web filter    | 8080 | embedded Jetty (`FrontcacheStandaloneServer`) | `FrontCacheFilter` | `FRONTCACHE_HOME_FILTER`  |
+| Web app (origin) | 8080 | same embedded-Jetty JVM as the filter | n/a (plain JSP/static app) | n/a              |
+| Console          | 7080 | embedded Jetty (optional)        | n/a             | n/a                       |
 
 Key facts:
 
-- The **filter and the web app share a single JVM** (Gretty farm) — the filter wraps the
+- The **filter and the web app share a single JVM** (one embedded-Jetty launcher) — the filter wraps the
   same webapp it caches. The standalone server runs in its **own JVM** and forwards *to*
   the :8080 container. Whether a request is actually cached at each hop depends on which
   of the two Frontcache instances is switched ON — see [§1.1 Test modes](#11-test-modes-the-2×2-onoff-matrix).
@@ -248,8 +248,8 @@ integration tests must run **sequentially** (see §7).
    server on :9080 and **blocks until** it logs
    `"Frontcache Standalone Server has been started successfully ..."` (the `ExecWait`
    ready string).
-4. `./gradlew :frontcache-tests:end2endTests` — runs `integrationTest`, surrounded by
-   Gretty start/stop (the filter + web app on :8080) via `integrationTestTask`.
+4. `./gradlew :frontcache-tests:end2endTests` — runs `integrationTest` against the
+   already-running filter + web app on :8080 (booted by `startWebfilterFrontcache`).
 5. Kills the standalone server process and stops Gradle daemons.
 
 ### Gradle tasks
@@ -258,9 +258,9 @@ integration tests must run **sequentially** (see §7).
 |------|---------|
 | `:frontcache-tests:integrationTest` | Runs the `src/test-integration` suite (both modes). Sequential: `maxParallelForks=1`, `forkEvery=1` (each test wipes the cache). Reports under `build/reports/tests/integration`. |
 | `:frontcache-tests:end2endTests` | Alias that `dependsOn integrationTest`. |
-| `:frontcache-tests:startStandaloneFrontcache` | `ExecWait` wrapper that launches `standaloneFrontcacheJetty` and waits for the ready line. |
-| `:frontcache-tests:standaloneFrontcacheJetty` | `JavaExec` → `FrontcacheStandaloneServer` on :9080. |
-| `:frontcache-tests:jettyRun` (Gretty) | Run **only** the filter + web app on :8080 for manual poking (`./gradlew clean :frontcache-tests:jettyRun`). |
+| `:frontcache-tests:startStandaloneFrontcache` | `ExecWait` wrapper that launches `standaloneJetty` and waits for the ready line. |
+| `:frontcache-tests:standaloneJetty` | `JavaExec` → `FrontcacheStandaloneServer` on :9080. |
+| `:frontcache-tests:webfilterJetty` | `JavaExec` → `FrontcacheStandaloneServer` (filter + web app) on :8080. Run **only** this for manual poking: `./gradlew clean :frontcache-tests:webfilterJetty`. |
 
 ### JVM args of note
 
@@ -288,10 +288,10 @@ tests are `@Ignore`d (they pass on Tomcat in production).
 - Tests **must** run sequentially; do not raise `maxParallelForks` — concurrent runs
   corrupt each other's cache because every test clears it on setup.
 - `/etc/hosts` must contain the entries in §5 or the domain-scoped tests fail.
-- `./tests.sh` binds **9080** (standalone HTTP) and **8080 + 8443** (filter + web app via
-  Gretty, `httpsEnabled=true`); a conflict on any of these breaks the run, so stop other
-  servers first. The standalone server opens HTTP only — there is no `9443` — and the
-  console (`7080`) is not started by the integration run. After the suite, `tests.sh`
+- `./tests.sh` binds **9080** (standalone) and **8080** (filter + web app); both embedded-Jetty
+  launchers open HTTP only — there are no HTTPS ports (`8443`/`9443`) — so a conflict on either
+  breaks the run; stop other servers first. The console (`7080`) is not started by the
+  integration run. After the suite, `tests.sh`
   force-kills the standalone server with
   `ps -e | grep standaloneFrontcacheJetty | ... | xargs kill -9`; this PID-by-grep cleanup
   is fragile, so if a prior run crashed, check for a leftover process on :9080 before

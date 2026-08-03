@@ -15,7 +15,7 @@ plugins {
 }
 
 // Jetty 12 (Jakarta EE10).
-ext.jettyVersion = '12.0.16'
+ext.jettyVersion = '12.0.37'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
 
 // Spawns a (long-running) server process and blocks only until it prints its
 // "ready" line, then keeps draining its stdout on a daemon thread so its pipe
