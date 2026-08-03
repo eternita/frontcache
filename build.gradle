@@ -6,8 +6,8 @@ plugins {
 ext.jettyVersion = '12.0.37'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
 
 license {
-    ignoreFailures true
-    strictCheck true
+    ignoreFailures = true
+    strictCheck = true
     include '**/*.java'
     mapping {
         java = 'SLASHSTAR_STYLE'
@@ -70,7 +70,7 @@ subprojects {
 	tasks.withType(Test) {
 		testLogging {
 			showStandardStreams = true
-			exceptionFormat 'full'
+			exceptionFormat = 'full'
 		}
 	}
 
@@ -233,7 +233,7 @@ project(':frontcache-server') {
 		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 	}
 
-	task copyWar(type: Copy) {
+	def copyWar = tasks.register('copyWar', Copy) {
 		  from tasks.named('war')
 		  into 'server/frontcache-base/webapps'
 		  rename '(.*).war', 'ROOT.war'
@@ -245,7 +245,7 @@ project(':frontcache-server') {
 	// The launcher only needs the Jetty EE10
 	// jars (in 'provided', deliberately kept out of the war) plus its own class; the
 	// war carries frontcache-core + its deps in WEB-INF/lib, so they stay out of here.
-	task copyServerLibs(type: Sync) {
+	def copyServerLibs = tasks.register('copyServerLibs', Sync) {
 		from configurations.provided
 		from tasks.named('jar')
 		into 'server/lib'
@@ -253,7 +253,7 @@ project(':frontcache-server') {
 	build.finalizedBy(copyServerLibs)
 
 	// Run Frontcache standalone on embedded Jetty 12.
-	task appRun(type: JavaExec) {
+	tasks.register('appRun', JavaExec) {
 		group = 'application'
 		description = 'Run Frontcache standalone on embedded Jetty 12'
 		mainClass = 'org.frontcache.server.FrontcacheJettyServer'
@@ -295,7 +295,7 @@ project(':frontcache-console') {
 	}
 
 	// Run the console standalone on embedded Jetty 12.
-	task appRun(type: JavaExec) {
+	tasks.register('appRun', JavaExec) {
 		group = 'application'
 		description = 'Run the Frontcache console on embedded Jetty 12'
 		mainClass = 'org.frontcache.console.ConsoleJettyServer'
