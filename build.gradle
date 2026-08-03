@@ -3,11 +3,11 @@ plugins {
 }
 
 // Jetty 12 (Jakarta EE10).
-ext.jettyVersion = '12.0.16'
+ext.jettyVersion = '12.0.37'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
 
 license {
-    ignoreFailures true
-    strictCheck true
+    ignoreFailures = true
+    strictCheck = true
     include '**/*.java'
     mapping {
         java = 'SLASHSTAR_STYLE'
@@ -19,22 +19,22 @@ license {
 subprojects {
 	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
 	apply plugin: 'jacoco'
-    version = '2.3.0'
+    version = '2.4.0'
     group = 'org.frontcache'
 
-	// Build/test with Java 21 via a toolchain, so the JDK launching Gradle is
+	// Build/test with Java 25 via a toolchain, so the JDK launching Gradle is
 	// decoupled from the project's target. Gradle auto-detects the installed
-	// JDK 21 for compilation and test execution. Jetty 12 / Jakarta EE10 require
-	// Java 17 as a baseline; we target the 21 LTS.
+	// JDK 25 for compilation and test execution. Jetty 12 / Jakarta EE10 require
+	// Java 17 as a baseline; we target the 25 LTS.
 	java {
 		toolchain {
-			languageVersion = JavaLanguageVersion.of(21)
+			languageVersion = JavaLanguageVersion.of(25)
 		}
 	}
 
-	// Emit Java 21 bytecode.
+	// Emit Java 25 bytecode.
 	tasks.withType(JavaCompile).configureEach {
-		options.release = 21
+		options.release = 25
 	}
 
 	// 'provided' deps (e.g. servlet-api) are on compile & test classpaths but
@@ -49,7 +49,7 @@ subprojects {
 		test.runtimeClasspath += configurations.provided
 	}
 
-	jacoco.toolVersion = '0.8.11'
+	jacoco.toolVersion = '0.8.13'   // 0.8.13+ understands Java 25 class files
 
     dependencies {
 		testImplementation 'junit:junit:4.12'
@@ -70,7 +70,7 @@ subprojects {
 	tasks.withType(Test) {
 		testLogging {
 			showStandardStreams = true
-			exceptionFormat 'full'
+			exceptionFormat = 'full'
 		}
 	}
 
@@ -185,7 +185,7 @@ project(':frontcache-core') {
 
 		api 			'com.fasterxml.jackson.core:jackson-databind:2.8.11.1'
 		api         	'com.fasterxml.jackson.core:jackson-annotations:2.7.5'
-        api         	'org.apache.httpcomponents:httpclient:4.5.1'
+        api         	'org.apache.httpcomponents:httpclient:4.5.14'
         api         	'commons-io:commons-io:2.4'
         api         	'ch.qos.logback:logback-classic:1.1.3'
 		api         	'com.netflix.hystrix:hystrix-core:1.5.9'
@@ -214,7 +214,7 @@ project(':frontcache-core') {
 
 project(':frontcache-agent') {
 	dependencies {
-        api         'org.apache.httpcomponents:httpclient:4.5.1'
+        api         'org.apache.httpcomponents:httpclient:4.5.14'
 	}
 }
 
@@ -233,7 +233,7 @@ project(':frontcache-server') {
 		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 	}
 
-	task copyWar(type: Copy) {
+	def copyWar = tasks.register('copyWar', Copy) {
 		  from tasks.named('war')
 		  into 'server/frontcache-base/webapps'
 		  rename '(.*).war', 'ROOT.war'
@@ -245,15 +245,15 @@ project(':frontcache-server') {
 	// The launcher only needs the Jetty EE10
 	// jars (in 'provided', deliberately kept out of the war) plus its own class; the
 	// war carries frontcache-core + its deps in WEB-INF/lib, so they stay out of here.
-	task copyServerLibs(type: Sync) {
+	def copyServerLibs = tasks.register('copyServerLibs', Sync) {
 		from configurations.provided
 		from tasks.named('jar')
 		into 'server/lib'
 	}
 	build.finalizedBy(copyServerLibs)
 
-	// Run Frontcache standalone on embedded Jetty 12 (replaces the gretty appRun).
-	task appRun(type: JavaExec) {
+	// Run Frontcache standalone on embedded Jetty 12.
+	tasks.register('appRun', JavaExec) {
 		group = 'application'
 		description = 'Run Frontcache standalone on embedded Jetty 12'
 		mainClass = 'org.frontcache.server.FrontcacheJettyServer'
@@ -295,7 +295,7 @@ project(':frontcache-console') {
 	}
 
 	// Run the console standalone on embedded Jetty 12.
-	task appRun(type: JavaExec) {
+	tasks.register('appRun', JavaExec) {
 		group = 'application'
 		description = 'Run the Frontcache console on embedded Jetty 12'
 		mainClass = 'org.frontcache.console.ConsoleJettyServer'

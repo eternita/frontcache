@@ -12,7 +12,7 @@ Two docker-compose projects and a set of control scripts.
 ## Requirements
 
 - Docker with the Compose plugin (`docker compose`)
-- For `fc-server`: a JDK to run the Gradle build on the host (the image ships JDK 21)
+- For `fc-server`: a JDK to run the Gradle build on the host (the image ships JDK 25)
 - For `pull-logs.sh`: `rsync`, `unzip`, and ssh access to the FC hosts via `~/.ssh/config`
 
 ---

@@ -17,7 +17,7 @@ import org.eclipse.jetty.server.Server;
 
 /**
  * Embedded Jetty 12 (Jakarta EE10) launcher for running the Frontcache console
- * locally (replaces the former gretty jettyRun). Deploys the webapp at context "/".
+ * locally. Deploys the webapp at context "/".
  * Kept self-contained in this module so the console does not depend on the
  * frontcache-server project.
  *

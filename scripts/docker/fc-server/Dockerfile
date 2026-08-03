@@ -10,7 +10,7 @@
 # so we can COPY the assembled frontcache-server/ tree. Build it first with
 #   ./gradlew :frontcache-server:build
 # (start-fc-server.sh does this for you).
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:25-jdk
 
 # nginx for the public front door; openssl for keystore -> PEM extraction at startup.
 RUN apt-get update \
