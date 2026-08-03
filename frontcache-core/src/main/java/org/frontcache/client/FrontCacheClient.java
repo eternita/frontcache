@@ -32,6 +32,7 @@ import org.apache.http.client.RedirectStrategy;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
@@ -268,9 +269,10 @@ public class FrontCacheClient {
 			post.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
 
 		InputStream is = null;
+		CloseableHttpResponse response = null;
 		try {
 			post.setEntity(new UrlEncodedFormEntity(urlParameters));
-			HttpResponse response = client.execute(post);
+			response = (CloseableHttpResponse) client.execute(post);
 			is = response.getEntity().getContent();
 	        int bytesRead = 0;
 	        int bufferSize = 4000;
@@ -285,6 +287,13 @@ public class FrontCacheClient {
 			try {
 				if (null != is)
 					is.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			// close the response too: if getContent() threw, 'is' is null and the connection would leak
+			try {
+				if (null != response)
+					response.close();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -549,12 +558,17 @@ public class FrontCacheClient {
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 
 		StringBuffer result = new StringBuffer();
-		HttpResponse response = client.execute(post);
-		BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+		CloseableHttpResponse response = (CloseableHttpResponse) client.execute(post);
+		try {
+			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
 
-		String line = "";
-		while ((line = rd.readLine()) != null) {
-			result.append(line);
+			String line = "";
+			while ((line = rd.readLine()) != null) {
+				result.append(line);
+			}
+		} finally {
+			// close in finally so the pooled connection is released even if reading the body throws
+			response.close();
 		}
 
 		return result.toString();

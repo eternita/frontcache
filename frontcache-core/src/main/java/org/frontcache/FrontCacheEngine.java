@@ -681,10 +681,14 @@ public class FrontCacheEngine {
 				}
 
 				addResponseHeaders(webResponse, context);
-				writeResponse(webResponse, context);
-
-				if (null != context.getHttpClientResponse())
-					context.getHttpClientResponse().close();
+				try {
+					writeResponse(webResponse, context);
+				} finally {
+					// close in finally: writeResponse streams the origin body to the client and can throw
+					// (e.g. broken pipe on client disconnect) - without finally the pooled connection leaks.
+					if (null != context.getHttpClientResponse())
+						context.getHttpClientResponse().close();
+				}
 
 				return;
 			}
@@ -701,11 +705,17 @@ public class FrontCacheEngine {
 //			forwardToOrigin();
 			new FC_BypassCache(httpClient, context).execute();
 
-			RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
-			addResponseHeaders(context);
-			writeResponse(context);
-			if (null != context.getHttpClientResponse())
-				context.getHttpClientResponse().close();
+			try {
+				RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
+				addResponseHeaders(context);
+				writeResponse(context);
+			} finally {
+				// close in finally: FC_BypassCache stashed the open origin response in the context, and
+				// writeResponse streams its body to the client - which can throw (e.g. broken pipe on
+				// client disconnect). Without finally the pooled connection leaks and the pool exhausts.
+				if (null != context.getHttpClientResponse())
+					context.getHttpClientResponse().close();
+			}
 		}
 		return;
 	}
