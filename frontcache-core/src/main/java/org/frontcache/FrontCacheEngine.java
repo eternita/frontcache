@@ -328,13 +328,6 @@ public class FrontCacheEngine {
 	}
 
 
-	@Override
-	protected void finalize() throws Throwable {
-		// TODO Auto-generated method stub
-		super.finalize();
-		stop();
-	}
-
 	private void stop() {
 
 		FCConfig.destroy();
