@@ -58,15 +58,15 @@ apply plugin: 'java-library'
 apply plugin: 'jacoco'
 group = 'org.frontcache'
 
-// Build/test with Java 21 via a toolchain (Jetty 12 / Jakarta EE10 need Java 17
-// as a baseline; we target the 21 LTS).
+// Build/test with Java 25 via a toolchain (Jetty 12 / Jakarta EE10 need Java 17
+// as a baseline; we target the 25 LTS).
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(21)
+		languageVersion = JavaLanguageVersion.of(25)
 	}
 }
 tasks.withType(JavaCompile).configureEach {
-	options.release = 21
+	options.release = 25
 }
 
 // 'provided' deps (e.g. servlet-api, the Jetty launcher jars) are on compile &
@@ -93,7 +93,7 @@ repositories {
 	mavenCentral()
 }
 
-jacoco.toolVersion = '0.8.11'
+jacoco.toolVersion = '0.8.13'   // 0.8.13+ understands Java 25 class files
 
 dependencies {
 	implementation 'org.frontcache:frontcache-core:2.2.3'   // from ../frontcache (composite build)

@@ -283,8 +283,8 @@ tests are `@Ignore`d (they pass on Tomcat in production).
 
 ## 8. Constraints & gotchas
 
-- **Java 8** source level; Gradle wrapper pinned to **Gradle 8.7**
-  (`gradle/wrapper/gradle-wrapper.properties`) — always use `./gradlew`.
+- **Java 25** source level (toolchain + `options.release = 25`); Gradle wrapper pinned to
+  **Gradle 9.1.0** (`gradle/wrapper/gradle-wrapper.properties`) — always use `./gradlew`.
 - Tests **must** run sequentially; do not raise `maxParallelForks` — concurrent runs
   corrupt each other's cache because every test clears it on setup.
 - `/etc/hosts` must contain the entries in §5 or the domain-scoped tests fail.
