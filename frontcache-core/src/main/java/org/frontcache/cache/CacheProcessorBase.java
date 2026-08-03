@@ -169,6 +169,12 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	 */
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
 	{
+		// Snapshot the request headers synchronously on the caller's thread. The async task below
+		// runs later on a pool thread while the original request thread keeps mutating the shared
+		// requestHeaders map - iterating it there (via putAll) races and throws
+		// ConcurrentModificationException. Copying it now, before submitting, avoids that race.
+		final Map<String, List<String>> requestHeadersCopy = new HashMap<String, List<String>>(requestHeaders);
+
 		// async invalidation
 		softInvalidationExecutor.submit(new Runnable(){
 
@@ -181,8 +187,6 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 					RequestContext ctxCopy = context.copy();
 					ctxCopy.setFilterChain(null); // async calls for ServletFilter doesnt works (some objects already disposed), so use http calls for soft resets
-					Map<String, List<String>> requestHeadersCopy = new HashMap<String, List<String>>();
-					requestHeadersCopy.putAll(requestHeaders);
 
 					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
 					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_SOFT_REFRESH, Arrays.asList(new String[]{"true"}));
