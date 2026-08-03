@@ -21,7 +21,7 @@ import org.eclipse.jetty.server.ServerConnector;
 
 /**
  * Embedded Jetty 12 (Jakarta EE10) launcher for running Frontcache standalone
- * locally (replaces the former gretty appRun). Deploys the webapp at context "/".
+ * locally. Deploys the webapp at context "/".
  *
  * System properties:
  *   frontcache.jetty.port    - listen port (default 9080)

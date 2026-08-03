@@ -31,7 +31,7 @@ public class IndexController {
 		else {
 
 			// check if it's development / test mode
-			// edge and console started inside gretty farm
+			// (FC edge and console running locally on the same host)
 			String localFrontcacheURL = (request.isSecure() ? "https" : "http") + "://localhost:" + request.getServerPort();
 			if (frontcacheService.isFrontCacheEdgeAvailable(localFrontcacheURL))
 			{
