@@ -22,19 +22,19 @@ subprojects {
     version = '2.3.1'
     group = 'org.frontcache'
 
-	// Build/test with Java 21 via a toolchain, so the JDK launching Gradle is
+	// Build/test with Java 25 via a toolchain, so the JDK launching Gradle is
 	// decoupled from the project's target. Gradle auto-detects the installed
-	// JDK 21 for compilation and test execution. Jetty 12 / Jakarta EE10 require
-	// Java 17 as a baseline; we target the 21 LTS.
+	// JDK 25 for compilation and test execution. Jetty 12 / Jakarta EE10 require
+	// Java 17 as a baseline; we target the 25 LTS.
 	java {
 		toolchain {
-			languageVersion = JavaLanguageVersion.of(21)
+			languageVersion = JavaLanguageVersion.of(25)
 		}
 	}
 
-	// Emit Java 21 bytecode.
+	// Emit Java 25 bytecode.
 	tasks.withType(JavaCompile).configureEach {
-		options.release = 21
+		options.release = 25
 	}
 
 	// 'provided' deps (e.g. servlet-api) are on compile & test classpaths but
@@ -49,7 +49,7 @@ subprojects {
 		test.runtimeClasspath += configurations.provided
 	}
 
-	jacoco.toolVersion = '0.8.11'
+	jacoco.toolVersion = '0.8.13'   // 0.8.13+ understands Java 25 class files
 
     dependencies {
 		testImplementation 'junit:junit:4.12'
