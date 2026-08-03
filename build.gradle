@@ -119,7 +119,7 @@ dependencies {
 tasks.withType(Test) {
 	testLogging {
 		showStandardStreams = true
-		exceptionFormat 'full'
+		exceptionFormat = 'full'
 	}
 }
 
@@ -131,7 +131,7 @@ jacocoTestReport {
 	}
 }
 
-task integrationTest(type: Test) {
+def integrationTest = tasks.register('integrationTest', Test) {
 	description = 'Runs the integration tests.'
 	group = 'verification'
 	maxParallelForks = 1 // run all tests sequentially (due to cache cleanup before every test)
@@ -146,7 +146,7 @@ task integrationTest(type: Test) {
 }
 
 // FC standalone (:9080) — embedded Jetty 12 serving the reverse-proxy webapp
-task standaloneJetty(type: JavaExec) {
+tasks.register('standaloneJetty', JavaExec) {
 	mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
 	classpath = sourceSets.main.runtimeClasspath + configurations.provided
 	systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/test-integration/webapp"
@@ -156,7 +156,7 @@ task standaloneJetty(type: JavaExec) {
 }
 
 // FC webfilter + web app (:8080) — embedded Jetty 12 serving the main webapp
-task webfilterJetty(type: JavaExec) {
+tasks.register('webfilterJetty', JavaExec) {
 	mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
 	classpath = sourceSets.main.runtimeClasspath + configurations.provided
 	systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
@@ -165,18 +165,18 @@ task webfilterJetty(type: JavaExec) {
 	systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml"
 }
 
-task startStandaloneFrontcache(type: ExecWait) {
-	command './gradlew standaloneJetty'
-	ready 'has been started successfully'
-	directory '.'
+tasks.register('startStandaloneFrontcache', ExecWait) {
+	command = './gradlew standaloneJetty'
+	ready = 'has been started successfully'
+	directory = '.'
 }
 
-task startWebfilterFrontcache(type: ExecWait) {
-	command './gradlew webfilterJetty'
-	ready 'has been started successfully'
-	directory '.'
+tasks.register('startWebfilterFrontcache', ExecWait) {
+	command = './gradlew webfilterJetty'
+	ready = 'has been started successfully'
+	directory = '.'
 }
 
-task end2endTests {
+tasks.register('end2endTests') {
 	dependsOn integrationTest
 }
