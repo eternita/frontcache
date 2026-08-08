@@ -8,6 +8,7 @@
  */
 package org.frontcache.cache.impl;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -151,6 +152,152 @@ public class L1L2CacheProcessorConcurrentInitTest {
 		assertNotNull("the shared manager must be able to write", manager.getResponse(url));
 
 		manager.close();
+	}
+
+	/**
+	 * Two managers racing to recover the SAME stale write.lock (the fc-eu production case: the previous
+	 * JVM was killed, leaving a real stale lock, and both managers of the duplicated cache processor
+	 * entered the heal path within 2ms) must not both "recover". Before the per-path monitor, both
+	 * deleted the lock and both opened a writer; the one whose lock file its peer had replaced then
+	 * threw AlreadyClosedException("Underlying file changed by an external force") on every operation
+	 * for 25 hours.
+	 */
+	@Test
+	public void concurrentHealersOnOneStaleLockNeverInvalidateEachOther() throws Exception {
+		final String dir = "/tmp/lucene-concurrent-heal-" + System.currentTimeMillis();
+
+		// an index with a genuinely stale write.lock, as left behind by a hard-killed JVM
+		LuceneIndexManager seed = new LuceneIndexManager(dir);
+		WebResponse seedResponse = new WebResponse(UUID.randomUUID().toString(), "seed".getBytes());
+		seedResponse.setDomain(DOMAIN);
+		seed.indexDoc(seedResponse);
+		LuceneIndexTests.leaveStaleWriteLockBehind(seed, dir);
+
+		final int racers = 2;
+		final CountDownLatch start = new CountDownLatch(1);
+		final CountDownLatch done = new CountDownLatch(racers);
+		final List<Throwable> failures = java.util.Collections.synchronizedList(new ArrayList<Throwable>());
+		final List<String> written = java.util.Collections.synchronizedList(new ArrayList<String>());
+		final LuceneIndexManager[] managers = new LuceneIndexManager[racers];
+
+		for (int i = 0; i < racers; i++) {
+			final int idx = i;
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						start.await();
+						LuceneIndexManager m = new LuceneIndexManager(dir);
+						managers[idx] = m;
+						String url = "http://test.example.com/heal/" + idx + "-" + UUID.randomUUID() + ".html";
+						WebResponse r = new WebResponse(url, ("payload " + idx).getBytes());
+						r.setDomain(DOMAIN);
+						m.indexDoc(r);
+						if (m.getResponse(url) != null)
+							written.add(url);
+					} catch (Throwable t) {
+						failures.add(t);
+					} finally {
+						done.countDown();
+					}
+				}
+			}).start();
+		}
+
+		start.countDown();
+		assertTrue("racers should finish", done.await(60, TimeUnit.SECONDS));
+
+		for (Throwable t : failures)
+			assertFalse("no manager may have its lock stolen by the other: " + t,
+					causeChainHas(t, org.apache.lucene.store.AlreadyClosedException.class));
+
+		assertFalse("at least one racer must hold a working writer and write", written.isEmpty());
+
+		for (LuceneIndexManager m : managers)
+			if (m != null)
+				m.close();
+	}
+
+	/**
+	 * A writer whose write.lock is deleted and recreated by an external force must be discarded and
+	 * reopened on a later call instead of being handed back forever by getIndexWriter()'s fast path -
+	 * {@code IndexWriter.isOpen()} stays true in that state, which is what made the wedge permanent.
+	 */
+	@Test
+	public void writerWithExternallyReplacedLockRecoversOnNextCall() throws Exception {
+		String dir = "/tmp/lucene-lock-stolen-" + System.currentTimeMillis();
+		LuceneIndexManager manager = new LuceneIndexManager(dir);
+
+		String before = "http://test.example.com/stolen/before-" + UUID.randomUUID() + ".html";
+		WebResponse r1 = new WebResponse(before, "before".getBytes());
+		r1.setDomain(DOMAIN);
+		manager.indexDoc(r1);
+		assertNotNull("baseline write should work", manager.getResponse(before));
+
+		// External force: same path, different file - exactly what a peer manager's stale-lock heal did.
+		// SimpleFSLock detects the swap by comparing the file's creationTime, whose granularity is as
+		// coarse as 1s on some filesystems; recreating within the same second is indistinguishable and
+		// would make this test pass vacuously, so replace until the timestamp actually differs.
+		java.nio.file.Path lockFile = java.nio.file.Paths.get(dir)
+				.resolve(org.apache.lucene.index.IndexWriter.WRITE_LOCK_NAME);
+		java.nio.file.attribute.FileTime original = java.nio.file.Files
+				.readAttributes(lockFile, java.nio.file.attribute.BasicFileAttributes.class).creationTime();
+		java.nio.file.attribute.FileTime replaced = original;
+		long deadline = System.currentTimeMillis() + 10000;
+		while (replaced.equals(original) && System.currentTimeMillis() < deadline) {
+			java.nio.file.Files.deleteIfExists(lockFile);
+			Thread.sleep(100);
+			java.nio.file.Files.createFile(lockFile);
+			replaced = java.nio.file.Files
+					.readAttributes(lockFile, java.nio.file.attribute.BasicFileAttributes.class).creationTime();
+		}
+		assertFalse("precondition: the replacement write.lock must be distinguishable from the original",
+				replaced.equals(original));
+
+		// The operation that discovers the invalid lock fails, and must discard the writer.
+		// It has to be a DELETE, not an add: a delete against an already-committed segment writes
+		// liveDocs from IndexWriter.writeReaderPool(), which Lucene does not treat as a tragic event -
+		// so the writer is left reporting isOpen()==true with a dead lock. That asymmetry is exactly why
+		// production wedged on the soft-invalidation path (delete + commit) while page writes kept
+		// working, and why isOpen() cannot be the liveness check.
+		manager.delete(DOMAIN, before);
+
+		// ...and the NEXT one must succeed against a freshly opened writer
+		String after = "http://test.example.com/stolen/after-" + UUID.randomUUID() + ".html";
+		WebResponse r3 = new WebResponse(after, "after".getBytes());
+		r3.setDomain(DOMAIN);
+		manager.indexDoc(r3);
+
+		// Checked against a fresh on-disk reader, NOT manager.getResponse(): readers are opened from the
+		// IndexWriter (near-real-time), so they surface in-memory segments that a dead lock prevented
+		// from ever being committed - which would make a wedged writer look healthy.
+		assertTrue("L2 must self-heal after its lock was replaced externally and durably commit",
+				committedOnDisk(dir, after));
+
+		manager.close();
+	}
+
+	/**
+	 * True if {@code url} is present in the index as committed on disk, read through an independent
+	 * reader (no IndexWriter involved, so nothing uncommitted is visible).
+	 */
+	private static boolean committedOnDisk(String dir, String url) throws Exception {
+		try (org.apache.lucene.store.Directory d =
+					org.apache.lucene.store.FSDirectory.open(java.nio.file.Paths.get(dir));
+				org.apache.lucene.index.IndexReader reader =
+						org.apache.lucene.index.DirectoryReader.open(d)) {
+			org.apache.lucene.search.IndexSearcher searcher = new org.apache.lucene.search.IndexSearcher(reader);
+			org.apache.lucene.index.Term term = new org.apache.lucene.index.Term(
+					LuceneIndexManager.URL_FIELD, LuceneIndexManager.toPathKey(url));
+			return searcher.count(new org.apache.lucene.search.TermQuery(term)) > 0;
+		}
+	}
+
+	private static boolean causeChainHas(Throwable t, Class<? extends Throwable> type) {
+		for (Throwable c = t; c != null; c = c.getCause())
+			if (type.isInstance(c))
+				return true;
+		return false;
 	}
 
 	/**

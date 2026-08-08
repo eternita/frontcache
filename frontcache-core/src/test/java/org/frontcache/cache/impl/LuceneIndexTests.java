@@ -530,16 +530,8 @@ public class LuceneIndexTests {
 		r1.setDomain(DOMAIN);
 		crashed.indexDoc(r1);
 
-		java.lang.reflect.Field iwField = LuceneIndexManager.class.getDeclaredField("indexWriter");
-		iwField.setAccessible(true);
-		org.apache.lucene.index.IndexWriter w = (org.apache.lucene.index.IndexWriter) iwField.get(crashed);
-		java.lang.reflect.Field writeLockField = org.apache.lucene.index.IndexWriter.class.getDeclaredField("writeLock");
-		writeLockField.setAccessible(true);
-		writeLockField.set(w, null); // detach so close() cannot delete the lock file
-		w.close();
+		leaveStaleWriteLockBehind(crashed, dir);
 
-		// simulate that the crashed JVM is gone: in a new JVM no live writer is registered for this dir
-		clearLiveWriterRegistration(dir);
 		java.nio.file.Path lockFile = java.nio.file.Paths.get(dir)
 				.resolve(org.apache.lucene.index.IndexWriter.WRITE_LOCK_NAME);
 		assertTrue("precondition: a stale write.lock should be left behind", java.nio.file.Files.exists(lockFile));
@@ -554,11 +546,28 @@ public class LuceneIndexTests {
 		restarted.close();
 	}
 
+	/**
+	 * Leaves a stale {@code write.lock} on disk exactly as a hard-killed JVM would: the manager's
+	 * IndexWriter is detached from its lock (so closing cannot delete the file) and closed, and the
+	 * in-JVM live-writer registration is cleared to stand in for "that process is gone".
+	 */
+	static void leaveStaleWriteLockBehind(LuceneIndexManager manager, String dir) throws Exception {
+		java.lang.reflect.Field iwField = LuceneIndexManager.class.getDeclaredField("indexWriter");
+		iwField.setAccessible(true);
+		org.apache.lucene.index.IndexWriter w = (org.apache.lucene.index.IndexWriter) iwField.get(manager);
+		java.lang.reflect.Field writeLockField = org.apache.lucene.index.IndexWriter.class.getDeclaredField("writeLock");
+		writeLockField.setAccessible(true);
+		writeLockField.set(w, null); // detach so close() cannot delete the lock file
+		w.close();
+		iwField.set(manager, null); // the manager must not keep handing out the closed writer
+		clearLiveWriterRegistration(dir);
+	}
+
 	@SuppressWarnings("unchecked")
 	private static void clearLiveWriterRegistration(String path) throws Exception {
 		java.lang.reflect.Field f = LuceneIndexManager.class.getDeclaredField("LIVE_WRITER_PATHS");
 		f.setAccessible(true);
-		((Set<String>) f.get(null)).remove(path);
+		((Set<String>) f.get(null)).remove(LuceneIndexManager.normalizePath(path));
 	}
 
 	private String baseDir;

@@ -42,6 +42,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.LockObtainFailedException;
@@ -77,6 +78,16 @@ public class LuceneIndexManager {
 	// constructor stays package-private so tests can still simulate a crashed-and-restarted JVM.
 	private static final java.util.concurrent.ConcurrentMap<String, LuceneIndexManager> INSTANCES =
 			new java.util.concurrent.ConcurrentHashMap<>();
+
+	// One monitor per index directory, guarding the whole "open writer / detect stale lock / delete it /
+	// retry" sequence in getIndexWriter(). Keyed by path rather than per manager because the thing that
+	// must not interleave is two managers healing the same directory.
+	private static final java.util.concurrent.ConcurrentMap<String, Object> WRITER_MONITORS =
+			new java.util.concurrent.ConcurrentHashMap<>();
+
+	private static Object writerMonitorFor(String path) {
+		return WRITER_MONITORS.computeIfAbsent(path, p -> new Object());
+	}
 
 	public static final String JSON_FIELD = "json";
 	public static final String BIN_FIELD = "bin";
@@ -285,7 +296,13 @@ public class LuceneIndexManager {
 		if (indexWriter != null && indexWriter.isOpen())
 			return indexWriter;
 
-		synchronized (this) {
+		// Acquisition is serialized per index directory, not just per manager: the stale-lock recovery
+		// below deletes write.lock, and two managers doing that at the same moment both "recover" and
+		// end up with a live writer on one index (prod, fc-eu 2026-08-07 14:16:16 - the loser's lock
+		// file was deleted and recreated by its peer, so every later op threw AlreadyClosedException
+		// "Underlying file changed by an external force" for 25h). One monitor per path makes the
+		// acquire-test-heal-retry sequence atomic against any other manager on the same directory.
+		synchronized (writerMonitorFor(indexPath)) {
 			if (indexWriter != null && indexWriter.isOpen())
 				return indexWriter;
 
@@ -362,6 +379,29 @@ public class LuceneIndexManager {
 		// relied on.
 		if (directory == null)
 			directory = FSDirectory.open(Paths.get(indexPath), SimpleFSLockFactory.INSTANCE);
+
+		// Claim the path BEFORE constructing the writer, not after. new IndexWriter() creates write.lock
+		// early but can take hundreds of ms to return on a large index; registering only on success left
+		// a window in which a concurrent manager saw "no live writer owns this lock", judged the lock
+		// stale and deleted it out from under us. Cleared again below if construction fails, so a real
+		// stale lock is still recoverable.
+		boolean claimed = LIVE_WRITER_PATHS.add(indexPath);
+		IndexWriter w;
+		try {
+			w = openWriterOnDirectory();
+		} catch (Throwable t) {
+			if (claimed)
+				LIVE_WRITER_PATHS.remove(indexPath);
+			throw t;
+		}
+		return w;
+	}
+
+	/**
+	 * Constructs the {@link IndexWriter}, rebuilding the directory if the on-disk index is in a format
+	 * Lucene can no longer read.
+	 */
+	private IndexWriter openWriterOnDirectory() throws IOException {
 		IndexWriter w;
 		try {
 			w = new IndexWriter(directory, buildIndexWriterConfig());
@@ -376,9 +416,6 @@ public class LuceneIndexManager {
 			rebuildEmptyIndexDirectory();
 			w = new IndexWriter(directory, buildIndexWriterConfig());
 		}
-		// Record that this JVM now holds a live writer on this index, so a concurrent manager on the
-		// same dir won't mistake our live lock for a stale one and delete it (see getIndexWriter).
-		LIVE_WRITER_PATHS.add(indexPath);
 		return w;
 	}
 
@@ -425,6 +462,76 @@ public class LuceneIndexManager {
 					+ "If this persists, restart the Frontcache server (index dir: {}). Cause: {}",
 					indexPath, e.toString());
 		}
+	}
+
+	/**
+	 * Commits pending changes, logging rather than propagating failures, and discarding the writer if
+	 * its lock turned out to be invalidated (so the next operation reopens a working one).
+	 * <p>
+	 * Used from the {@code finally} blocks of the mutating operations. An {@link AlreadyClosedException}
+	 * raised here is a RuntimeException, so before this it escaped the (IOException-only) handlers and
+	 * surfaced far away - e.g. as "Soft invalidation/refresh failed" on every background refresh.
+	 */
+	private void commitQuietly(IndexWriter iWriter, String operation) {
+		if (indexWriter == null)
+			return; // writer already discarded by this operation's error handling
+		try {
+			iWriter.commit();
+		} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, operation))
+				logger.error(e.getMessage(), e);
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, operation);
+		}
+	}
+
+	/**
+	 * True when {@code t} (or anything in its cause chain) is an {@link AlreadyClosedException} - i.e.
+	 * this writer's lock is no longer valid, typically because its {@code write.lock} file was deleted
+	 * and recreated by something else ("Underlying file changed by an external force").
+	 */
+	private static boolean isWriterLockLost(Throwable t) {
+		for (Throwable c = t; c != null; c = c.getCause()) {
+			if (c instanceof AlreadyClosedException)
+				return true;
+			if (c == c.getCause())
+				break; // defensive: self-referencing cause
+		}
+		return false;
+	}
+
+	/**
+	 * Discards a writer whose lock has been invalidated so the next call reopens a working one.
+	 * <p>
+	 * {@link IndexWriter#isOpen()} is NOT sufficient to detect this: an invalid lock is not one of
+	 * Lucene's "tragic" events, so the writer reports itself open while every operation on it throws
+	 * {@link AlreadyClosedException}. Without this, getIndexWriter()'s fast path kept handing back the
+	 * same dead writer indefinitely - in production that flooded ~9k errors/day for 25 hours and left
+	 * soft invalidation permanently broken until a restart.
+	 *
+	 * @return true if a lost-lock writer was discarded (caller's operation still failed, the next one
+	 *         will reopen)
+	 */
+	private boolean discardWriterIfLockLost(Throwable t, String operation) {
+		if (!isWriterLockLost(t))
+			return false;
+
+		synchronized (writerMonitorFor(indexPath)) {
+			if (indexWriter != null) {
+				try {
+					indexWriter.close();
+				} catch (Throwable closeFailure) {
+					// expected: SimpleFSLock refuses to remove a lock file it no longer owns
+					// ("Lock file cannot be safely removed") - nothing to do but drop the reference
+					logger.debug("Closing a writer with a lost lock failed: {}", closeFailure.toString());
+				}
+				indexWriter = null;
+				LIVE_WRITER_PATHS.remove(indexPath);
+			}
+		}
+		logger.error("L2 Lucene write lock was invalidated externally during {} - discarded the writer, "
+				+ "the next L2 operation will reopen it (index dir: {}). Cause: {}", operation, indexPath, t.toString());
+		return true;
 	}
 
 	/**
@@ -568,13 +675,21 @@ public class LuceneIndexManager {
 		try {
 			iWriter.updateDocument(new Term(URL_FIELD, urlKey), doc);
 		} catch (IOException e) {
-			logger.error("Error while in Lucene index operation: {}", e.getMessage(), e);
-
+			if (!discardWriterIfLockLost(e, "indexDoc"))
+				logger.error("Error while in Lucene index operation: {}", e.getMessage(), e);
+		} catch (AlreadyClosedException ace) {
+			// lock invalidated externally - drop the writer so the next call reopens instead of wedging
+			discardWriterIfLockLost(ace, "indexDoc");
+			return; // nothing to commit on a dead writer
 		} finally {
 			try {
-				iWriter.commit();
+				if (indexWriter != null)
+					iWriter.commit();
 			} catch (IOException ioEx) {
-				logger.error("Error while commiting changes to Lucene index: {}", ioEx.getMessage(), ioEx);
+				if (!discardWriterIfLockLost(ioEx, "indexDoc commit"))
+					logger.error("Error while commiting changes to Lucene index: {}", ioEx.getMessage(), ioEx);
+			} catch (AlreadyClosedException ace) {
+				discardWriterIfLockLost(ace, "indexDoc commit");
 			}
 		}
 
@@ -674,7 +789,8 @@ public class LuceneIndexManager {
 			// searcher.termStatistics(Term, TermStates) overload; docFreq gives the same value directly)
 			count = reader.docFreq(domainTerm);
 		} catch (Exception e1) {
-			logger.debug("Error during reader.totalTermFreq(domainTerm). " + e1.getMessage());
+			if (!discardWriterIfLockLost(e1, "getDocumentsCount"))
+				logger.debug("Error during reader.totalTermFreq(domainTerm). " + e1.getMessage());
 		} finally {
 			if (reader != null) {
 				try {
@@ -721,13 +837,12 @@ public class LuceneIndexManager {
 			long count = iWriter.deleteDocuments(booleanQuery.build());
 			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
 		} catch (IOException e) {
-			logger.error(e.getMessage(), e);
-		} finally {
-			try {
-				iWriter.commit();
-			} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, "delete"))
 				logger.error(e.getMessage(), e);
-			}
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "delete");
+		} finally {
+			commitQuietly(iWriter, "delete/commit");
 		}
 	}
 
@@ -756,13 +871,12 @@ public class LuceneIndexManager {
 			long count = iWriter.deleteDocuments(booleanQuery.build());
 			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
 		} catch (IOException e) {
-			logger.error(e.getMessage(), e);
-		} finally {
-			try {
-				iWriter.commit();
-			} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, "delete"))
 				logger.error(e.getMessage(), e);
-			}
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "delete");
+		} finally {
+			commitQuietly(iWriter, "delete/commit");
 		}
 	}
 
@@ -798,13 +912,12 @@ public class LuceneIndexManager {
 			long count = iWriter.deleteDocuments(domainQuery);
 			logger.debug("Removed  {} documents for {}.", count, domain);
 		} catch (IOException e) {
-			logger.error(e.getMessage(), e);
-		} finally {
-			try {
-				iWriter.commit();
-			} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, "deleteAll"))
 				logger.error(e.getMessage(), e);
-			}
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "deleteAll");
+		} finally {
+			commitQuietly(iWriter, "delete/commit");
 		}
 	}
 
@@ -846,7 +959,10 @@ public class LuceneIndexManager {
 			iWriter.deleteDocuments(expiredQuery);
 			logger.info("deleteExpired() removed {} expired documents", count);
 		} catch (IOException e) {
-			logger.error(e.getMessage(), e);
+			if (!discardWriterIfLockLost(e, "deleteExpired"))
+				logger.error(e.getMessage(), e);
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "deleteExpired");
 		} finally {
 			if (reader != null) {
 				try {
@@ -855,11 +971,7 @@ public class LuceneIndexManager {
 					logger.error(e.getMessage(), e);
 				}
 			}
-			try {
-				iWriter.commit();
-			} catch (IOException e) {
-				logger.error(e.getMessage(), e);
-			}
+			commitQuietly(iWriter, "delete/commit");
 		}
 
 		return count;
@@ -925,7 +1037,8 @@ public class LuceneIndexManager {
 				lastHit = topDocs.scoreDocs[topDocs.scoreDocs.length - 1];
 			}
 		} catch (Exception e) {
-			logger.error("Error during loading urls/keys from index", e);
+			if (!discardWriterIfLockLost(e, "getKeys"))
+				logger.error("Error during loading urls/keys from index", e);
 		} finally {
 			if (reader != null) {
 				try {
@@ -957,7 +1070,8 @@ public class LuceneIndexManager {
 
 			return response;
 		} catch (Exception e) {
-			logger.error("Error during loading data from index", e);
+			if (!discardWriterIfLockLost(e, "getResponse"))
+				logger.error("Error during loading data from index", e);
 		}
 		return null;
 	}
