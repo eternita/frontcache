@@ -103,23 +103,33 @@ public class FrontCacheEngine {
 
 	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output
 
-	private static FrontCacheEngine instance;
+	// volatile + double-checked locking - see CacheManager.getInstance(): the unsynchronized
+	// check-then-act let concurrent first requests build two engines, each initializing its own
+	// cache processor / Lucene writer on one index dir.
+	private static volatile FrontCacheEngine instance;
 
     private static final String INCLUDE_LEVEL_TOP_LEVEL = "0";
 
 	public static FrontCacheEngine getFrontCache() {
-		if (null == instance) {
-//			FCConfig.init();
+		FrontCacheEngine localInstance = instance;
+		if (null == localInstance) {
+			synchronized (FrontCacheEngine.class) {
+				localInstance = instance;
+				if (null == localInstance) {
+//					FCConfig.init();
 
-			//Logs config ->  !!! -Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
+					//Logs config ->  !!! -Dlogback.configurationFile=/opt/frontcache/conf/fc-logback.xml
 
-			String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
-			if ("true".equalsIgnoreCase(debugCommentsStr))
-				debugComments = true;
+					String debugCommentsStr = FCConfig.getProperty("front-cache.debug-comments", "false");
+					if ("true".equalsIgnoreCase(debugCommentsStr))
+						debugComments = true;
 
-			instance = new FrontCacheEngine();
+					localInstance = new FrontCacheEngine();
+					instance = localInstance;
+				}
+			}
 		}
-		return instance;
+		return localInstance;
 	}
 
 	public DomainContext getDomainContexBySiteKey(String siteKey)
@@ -135,10 +145,14 @@ public class FrontCacheEngine {
 		return getDomainContext(origin);
 	}
 
+	// synchronized on the same monitor as getFrontCache() so a shutdown/reload can't interleave with
+	// a lazy init and leave two engines (and two Lucene writers) alive.
 	public static void destroy() {
-		if (null != instance) {
-			instance.stop();
-			instance = null;
+		synchronized (FrontCacheEngine.class) {
+			if (null != instance) {
+				instance.stop();
+				instance = null;
+			}
 		}
 	}
 

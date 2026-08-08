@@ -42,6 +42,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.LockObtainFailedException;
@@ -65,7 +66,28 @@ public class LuceneIndexManager {
 
 	private static final Logger logger = LoggerFactory.getLogger(LuceneIndexManager.class);
 
-	private static String INDEX_PATH;
+	// The index directory this manager owns. Instance state, NOT static: as a static field every new
+	// manager clobbered the path of all existing ones, so a second manager (on any dir) corrupted the
+	// LIVE_WRITER_PATHS bookkeeping and the lock/error messages of the first.
+	private final String indexPath;
+
+	// One manager per index directory, process-wide. Two IndexWriters cannot share a directory, so a
+	// second manager on the same dir is always a bug: one wins write.lock and the other is left
+	// permanently writer-less ("Lock held elsewhere" on every request, L2 dead until restart - the
+	// production wedge this registry prevents). Production goes through getInstance(); the
+	// constructor stays package-private so tests can still simulate a crashed-and-restarted JVM.
+	private static final java.util.concurrent.ConcurrentMap<String, LuceneIndexManager> INSTANCES =
+			new java.util.concurrent.ConcurrentHashMap<>();
+
+	// One monitor per index directory, guarding the whole "open writer / detect stale lock / delete it /
+	// retry" sequence in getIndexWriter(). Keyed by path rather than per manager because the thing that
+	// must not interleave is two managers healing the same directory.
+	private static final java.util.concurrent.ConcurrentMap<String, Object> WRITER_MONITORS =
+			new java.util.concurrent.ConcurrentHashMap<>();
+
+	private static Object writerMonitorFor(String path) {
+		return WRITER_MONITORS.computeIfAbsent(path, p -> new Object());
+	}
 
 	public static final String JSON_FIELD = "json";
 	public static final String BIN_FIELD = "bin";
@@ -164,10 +186,46 @@ public class LuceneIndexManager {
 
 
 	/**
+	 * Returns the one manager for {@code indexPath}, creating it on first use.
+	 * <p>
+	 * This is how production code must obtain a manager. Only one {@link IndexWriter} can hold an
+	 * index directory, so sharing a single manager per directory is what keeps a second, permanently
+	 * broken writer from ever existing - see {@link #INSTANCES}.
+	 *
+	 * @param indexPath index directory (any form; normalised internally)
+	 * @param maxMergedSegmentMB cap on largest merged segment (MB); &lt;=0 -&gt; default
+	 * @param deletesPctAllowed % deleted docs tolerated before reclaim; clamped to Lucene's [20,50]
+	 */
+	public static LuceneIndexManager getInstance(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
+		String key = normalizePath(indexPath);
+		LuceneIndexManager existing = INSTANCES.get(key);
+		if (null != existing) {
+			if (existing.maxMergedSegmentMB != validateMaxMergedSegmentMB(maxMergedSegmentMB)
+					|| existing.deletesPctAllowed != validateDeletesPctAllowed(deletesPctAllowed))
+				logger.warn("L2 index {} is already open with different merge tuning "
+						+ "(maxMergedSegmentMB={}, deletesPctAllowed={}) - reusing the existing manager; "
+						+ "restart to apply new tuning.", key, existing.maxMergedSegmentMB, existing.deletesPctAllowed);
+			return existing;
+		}
+
+		// computeIfAbsent so two threads racing the first request can't each build a manager
+		return INSTANCES.computeIfAbsent(key,
+				p -> new LuceneIndexManager(p, maxMergedSegmentMB, deletesPctAllowed));
+	}
+
+	/**
+	 * Normalises an index path so the same directory maps to one registry key / one lock-bookkeeping
+	 * entry regardless of how it was spelled (relative, trailing slash, {@code ..} segments).
+	 */
+	static String normalizePath(String indexPath) {
+		return Paths.get(indexPath).toAbsolutePath().normalize().toString();
+	}
+
+	/**
 	 * Constructor - uses default merge tuning.
 	 * @param indexPath
 	 */
-	public LuceneIndexManager(String indexPath) {
+	LuceneIndexManager(String indexPath) {
 		this(indexPath, DEFAULT_MAX_MERGED_SEGMENT_MB, DEFAULT_DELETES_PCT_ALLOWED);
 	}
 
@@ -177,13 +235,12 @@ public class LuceneIndexManager {
 	 * @param maxMergedSegmentMB cap on largest merged segment (MB); &lt;=0 -&gt; default
 	 * @param deletesPctAllowed % deleted docs tolerated before reclaim; clamped to Lucene's [20,50]
 	 */
-	public LuceneIndexManager(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
-		this.maxMergedSegmentMB = (maxMergedSegmentMB > 0) ? maxMergedSegmentMB : DEFAULT_MAX_MERGED_SEGMENT_MB;
-		// TieredMergePolicy.setDeletesPctAllowed requires 20 <= value <= 50
-		this.deletesPctAllowed = Math.min(50.0, Math.max(20.0, deletesPctAllowed));
+	LuceneIndexManager(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
+		this.maxMergedSegmentMB = validateMaxMergedSegmentMB(maxMergedSegmentMB);
+		this.deletesPctAllowed = validateDeletesPctAllowed(deletesPctAllowed);
 
-		INDEX_PATH = indexPath;
-		Path path = Paths.get(INDEX_PATH);
+		this.indexPath = normalizePath(indexPath);
+		Path path = Paths.get(this.indexPath);
 		if (!Files.exists(path)) {
 			try {
 				if (path.getParent().toFile().isDirectory() && !path.getParent().toFile().exists())
@@ -211,6 +268,15 @@ public class LuceneIndexManager {
 		}
 	}
 
+	private static double validateMaxMergedSegmentMB(double maxMergedSegmentMB) {
+		return (maxMergedSegmentMB > 0) ? maxMergedSegmentMB : DEFAULT_MAX_MERGED_SEGMENT_MB;
+	}
+
+	private static double validateDeletesPctAllowed(double deletesPctAllowed) {
+		// TieredMergePolicy.setDeletesPctAllowed requires 20 <= value <= 50
+		return Math.min(50.0, Math.max(20.0, deletesPctAllowed));
+	}
+
 	// package-private accessors for the effective (validated/clamped) merge-tuning values - for tests
 	double getMaxMergedSegmentMB() {
 		return maxMergedSegmentMB;
@@ -230,7 +296,13 @@ public class LuceneIndexManager {
 		if (indexWriter != null && indexWriter.isOpen())
 			return indexWriter;
 
-		synchronized (this) {
+		// Acquisition is serialized per index directory, not just per manager: the stale-lock recovery
+		// below deletes write.lock, and two managers doing that at the same moment both "recover" and
+		// end up with a live writer on one index (prod, fc-eu 2026-08-07 14:16:16 - the loser's lock
+		// file was deleted and recreated by its peer, so every later op threw AlreadyClosedException
+		// "Underlying file changed by an external force" for 25h). One monitor per path makes the
+		// acquire-test-heal-retry sequence atomic against any other manager on the same directory.
+		synchronized (writerMonitorFor(indexPath)) {
 			if (indexWriter != null && indexWriter.isOpen())
 				return indexWriter;
 
@@ -244,7 +316,7 @@ public class LuceneIndexManager {
 					logger.warn("Error closing stale IndexWriter before reopen (lock may be released on close): {}", t.getMessage());
 				}
 				indexWriter = null;
-				LIVE_WRITER_PATHS.remove(INDEX_PATH);
+				LIVE_WRITER_PATHS.remove(indexPath);
 			}
 
 			logger.debug("(re)opening Lucene IndexWriter...");
@@ -265,7 +337,7 @@ public class LuceneIndexManager {
 				// If a live writer IN THIS JVM does own it, we must NOT delete: that would put two
 				// writers on one index (corruption). That only arises from two managers on one dir in
 				// one process - unsupported in prod (single writer per FRONTCACHE_HOME).
-				if (!LIVE_WRITER_PATHS.contains(INDEX_PATH)) {
+				if (!LIVE_WRITER_PATHS.contains(indexPath)) {
 					logger.warn("L2 Lucene write lock is stale ({}) - clearing it and retrying", lofe.getMessage());
 					deleteStaleWriteLock();
 					try {
@@ -306,7 +378,30 @@ public class LuceneIndexManager {
 		// owns its FRONTCACHE_HOME), so the cross-process protection we give up is protection we never
 		// relied on.
 		if (directory == null)
-			directory = FSDirectory.open(Paths.get(INDEX_PATH), SimpleFSLockFactory.INSTANCE);
+			directory = FSDirectory.open(Paths.get(indexPath), SimpleFSLockFactory.INSTANCE);
+
+		// Claim the path BEFORE constructing the writer, not after. new IndexWriter() creates write.lock
+		// early but can take hundreds of ms to return on a large index; registering only on success left
+		// a window in which a concurrent manager saw "no live writer owns this lock", judged the lock
+		// stale and deleted it out from under us. Cleared again below if construction fails, so a real
+		// stale lock is still recoverable.
+		boolean claimed = LIVE_WRITER_PATHS.add(indexPath);
+		IndexWriter w;
+		try {
+			w = openWriterOnDirectory();
+		} catch (Throwable t) {
+			if (claimed)
+				LIVE_WRITER_PATHS.remove(indexPath);
+			throw t;
+		}
+		return w;
+	}
+
+	/**
+	 * Constructs the {@link IndexWriter}, rebuilding the directory if the on-disk index is in a format
+	 * Lucene can no longer read.
+	 */
+	private IndexWriter openWriterOnDirectory() throws IOException {
 		IndexWriter w;
 		try {
 			w = new IndexWriter(directory, buildIndexWriterConfig());
@@ -317,13 +412,10 @@ public class LuceneIndexManager {
 			// empty rather than letting the writer stay null and silently drop the whole app to
 			// dynamic/uncached (the wedge failure mode). The cache repopulates from origin on demand.
 			logger.warn("L2 Lucene index at {} is in an unreadable older format ({}) - discarding it and "
-					+ "rebuilding an empty index; it will repopulate from origin.", INDEX_PATH, tooOld.getMessage());
+					+ "rebuilding an empty index; it will repopulate from origin.", indexPath, tooOld.getMessage());
 			rebuildEmptyIndexDirectory();
 			w = new IndexWriter(directory, buildIndexWriterConfig());
 		}
-		// Record that this JVM now holds a live writer on this index, so a concurrent manager on the
-		// same dir won't mistake our live lock for a stale one and delete it (see getIndexWriter).
-		LIVE_WRITER_PATHS.add(INDEX_PATH);
 		return w;
 	}
 
@@ -342,7 +434,7 @@ public class LuceneIndexManager {
 			}
 			directory = null;
 		}
-		Path dir = Paths.get(INDEX_PATH);
+		Path dir = Paths.get(indexPath);
 		if (Files.isDirectory(dir)) {
 			try (java.util.stream.Stream<Path> files = Files.list(dir)) {
 				files.forEach(p -> {
@@ -368,8 +460,78 @@ public class LuceneIndexManager {
 			lastReopenFailureLogMillis = now;
 			logger.error("L2 Lucene IndexWriter is unavailable - cache reads/writes to L2 are failing. "
 					+ "If this persists, restart the Frontcache server (index dir: {}). Cause: {}",
-					INDEX_PATH, e.toString());
+					indexPath, e.toString());
 		}
+	}
+
+	/**
+	 * Commits pending changes, logging rather than propagating failures, and discarding the writer if
+	 * its lock turned out to be invalidated (so the next operation reopens a working one).
+	 * <p>
+	 * Used from the {@code finally} blocks of the mutating operations. An {@link AlreadyClosedException}
+	 * raised here is a RuntimeException, so before this it escaped the (IOException-only) handlers and
+	 * surfaced far away - e.g. as "Soft invalidation/refresh failed" on every background refresh.
+	 */
+	private void commitQuietly(IndexWriter iWriter, String operation) {
+		if (indexWriter == null)
+			return; // writer already discarded by this operation's error handling
+		try {
+			iWriter.commit();
+		} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, operation))
+				logger.error(e.getMessage(), e);
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, operation);
+		}
+	}
+
+	/**
+	 * True when {@code t} (or anything in its cause chain) is an {@link AlreadyClosedException} - i.e.
+	 * this writer's lock is no longer valid, typically because its {@code write.lock} file was deleted
+	 * and recreated by something else ("Underlying file changed by an external force").
+	 */
+	private static boolean isWriterLockLost(Throwable t) {
+		for (Throwable c = t; c != null; c = c.getCause()) {
+			if (c instanceof AlreadyClosedException)
+				return true;
+			if (c == c.getCause())
+				break; // defensive: self-referencing cause
+		}
+		return false;
+	}
+
+	/**
+	 * Discards a writer whose lock has been invalidated so the next call reopens a working one.
+	 * <p>
+	 * {@link IndexWriter#isOpen()} is NOT sufficient to detect this: an invalid lock is not one of
+	 * Lucene's "tragic" events, so the writer reports itself open while every operation on it throws
+	 * {@link AlreadyClosedException}. Without this, getIndexWriter()'s fast path kept handing back the
+	 * same dead writer indefinitely - in production that flooded ~9k errors/day for 25 hours and left
+	 * soft invalidation permanently broken until a restart.
+	 *
+	 * @return true if a lost-lock writer was discarded (caller's operation still failed, the next one
+	 *         will reopen)
+	 */
+	private boolean discardWriterIfLockLost(Throwable t, String operation) {
+		if (!isWriterLockLost(t))
+			return false;
+
+		synchronized (writerMonitorFor(indexPath)) {
+			if (indexWriter != null) {
+				try {
+					indexWriter.close();
+				} catch (Throwable closeFailure) {
+					// expected: SimpleFSLock refuses to remove a lock file it no longer owns
+					// ("Lock file cannot be safely removed") - nothing to do but drop the reference
+					logger.debug("Closing a writer with a lost lock failed: {}", closeFailure.toString());
+				}
+				indexWriter = null;
+				LIVE_WRITER_PATHS.remove(indexPath);
+			}
+		}
+		logger.error("L2 Lucene write lock was invalidated externally during {} - discarded the writer, "
+				+ "the next L2 operation will reopen it (index dir: {}). Cause: {}", operation, indexPath, t.toString());
+		return true;
 	}
 
 	/**
@@ -380,7 +542,7 @@ public class LuceneIndexManager {
 	 * own writer is closed/null - so no live writer's lock is being pulled out from under it.
 	 */
 	private void deleteStaleWriteLock() {
-		Path lockFile = Paths.get(INDEX_PATH).resolve(IndexWriter.WRITE_LOCK_NAME);
+		Path lockFile = Paths.get(indexPath).resolve(IndexWriter.WRITE_LOCK_NAME);
 		try {
 			if (Files.deleteIfExists(lockFile))
 				logger.warn("Deleted stale L2 write lock {}", lockFile);
@@ -447,7 +609,7 @@ public class LuceneIndexManager {
 		// flush pending changes so the snapshot reflects the current cache state
 		iWriter.commit();
 
-		Path indexDir = Paths.get(INDEX_PATH).toAbsolutePath();
+		Path indexDir = Paths.get(indexPath).toAbsolutePath();
 		// keep the original index directory name inside the archive (e.g. l2-lucene-index)
 		String indexDirName = indexDir.getFileName().toString();
 		String archiveName = indexDirName + ".backup-" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".zip";
@@ -513,13 +675,21 @@ public class LuceneIndexManager {
 		try {
 			iWriter.updateDocument(new Term(URL_FIELD, urlKey), doc);
 		} catch (IOException e) {
-			logger.error("Error while in Lucene index operation: {}", e.getMessage(), e);
-
+			if (!discardWriterIfLockLost(e, "indexDoc"))
+				logger.error("Error while in Lucene index operation: {}", e.getMessage(), e);
+		} catch (AlreadyClosedException ace) {
+			// lock invalidated externally - drop the writer so the next call reopens instead of wedging
+			discardWriterIfLockLost(ace, "indexDoc");
+			return; // nothing to commit on a dead writer
 		} finally {
 			try {
-				iWriter.commit();
+				if (indexWriter != null)
+					iWriter.commit();
 			} catch (IOException ioEx) {
-				logger.error("Error while commiting changes to Lucene index: {}", ioEx.getMessage(), ioEx);
+				if (!discardWriterIfLockLost(ioEx, "indexDoc commit"))
+					logger.error("Error while commiting changes to Lucene index: {}", ioEx.getMessage(), ioEx);
+			} catch (AlreadyClosedException ace) {
+				discardWriterIfLockLost(ace, "indexDoc commit");
 			}
 		}
 
@@ -536,7 +706,7 @@ public class LuceneIndexManager {
 		indexWriter = null;
 		// SimpleFSLockFactory deletes write.lock on a clean close; drop our live-writer registration
 		// so a later reopen treats any leftover lock as stale.
-		LIVE_WRITER_PATHS.remove(INDEX_PATH);
+		LIVE_WRITER_PATHS.remove(indexPath);
 
 		if (directory != null) {
 			try {
@@ -546,6 +716,11 @@ public class LuceneIndexManager {
 			}
 			directory = null;
 		}
+
+		// Drop the registry entry so a later init (destroy/reload cycle) builds a fresh manager rather
+		// than handing out this closed one. Removed by identity: if a new manager for this path has
+		// already been registered we must not evict it.
+		INSTANCES.remove(indexPath, this);
 	}
 
 	/**
@@ -614,7 +789,8 @@ public class LuceneIndexManager {
 			// searcher.termStatistics(Term, TermStates) overload; docFreq gives the same value directly)
 			count = reader.docFreq(domainTerm);
 		} catch (Exception e1) {
-			logger.debug("Error during reader.totalTermFreq(domainTerm). " + e1.getMessage());
+			if (!discardWriterIfLockLost(e1, "getDocumentsCount"))
+				logger.debug("Error during reader.totalTermFreq(domainTerm). " + e1.getMessage());
 		} finally {
 			if (reader != null) {
 				try {
@@ -661,13 +837,12 @@ public class LuceneIndexManager {
 			long count = iWriter.deleteDocuments(booleanQuery.build());
 			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
 		} catch (IOException e) {
-			logger.error(e.getMessage(), e);
-		} finally {
-			try {
-				iWriter.commit();
-			} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, "delete"))
 				logger.error(e.getMessage(), e);
-			}
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "delete");
+		} finally {
+			commitQuietly(iWriter, "delete/commit");
 		}
 	}
 
@@ -696,13 +871,12 @@ public class LuceneIndexManager {
 			long count = iWriter.deleteDocuments(booleanQuery.build());
 			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
 		} catch (IOException e) {
-			logger.error(e.getMessage(), e);
-		} finally {
-			try {
-				iWriter.commit();
-			} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, "delete"))
 				logger.error(e.getMessage(), e);
-			}
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "delete");
+		} finally {
+			commitQuietly(iWriter, "delete/commit");
 		}
 	}
 
@@ -738,13 +912,12 @@ public class LuceneIndexManager {
 			long count = iWriter.deleteDocuments(domainQuery);
 			logger.debug("Removed  {} documents for {}.", count, domain);
 		} catch (IOException e) {
-			logger.error(e.getMessage(), e);
-		} finally {
-			try {
-				iWriter.commit();
-			} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, "deleteAll"))
 				logger.error(e.getMessage(), e);
-			}
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "deleteAll");
+		} finally {
+			commitQuietly(iWriter, "delete/commit");
 		}
 	}
 
@@ -786,7 +959,10 @@ public class LuceneIndexManager {
 			iWriter.deleteDocuments(expiredQuery);
 			logger.info("deleteExpired() removed {} expired documents", count);
 		} catch (IOException e) {
-			logger.error(e.getMessage(), e);
+			if (!discardWriterIfLockLost(e, "deleteExpired"))
+				logger.error(e.getMessage(), e);
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "deleteExpired");
 		} finally {
 			if (reader != null) {
 				try {
@@ -795,11 +971,7 @@ public class LuceneIndexManager {
 					logger.error(e.getMessage(), e);
 				}
 			}
-			try {
-				iWriter.commit();
-			} catch (IOException e) {
-				logger.error(e.getMessage(), e);
-			}
+			commitQuietly(iWriter, "delete/commit");
 		}
 
 		return count;
@@ -865,7 +1037,8 @@ public class LuceneIndexManager {
 				lastHit = topDocs.scoreDocs[topDocs.scoreDocs.length - 1];
 			}
 		} catch (Exception e) {
-			logger.error("Error during loading urls/keys from index", e);
+			if (!discardWriterIfLockLost(e, "getKeys"))
+				logger.error("Error during loading urls/keys from index", e);
 		} finally {
 			if (reader != null) {
 				try {
@@ -897,7 +1070,8 @@ public class LuceneIndexManager {
 
 			return response;
 		} catch (Exception e) {
-			logger.error("Error during loading data from index", e);
+			if (!discardWriterIfLockLost(e, "getResponse"))
+				logger.error("Error during loading data from index", e);
 		}
 		return null;
 	}
@@ -911,7 +1085,7 @@ public class LuceneIndexManager {
 		IndexReader reader = null;
 		try {
 
-			Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
+			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			reader = DirectoryReader.open(dir);
 			n = reader.numDocs();
 
