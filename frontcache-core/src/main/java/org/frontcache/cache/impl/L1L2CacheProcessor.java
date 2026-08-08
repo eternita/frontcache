@@ -134,7 +134,9 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		double maxMergedSegmentMB = getDoubleProperty(properties, L2_MAX_MERGED_SEGMENT_MB_KEY, LuceneIndexManager.DEFAULT_MAX_MERGED_SEGMENT_MB);
 		double deletesPctAllowed = getDoubleProperty(properties, L2_DELETES_PCT_ALLOWED_KEY, LuceneIndexManager.DEFAULT_DELETES_PCT_ALLOWED);
 
-		luceneIndexManager = new LuceneIndexManager(INDEX_BASE_DIR, maxMergedSegmentMB, deletesPctAllowed);
+		// getInstance(), never new: one manager (hence one IndexWriter) per index dir, so a duplicate
+		// cache processor can't leave a second, permanently lock-starved writer behind.
+		luceneIndexManager = LuceneIndexManager.getInstance(INDEX_BASE_DIR, maxMergedSegmentMB, deletesPctAllowed);
 	}
 
 	/**

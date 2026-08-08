@@ -21,13 +21,28 @@ public class CacheManager {
 	private static Logger logger = LoggerFactory.getLogger(CacheManager.class);
 	private CacheManager() {}
 
-	private static CacheProcessor instance;
+	// volatile + double-checked locking: a plain "if (null == instance)" here was a check-then-act
+	// race. Under production traffic two Jetty threads hitting the very first requests both saw
+	// null and each built its own CacheProcessor, so L1L2CacheProcessor created TWO
+	// LuceneIndexManagers on the same L2 index dir. One won write.lock; the other was left with a
+	// permanently null IndexWriter, and because a live writer in this JVM owned the lock the
+	// stale-lock self-heal (by design) refused to clear it - so whichever engine happened to hold
+	// the loser logged "LockObtainFailedException: Lock held elsewhere" on every single request and
+	// L2 stayed dead (reads included) until the next restart, which re-rolled the same dice.
+	private static volatile CacheProcessor instance;
 
 	public static CacheProcessor getInstance(){
-		if (null == instance) {
-			instance = getCacheProcessor();
+		CacheProcessor localInstance = instance;
+		if (null == localInstance) {
+			synchronized (CacheManager.class) {
+				localInstance = instance;
+				if (null == localInstance) {
+					localInstance = getCacheProcessor();
+					instance = localInstance;
+				}
+			}
 		}
-		return instance;
+		return localInstance;
 	}
 
 

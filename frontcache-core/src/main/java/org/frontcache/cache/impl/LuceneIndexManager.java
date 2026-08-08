@@ -65,7 +65,18 @@ public class LuceneIndexManager {
 
 	private static final Logger logger = LoggerFactory.getLogger(LuceneIndexManager.class);
 
-	private static String INDEX_PATH;
+	// The index directory this manager owns. Instance state, NOT static: as a static field every new
+	// manager clobbered the path of all existing ones, so a second manager (on any dir) corrupted the
+	// LIVE_WRITER_PATHS bookkeeping and the lock/error messages of the first.
+	private final String indexPath;
+
+	// One manager per index directory, process-wide. Two IndexWriters cannot share a directory, so a
+	// second manager on the same dir is always a bug: one wins write.lock and the other is left
+	// permanently writer-less ("Lock held elsewhere" on every request, L2 dead until restart - the
+	// production wedge this registry prevents). Production goes through getInstance(); the
+	// constructor stays package-private so tests can still simulate a crashed-and-restarted JVM.
+	private static final java.util.concurrent.ConcurrentMap<String, LuceneIndexManager> INSTANCES =
+			new java.util.concurrent.ConcurrentHashMap<>();
 
 	public static final String JSON_FIELD = "json";
 	public static final String BIN_FIELD = "bin";
@@ -164,10 +175,46 @@ public class LuceneIndexManager {
 
 
 	/**
+	 * Returns the one manager for {@code indexPath}, creating it on first use.
+	 * <p>
+	 * This is how production code must obtain a manager. Only one {@link IndexWriter} can hold an
+	 * index directory, so sharing a single manager per directory is what keeps a second, permanently
+	 * broken writer from ever existing - see {@link #INSTANCES}.
+	 *
+	 * @param indexPath index directory (any form; normalised internally)
+	 * @param maxMergedSegmentMB cap on largest merged segment (MB); &lt;=0 -&gt; default
+	 * @param deletesPctAllowed % deleted docs tolerated before reclaim; clamped to Lucene's [20,50]
+	 */
+	public static LuceneIndexManager getInstance(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
+		String key = normalizePath(indexPath);
+		LuceneIndexManager existing = INSTANCES.get(key);
+		if (null != existing) {
+			if (existing.maxMergedSegmentMB != validateMaxMergedSegmentMB(maxMergedSegmentMB)
+					|| existing.deletesPctAllowed != validateDeletesPctAllowed(deletesPctAllowed))
+				logger.warn("L2 index {} is already open with different merge tuning "
+						+ "(maxMergedSegmentMB={}, deletesPctAllowed={}) - reusing the existing manager; "
+						+ "restart to apply new tuning.", key, existing.maxMergedSegmentMB, existing.deletesPctAllowed);
+			return existing;
+		}
+
+		// computeIfAbsent so two threads racing the first request can't each build a manager
+		return INSTANCES.computeIfAbsent(key,
+				p -> new LuceneIndexManager(p, maxMergedSegmentMB, deletesPctAllowed));
+	}
+
+	/**
+	 * Normalises an index path so the same directory maps to one registry key / one lock-bookkeeping
+	 * entry regardless of how it was spelled (relative, trailing slash, {@code ..} segments).
+	 */
+	static String normalizePath(String indexPath) {
+		return Paths.get(indexPath).toAbsolutePath().normalize().toString();
+	}
+
+	/**
 	 * Constructor - uses default merge tuning.
 	 * @param indexPath
 	 */
-	public LuceneIndexManager(String indexPath) {
+	LuceneIndexManager(String indexPath) {
 		this(indexPath, DEFAULT_MAX_MERGED_SEGMENT_MB, DEFAULT_DELETES_PCT_ALLOWED);
 	}
 
@@ -177,13 +224,12 @@ public class LuceneIndexManager {
 	 * @param maxMergedSegmentMB cap on largest merged segment (MB); &lt;=0 -&gt; default
 	 * @param deletesPctAllowed % deleted docs tolerated before reclaim; clamped to Lucene's [20,50]
 	 */
-	public LuceneIndexManager(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
-		this.maxMergedSegmentMB = (maxMergedSegmentMB > 0) ? maxMergedSegmentMB : DEFAULT_MAX_MERGED_SEGMENT_MB;
-		// TieredMergePolicy.setDeletesPctAllowed requires 20 <= value <= 50
-		this.deletesPctAllowed = Math.min(50.0, Math.max(20.0, deletesPctAllowed));
+	LuceneIndexManager(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
+		this.maxMergedSegmentMB = validateMaxMergedSegmentMB(maxMergedSegmentMB);
+		this.deletesPctAllowed = validateDeletesPctAllowed(deletesPctAllowed);
 
-		INDEX_PATH = indexPath;
-		Path path = Paths.get(INDEX_PATH);
+		this.indexPath = normalizePath(indexPath);
+		Path path = Paths.get(this.indexPath);
 		if (!Files.exists(path)) {
 			try {
 				if (path.getParent().toFile().isDirectory() && !path.getParent().toFile().exists())
@@ -209,6 +255,15 @@ public class LuceneIndexManager {
 				logger.error("Error during creating indexWriter " + e.getMessage());
 			}
 		}
+	}
+
+	private static double validateMaxMergedSegmentMB(double maxMergedSegmentMB) {
+		return (maxMergedSegmentMB > 0) ? maxMergedSegmentMB : DEFAULT_MAX_MERGED_SEGMENT_MB;
+	}
+
+	private static double validateDeletesPctAllowed(double deletesPctAllowed) {
+		// TieredMergePolicy.setDeletesPctAllowed requires 20 <= value <= 50
+		return Math.min(50.0, Math.max(20.0, deletesPctAllowed));
 	}
 
 	// package-private accessors for the effective (validated/clamped) merge-tuning values - for tests
@@ -244,7 +299,7 @@ public class LuceneIndexManager {
 					logger.warn("Error closing stale IndexWriter before reopen (lock may be released on close): {}", t.getMessage());
 				}
 				indexWriter = null;
-				LIVE_WRITER_PATHS.remove(INDEX_PATH);
+				LIVE_WRITER_PATHS.remove(indexPath);
 			}
 
 			logger.debug("(re)opening Lucene IndexWriter...");
@@ -265,7 +320,7 @@ public class LuceneIndexManager {
 				// If a live writer IN THIS JVM does own it, we must NOT delete: that would put two
 				// writers on one index (corruption). That only arises from two managers on one dir in
 				// one process - unsupported in prod (single writer per FRONTCACHE_HOME).
-				if (!LIVE_WRITER_PATHS.contains(INDEX_PATH)) {
+				if (!LIVE_WRITER_PATHS.contains(indexPath)) {
 					logger.warn("L2 Lucene write lock is stale ({}) - clearing it and retrying", lofe.getMessage());
 					deleteStaleWriteLock();
 					try {
@@ -306,7 +361,7 @@ public class LuceneIndexManager {
 		// owns its FRONTCACHE_HOME), so the cross-process protection we give up is protection we never
 		// relied on.
 		if (directory == null)
-			directory = FSDirectory.open(Paths.get(INDEX_PATH), SimpleFSLockFactory.INSTANCE);
+			directory = FSDirectory.open(Paths.get(indexPath), SimpleFSLockFactory.INSTANCE);
 		IndexWriter w;
 		try {
 			w = new IndexWriter(directory, buildIndexWriterConfig());
@@ -317,13 +372,13 @@ public class LuceneIndexManager {
 			// empty rather than letting the writer stay null and silently drop the whole app to
 			// dynamic/uncached (the wedge failure mode). The cache repopulates from origin on demand.
 			logger.warn("L2 Lucene index at {} is in an unreadable older format ({}) - discarding it and "
-					+ "rebuilding an empty index; it will repopulate from origin.", INDEX_PATH, tooOld.getMessage());
+					+ "rebuilding an empty index; it will repopulate from origin.", indexPath, tooOld.getMessage());
 			rebuildEmptyIndexDirectory();
 			w = new IndexWriter(directory, buildIndexWriterConfig());
 		}
 		// Record that this JVM now holds a live writer on this index, so a concurrent manager on the
 		// same dir won't mistake our live lock for a stale one and delete it (see getIndexWriter).
-		LIVE_WRITER_PATHS.add(INDEX_PATH);
+		LIVE_WRITER_PATHS.add(indexPath);
 		return w;
 	}
 
@@ -342,7 +397,7 @@ public class LuceneIndexManager {
 			}
 			directory = null;
 		}
-		Path dir = Paths.get(INDEX_PATH);
+		Path dir = Paths.get(indexPath);
 		if (Files.isDirectory(dir)) {
 			try (java.util.stream.Stream<Path> files = Files.list(dir)) {
 				files.forEach(p -> {
@@ -368,7 +423,7 @@ public class LuceneIndexManager {
 			lastReopenFailureLogMillis = now;
 			logger.error("L2 Lucene IndexWriter is unavailable - cache reads/writes to L2 are failing. "
 					+ "If this persists, restart the Frontcache server (index dir: {}). Cause: {}",
-					INDEX_PATH, e.toString());
+					indexPath, e.toString());
 		}
 	}
 
@@ -380,7 +435,7 @@ public class LuceneIndexManager {
 	 * own writer is closed/null - so no live writer's lock is being pulled out from under it.
 	 */
 	private void deleteStaleWriteLock() {
-		Path lockFile = Paths.get(INDEX_PATH).resolve(IndexWriter.WRITE_LOCK_NAME);
+		Path lockFile = Paths.get(indexPath).resolve(IndexWriter.WRITE_LOCK_NAME);
 		try {
 			if (Files.deleteIfExists(lockFile))
 				logger.warn("Deleted stale L2 write lock {}", lockFile);
@@ -447,7 +502,7 @@ public class LuceneIndexManager {
 		// flush pending changes so the snapshot reflects the current cache state
 		iWriter.commit();
 
-		Path indexDir = Paths.get(INDEX_PATH).toAbsolutePath();
+		Path indexDir = Paths.get(indexPath).toAbsolutePath();
 		// keep the original index directory name inside the archive (e.g. l2-lucene-index)
 		String indexDirName = indexDir.getFileName().toString();
 		String archiveName = indexDirName + ".backup-" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".zip";
@@ -536,7 +591,7 @@ public class LuceneIndexManager {
 		indexWriter = null;
 		// SimpleFSLockFactory deletes write.lock on a clean close; drop our live-writer registration
 		// so a later reopen treats any leftover lock as stale.
-		LIVE_WRITER_PATHS.remove(INDEX_PATH);
+		LIVE_WRITER_PATHS.remove(indexPath);
 
 		if (directory != null) {
 			try {
@@ -546,6 +601,11 @@ public class LuceneIndexManager {
 			}
 			directory = null;
 		}
+
+		// Drop the registry entry so a later init (destroy/reload cycle) builds a fresh manager rather
+		// than handing out this closed one. Removed by identity: if a new manager for this path has
+		// already been registered we must not evict it.
+		INSTANCES.remove(indexPath, this);
 	}
 
 	/**
@@ -911,7 +971,7 @@ public class LuceneIndexManager {
 		IndexReader reader = null;
 		try {
 
-			Directory dir = FSDirectory.open(Paths.get(INDEX_PATH));
+			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			reader = DirectoryReader.open(dir);
 			n = reader.numDocs();
 
