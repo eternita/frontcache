@@ -95,8 +95,17 @@ public class FrontCacheEngine {
 	private static final int DEFAULT_CONNECTION_REQUEST_TIMEOUT = 2000;
 	private int fcConnectionRequestTimeout = DEFAULT_CONNECTION_REQUEST_TIMEOUT;
 
-	// fraction of the pool in use above which the periodic stats line is logged at WARN
+	// fraction of the pool in use above which the periodic stats line also warns on the engine logger
 	private static final double POOL_SATURATION_WARN_RATIO = 0.8;
+
+	// how often the connection-pool snapshot is written
+	private static final long POOL_STATS_LOG_PERIOD_MS = 5 * 60 * 1000;
+
+	// Dedicated logger for the pool snapshot, routed by fc-logback.xml to
+	// ${frontcache.home}/frontcache-logs/http-pool.info (additivity=false keeps it out of info.log).
+	// Named, not class-based, so the destination is a config decision - same approach as
+	// the 'frontcache.failed-requests' logger.
+	private static final Logger httpPoolLogger = LoggerFactory.getLogger("frontcache.http-pool");
 
 	// grace period before a replaced HTTP client is closed on reload - longer than the largest Hystrix
 	// command timeout so in-flight origin calls finish rather than being cut off
@@ -305,9 +314,11 @@ public class FrontCacheEngine {
 			}
 		}, 30000, 5000);
 
-		// log connectionManager stats - at WARN once the pool is nearly exhausted, so a connection
-		// shortage names itself in the log instead of only showing up as downstream timeouts and open
-		// circuits. A sustained warn here with pending > 0 means threads are queuing for connections.
+		// Periodic connection-pool snapshot. Two destinations on purpose:
+		//  - every tick goes to the dedicated http-pool logger, giving a continuous history to read
+		//    back after an incident (the pool was invisible during the 2026-08-12 outage);
+		//  - a near-exhausted pool additionally warns on the engine logger, so it lands in error.log
+		//    where alerting looks, instead of only in a file nobody watches.
 		connectionManagerTimer.schedule(new TimerTask() {
 			@Override
 			public void run() {
@@ -315,12 +326,16 @@ public class FrontCacheEngine {
 					return;
 				}
 				PoolStats poolStats = connectionManager.getTotalStats();
+
+				httpPoolLogger.info("leased " + poolStats.getLeased()
+						+ ", pending " + poolStats.getPending()
+						+ ", available " + poolStats.getAvailable()
+						+ ", max " + poolStats.getMax());
+
 				if (poolStats.getPending() > 0 || poolStats.getLeased() >= POOL_SATURATION_WARN_RATIO * poolStats.getMax())
 					logger.warn("HTTP connection pool is close to exhaustion - " + poolStats);
-				else
-					logger.debug("HTTP connection manager pool stats - " + poolStats);
 			}
-		}, 1000, 60000);
+		}, POOL_STATS_LOG_PERIOD_MS, POOL_STATS_LOG_PERIOD_MS);
 
 
 		Thread t = new Thread(new Runnable() {
