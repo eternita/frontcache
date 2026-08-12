@@ -8,6 +8,7 @@
  */
 package org.frontcache.core;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
@@ -16,12 +17,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -33,6 +37,8 @@ import org.apache.http.client.methods.CloseableHttpResponse;
  */
 @SuppressWarnings("serial")
 public class RequestContext extends ConcurrentHashMap<String, Object> {
+
+    private static final Logger logger = LoggerFactory.getLogger(RequestContext.class);
 
     private static final String FRONTCACHE_REQUEST_TYPE = "frontcacheRequestType"; // { toplevel | include }
     private static final String FRONTCACHE_REQUEST_ID = "frontcacheRequestID"; //
@@ -420,6 +426,40 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 
     public void setHttpClientResponse(CloseableHttpResponse response) {
     	this.set("httpClientResponse", response);
+    }
+
+    /**
+     * How many of the two parties (the Hystrix worker thread that opens the origin response, and
+     * the request thread that streams its body to the client) are done with it.
+     * Not carried over by copy() - a copied context is a fresh exchange.
+     */
+    private final transient AtomicInteger httpClientResponseParties = new AtomicInteger(0);
+
+    /**
+     * Releases the origin response opened by FC_BypassCache, closing it once BOTH parties are done.
+     *
+     * The response is opened on a Hystrix worker thread but its body is streamed by the request
+     * thread, so neither thread can close it unilaterally. On a Hystrix TIMEOUT the request thread
+     * finishes early (through the fallback) while the worker is still inside httpclient.execute() -
+     * a blocking socket read ignores the interrupt - and then stashes a response nobody is left to
+     * close, leaking the pooled connection permanently (leased entries are never reclaimed by
+     * closeExpiredConnections). Both threads call this in a finally; whichever arrives last does the
+     * close, so the connection is returned exactly once no matter which one wins the race.
+     */
+    public void releaseHttpClientResponse() {
+
+    	if (2 > httpClientResponseParties.incrementAndGet())
+    		return; // the other party is still using the response (or has yet to open it)
+
+    	CloseableHttpResponse response = getHttpClientResponse();
+    	if (null == response)
+    		return; // no origin response was ever opened (filter mode, or the call failed)
+
+    	try {
+    		response.close();
+    	} catch (IOException e) {
+    		logger.error("Can't close origin response for " + get("currentRequestURL"), e);
+    	}
     }
 
     public void setFrontCacheHttpPort(String frontCacheHttpPort) {

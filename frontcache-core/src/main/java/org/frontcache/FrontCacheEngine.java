@@ -78,9 +78,35 @@ public class FrontCacheEngine {
 
 	public final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
 
-	private static int fcConnectionsMaxTotal = 200;
+	// Connection pool must be at least as large as the pools that draw from it: the Hystrix
+	// OriginHitsPool (hystrix.threadpool.OriginHitsPool.coreSize) plus the include-processor threads
+	// (front-cache.include-processor.impl.concurrent.thread-amount). Practically all traffic goes to a
+	// single origin, i.e. ONE route - so a per-route cap below that count guarantees the surplus
+	// threads block on the pool lease under load, regardless of how healthy the origin is. Hence
+	// max-per-route defaults to max-total rather than HttpClient's own default of 2/20.
+	private static final int DEFAULT_CONNECTIONS_MAX_TOTAL = 400;
+	private int fcConnectionsMaxTotal = DEFAULT_CONNECTIONS_MAX_TOTAL;
+	private int fcConnectionsMaxPerRoute = DEFAULT_CONNECTIONS_MAX_TOTAL;
 
-	private static int fcConnectionsMaxPerRoute = 20;
+	// How long a thread may wait for a connection from the pool. Without it the wait is UNBOUNDED:
+	// a starved request parks in AbstractConnPool.getPoolEntryBlocking holding its Hystrix thread for
+	// the whole command timeout, so a brief connection shortage escalates into thread-pool rejections
+	// and open circuits. Failing fast here turns that into a normal fallback instead.
+	private static final int DEFAULT_CONNECTION_REQUEST_TIMEOUT = 2000;
+	private int fcConnectionRequestTimeout = DEFAULT_CONNECTION_REQUEST_TIMEOUT;
+
+	// fraction of the pool in use above which the periodic stats line is logged at WARN
+	private static final double POOL_SATURATION_WARN_RATIO = 0.8;
+
+	// grace period before a replaced HTTP client is closed on reload - longer than the largest Hystrix
+	// command timeout so in-flight origin calls finish rather than being cut off
+	private static final long SHUTDOWN_GRACE_PERIOD_MS = 30000;
+
+	private static final int DEFAULT_SOCKET_TIMEOUT = 10000;
+	private int fcSocketTimeout = DEFAULT_SOCKET_TIMEOUT;
+
+	private static final int DEFAULT_CONNECT_TIMEOUT = 5000;
+	private int fcConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 
 	// Requests whose URI (path + query) exceeds this length are rejected with 414 before touching
 	// cache or origin. Guards against absurdly long URLs (e.g. a crawler's compounding &amp;-mangled
@@ -251,18 +277,23 @@ public class FrontCacheEngine {
 
         logToHeadersConfig = "true".equals(FCConfig.getProperty("front-cache.log-to-headers", "false")) ? true : false;
 
-        try {
-            maxRequestURILength = Integer.parseInt(FCConfig.getProperty("front-cache.max-request-uri-length", "" + DEFAULT_MAX_REQUEST_URI_LENGTH).trim());
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid front-cache.max-request-uri-length - using default " + DEFAULT_MAX_REQUEST_URI_LENGTH);
-            maxRequestURILength = DEFAULT_MAX_REQUEST_URI_LENGTH;
-        }
+        maxRequestURILength = getIntProperty("front-cache.max-request-uri-length", DEFAULT_MAX_REQUEST_URI_LENGTH);
+
+		fcConnectionsMaxTotal = getIntProperty("front-cache.http-client.connections-max-total", DEFAULT_CONNECTIONS_MAX_TOTAL);
+		fcConnectionsMaxPerRoute = getIntProperty("front-cache.http-client.connections-max-per-route", fcConnectionsMaxTotal);
+		fcConnectionRequestTimeout = getIntProperty("front-cache.http-client.connection-request-timeout", DEFAULT_CONNECTION_REQUEST_TIMEOUT);
+		fcSocketTimeout = getIntProperty("front-cache.http-client.socket-timeout", DEFAULT_SOCKET_TIMEOUT);
+		fcConnectTimeout = getIntProperty("front-cache.http-client.connect-timeout", DEFAULT_CONNECT_TIMEOUT);
 
 		cacheProcessor = CacheManager.getInstance();
 
 		includeProcessor = IncludeProcessorManager.getInstance();
 
 		this.httpClient = newClient();
+
+		logger.info("HTTP client pool - max total " + fcConnectionsMaxTotal + ", max per route " + fcConnectionsMaxPerRoute
+				+ ", connection request timeout " + fcConnectionRequestTimeout + "ms, connect timeout " + fcConnectTimeout
+				+ "ms, socket timeout " + fcSocketTimeout + "ms");
 
 		connectionManagerTimer.schedule(new TimerTask() {
 			@Override
@@ -274,7 +305,9 @@ public class FrontCacheEngine {
 			}
 		}, 30000, 5000);
 
-		// log connectionManager stats
+		// log connectionManager stats - at WARN once the pool is nearly exhausted, so a connection
+		// shortage names itself in the log instead of only showing up as downstream timeouts and open
+		// circuits. A sustained warn here with pending > 0 means threads are queuing for connections.
 		connectionManagerTimer.schedule(new TimerTask() {
 			@Override
 			public void run() {
@@ -282,8 +315,10 @@ public class FrontCacheEngine {
 					return;
 				}
 				PoolStats poolStats = connectionManager.getTotalStats();
-				logger.debug("HTTP connection manager pool stats - " + poolStats);
-//				System.out.println("pool stats \n " + poolStats);
+				if (poolStats.getPending() > 0 || poolStats.getLeased() >= POOL_SATURATION_WARN_RATIO * poolStats.getMax())
+					logger.warn("HTTP connection pool is close to exhaustion - " + poolStats);
+				else
+					logger.debug("HTTP connection manager pool stats - " + poolStats);
 			}
 		}, 1000, 60000);
 
@@ -303,6 +338,43 @@ public class FrontCacheEngine {
 		t.start();
 
 		return;
+	}
+
+	/**
+	 * Closes a replaced HTTP client once the requests still running on it have had time to finish.
+	 * Runs on a daemon thread so it can never hold up JVM shutdown.
+	 */
+	private void closeQuietlyAfterGracePeriod(final CloseableHttpClient client) {
+
+		if (null == client)
+			return;
+
+		Thread closer = new Thread(new Runnable() {
+			public void run() {
+				try {
+					Thread.sleep(SHUTDOWN_GRACE_PERIOD_MS);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt(); // JVM is going down - close now
+				}
+				try {
+					client.close(); // also shuts down the connection manager it owns
+					logger.info("Replaced HTTP client closed, its connection pool released");
+				} catch (IOException e) {
+					logger.error("Can't close replaced HTTP client", e);
+				}
+			}
+		}, "FrontCacheEngine.httpClientCloser");
+		closer.setDaemon(true);
+		closer.start();
+	}
+
+	private int getIntProperty(String key, int defaultValue) {
+		try {
+			return Integer.parseInt(FCConfig.getProperty(key, "" + defaultValue).trim());
+		} catch (NumberFormatException e) {
+			logger.warn("Invalid " + key + " - using default " + defaultValue);
+			return defaultValue;
+		}
 	}
 
 	private URL getOriginUrl(RequestContext context) {
@@ -350,6 +422,17 @@ public class FrontCacheEngine {
 
 		connectionManagerTimer.cancel();
 
+		// Close the client (and with it the connection manager) - reload() destroys this engine and
+		// builds a new one, so without this every reload orphans a whole pool: up to
+		// front-cache.http-client.connections-max-total sockets kept alive with no reference left to
+		// close them, and no timer still running to expire them.
+		// Deferred: close() shuts the pool down immediately, killing origin calls still in flight on
+		// this (now replaced) client. Requests are bounded by the Hystrix command timeouts, so waiting
+		// out SHUTDOWN_GRACE_PERIOD_MS lets them drain and keeps a config reload non-disruptive.
+		closeQuietlyAfterGracePeriod(httpClient);
+		httpClient = null;
+		connectionManager = null;
+
 		if (null != includeProcessor)
 			includeProcessor.destroy();
 
@@ -361,8 +444,14 @@ public class FrontCacheEngine {
 
 	private CloseableHttpClient newClient() {
 		final RequestConfig requestConfig = RequestConfig.custom()
-				.setSocketTimeout(10000)
-				.setConnectTimeout(5500) // should be slightly more then hystrix timeout for http client
+				// Keep both below the Hystrix command timeouts (hystrix.properties: Cache-Origin-http
+				// 10s, Origin-Hits 20s) so a slow origin is ended by HttpClient - which releases the
+				// connection - rather than by Hystrix, which only sets an interrupt flag that a
+				// blocking socket read ignores while the connection stays leased.
+				.setSocketTimeout(fcSocketTimeout)
+				.setConnectTimeout(fcConnectTimeout)
+				// bounded wait for a pooled connection - never block a worker thread indefinitely
+				.setConnectionRequestTimeout(fcConnectionRequestTimeout)
 				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
 				.build();
 
@@ -717,11 +806,13 @@ public class FrontCacheEngine {
 				addResponseHeaders(context);
 				writeResponse(context);
 			} finally {
-				// close in finally: FC_BypassCache stashed the open origin response in the context, and
+				// release in finally: FC_BypassCache stashed the open origin response in the context, and
 				// writeResponse streams its body to the client - which can throw (e.g. broken pipe on
 				// client disconnect). Without finally the pooled connection leaks and the pool exhausts.
-				if (null != context.getHttpClientResponse())
-					context.getHttpClientResponse().close();
+				// Don't close directly - on a Hystrix TIMEOUT the worker thread is still opening the
+				// response and would stash it after we got here; releaseHttpClientResponse() hands the
+				// close to whichever of the two threads finishes last. See RequestContext.
+				context.releaseHttpClientResponse();
 			}
 		}
 		return;

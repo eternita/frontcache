@@ -15,7 +15,6 @@ import java.util.Map;
 
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -41,6 +40,8 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 	private final Map<String, List<String>> requestHeaders;
 	private final HttpClient client;
 	private final RequestContext context;
+	// published by run(), read by getFallback() on the Hystrix timer thread - see getFallback()
+	private volatile HttpGet pendingRequest = null;
 	private Logger logger = LoggerFactory.getLogger(FC_ThroughCache_HttpClient.class);
 
     public FC_ThroughCache_HttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
@@ -64,7 +65,8 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 		try {
 			logger.debug("calling " + originRequestURL);
 			HttpHost httpHost = FCUtils.getHttpHost(new URL(originRequestURL));
-			HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(originRequestURL));
+			HttpGet httpRequest = new HttpGet(FCUtils.buildRequestURI(originRequestURL));
+			this.pendingRequest = httpRequest; // so getFallback() can abort it on timeout
 
 			// translate headers
 			Header[] httpHeaders = FCUtils.convertHeaders(requestHeaders);
@@ -98,6 +100,17 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 
     @Override
     protected WebResponse getFallback() {
+
+		// Abort the origin call this fallback is replacing. Hystrix's interruptOnTimeout only sets the
+		// interrupt flag, which a blocking socket read ignores - so without this the abandoned run()
+		// keeps its pooled connection until the socket timeout expires (another full 10s), doubling
+		// connection occupancy exactly when the origin is slow and the pool is already tight.
+		// No-op when run() never started (SHORT_CIRCUITED / THREAD_POOL_REJECTED -> null) or when it
+		// already completed (FAILURE); the result of an aborted run() is discarded either way.
+		HttpGet pending = this.pendingRequest;
+		if (null != pending)
+			pending.abort();
+
 		context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
 
 		String failedExceptionMessage = "";
