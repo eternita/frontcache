@@ -62,9 +62,9 @@ front-cache.request-logs-config=fc-logback.xml
 
     <!-- HttpPoolFile for the HTTP (origin) CONNECTION POOL SNAPSHOT ONLY - one line every 5 min -->
     <appender name="HttpPoolFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <File>${frontcache.home}/frontcache-logs/http-pool.info</File>
+        <File>${frontcache.home}/logs/http-pool.info</File>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <FileNamePattern>${frontcache.home}/frontcache-logs/http-pool-%d{yyyy-MM-dd}.info.zip</FileNamePattern>
+            <FileNamePattern>${frontcache.home}/logs/http-pool-%d{yyyy-MM-dd}.info.zip</FileNamePattern>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder>

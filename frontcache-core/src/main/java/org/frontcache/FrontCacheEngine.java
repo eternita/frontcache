@@ -102,7 +102,7 @@ public class FrontCacheEngine {
 	private static final long POOL_STATS_LOG_PERIOD_MS = 5 * 60 * 1000;
 
 	// Dedicated logger for the pool snapshot, routed by fc-logback.xml to
-	// ${frontcache.home}/frontcache-logs/http-pool.info (additivity=false keeps it out of info.log).
+	// ${frontcache.home}/logs/http-pool.info (additivity=false keeps it out of info.log).
 	// Named, not class-based, so the destination is a config decision - same approach as
 	// the 'frontcache.failed-requests' logger.
 	private static final Logger httpPoolLogger = LoggerFactory.getLogger("frontcache.http-pool");
