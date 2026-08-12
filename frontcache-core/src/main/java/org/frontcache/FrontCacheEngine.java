@@ -803,8 +803,18 @@ public class FrontCacheEngine {
 
 			try {
 				RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
-				addResponseHeaders(context);
-				writeResponse(context);
+
+				// Exactly one writer. When the command fell back, FC_BypassCache parked the fallback
+				// rather than writing it, so serve that and ignore whatever the abandoned origin call
+				// may have left in the context - writing both concatenated two bodies under a status
+				// code (default 500) that overwrote the fallback's own.
+				WebResponse fallbackWebResponse = context.getFallbackWebResponse();
+				if (null != fallbackWebResponse)
+					writeFallbackResponse(fallbackWebResponse, context);
+				else {
+					addResponseHeaders(context);
+					writeResponse(context);
+				}
 			} finally {
 				// release in finally: FC_BypassCache stashed the open origin response in the context, and
 				// writeResponse streams its body to the client - which can throw (e.g. broken pipe on
@@ -856,6 +866,37 @@ public class FrontCacheEngine {
 
 	}
 
+	/**
+	 * Writes the fallback resolved by FC_BypassCache. Headers first, body second, on the request
+	 * thread only - the fallback carries its own status and content type, so unlike the origin path
+	 * it must not have the context's status code applied over it.
+	 */
+	private void writeFallbackResponse(WebResponse webResponse, RequestContext context) throws Exception {
+
+		HttpServletResponse servletResponse = context.getResponse();
+
+		FCUtils.applyFallbackHeaders(servletResponse, webResponse);
+		addFrontCacheMarkerHeaders(context);
+
+		byte[] content = webResponse.getContent();
+		if (null == content)
+			return;
+
+		OutputStream outStream = servletResponse.getOutputStream();
+		try {
+			FCUtils.writeResponse(new ByteArrayInputStream(content), outStream);
+		}
+		finally {
+			try {
+				outStream.flush();
+				outStream.close();
+			}
+			catch (IOException ex) {
+				ex.printStackTrace();
+			}
+		}
+	}
+
 	private void writeResponse(WebResponse webResponse, RequestContext context) throws Exception {
 
 		// there is no body to send
@@ -883,6 +924,20 @@ public class FrontCacheEngine {
 		return;
 	}
 
+	/**
+	 * Frontcache's own tracing headers - stamped on every response, whether it came from the origin,
+	 * the cache or a fallback.
+	 */
+	private void addFrontCacheMarkerHeaders(RequestContext context) {
+		HttpServletResponse servletResponse = context.getResponse();
+
+		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_ID, fcHostId);
+		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
+
+		if (context.isHystrixFallback())
+			servletResponse.addHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED, "true");
+	}
+
 	private void addResponseHeaders(RequestContext context) {
 		HttpServletResponse servletResponse = context.getResponse();
 		Map<String, List<String>> originResponseHeaders = context.getOriginResponseHeaders();
@@ -895,11 +950,7 @@ public class FrontCacheEngine {
 			originResponseHeaders.put("Location",  Arrays.asList(new String[]{fcLocation}));
 		}
 
-		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_ID, fcHostId);
-		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
-
-		if (context.isHystrixFallback())
-			servletResponse.addHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED, "true");
+		addFrontCacheMarkerHeaders(context);
 
 		servletResponse.setStatus(context.getResponseStatusCode());
 

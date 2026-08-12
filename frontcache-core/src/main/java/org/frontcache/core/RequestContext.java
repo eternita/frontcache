@@ -462,6 +462,25 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     	}
     }
 
+    /**
+     * The fallback to serve instead of the origin response, parked here by FC_BypassCache.getFallback().
+     *
+     * The fallback is resolved on the Hystrix thread but written by the request thread, which is the
+     * only thread that may touch the servlet output stream in bypass mode. Writing it from
+     * getFallback() instead raced with the request thread's own writeResponse(): the fallback body
+     * went out first, then addResponseHeaders() stamped the context status over it - which defaults
+     * to 500 - and any origin body that arrived late was appended to it. Whenever the fallback was
+     * smaller than the container's response buffer (32KB in Jetty) the response was not yet committed
+     * when that happened, so the status actually took effect and the client got a 500.
+     */
+    public void setFallbackWebResponse(WebResponse webResponse) {
+        set("fallbackWebResponse", webResponse);
+    }
+
+    public WebResponse getFallbackWebResponse() {
+        return (WebResponse) get("fallbackWebResponse");
+    }
+
     public void setFrontCacheHttpPort(String frontCacheHttpPort) {
         set("frontCacheHttpPort", frontCacheHttpPort);
     }
