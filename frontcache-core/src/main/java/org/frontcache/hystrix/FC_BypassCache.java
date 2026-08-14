@@ -64,7 +64,17 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     @Override
     protected Object run() throws Exception {
 
-    	forwardToOrigin();
+    	try {
+    		forwardToOrigin();
+    	} finally {
+    		// Signal that this thread is done with the origin response. In the normal flow the request
+    		// thread is still streaming the body, so this is a no-op and that thread closes. When we
+    		// lost the race to a Hystrix TIMEOUT it has already finished (through the fallback) and
+    		// left the response for us - so the close happens here instead.
+    		// Must be in a finally: on an aborted/failed call there is nothing to close, but the
+    		// request thread must not be left waiting on a party that never arrives.
+    		context.releaseHttpClientResponse();
+    	}
 
     	return null;
     }
@@ -75,7 +85,6 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 		try {
 			HttpServletRequest httpRequest = context.getRequest();
 			String url = FCUtils.getRequestURL(httpRequest);
-			HttpServletResponse httpResponse = context.getResponse();
 
 			context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
 
@@ -87,8 +96,11 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 
 			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
 
-			FCUtils.applyFallbackHeaders(httpResponse, webResponse);
-			httpResponse.getOutputStream().write(webResponse.getContent());
+			// Park the fallback for the request thread to write - don't write it here. This runs on a
+			// Hystrix thread while the request thread is about to write the response itself, and two
+			// writers on one servlet output stream produced a mangled response (see
+			// RequestContext.setFallbackWebResponse). FrontCacheEngine serves whatever is parked here.
+			context.setFallbackWebResponse(webResponse);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

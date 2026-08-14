@@ -60,6 +60,19 @@ front-cache.request-logs-config=fc-logback.xml
     </appender>
 
 
+    <!-- HttpPoolFile for the HTTP (origin) CONNECTION POOL SNAPSHOT ONLY - one line every 5 min -->
+    <appender name="HttpPoolFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <File>${frontcache.home}/logs/http-pool.info</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>${frontcache.home}/logs/http-pool-%d{yyyy-MM-dd}.info.zip</FileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %msg%n</pattern>
+        </encoder>
+    </appender>
+
+
 	<appender name="Error" class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<!-- WARN and above. This was LevelFilter(ERROR), which matched ERROR *exactly* - and since no
 		     other appender picks up WARN either, every WARN was silently discarded. That hid the L2
@@ -125,6 +138,13 @@ front-cache.request-logs-config=fc-logback.xml
     <logger name="org.frontcache.hystrix.FallbackLogger">
         <level value="TRACE" />
         <appender-ref ref="FallbackLoggerFile" />
+    </logger>
+
+    <!-- HTTP origin connection pool snapshot, every 5 min (additivity=false -> kept out of info.log;
+         a near-exhausted pool still warns separately into error.log) -->
+    <logger name="frontcache.http-pool" additivity="false">
+        <level value="INFO" />
+        <appender-ref ref="HttpPoolFile" />
     </logger>
 
 </configuration>

@@ -3,7 +3,8 @@ plugins {
 }
 
 // Jetty 12 (Jakarta EE10).
-ext.jettyVersion = '12.0.37'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
+ext.jettyVersion = '12.0.38'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
+                               // stay on the 12.0.x (Jakarta EE10 / Servlet 6.0) line - 12.1.x moves to EE11
 
 license {
     ignoreFailures = true
@@ -19,7 +20,7 @@ license {
 subprojects {
 	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
 	apply plugin: 'jacoco'
-    version = '2.4.1'
+    version = '2.4.3'
     group = 'org.frontcache'
 
 	// Build/test with Java 25 via a toolchain, so the JDK launching Gradle is
@@ -49,10 +50,10 @@ subprojects {
 		test.runtimeClasspath += configurations.provided
 	}
 
-	jacoco.toolVersion = '0.8.13'   // 0.8.13+ understands Java 25 class files
+	jacoco.toolVersion = '0.8.15'   // 0.8.13+ understands Java 25 class files
 
     dependencies {
-		testImplementation 'junit:junit:4.12'
+		testImplementation 'junit:junit:4.13.2'
     }
 
     repositories {
@@ -183,22 +184,21 @@ project(':frontcache-core') {
         provided        'jakarta.servlet:jakarta.servlet-api:6.0.0'
 		provided        'jakarta.servlet.jsp:jakarta.servlet.jsp-api:3.1.1'
 
-		api 			'com.fasterxml.jackson.core:jackson-databind:2.8.11.1'
-		api         	'com.fasterxml.jackson.core:jackson-annotations:2.7.5'
-        api         	'org.apache.httpcomponents:httpclient:4.5.14'
-        api         	'commons-io:commons-io:2.4'
-        api         	'ch.qos.logback:logback-classic:1.1.3'
-		api         	'com.netflix.hystrix:hystrix-core:1.5.9'
-		api         	'com.netflix.hystrix:hystrix-metrics-event-stream:1.5.9'
-		api         	'com.netflix.hystrix:hystrix-serialization:1.5.9' // provides com.netflix.hystrix.serial.SerialHystrixDashboardData (not pulled transitively)
-        api         	'net.sf.ehcache:ehcache:2.10.0'
-        api         	'com.google.code.gson:gson:2.5'
-        api         	'org.apache.lucene:lucene-core:10.5.0'
-        api         	'com.typesafe:config:1.3.0'
+		api 			'com.fasterxml.jackson.core:jackson-databind:2.22.1'
+		api         	'com.fasterxml.jackson.core:jackson-annotations:2.22'
+        api         	'org.apache.httpcomponents:httpclient:4.5.14' // final 4.5.x; 5.x is a package/API migration
+        api         	'commons-io:commons-io:2.22.0'
+        api         	'ch.qos.logback:logback-classic:1.5.38'
+		api         	'com.netflix.hystrix:hystrix-core:1.5.18'
+		api         	'com.netflix.hystrix:hystrix-metrics-event-stream:1.5.18'
+		api         	'com.netflix.hystrix:hystrix-serialization:1.5.18' // provides com.netflix.hystrix.serial.SerialHystrixDashboardData (not pulled transitively)
+        api         	'net.sf.ehcache:ehcache:2.10.9.2'
+        api         	'com.google.code.gson:gson:2.14.0'
+        api         	'org.apache.lucene:lucene-core:10.5.1'
+        api         	'com.typesafe:config:1.4.9'
 
-        testImplementation     'junit:junit:4.12'
-        testImplementation     'com.squareup.okhttp:okhttp:2.5.0'
-        testImplementation     'org.mockito:mockito-core:4.11.0'
+        testImplementation     'junit:junit:4.13.2'
+        testImplementation     'org.mockito:mockito-core:5.23.0'
     }
 
     test {
@@ -214,7 +214,7 @@ project(':frontcache-core') {
 
 project(':frontcache-agent') {
 	dependencies {
-        api         'org.apache.httpcomponents:httpclient:4.5.14'
+        api         'org.apache.httpcomponents:httpclient:4.5.14' // final 4.5.x; 5.x is a package/API migration
 	}
 }
 
@@ -272,6 +272,7 @@ project(':frontcache-console') {
 
 	ext {
 		springVersion = '6.2.19'   // 6.2.x bundles ASM that knows class v69, required to scan Java 25 bytecode (6.1.x ASM tops out at v67)
+		                           // latest of the 6.2.x line - Spring 7 requires Jakarta EE11 / Servlet 6.1, Jetty 12.0.x is EE10
 	}
 
 	dependencies {
@@ -279,12 +280,12 @@ project(':frontcache-console') {
 		implementation "org.springframework:spring-context:${springVersion}"
 		implementation "org.springframework:spring-webmvc:${springVersion}"
 		implementation 'org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1'
-		implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0'
-		implementation 'com.typesafe:config:1.3.0'
-		implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+		implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.2'
+		implementation 'com.typesafe:config:1.4.9'
+		implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.1'
 
 		testImplementation "org.springframework:spring-test:${springVersion}"
-		testImplementation 'org.mockito:mockito-core:4.11.0'
+		testImplementation 'org.mockito:mockito-core:5.23.0'
         provided 'jakarta.servlet:jakarta.servlet-api:6.0.0'
 
 		// Embedded Jetty 12 (EE10) for the standalone `appRun` task
