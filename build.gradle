@@ -312,10 +312,3 @@ project(':frontcache-console') {
 // sibling ../frontcache-tests). It consumes frontcache-core / frontcache-agent
 // from this build via a Gradle composite build (includeBuild) and is run with its
 // own ./tests.sh.
-
-// TEMP verification task (removed after use)
-project(':frontcache-core') {
-	tasks.register('printRuntimeCp') {
-		doLast { println sourceSets.main.runtimeClasspath.asPath }
-	}
-}
