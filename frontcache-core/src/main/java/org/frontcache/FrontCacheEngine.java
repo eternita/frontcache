@@ -940,11 +940,34 @@ public class FrontCacheEngine {
 	}
 
 	/**
+	 * Writes the buffered X-frontcache-trace-* headers onto the response. Called on the request thread
+	 * only - the include-processor worker threads must never touch the servlet response themselves
+	 * (HttpServletResponse / Jetty's HttpFields are not thread safe: two threads in setHeader() race on
+	 * the field list and one of them reads a null slot -> NPE in HttpFields$Mutable$Wrapper.put).
+	 * Best effort: an include that overran its timeout may still be resolving, its trace header is then
+	 * simply not part of the response - the request itself is still in the log files.
+	 */
+	private void flushTraceHeaders(RequestContext context) {
+		HttpServletResponse servletResponse = context.getResponse();
+		if (null == servletResponse || servletResponse.isCommitted())
+			return;
+
+		try {
+			for (Map.Entry<String, String> traceHeader : context.getTraceHeaders().entrySet())
+				servletResponse.setHeader(traceHeader.getKey(), traceHeader.getValue());
+		} catch (IllegalStateException e) {
+			logger.debug("skipped trace headers for {} - response already committed/recycled", context.getRequestURI());
+		}
+	}
+
+	/**
 	 * Frontcache's own tracing headers - stamped on every response, whether it came from the origin,
 	 * the cache or a fallback.
 	 */
 	private void addFrontCacheMarkerHeaders(RequestContext context) {
 		HttpServletResponse servletResponse = context.getResponse();
+
+		flushTraceHeaders(context);
 
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_ID, fcHostId);
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
@@ -994,6 +1017,8 @@ public class FrontCacheEngine {
 
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_ID, fcHostId);
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
+
+		flushTraceHeaders(context);
 
 		if (webResponse.getHeaders() != null) {
 			for (String name : webResponse.getHeaders().keySet()) {
