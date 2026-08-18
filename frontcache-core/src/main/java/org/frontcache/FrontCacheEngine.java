@@ -681,7 +681,7 @@ public class FrontCacheEngine {
 	 * Sends a rejection response (e.g. 400 / 414) for an abusive or invalid request, without touching
 	 * cache or origin, and records it in the failed-requests log (not error.log, to avoid a flood).
 	 *
-	 * @param status  HTTP status code to send
+	 * @param status  HTTP status code to send (also written as the last column of the log line)
 	 * @param body    short plain-text response body
 	 * @param reason  short failure category for the failed-requests log (e.g. "bad-request", "uri-too-long")
 	 */
@@ -699,6 +699,7 @@ public class FrontCacheEngine {
 		RequestLogger.logRejectedRequest(
 				context.getFrontCacheHost() + context.getRequestURI() + context.getRequestQueryString(),
 				reason,
+				status,
 				context);
 		return;
 	}
