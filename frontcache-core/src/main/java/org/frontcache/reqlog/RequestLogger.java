@@ -13,7 +13,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
@@ -163,8 +162,6 @@ public class RequestLogger {
 
         if (context.getLogToHTTPHeaders())
         {
-    		HttpServletResponse servletResponse = context.getResponse();
-
     		StringBuilder sb4header = new StringBuilder();
     		sb4header.append((isHystrixError) ? "error" : "success")
     		.append(SEPARATOR).append(requestType) // toplevel | include | include-async
@@ -176,16 +173,13 @@ public class RequestLogger {
 //    		.append(SEPARATOR).append(dummy)
     		.append(SEPARATOR).append(context.getClientType());
 
-    		// Trace headers are best-effort. When an include is resolved on a background thread the
-    		// top-level response may already be committed/recycled by the container, so setHeader()
-    		// would throw "Response does not exist (likely recycled)". Skip/ignore in that case - the
-    		// request is still captured in the log files via logRequest().
-    		try {
-    			if (null != servletResponse && !servletResponse.isCommitted())
-    				servletResponse.setHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + "." + includeLevel, sb4header.toString());
-    		} catch (IllegalStateException e) {
-    			logger.debug("skipped trace header for {} - response already committed/recycled", url);
-    		}
+    		// Never touch HttpServletResponse from here: includes are resolved on the include-processor's
+    		// worker threads and the servlet response is not thread safe (concurrent setHeader() corrupts
+    		// Jetty's HttpFields -> NPE in HttpFields$Mutable$Wrapper.put), while a late/timed-out include
+    		// can hit an already committed/recycled response. Buffer instead; FrontCacheEngine flushes the
+    		// buffer onto the response on the request thread. Anything arriving after the flush is simply
+    		// dropped from the headers - it is still captured in the log files via logRequest().
+    		context.getTraceHeaders().put(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + "." + includeLevel, sb4header.toString());
         }
 
 	}

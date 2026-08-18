@@ -185,7 +185,7 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	 * Saves web response to cache-file
 	 */
 	@Override
-	public void putToCache(String domain, String url, WebResponse component) {
+	public void putToCacheImpl(String domain, String url, WebResponse component) {
 
 		// don't cache pure dynamic components
 		if (!FCUtils.isWebComponentSubjectToCache(component.getExpireTimeMap()))

@@ -43,8 +43,29 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     private static final String FRONTCACHE_REQUEST_TYPE = "frontcacheRequestType"; // { toplevel | include }
     private static final String FRONTCACHE_REQUEST_ID = "frontcacheRequestID"; //
 
+    private static final String FRONTCACHE_TRACE_HEADERS = "frontcacheTraceHeaders";
+
     public RequestContext() {
         super();
+        // Created here (not lazily) so that the copies made by the include processor -
+        // new RequestContext() + putAll(parent) - inherit the *same* buffer instance.
+        put(FRONTCACHE_TRACE_HEADERS, new ConcurrentHashMap<String, String>());
+    }
+
+    /**
+     * Buffer for the X-frontcache-trace-* headers.
+     *
+     * Includes are resolved on the include-processor's worker threads, but HttpServletResponse (and
+     * Jetty's underlying HttpFields) is NOT thread safe - concurrent setHeader() calls corrupt the
+     * field list (NPE in HttpFields$Mutable$Wrapper.put) and a late/timed-out include can hit an
+     * already committed or recycled response. So worker threads only fill this map; the request
+     * thread flushes it onto the response right before the body is written.
+     *
+     * @return the shared (thread safe) trace header buffer of this request
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, String> getTraceHeaders() {
+        return (Map<String, String>) computeIfAbsent(FRONTCACHE_TRACE_HEADERS, k -> new ConcurrentHashMap<String, String>());
     }
 
 

@@ -65,7 +65,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}
 
 	@Override
-	public void putToCache(String domain, String url, WebResponse component) {
+	public void putToCacheImpl(String domain, String url, WebResponse component) {
 
 		int newSize = currentSize + component.getContent().length;
 		if (newSize < maxSize)
