@@ -60,14 +60,20 @@ public class RequestLogger {
 
 	/**
 	 * Logs a request that FrontCache rejected before touching cache or origin (e.g. a 400 for a
-	 * malformed query). Written to the dedicated failed-requests log with the reason as the last
-	 * column - NOT to error.log, so a high-volume bad-crawler flood stays filterable without drowning
-	 * real errors.
+	 * malformed query). Written to the dedicated failed-requests log with the reason and the sent
+	 * HTTP status as the last two columns - NOT to error.log, so a high-volume bad-crawler flood
+	 * stays filterable without drowning real errors.
+	 *
+	 * The trailing status column is written for rejections only; the hystrix-fallback lines that
+	 * {@link #logRequest} adds to the same file end at the reason (the response there is a normal
+	 * - usually 200 - fallback response, whose status this logger does not read: includes are
+	 * logged off the request thread, where HttpServletResponse is not safe to touch).
 	 *
 	 * @param url    request URL (host + URI + query)
 	 * @param reason short failure category, e.g. "bad-request"
+	 * @param status HTTP status sent to the client, e.g. 400 / 414
 	 */
-	public static void logRejectedRequest(String url, String reason, RequestContext context)
+	public static void logRejectedRequest(String url, String reason, int status, RequestContext context)
 	{
 		HttpServletRequest request = context.getRequest();
 		String userAgent = (null != request) ? request.getHeader("User-Agent") : null;
@@ -88,7 +94,8 @@ public class RequestLogger {
 			.append(SEPARATOR).append(context.getFrontCacheId())
 			.append(SEPARATOR).append(context.getClientType())
 			.append(SEPARATOR).append("\"").append(userAgent).append("\"")
-			.append(SEPARATOR).append("\"").append(reason).append("\"");
+			.append(SEPARATOR).append("\"").append(reason).append("\"")
+			.append(SEPARATOR).append(status);
 
 		failedRequestLogger.trace(sb.toString());
 		return;
@@ -132,7 +139,8 @@ public class RequestLogger {
 		logger.trace(sb4file.toString());
 
 		// also write non-successful requests to the dedicated failed-requests log, with the
-		// failure category appended as the last column for easy filtering.
+		// failure category appended as the last column for easy filtering. No HTTP-status column
+		// here - see logRejectedRequest(), which writes one for up-front rejections only.
 		if (isHystrixError)
 		{
 			sb4file.append(SEPARATOR).append("\"").append(context.getHystrixReason()).append("\"");

@@ -7,7 +7,8 @@ Two docker-compose projects and a set of control scripts.
   (Jetty 12, HTTP on 9080) and the configured origin paths to your backend. This is
   the containerized equivalent of `scripts/bash/install-frontcache-server-remote.sh`.
 - **`fc-elk/`** — **Elasticsearch + Kibana + Logstash** (Elastic 8.x) for browsing
-  Frontcache request, error, and fallback logs pulled from your FC servers.
+  Frontcache request, error, fallback, and rejected-request logs pulled from your
+  FC servers.
 
 ## Requirements
 
@@ -75,11 +76,13 @@ Then:
    ```sh
    ./pull-logs.sh "fc-edge fc-eu"
    ```
-   This rsyncs `frontcache-requests*.log(.zip)`, `error*.log(.zip)`, and
-   `fallback*.log(.zip)` from the FC log dir on each host, unzips rolled archives,
-   prefixes each file with the host alias, and drops them into `fc-elk/logs/` —
-   which Logstash tails and indexes into `frontcache-YYYY.MM.dd`,
-   `frontcache-errors-YYYY.MM.dd`, and `frontcache-fallbacks-YYYY.MM.dd` indices.
+   This rsyncs `frontcache-requests*.log(.zip)`, `error*.log(.zip)`,
+   `fallback*.log(.zip)`, and `frontcache-failed-requests*.log(.zip)` from the FC
+   log dir on each host, unzips rolled archives, prefixes each file with the host
+   alias, and drops them into `fc-elk/logs/` — which Logstash tails and indexes
+   into `frontcache-YYYY.MM.dd`, `frontcache-errors-YYYY.MM.dd`,
+   `frontcache-fallbacks-YYYY.MM.dd`, and `frontcache-rejected-YYYY.MM.dd`
+   indices.
    (`start-fc-elk.sh` applies index templates first so `geoip.location` is mapped
    as `geo_point` and numerics/enums get proper types.)
 
@@ -87,11 +90,13 @@ Then:
    - **Overview**: http://localhost:5601/app/dashboards#/view/fc-overview
    - **Errors**: http://localhost:5601/app/dashboards#/view/fc-errors
    - **Fallbacks**: http://localhost:5601/app/dashboards#/view/fc-fallbacks
+   - **Rejected Requests**: http://localhost:5601/app/dashboards#/view/fc-rejected
 
    (or Dashboard → **Frontcache Overview** / **Frontcache Errors** /
-   **Frontcache Fallbacks**; explore raw events in **Discover**).
+   **Frontcache Fallbacks** / **Frontcache Rejected Requests**; explore raw events
+   in **Discover**).
 
-`start-fc-elk.sh` imports the data views + all three dashboards automatically on
+`start-fc-elk.sh` imports the data views + all four dashboards automatically on
 every start — including after a `stop-fc-elk.sh -v`, which drops the ES volume
 where Kibana stores saved objects. If you ever start the stack with raw
 `docker compose up` instead, import the `.ndjson` files from `fc-elk/kibana/`
@@ -127,6 +132,25 @@ read position).
   (top 10), top fallback URLs (top 20 bar chart).
 - **Table** — top fallback URLs with total count and "from file" count.
 
+### Dashboard: "Frontcache Rejected Requests"
+
+Fed by `frontcache-failed-requests*.log` — requests Frontcache refused up-front in
+`FrontCacheEngine.rejectRequest()` (400 bad-request / 414 uri-too-long, never
+reaching cache or origin) plus requests that completed through a Hystrix fallback.
+**`reject_reason` is the headline dimension.**
+
+- **KPI tiles** — total rejected requests, distinct client IPs, up-front rejection
+  share (rejected vs Hystrix fallback), bot share.
+- **Over time** — rejected requests by reason (stacked area) and by FC node.
+- **Breakdowns** — reason pie and reason bar (top 10), rejected-vs-Hystrix-fallback
+  pie, rejections by FC node, by domain, by country, and by HTTP status (400 / 414).
+- **Top-N tables** — top 20 client IPs (with per-reason columns and distinct-URL
+  count), top 20 rejected URLs, top 10 user agents.
+
+Typical use: a single crawler generating compounding `&amp;`-mangled query strings
+shows up as one client IP dominating `bad-request`, which is exactly the pattern the
+rejection rules were added to shed.
+
 ### Parsed fields
 
 **Request logs** (`frontcache-requests*.log`) — Logstash grok extracts: `domain`,
@@ -151,6 +175,27 @@ current day's `error.log` (which has no date in its name).
 **Fallback logs** (`fallback*.log`) — Logstash grok extracts: `fallback_source`,
 `fallback_status` (`default` / `from file`), `fallback_details`, `fallback_url`.
 
+**Rejected/failed request logs** (`frontcache-failed-requests*.log`) — same columns
+as the request log plus a trailing quoted reason, so grok extracts everything listed
+above for request logs (incl. `geoip.*`) plus `reject_reason`, `http_status`, and
+`failure_type`. The file holds two kinds of lines, which `failure_type` separates:
+
+| `failure_type` | Written by | `is_cached` | `reject_reason` values | `http_status` |
+| --- | --- | --- | --- | --- |
+| `rejected` | `FrontCacheEngine.rejectRequest()` → `RequestLogger.logRejectedRequest()` | `rejected` | `bad-request`, `uri-too-long` | `400`, `414` |
+| `hystrix-fallback` | `RequestLogger.logRequest()` when the request fell back | `from-cache` / `dynamic` / … | `short-circuited`, `timeout`, `rejected`, `failure`, `error` | *(unset)* |
+
+`http_status` is the status Frontcache actually sent, written as an extra unquoted
+column after the reason — on rejection lines only, so the grok matches it as an
+optional trailing group. Hystrix-fallback lines end at the reason: the response there
+is a normal (usually 200) fallback response, and `logRequest()` deliberately does not
+read the servlet response, which is not safe to touch from the include threads it
+runs on. It is mapped as a `keyword` — a status code is a category, not a quantity.
+
+Note the filename: `frontcache-failed-requests*.log` does **not** match the request
+pipeline's `*frontcache-requests*.log` glob (nor the error pipeline, which excludes
+it explicitly), so each log type still lands in exactly one index.
+
 ---
 
 ## Scripts
@@ -166,7 +211,7 @@ equivalent; the table lists the Bash names.
 | `build-push-fc-server.sh "<tag>"` | Build WAR + image and push to a registry (Docker Hub) |
 | `start-fc-elk.sh` | Start Elasticsearch + Kibana + Logstash |
 | `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes) |
-| `pull-logs.sh "<hosts>"` | rsync FC request, error, and fallback logs into `fc-elk/logs` |
+| `pull-logs.sh "<hosts>"` | rsync FC request, error, fallback, and rejected-request logs into `fc-elk/logs` |
 
 ### Windows (PowerShell)
 
@@ -198,8 +243,9 @@ the Gradle build (`gradlew.bat`), and — for `pull-logs.ps1` — `ssh`, `scp`, 
 `pull-logs.sh` env knobs: `HOSTS`, `REMOTE_LOG_DIR` (default
 `/opt/frontcache/logs`),
 `DEST_DIR`, `RSYNC_SUDO` (default `1` — uses `sudo rsync` on the remote; set `0` if
-the ssh user can read the logs directly). The script pulls three log types:
-`frontcache-requests*.log(.zip)`, `error*.log(.zip)`, and `fallback*.log(.zip)`.
+the ssh user can read the logs directly). The script pulls four log types:
+`frontcache-requests*.log(.zip)`, `error*.log(.zip)`, `fallback*.log(.zip)`, and
+`frontcache-failed-requests*.log(.zip)`.
 
 The PowerShell version (`pull-logs.ps1`) shares `HOSTS`, `REMOTE_LOG_DIR`,
 `DEST_DIR`, and `RSYNC_SUDO` (here it controls whether the *remote* `tar`/`chmod`
