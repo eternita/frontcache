@@ -242,14 +242,19 @@ public class GuardRuleEngine {
 	}
 
 	/**
-	 * Warns when a rule can terminate requests to the two paths that must always work: the GSLB
-	 * health check and the management servlet. Both are commonly addressed by IP, which is exactly
-	 * what an ip-access rule matches - a missing exemption turns that rule into an outage.
+	 * Warns when a rule can terminate requests to the paths that must always work: the GSLB health
+	 * check, the management servlet, and the Hystrix metrics stream. All three are commonly
+	 * addressed by IP, which is exactly what an ip-access rule matches - a missing exemption turns
+	 * that rule into an outage.
+	 *
+	 * The URL patterns come from web.xml (frontcache-server and the e2e webapps both map the IO
+	 * servlet at /frontcache-io).
 	 */
 	private void warnOnMissingExemptions()
 	{
 		checkReachable("http://127.0.0.1/fc-ping.jsp", "GSLB health check (/fc-ping.jsp)");
-		checkReachable("http://127.0.0.1/frontcache/?action=ping", "management API (/frontcache/) used by frontcache-agent, the console and replication");
+		checkReachable("http://127.0.0.1/frontcache-io?action=ping", "management API (/frontcache-io) used by frontcache-agent, the console and replication");
+		checkReachable("http://127.0.0.1/hystrix.stream", "Hystrix metrics stream (/hystrix.stream) read by the console");
 	}
 
 	private void checkReachable(String url, String what)
@@ -258,7 +263,9 @@ public class GuardRuleEngine {
 		if (null == probe)
 			return;
 
-		GuardOutcome outcome = evaluate(probe);
+		// countHits=false: a startup self-check must not show up as traffic in the hit counters the
+		// console reports
+		GuardOutcome outcome = evaluate(probe, false);
 		if (outcome.isTerminal())
 			logger.warn("Guard rule '" + outcome.getRule().getName() + "' would " + outcome.getAction()
 					+ " the " + what + " - add an 'allow' rule for it ABOVE that rule in " + GUARD_RULES_CONFIG_FILE);
@@ -316,6 +323,15 @@ public class GuardRuleEngine {
 	 */
 	public GuardOutcome evaluate(RequestContext context)
 	{
+		return evaluate(context, true);
+	}
+
+	/**
+	 * @param countHits false for synthetic probes (load-time self-checks), so they do not pollute
+	 *                  the hit counters reported by the management API
+	 */
+	GuardOutcome evaluate(RequestContext context, boolean countHits)
+	{
 		List<GuardRule> rulesNow = this.rules;
 		if (rulesNow.isEmpty())
 			return GuardOutcome.CONTINUE;
@@ -336,7 +352,8 @@ public class GuardRuleEngine {
 			if (!matched)
 				continue;
 
-			rule.countHit();
+			if (countHits)
+				rule.countHit();
 
 			if (rule.isDryRun())
 			{

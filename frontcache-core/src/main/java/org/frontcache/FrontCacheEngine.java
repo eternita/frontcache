@@ -721,6 +721,14 @@ public class FrontCacheEngine {
 		return;
 	}
 
+	/**
+	 * @return the guard pipeline this node is running - used by the management API
+	 *         (get-guard-rules / reload-guard-rules) and, through it, by the console
+	 */
+	public GuardRuleEngine getGuardRuleEngine() {
+		return guardRuleEngine;
+	}
+
 	private void logGuardAction(RequestContext context, String reason, int status, String disposition)
 	{
 		RequestLogger.logGuardedRequest(

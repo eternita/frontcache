@@ -118,7 +118,7 @@ public class GuardRuleEngineTest {
 		// the exemptions that keep the ip-access rule from becoming an outage: GSLB pings the node
 		// by IP, and frontcache-agent / console / replication call the management servlet by IP
 		assertFalse(engine.evaluate(GuardRuleEngine.probeContext("http://160.202.254.65/fc-ping.jsp")).isTerminal());
-		assertFalse(engine.evaluate(GuardRuleEngine.probeContext("http://160.202.254.65/frontcache/?action=ping")).isTerminal());
+		assertFalse(engine.evaluate(GuardRuleEngine.probeContext("http://160.202.254.65/frontcache-io?action=ping")).isTerminal());
 	}
 
 	// ---- use case 2: no session cookie on account-only pages --------------------------------
@@ -196,6 +196,16 @@ public class GuardRuleEngineTest {
 
 		// 2 built-ins + 3 allow + ip-access + anon-analytics + noisy-bots(dry-run)
 		assertEquals(8, engine.getRules().size());
+	}
+
+	@Test
+	public void startupProbesDoNotInflateHitCounters() {
+		// load() self-checks the health-check / management / hystrix-stream paths against an IP host;
+		// those synthetic probes must not look like traffic in the management API's hit counts
+		GuardRuleEngine fresh = new GuardRuleEngine(MAX_URI_LENGTH);
+
+		for (GuardRule rule : fresh.getRules())
+			assertEquals("rule " + rule.getName() + " counted a startup probe", 0, rule.getHits());
 	}
 
 	@Test

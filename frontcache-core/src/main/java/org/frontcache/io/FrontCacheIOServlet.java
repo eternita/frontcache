@@ -16,8 +16,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,6 +36,8 @@ import org.frontcache.cache.CacheManager;
 import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
+import org.frontcache.guard.GuardRule;
+import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
@@ -178,6 +182,14 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.GET_HYSTRIX_CONFIGS:
 			aResponse = getHystrixConfigs(request);
+			break;
+
+		case FrontcacheAction.GET_GUARD_RULES:
+			aResponse = getGuardRules(request);
+			break;
+
+		case FrontcacheAction.RELOAD_GUARD_RULES:
+			aResponse = reloadGuardRules(request);
 			break;
 
 		case FrontcacheAction.PATCH:
@@ -446,6 +458,41 @@ public class FrontCacheIOServlet extends HttpServlet {
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
 		aResponse.setBots(bots);
 
+		return aResponse;
+	}
+
+	/**
+	 * Guard rules in evaluation order (built-ins first, then conf/guard-rules.conf), each with the
+	 * number of requests it matched since start - which is how you tell a rule that is doing work
+	 * from one that can be deleted.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getGuardRules(HttpServletRequest req)
+	{
+		List<GuardRuleEntry> guardRules = new ArrayList<GuardRuleEntry>();
+		for (GuardRule rule : FrontCacheEngine.getFrontCache().getGuardRuleEngine().getRules())
+			guardRules.add(rule.toEntry());
+
+		GetGuardRulesActionResponse aResponse = new GetGuardRulesActionResponse();
+		aResponse.setGuardRules(guardRules);
+
+		return aResponse;
+	}
+
+	/**
+	 * Re-reads conf/guard-rules.conf without restarting the node. Rules are rebuilt, so hit counters
+	 * start from zero again.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse reloadGuardRules(HttpServletRequest req)
+	{
+		FrontCacheEngine.getFrontCache().getGuardRuleEngine().reload();
+
+		ActionResponse aResponse = new ReloadGuardRulesActionResponse();
 		return aResponse;
 	}
 

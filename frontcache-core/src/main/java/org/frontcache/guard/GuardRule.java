@@ -86,6 +86,13 @@ public class GuardRule {
 		return sb.toString();
 	}
 
+	/**
+	 * @return flat, JSON-friendly snapshot of this rule for the management API and the console
+	 */
+	public GuardRuleEntry toEntry() {
+		return new GuardRuleEntry(name, getCondition(), action.toString(), dryRun, getHits());
+	}
+
 	@Override
 	public String toString() {
 		return name + " | " + getCondition() + " | " + action + (dryRun ? " | dry-run" : "");
