@@ -13,13 +13,16 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -610,6 +613,42 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 
 	public void setCurrentRequestURL(String currentRequestURL) {
         set("currentRequestURL", currentRequestURL);
+	}
+
+	/**
+	 * Names of the cookies the client sent, parsed once per request and memoized.
+	 *
+	 * Used by the guard rules (org.frontcache.guard), which run on every request before cache and
+	 * origin - so a request pays for cookie parsing only when some rule asks about a cookie, and
+	 * never more than once. Names only: guard rules test presence and must not read, compare or log
+	 * cookie values.
+	 *
+	 * @return cookie names, empty when there is no (or no longer a) usable servlet request
+	 */
+	@SuppressWarnings("unchecked")
+	public Set<String> getCookieNames() {
+
+		Object cached = get("cookieNames");
+		if (null != cached)
+			return (Set<String>) cached;
+
+		Set<String> names = new HashSet<String>();
+		HttpServletRequest request = getRequest();
+		if (null != request)
+		{
+			try {
+				Cookie[] cookies = request.getCookies();
+				if (null != cookies)
+					for (Cookie cookie : cookies)
+						names.add(cookie.getName());
+			} catch (Exception e) {
+				// recycled request (async include resolved after the response completed) - the
+				// cookies are simply unknown by then; treat them as absent rather than failing.
+			}
+		}
+
+		set("cookieNames", names);
+		return names;
 	}
 
 	// bot | browser

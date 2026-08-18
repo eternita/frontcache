@@ -44,6 +44,7 @@ import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
+import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.BackupActionResponse;
@@ -54,6 +55,7 @@ import org.frontcache.io.GetBotsActionResponse;
 import org.frontcache.io.GetDynamicURLsActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
+import org.frontcache.io.GetGuardRulesActionResponse;
 import org.frontcache.io.GetHystrixConfigActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
@@ -417,6 +419,37 @@ public class FrontCacheClient {
 			return null;
 
 		return actionResponse.getDynamicURLs();
+	}
+
+	/**
+	 *
+	 * @return guard rules this edge is running, in evaluation order, with hit counts
+	 */
+	public GetGuardRulesActionResponse getGuardRulesActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_GUARD_RULES));
+
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			GetGuardRulesActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetGuardRulesActionResponse.class);
+			return actionResponse;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	public List<GuardRuleEntry> getGuardRules()
+	{
+		GetGuardRulesActionResponse actionResponse = getGuardRulesActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getGuardRules();
 	}
 
 	/**

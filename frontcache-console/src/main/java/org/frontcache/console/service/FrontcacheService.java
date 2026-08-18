@@ -27,9 +27,11 @@ import org.frontcache.console.model.BotConfig;
 import org.frontcache.console.model.DynamicURLsConfig;
 import org.frontcache.console.model.FallbackConfig;
 import org.frontcache.console.model.FrontCacheStatus;
+import org.frontcache.console.model.GuardRulesConfig;
 import org.frontcache.console.model.HystrixConfig;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
+import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.hystrix.fr.FallbackConfigEntry;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
@@ -249,6 +251,46 @@ public class FrontcacheService {
                 f.cancel(true);
                 timeoutReached =  true;
                 logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
+            }
+        }
+
+		return clusterStatus;
+	}
+
+	/**
+	 * Guard rules per edge, in evaluation order, with hit counts.
+	 *
+	 * Read-only: rules are edited in FRONTCACHE_HOME/conf/guard-rules.conf and applied with the
+	 * reload-guard-rules action - same story as the other config screens.
+	 */
+	public Map<String, List<GuardRuleEntry>> getGuardRules() {
+
+        List<Future<GuardRulesConfig>> futureList = new ArrayList<Future<GuardRulesConfig>>();
+
+		// LinkedHashMap preserves the edge order defined in the console config
+		Map<String, List<GuardRuleEntry>> clusterStatus = new LinkedHashMap<String, List<GuardRuleEntry>>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+            futureList.add(executor.submit(new GuardRulesCaller(fcClient)));
+
+		// processing timeouts
+        boolean timeoutReached = false;
+        for (Future<GuardRulesConfig> f : futureList)
+        {
+            try {
+            	GuardRulesConfig result = null;
+            	if (timeoutReached)
+            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
+            	else
+            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+
+            	if (null != result && null != result.getConfig())
+            		clusterStatus.put(result.getName(), result.getConfig());
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                f.cancel(true);
+                timeoutReached =  true;
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some guard rules may not be retrieved ");
             }
         }
 

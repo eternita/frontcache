@@ -134,22 +134,29 @@ read position).
 
 ### Dashboard: "Frontcache Rejected Requests"
 
-Fed by `frontcache-failed-requests*.log` — requests Frontcache refused up-front in
-`FrontCacheEngine.rejectRequest()` (400 bad-request / 414 uri-too-long, never
-reaching cache or origin) plus requests that completed through a Hystrix fallback.
-**`reject_reason` is the headline dimension.**
+Fed by `frontcache-failed-requests*.log`: everything a **guard rule**
+(`org.frontcache.guard`, see
+[the protection design](../../docs/frontcache-protection-tech-design.md)) did before
+cache/origin — rejected (400 / 414), redirected (301 / 302), or matched in dry-run —
+plus requests that completed through a Hystrix fallback. **`reject_reason` is the
+headline dimension: it holds the rule name**, so a new rule appears in every panel
+without touching the dashboard.
 
-- **KPI tiles** — total rejected requests, distinct client IPs, up-front rejection
-  share (rejected vs Hystrix fallback), bot share.
-- **Over time** — rejected requests by reason (stacked area) and by FC node.
-- **Breakdowns** — reason pie and reason bar (top 10), rejected-vs-Hystrix-fallback
-  pie, rejections by FC node, by domain, by country, and by HTTP status (400 / 414).
+- **KPI tiles** — total guarded & failed requests, distinct client IPs, guard-action
+  share (rule acted vs Hystrix fallback), bot share.
+- **Over time** — guard actions & failures by rule (stacked area) and by FC node.
+- **Breakdowns** — rule/reason pie and bar (top 10), guard-actions-vs-Hystrix-fallback
+  pie, events by FC node, by domain, by country, and by HTTP status sent.
 - **Top-N tables** — top 20 client IPs (with per-reason columns and distinct-URL
-  count), top 20 rejected URLs, top 10 user agents.
+  count), top 20 URLs, top 10 user agents.
+- **Dry-run table** — what a rule *would* have caught, by rule, with distinct client
+  IPs and URLs. This is the rollout tool: ship a rule as `dry-run`, watch this panel
+  against real traffic, then let it act.
 
 Typical use: a single crawler generating compounding `&amp;`-mangled query strings
 shows up as one client IP dominating `bad-request`, which is exactly the pattern the
-rejection rules were added to shed.
+guard rules were added to shed; a scanner walking the node by IP shows up the same
+way under `ip-access`.
 
 ### Parsed fields
 
@@ -182,11 +189,13 @@ above for request logs (incl. `geoip.*`) plus `reject_reason`, `http_status`, an
 
 | `failure_type` | Written by | `is_cached` | `reject_reason` values | `http_status` |
 | --- | --- | --- | --- | --- |
-| `rejected` | `FrontCacheEngine.rejectRequest()` → `RequestLogger.logRejectedRequest()` | `rejected` | `bad-request`, `uri-too-long` | `400`, `414` |
+| `rejected` | a guard rule's `reject` action → `RequestLogger.logGuardedRequest()` | `rejected` | `bad-request`, `uri-too-long`, or any rule name from `guard-rules.conf` | `400`, `414`, … |
+| `redirected` | a guard rule's `redirect` action | `redirected` | rule name, e.g. `ip-access`, `anon-analytics` | `301`, `302`, … |
+| `dry-run` | a rule marked `dry-run` — matched and logged, request untouched | `dry-run` | `<rule>:dry-run` | *(dropped — nothing was sent)* |
 | `hystrix-fallback` | `RequestLogger.logRequest()` when the request fell back | `from-cache` / `dynamic` / … | `short-circuited`, `timeout`, `rejected`, `failure`, `error` | *(unset)* |
 
 `http_status` is the status Frontcache actually sent, written as an extra unquoted
-column after the reason — on rejection lines only, so the grok matches it as an
+column after the reason — on guard-action lines only, so the grok matches it as an
 optional trailing group. Hystrix-fallback lines end at the reason: the response there
 is a normal (usually 200) fallback response, and `logRequest()` deliberately does not
 read the servlet response, which is not safe to touch from the include threads it

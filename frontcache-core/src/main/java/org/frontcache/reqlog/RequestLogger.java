@@ -51,29 +51,33 @@ public class RequestLogger {
 
 	private static Logger logger = LoggerFactory.getLogger(RequestLogger.class);
 
-	// dedicated logger for non-successful requests (hystrix fallback: short-circuited / timeout /
-	// rejected / bad-request / failure). Routed to its own file via logback (frontcache-failed-requests.log).
+	// dedicated logger for non-successful requests: guard-rule actions (reject / redirect / dry-run)
+	// and hystrix fallbacks (short-circuited / timeout / rejected / failure). Routed to its own file
+	// via logback (frontcache-failed-requests.log).
 	private static Logger failedRequestLogger = LoggerFactory.getLogger("frontcache.failed-requests");
 
 	private RequestLogger() {
 	}
 
 	/**
-	 * Logs a request that FrontCache rejected before touching cache or origin (e.g. a 400 for a
-	 * malformed query). Written to the dedicated failed-requests log with the reason and the sent
-	 * HTTP status as the last two columns - NOT to error.log, so a high-volume bad-crawler flood
-	 * stays filterable without drowning real errors.
+	 * Logs a request a guard rule acted on before it touched cache or origin - rejected (e.g. a 400
+	 * for a malformed query), redirected (e.g. a scanner hitting the node by IP), or matched by a
+	 * dry-run rule that only observed it. Written to the dedicated failed-requests log with the rule
+	 * name as the reason and the sent HTTP status as the last two columns - NOT to error.log, so a
+	 * high-volume bad-crawler flood stays filterable without drowning real errors.
 	 *
-	 * The trailing status column is written for rejections only; the hystrix-fallback lines that
+	 * The trailing status column is written for guard actions only; the hystrix-fallback lines that
 	 * {@link #logRequest} adds to the same file end at the reason (the response there is a normal
 	 * - usually 200 - fallback response, whose status this logger does not read: includes are
 	 * logged off the request thread, where HttpServletResponse is not safe to touch).
 	 *
-	 * @param url    request URL (host + URI + query)
-	 * @param reason short failure category, e.g. "bad-request"
-	 * @param status HTTP status sent to the client, e.g. 400 / 414
+	 * @param url         request URL (host + URI + query)
+	 * @param reason      guard rule name, e.g. "bad-request" / "ip-access"
+	 * @param status      HTTP status sent to the client (0 for dry-run, where nothing was sent)
+	 * @param disposition what happened: "rejected" | "redirected" | "dry-run" - written to the
+	 *                    is_cached column, which is what the ELK pipeline buckets on
 	 */
-	public static void logRejectedRequest(String url, String reason, int status, RequestContext context)
+	public static void logGuardedRequest(String url, String reason, int status, String disposition, RequestContext context)
 	{
 		HttpServletRequest request = context.getRequest();
 		String userAgent = (null != request) ? request.getHeader("User-Agent") : null;
@@ -86,7 +90,7 @@ public class RequestLogger {
 			.append(SEPARATOR).append("error")
 			.append(SEPARATOR).append(context.getRequestType())
 			.append(SEPARATOR).append("direct")
-			.append(SEPARATOR).append("rejected")
+			.append(SEPARATOR).append(disposition)
 			.append(SEPARATOR).append(0)   // runtimeMillis
 			.append(SEPARATOR).append(-1)  // lengthBytes
 			.append(SEPARATOR).append("\"").append(url).append("\"")
@@ -140,7 +144,7 @@ public class RequestLogger {
 
 		// also write non-successful requests to the dedicated failed-requests log, with the
 		// failure category appended as the last column for easy filtering. No HTTP-status column
-		// here - see logRejectedRequest(), which writes one for up-front rejections only.
+		// here - see logGuardedRequest(), which writes one for guard actions only.
 		if (isHystrixError)
 		{
 			sb4file.append(SEPARATOR).append("\"").append(context.getHystrixReason()).append("\"");

@@ -36,6 +36,10 @@ public abstract class FrontcacheAction {
 
 	public static final String GET_HYSTRIX_CONFIGS = "get-hystrix-configs";
 
+	public static final String GET_GUARD_RULES = "get-guard-rules";
+
+	public static final String RELOAD_GUARD_RULES = "reload-guard-rules";
+
 	public static final String PATCH = "patch";
 
 	public static final String PURGE = "purge";
@@ -60,6 +64,8 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get substring to determine bots based on User-Agent HTTP header from ./conf/bots.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_HYSTRIX_CONFIGS, "get raw hystrix configuration from ./conf/hystrix.properties");
+		actionsDescriptionMap.put(FrontcacheAction.GET_GUARD_RULES, "get guard rules (checks running before cache & origin) in evaluation order, with hit counts - built-ins plus ./conf/guard-rules.conf");
+		actionsDescriptionMap.put(FrontcacheAction.RELOAD_GUARD_RULES, "reload guard rules from ./conf/guard-rules.conf (resets hit counters)");
 		actionsDescriptionMap.put(FrontcacheAction.PURGE, "purge expired entries from the cache (keeps non-expired and cache-forever entries)");
 		actionsDescriptionMap.put(FrontcacheAction.BACKUP_INDEX, "backup the L2 (Lucene) index to a zip archive at the edge (l2-lucene-index.backup-{yyyyMMdd_HHmmss}.zip)");
 		actionsDescriptionMap.put(FrontcacheAction.PING, "ping for GSLB");

@@ -50,6 +50,10 @@ import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
+import org.frontcache.guard.GuardAction;
+import org.frontcache.guard.GuardOutcome;
+import org.frontcache.guard.GuardRule;
+import org.frontcache.guard.GuardRuleEngine;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -123,6 +127,11 @@ public class FrontCacheEngine {
 	// front-cache.max-request-uri-length; <= 0 disables the check.
 	private static final int DEFAULT_MAX_REQUEST_URI_LENGTH = 4096;
 	private static int maxRequestURILength = DEFAULT_MAX_REQUEST_URI_LENGTH;
+
+	// Guard rules run before cache and origin: the two built-in checks above plus whatever
+	// conf/guard-rules.conf adds (reject / redirect / allow). See
+	// docs/frontcache-protection-tech-design.md.
+	private GuardRuleEngine guardRuleEngine = null;
 
 	private IncludeProcessor includeProcessor = null;
 
@@ -287,6 +296,10 @@ public class FrontCacheEngine {
         logToHeadersConfig = "true".equals(FCConfig.getProperty("front-cache.log-to-headers", "false")) ? true : false;
 
         maxRequestURILength = getIntProperty("front-cache.max-request-uri-length", DEFAULT_MAX_REQUEST_URI_LENGTH);
+
+        // built from the current config; reload() rebuilds the engine, so it picks up both a changed
+        // max-request-uri-length and an edited guard-rules.conf
+        guardRuleEngine = new GuardRuleEngine(maxRequestURILength);
 
 		fcConnectionsMaxTotal = getIntProperty("front-cache.http-client.connections-max-total", DEFAULT_CONNECTIONS_MAX_TOTAL);
 		fcConnectionsMaxPerRoute = getIntProperty("front-cache.http-client.connections-max-per-route", fcConnectionsMaxTotal);
@@ -652,23 +665,20 @@ public class FrontCacheEngine {
 	{
 		RequestContext context = init(servletRequest, servletResponse, filterChain);
 
-		// Reject abusive/invalid requests before they reach cache or origin. Each such request is a
-		// unique cache key that otherwise misses the cache and hits origin - the source of the origin
-		// overload from a broken crawler's compounding &amp;-mangled query strings.
-		String requestURI = context.getRequestURI();
-		String queryString = context.getRequestQueryString();
+		// Guard rules: reject or redirect abusive/pointless requests before they reach cache or
+		// origin. An abusive request is a unique cache key that misses the cache and hits origin -
+		// the source of the origin overload from a broken crawler's compounding &amp;-mangled query
+		// strings - while a scanner or a logged-out visitor on an account-only page costs a full
+		// origin render for a response nobody wanted.
+		GuardOutcome guardOutcome = guardRuleEngine.evaluate(context);
 
-		// 1) URI too long (path + query) -> 414
-		if (0 < maxRequestURILength && (requestURI.length() + queryString.length()) > maxRequestURILength)
-		{
-			rejectRequest(context, HttpServletResponse.SC_REQUEST_URI_TOO_LONG, "414 Request-URI Too Long", "uri-too-long");
-			return;
-		}
+		// dry-run rules only observe: they are logged, then the request carries on
+		for (GuardRule dryRunRule : guardOutcome.getDryRunMatches())
+			logGuardAction(context, dryRunRule.getName() + ":dry-run", 0, GuardAction.DISPOSITION_DRY_RUN);
 
-		// 2) structurally-invalid query params (amp;-mangled) -> 400
-		if (FCUtils.hasMalformedQueryParams(queryString))
+		if (guardOutcome.isTerminal())
 		{
-			rejectRequest(context, HttpServletResponse.SC_BAD_REQUEST, "400 Bad Request", "bad-request");
+			applyGuardAction(context, guardOutcome);
 			return;
 		}
 
@@ -678,28 +688,54 @@ public class FrontCacheEngine {
 	}
 
 	/**
-	 * Sends a rejection response (e.g. 400 / 414) for an abusive or invalid request, without touching
+	 * Serves a guard rule's response - a rejection (e.g. 400 / 414) or a redirect - without touching
 	 * cache or origin, and records it in the failed-requests log (not error.log, to avoid a flood).
 	 *
-	 * @param status  HTTP status code to send (also written as the last column of the log line)
-	 * @param body    short plain-text response body
-	 * @param reason  short failure category for the failed-requests log (e.g. "bad-request", "uri-too-long")
+	 * @param outcome terminal outcome from the guard engine, carrying the rule that matched
 	 */
-	private void rejectRequest(RequestContext context, int status, String body, String reason)
+	private void applyGuardAction(RequestContext context, GuardOutcome outcome)
 	{
+		GuardRule rule = outcome.getRule();
+		GuardAction action = outcome.getAction();
 		HttpServletResponse servletResponse = context.getResponse();
+		int status = action.getStatus();
+
 		try {
-			servletResponse.setStatus(status);
-			servletResponse.setContentType("text/plain; charset=UTF-8");
-			servletResponse.getWriter().write(body);
+			if (GuardAction.Type.REDIRECT == action.getType())
+			{
+				servletResponse.setStatus(status);
+				servletResponse.setHeader("Location", outcome.getResolvedTarget());
+				// never let a browser or CDN cache the decision: it depends on the request (host,
+				// cookies) and must be re-made at the edge on every visit
+				servletResponse.setHeader(FCHeaders.CACHE_CONTROL, "no-store, no-cache, max-age=0, must-revalidate");
+			} else {
+				servletResponse.setStatus(status);
+				servletResponse.setContentType("text/plain; charset=UTF-8");
+				servletResponse.getWriter().write(action.getBody());
+			}
 		} catch (Exception e) {
-			logger.debug("Error writing " + status + " response: " + e);
+			logger.debug("Error writing guard rule '" + rule.getName() + "' response (" + status + "): " + e);
 		}
 
-		RequestLogger.logRejectedRequest(
+		logGuardAction(context, rule.getName(), status, action.getDisposition());
+		return;
+	}
+
+	/**
+	 * @return the guard pipeline this node is running - used by the management API
+	 *         (get-guard-rules / reload-guard-rules) and, through it, by the console
+	 */
+	public GuardRuleEngine getGuardRuleEngine() {
+		return guardRuleEngine;
+	}
+
+	private void logGuardAction(RequestContext context, String reason, int status, String disposition)
+	{
+		RequestLogger.logGuardedRequest(
 				context.getFrontCacheHost() + context.getRequestURI() + context.getRequestQueryString(),
 				reason,
 				status,
+				disposition,
 				context);
 		return;
 	}
