@@ -56,6 +56,37 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 	public abstract WebResponse getFromCacheImpl(String url);
 
+	/**
+	 * Stores the entry. Called by {@link #putToCache(String, String, WebResponse)} once the headers
+	 * that must never be persisted (Set-Cookie in particular) have been removed.
+	 *
+	 * @param domain domain the entry belongs to
+	 * @param url cache key
+	 * @param component response to store - the cache takes ownership of it
+	 */
+	public abstract void putToCacheImpl(String domain, String url, WebResponse component);
+
+	/**
+	 * Single entry point for writing to the cache.
+	 *
+	 * The header strip lives here rather than in the callers so that no write path can bypass it -
+	 * the origin/refresh paths below, the admin API (FrontCacheIOServlet) and replication all end up
+	 * here. Caching a Set-Cookie would replay one visitor's session cookie to every later visitor.
+	 *
+	 * The response is modified in place, so callers must hand over an instance that is not being
+	 * served to a client (the origin paths below pass a copy() - that is what keeps the visitor's own
+	 * Set-Cookie on the live response of a cache miss).
+	 */
+	@Override
+	public final void putToCache(String domain, String url, WebResponse component) {
+
+		if (null == component)
+			return;
+
+		cleanupNonPersistentHeaders(component.getHeaders());
+		putToCacheImpl(domain, url, component);
+	}
+
 	@Override
 	public final WebResponse getFromCache(String url, RequestContext context)
 	{
@@ -130,10 +161,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
                         && lengthBytes > 0 // don't cache empty responses
                 )
 				{
-					WebResponse copy4cache = cachedWebResponse.copy();
-					Map<String, List<String>> copyHeaders = copy4cache.getHeaders();
-					cleanupNonPersistentHeaders(copyHeaders);
-
+					WebResponse copy4cache = cachedWebResponse.copy(); // copy - putToCache strips headers in place
 					copy4cache.setUrl(currentRequestURL);
 					putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
 				}
@@ -192,9 +220,6 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_SOFT_REFRESH, Arrays.asList(new String[]{"true"}));
 
 					WebResponse copy4cache = FCUtils.dynamicCall(originUrlStr, requestHeadersCopy, client, ctxCopy);
-					Map<String, List<String>> copyHeaders = copy4cache.getHeaders();
-					cleanupNonPersistentHeaders(copyHeaders);
-
 					copy4cache.setUrl(currentRequestURL);
 
 					if (!ctxCopy.isHystrixFallback()) // don't cache hystrix fallbacks
@@ -220,6 +245,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	 */
 	private void cleanupNonPersistentHeaders(Map<String, List<String>> headers)
 	{
+		if (null == headers)
+			return;
+
 		// HTTP header names are case-insensitive (RFC 7230) and intermediaries (e.g. Cloudflare)
 		// may re-case them - so match case-insensitively. Otherwise a downstream node's trace
 		// headers that arrive re-cased (e.g. "X-Frontcache-Trace-Request.1.0") slip past the strip,
