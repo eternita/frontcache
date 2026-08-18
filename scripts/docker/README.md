@@ -182,15 +182,21 @@ above for request logs (incl. `geoip.*`) plus `reject_reason`, `http_status`, an
 
 | `failure_type` | Written by | `is_cached` | `reject_reason` values | `http_status` |
 | --- | --- | --- | --- | --- |
-| `rejected` | `FrontCacheEngine.rejectRequest()` → `RequestLogger.logRejectedRequest()` | `rejected` | `bad-request`, `uri-too-long` | `400`, `414` |
+| `rejected` | a guard rule's `reject` action → `RequestLogger.logGuardedRequest()` | `rejected` | `bad-request`, `uri-too-long`, or any rule name from `guard-rules.conf` | `400`, `414`, … |
 | `hystrix-fallback` | `RequestLogger.logRequest()` when the request fell back | `from-cache` / `dynamic` / … | `short-circuited`, `timeout`, `rejected`, `failure`, `error` | *(unset)* |
 
 `http_status` is the status Frontcache actually sent, written as an extra unquoted
-column after the reason — on rejection lines only, so the grok matches it as an
+column after the reason — on guard-action lines only, so the grok matches it as an
 optional trailing group. Hystrix-fallback lines end at the reason: the response there
 is a normal (usually 200) fallback response, and `logRequest()` deliberately does not
 read the servlet response, which is not safe to touch from the include threads it
 runs on. It is mapped as a `keyword` — a status code is a category, not a quantity.
+
+> **Pending:** guard rules can now also `redirect` (disposition `redirected`) and run
+> in `dry-run` (disposition `dry-run`) — see
+> [the protection design](../../docs/frontcache-protection-tech-design.md). The
+> `failure_type` branch below still buckets those as `hystrix-fallback`; phase 3 of
+> that design fixes it. Worth applying before enabling a redirect rule in production.
 
 Note the filename: `frontcache-failed-requests*.log` does **not** match the request
 pipeline's `*frontcache-requests*.log` glob (nor the error pipeline, which excludes
