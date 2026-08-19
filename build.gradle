@@ -17,10 +17,24 @@ license {
 
 //build.dependsOn licenseFormat
 
+// Single source of truth for the project version (see version.properties). It cannot live
+// in gradle.properties - that file is git-ignored (see .gitignore), so it would not be
+// checked in. Everything downstream derives from this: Maven coordinates, distribution
+// archive names, Docker tags, the installer's default --version.
+ext.frontcacheVersion = {
+	def props = new Properties()
+	file('version.properties').withInputStream { props.load(it) }
+	def v = props.getProperty('version')
+	if (!v?.trim()) {
+		throw new GradleException("version.properties: 'version' is missing or empty")
+	}
+	v.trim()
+}()
+
 subprojects {
 	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
 	apply plugin: 'jacoco'
-    version = '2.5.0'
+    version = rootProject.frontcacheVersion
     group = 'org.frontcache'
 
 	// Build/test with Java 25 via a toolchain, so the JDK launching Gradle is
@@ -120,8 +134,21 @@ def awsSharedCreds() {
 	creds
 }
 
-// Artifact deployment (was pom.xml). Publishes ONLY the two library modules to the
-// Eternita S3 repo. Gradle's maven-publish speaks s3:// natively.
+// The single publish target for every published module.
+def eternitaMaven(repos) {
+	repos.maven {
+		url = 's3://repo.eternita.co/maven2'
+		credentials(AwsCredentials) {
+			def shared = awsSharedCreds()
+			accessKey = findProperty('awsAccessKey') ?: System.getenv('AWS_ACCESS_KEY_ID') ?: shared['aws_access_key_id']
+			secretKey = findProperty('awsSecretKey') ?: System.getenv('AWS_SECRET_ACCESS_KEY') ?: shared['aws_secret_access_key']
+		}
+	}
+}
+
+// Artifact deployment (was pom.xml). Publishes the two library modules to the Eternita
+// S3 repo; the two distribution bundles are published from the block further down.
+// Gradle's maven-publish speaks s3:// natively.
 // Run with: ./gradlew publish  (or publishToMavenLocal for a dry run)
 configure([project(':frontcache-core'), project(':frontcache-agent')]) {
 	apply plugin: 'maven-publish'
@@ -173,14 +200,7 @@ configure([project(':frontcache-core'), project(':frontcache-agent')]) {
 			}
 		}
 		repositories {
-			maven {
-				url = 's3://repo.eternita.co/maven2'
-				credentials(AwsCredentials) {
-					def shared = awsSharedCreds()
-					accessKey = project.findProperty('awsAccessKey') ?: System.getenv('AWS_ACCESS_KEY_ID') ?: shared['aws_access_key_id']
-					secretKey = project.findProperty('awsSecretKey') ?: System.getenv('AWS_SECRET_ACCESS_KEY') ?: shared['aws_secret_access_key']
-				}
-			}
+			rootProject.eternitaMaven(delegate)
 		}
 	}
 }
@@ -260,6 +280,68 @@ project(':frontcache-server') {
 	}
 	build.finalizedBy(copyServerLibs)
 
+	// ---- binary distribution -------------------------------------------------
+	// `./gradlew :frontcache-server:distZip` (or distTar) assembles a self-contained
+	// bundle under build/distributions: the launcher, its Jetty 12 EE10 classpath, the
+	// war and a config skeleton. This is the base artifact of every delivery channel -
+	// the Docker image and the VM installer unpack THIS rather than re-running Gradle.
+	// See docs/frontcache-distribution-proposal.md.
+	//
+	// The archive is built from the task outputs (war / jar / configurations.provided)
+	// rather than from the in-place server/ tree, so a developer's leftovers there -
+	// a populated server/lib, a hand-copied frontcache-console.war - can never leak
+	// into a release.
+	apply plugin: 'distribution'
+
+	distributions {
+		main {
+			distributionBaseName = 'frontcache-server'
+			contents {
+				// macOS sidecars: Jetty globs *.ini and dies trying to parse a ._ file as UTF-8
+				exclude '**/.DS_Store', '**/._*'
+
+				// launcher classpath: the Jetty EE10 jars (deliberately kept out of the war)
+				// plus this module's jar, which holds FrontcacheJettyServer
+				from(configurations.provided) { into 'server/lib' }
+				from(tasks.named('jar'))      { into 'server/lib' }
+
+				// the webapp; frontcache-core and its deps ride along in WEB-INF/lib
+				from(tasks.named('war')) {
+					into 'server/frontcache-base/webapps'
+					rename '(.*).war', 'ROOT.war'
+				}
+
+				// checked-in parts of the server tree
+				from('server/bin')                 { into 'server/bin'; filePermissions { unix('0755') } }
+				from('bin')                        { into 'bin';        filePermissions { unix('0755') } }
+				from('server/frontcache-base/etc') { into 'server/frontcache-base/etc' }
+				from(files('server/notice.html', 'server/license-eplv10-aslv20.html')) { into 'server' }
+
+				// config skeleton. Runtime state is never shipped: 'logs/*' and
+				// 'cache/l2-lucene-index/*' drop a developer's logs and cache index while
+				// keeping the (empty) directories. ReadMe.txt is the stale pre-2.0
+				// Tomcat/Java-8 instructions, superseded by README-INSTALL.md.
+				from('FRONTCACHE_HOME') {
+					into 'FRONTCACHE_HOME'
+					exclude 'ReadMe.txt', 'logs/*', 'cache/l2-lucene-index/*', 'warmer/warmer.sh'
+				}
+				from('FRONTCACHE_HOME/warmer') {
+					into 'FRONTCACHE_HOME/warmer'
+					filePermissions { unix('0755') }
+				}
+
+				from(rootProject.file('LICENSE'))
+				from('dist/README-INSTALL.md')
+			}
+		}
+	}
+
+	// an uncompressed tar is no use as a download
+	tasks.named('distTar', Tar) {
+		compression = Compression.GZIP
+		archiveExtension = 'tar.gz'
+	}
+
 	// Run Frontcache standalone on embedded Jetty 12.
 	tasks.register('appRun', JavaExec) {
 		group = 'application'
@@ -303,6 +385,44 @@ project(':frontcache-console') {
 		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 	}
 
+	// ---- binary distribution -------------------------------------------------
+	// The console ships as its own bundle (and its own container) - it is a separate
+	// process on :7080, not something the standalone server can host: the
+	// FrontcacheJettyServer launcher deploys exactly one webapp at context '/'.
+	//
+	// Layout is flatter than frontcache-server (no legacy server/ nesting):
+	//   bin/frontcache-console  lib/*.jar  webapps/ROOT.war  conf/  logs/
+	// The war carries Spring + frontcache-core in WEB-INF/lib; lib/ holds only the
+	// Jetty 12 EE10 launcher classpath plus this module's jar (ConsoleJettyServer).
+	apply plugin: 'distribution'
+
+	distributions {
+		main {
+			distributionBaseName = 'frontcache-console'
+			contents {
+				exclude '**/.DS_Store', '**/._*'
+
+				from(configurations.provided) { into 'lib' }
+				from(tasks.named('jar'))      { into 'lib' }
+				from(tasks.named('war')) {
+					into 'webapps'
+					rename '(.*).war', 'ROOT.war'
+				}
+
+				from('bin')    { into 'bin'; filePermissions { unix('0755') } }
+				from('config') { into 'conf' }
+
+				from(rootProject.file('LICENSE'))
+				from('dist/README-INSTALL.md')
+			}
+		}
+	}
+
+	tasks.named('distTar', Tar) {
+		compression = Compression.GZIP
+		archiveExtension = 'tar.gz'
+	}
+
 	// Run the console standalone on embedded Jetty 12.
 	tasks.register('appRun', JavaExec) {
 		group = 'application'
@@ -320,3 +440,146 @@ project(':frontcache-console') {
 // dependencies and is run with the repo-root tests.sh, which starts the two
 // embedded Jetty servers, runs the suite, then kills them. It is deliberately
 // NOT wired into `check` — the suite needs those servers up first.
+
+
+// ---- distribution bundles: checksums, verification, publishing ----------------
+// The two runnable modules ship as downloadable archives (see
+// docs/frontcache-distribution-proposal.md, channel B). They are published to the same
+// public-read S3 Maven repo as the jars, so no extra hosting is needed:
+//   https://repo.eternita.co/maven2/org/frontcache/frontcache-server/<v>/frontcache-server-<v>.zip
+// Release step:  ./gradlew dist && ./gradlew publish
+configure([project(':frontcache-server'), project(':frontcache-console')]) {
+	apply plugin: 'maven-publish'
+
+	def zipFile = tasks.named('distZip', Zip).flatMap { it.archiveFile }
+	def tarFile = tasks.named('distTar', Tar).flatMap { it.archiveFile }
+	def zipSha  = layout.buildDirectory.file("distributions/${project.name}-${project.version}.zip.sha256")
+	def tarSha  = layout.buildDirectory.file("distributions/${project.name}-${project.version}.tar.gz.sha256")
+
+	// Structural check on the assembled archive: complete, and free of build/runtime
+	// leftovers. Runs on every distZip so a broken bundle can't reach a release. A real
+	// boot test needs a JDK 25 runtime and a free port, so that lives in
+	// scripts/dist/smoke-test-dist.sh and is driven from the release checklist.
+	def isServer = project.name == 'frontcache-server'
+	def libPrefix = isServer ? 'server/lib/' : 'lib/'
+	def requiredEntries = isServer
+		? ['server/frontcache-base/webapps/ROOT.war', 'server/bin/frontcache', 'bin/frontcache',
+		   'server/frontcache-base/etc/keystore', 'FRONTCACHE_HOME/conf/frontcache.properties',
+		   'FRONTCACHE_HOME/conf/fc-logback.xml', 'FRONTCACHE_HOME/conf/guard-rules.conf',
+		   'README-INSTALL.md', 'LICENSE']
+		: ['webapps/ROOT.war', 'bin/frontcache-console', 'conf/frontcache-console.conf',
+		   'conf/fc-logback.xml', 'README-INSTALL.md', 'LICENSE']
+	def forbidden = ['.DS_Store', '._', 'frontcache-console.war', '.log', 'l2-lucene-index/']
+
+	def verifyDist = tasks.register('verifyDist') {
+		group = 'distribution'
+		description = 'Assert the distribution archive is complete and carries no build/runtime leftovers'
+		inputs.file(zipFile)
+		outputs.upToDateWhen { false }
+		def archive = zipFile
+		def prefix = "${project.name}-${project.version}/"
+		doLast {
+			def file = archive.get().asFile
+			def sizes = [:]
+			new java.util.zip.ZipFile(file).withCloseable { zf ->
+				for (entry in zf.entries()) {
+					if (entry.name.startsWith(prefix)) {
+						sizes[entry.name.substring(prefix.length())] = entry.size
+					} else {
+						throw new GradleException("${file.name}: entry outside the '${prefix}' root: ${entry.name}")
+					}
+				}
+			}
+			def problems = []
+			requiredEntries.each { required ->
+				if (!sizes.containsKey(required)) problems << "missing: ${required}"
+			}
+			// only file entries: the empty logs/ and cache/l2-lucene-index/ directories ARE
+			// shipped (they show the layout); it is their contents that must never be.
+			def files = sizes.keySet().findAll { !it.endsWith('/') }
+			forbidden.each { bad ->
+				def hits = files.findAll { it.contains(bad) }
+				if (hits) problems << "must not be shipped (${bad}): ${hits.take(5)}"
+			}
+			def jars = sizes.keySet().findAll { it.startsWith(libPrefix) && it.endsWith('.jar') }
+			if (jars.size() < 15) problems << "only ${jars.size()} jar(s) under ${libPrefix} - launcher classpath looks incomplete"
+			if (!jars.any { it.contains('jetty-ee10-webapp-') }) problems << "no jetty-ee10-webapp jar under ${libPrefix}"
+			if (!jars.any { it.contains("${project.name}-${project.version}.jar") }) problems << "no ${project.name}-${project.version}.jar under ${libPrefix}"
+			def war = sizes.find { it.key.endsWith('ROOT.war') }
+			if (war && war.value < 100_000) problems << "${war.key} is only ${war.value} bytes - war looks empty"
+
+			if (problems) {
+				throw new GradleException("${file.name} failed verification:\n  - " + problems.join('\n  - '))
+			}
+			logger.lifecycle("verifyDist: ${file.name} OK (${sizes.size()} entries, ${jars.size()} launcher jars)")
+		}
+	}
+	tasks.named('distZip') { finalizedBy verifyDist }
+
+	// Not wired into `build` - hashing two archives on every dev build is pointless.
+	// It runs from `dist` and, via builtBy below, from `publish`.
+	def distChecksums = tasks.register('distChecksums') {
+		group = 'distribution'
+		description = 'Write .sha256 files next to the distribution archives'
+		inputs.files(zipFile, tarFile)
+		outputs.files(zipSha, tarSha)
+		def pairs = [[zipFile, zipSha], [tarFile, tarSha]]
+		doLast {
+			pairs.each { srcProvider, outProvider ->
+				def src = srcProvider.get().asFile
+				def out = outProvider.get().asFile
+				def digest = java.security.MessageDigest.getInstance('SHA-256')
+				src.withInputStream { ins ->
+					byte[] buf = new byte[1 << 16]
+					int read
+					while ((read = ins.read(buf)) > 0) digest.update(buf, 0, read)
+				}
+				// same format shasum -c / sha256sum -c expect
+				out.text = digest.digest().encodeHex().toString() + '  ' + src.name + '\n'
+				logger.lifecycle("sha256: ${out.name}")
+			}
+		}
+	}
+
+	publishing {
+		publications {
+			dist(MavenPublication) {
+				artifactId = project.name
+				artifact tasks.named('distZip')
+				artifact tasks.named('distTar')
+				artifact(zipSha) { extension = 'zip.sha256'; builtBy distChecksums }
+				artifact(tarSha) { extension = 'tar.gz.sha256'; builtBy distChecksums }
+				pom {
+					packaging = 'zip'
+					name = "${project.group}:${project.name}"
+					description = project.name == 'frontcache-server'
+						? 'Frontcache standalone server - reverse-proxy page fragment cache (binary distribution)'
+						: 'Frontcache console - realtime stats and cache management UI (binary distribution)'
+					url = 'https://github.com/eternita/frontcache'
+					licenses {
+						license {
+							name = 'Frontcache license'
+							url  = 'https://www.eternita.co/frontcache-license.html'
+						}
+					}
+					scm {
+						connection = 'scm:git:git://github.com/eternita/frontcache.git'
+						developerConnection = 'scm:git:ssh://github.com:eternita/frontcache.git'
+						url = 'https://github.com/eternita/frontcache/tree/master'
+					}
+				}
+			}
+		}
+		repositories {
+			rootProject.eternitaMaven(delegate)
+		}
+	}
+}
+
+// One command to build every downloadable artifact, for the release checklist.
+tasks.register('dist') {
+	group = 'distribution'
+	description = 'Build the server + console distribution archives and their checksums'
+	dependsOn ':frontcache-server:distZip', ':frontcache-server:distTar', ':frontcache-server:distChecksums',
+	          ':frontcache-console:distZip', ':frontcache-console:distTar', ':frontcache-console:distChecksums'
+}
