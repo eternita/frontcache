@@ -1,0 +1,194 @@
+// End-to-end / integration test suite. frontcache-core / frontcache-agent are
+// consumed as project dependencies from this same build (they used to come from
+// a sibling checkout via a composite build, back when this suite lived in its
+// own repository).
+//
+// Topology (see tests.sh):
+//   tests -> FC standalone (localhost:9080) -> FC webfilter (localhost:8080) -> web app (localhost:8080)
+// Both FC standalone (:9080, serving src/test-integration/webapp) and FC webfilter
+// + web app (:8080, serving src/main/webapp) run in embedded Jetty 12 via the
+// org.frontcache.tests.FrontcacheStandaloneServer launcher. tests.sh starts both,
+// runs the integration suite, then kills them.
+//
+// The java-library / jacoco plugins, the Java 25 toolchain, the 'provided'
+// configuration and the repositories all come from the root build's subprojects {} block.
+
+apply plugin: 'war'
+
+// Spawns a (long-running) server process and blocks only until it prints its
+// "ready" line, then keeps draining its stdout on a daemon thread so its pipe
+// buffer never fills and hangs it mid-test.
+class ExecWait extends DefaultTask {
+	@Internal String command
+	@Internal String ready
+	@Internal String directory
+
+	@TaskAction
+	def spawnProcess() {
+
+		ProcessBuilder builder = new ProcessBuilder(command.split(' '))
+		builder.redirectErrorStream(true)
+		builder.directory(new File(directory))
+		Process process = builder.start()
+
+		InputStream stdout = process.getInputStream()
+		BufferedReader reader = new BufferedReader(new InputStreamReader(stdout))
+
+		def line
+		while ((line = reader.readLine()) != null) {
+			println line
+			if (line.contains(ready)) {
+				println "$command is ready"
+				break
+			}
+		}
+
+		Thread.startDaemon {
+			def l
+			while ((l = reader.readLine()) != null) {
+				println l
+			}
+		}
+	}
+}
+
+sourceSets {
+	integrationTest {
+		java.srcDir file('src/test-integration/java')
+		resources.srcDir file('src/test-integration/resources')
+		compileClasspath = sourceSets.main.output + configurations.testRuntimeClasspath + configurations.provided
+		runtimeClasspath = output + compileClasspath
+	}
+}
+
+dependencies {
+	implementation project(':frontcache-core')
+	implementation project(':frontcache-agent')
+
+	implementation('org.htmlunit:htmlunit:4.21.0') {
+		exclude group: 'org.eclipse.jetty'
+		exclude group: 'org.eclipse.jetty.websocket'
+	}
+	implementation 'org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1'
+	implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0'
+
+	// Embedded Jetty 12 launcher deps (compile + launcher runtime; not bundled in the war)
+	provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
+
+	// src/main/java holds the shared test base classes, so junit is a compile dep here
+	provided 'junit:junit:4.13.2'
+}
+
+def integrationTest = tasks.register('integrationTest', Test) {
+	description = 'Runs the integration tests.'
+	group = 'verification'
+	maxParallelForks = 1 // run all tests sequentially (due to cache cleanup before every test)
+	forkEvery = 1        // run all tests sequentially (due to cache cleanup before every test)
+	testClassesDirs = sourceSets.integrationTest.output.classesDirs
+	classpath = sourceSets.integrationTest.runtimeClasspath
+	reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/integration')
+	reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/integration')
+
+	//	jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
+	jvmArgs '-Dfrontcache-tests.home=' + projectDir
+}
+
+// FC standalone (:9080) — embedded Jetty 12 serving the reverse-proxy webapp
+tasks.register('standaloneJetty', JavaExec) {
+	mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
+	classpath = sourceSets.main.runtimeClasspath + configurations.provided
+	systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/test-integration/webapp"
+	systemProperty 'frontcache.jetty.port', '9080'
+	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_STANDALONE"
+	systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_STANDALONE/conf/fc-logback.xml"
+}
+
+// FC webfilter + web app (:8080) — embedded Jetty 12 serving the main webapp
+tasks.register('webfilterJetty', JavaExec) {
+	mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
+	classpath = sourceSets.main.runtimeClasspath + configurations.provided
+	systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+	systemProperty 'frontcache.jetty.port', '8080'
+	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_FILTER"
+	systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml"
+}
+
+tasks.register('startStandaloneFrontcache', ExecWait) {
+	command = './gradlew :frontcache-tests:standaloneJetty'
+	ready = 'has been started successfully'
+	directory = rootDir.absolutePath
+}
+
+tasks.register('startWebfilterFrontcache', ExecWait) {
+	command = './gradlew :frontcache-tests:webfilterJetty'
+	ready = 'has been started successfully'
+	directory = rootDir.absolutePath
+}
+
+tasks.register('end2endTests') {
+	dependsOn integrationTest
+}
+
+// Coverage for the integration suite, configured like the root build's
+// jacocoTestReport (html + xml on, csv off). The jacoco plugin already instruments
+// every Test task, so integrationTest writes build/jacoco/integrationTest.exec on its
+// own; this is the report over that data.
+//
+// The suite drives frontcache-core / -agent, not this project's own code, so the
+// report spans those modules' sources too. Note the two Jetty servers run in
+// SEPARATE JVMs (see startWebfilterFrontcache / startStandaloneFrontcache), so the
+// engine-side code they execute is only counted when those JVMs are instrumented as
+// well — see jacocoAgent / the jettyJacoco* wiring below.
+def coveredProjects = [project, project(':frontcache-core'), project(':frontcache-agent')]
+
+def jacocoIntegrationTestReport = tasks.register('jacocoIntegrationTestReport', JacocoReport) {
+	description = 'Generates a code coverage report for the integration tests.'
+	group = 'verification'
+
+	// integrationTest.exec (the test-client JVM) plus whatever the two server JVMs
+	// dumped. Missing files are ignored so the report still builds if a server was
+	// never started.
+	executionData.from fileTree(layout.buildDirectory.dir('jacoco')) {
+		include '*.exec'
+	}
+	sourceDirectories.from files({ coveredProjects.collect { it.sourceSets.main.allSource.srcDirs } })
+	classDirectories.from files({ coveredProjects.collect { it.sourceSets.main.output.classesDirs } })
+
+	reports {
+		html.required = true
+		xml.required = true
+		csv.required = false
+		html.outputLocation = layout.buildDirectory.dir('reports/jacoco/integration')
+		xml.outputLocation = layout.buildDirectory.file('reports/jacoco/integration/jacocoIntegrationTestReport.xml')
+	}
+}
+
+// Report whenever the suite runs, mirroring the root build's
+// `check.dependsOn jacocoTestReport`. It hangs off integrationTest rather than check
+// because integrationTest itself is deliberately out of check — it needs the two
+// servers up first. This pass only sees the test-client JVM's data; tests.sh runs the
+// task again after stopping the servers, which is when their .exec files land and the
+// report gets its engine-side numbers.
+integrationTest.configure {
+	finalizedBy jacocoIntegrationTestReport
+}
+
+
+// The two Jetty servers run in their own JVMs, so they need the jacoco agent attached
+// individually — without this every engine-side class (FrontCacheEngine, the cache
+// processors, includes, hystrix) reports 0% no matter what the suite exercises, since
+// the integrationTest JVM only ever runs the HtmlUnit client and the FC client/agent.
+// Each writes its own .exec, which jacocoIntegrationTestReport picks up by glob.
+// The agent flushes on JVM shutdown, so tests.sh must stop these servers with SIGTERM
+// (not SIGKILL) and generate the report afterwards.
+// applyTo() is the hook for non-Test JVM tasks: only Test tasks get a
+// JacocoTaskExtension automatically, so a bare `jacoco { }` here would resolve to the
+// PROJECT extension and fail on 'destinationFile'.
+tasks.withType(JavaExec).matching { it.name in ['standaloneJetty', 'webfilterJetty'] }.configureEach { task ->
+	project.extensions.getByType(JacocoPluginExtension).applyTo(task)
+	task.extensions.getByType(JacocoTaskExtension).destinationFile =
+		layout.buildDirectory.file("jacoco/${task.name}.exec").get().asFile
+}

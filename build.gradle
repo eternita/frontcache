@@ -61,11 +61,16 @@ subprojects {
         mavenCentral()
     }
 
+    // Unit-test coverage. Output mirrors the test reports' unit/integration split
+    // (reports/tests/unit), so this lands in reports/jacoco/unit — the e2e suite's
+    // report is reports/jacoco/integration in frontcache-tests/build.gradle.
     jacocoTestReport {
         reports {
             html.required = true
             xml.required = true
             csv.required = false
+            html.outputLocation = layout.buildDirectory.dir('reports/jacoco/unit')
+            xml.outputLocation = layout.buildDirectory.file('reports/jacoco/unit/jacocoTestReport.xml')
         }
     }
 	tasks.withType(Test) {
@@ -86,6 +91,9 @@ subprojects {
 	}
 
 	check.dependsOn jacocoTestReport
+
+	// Also emit the report for a bare `gradlew :module:test`, not only via check/build.
+	test.finalizedBy jacocoTestReport
 }
 
 
@@ -307,8 +315,8 @@ project(':frontcache-console') {
 	}
 }
 
-// The end-to-end / integration test suite (frontcache-tests) lives in its own
-// repository now: https://github.com/eternita/frontcache-tests (checked out as a
-// sibling ../frontcache-tests). It consumes frontcache-core / frontcache-agent
-// from this build via a Gradle composite build (includeBuild) and is run with its
-// own ./tests.sh.
+// The end-to-end / integration test suite lives in the ':frontcache-tests'
+// subproject. It depends on frontcache-core / frontcache-agent as project
+// dependencies and is run with the repo-root tests.sh, which starts the two
+// embedded Jetty servers, runs the suite, then kills them. It is deliberately
+// NOT wired into `check` — the suite needs those servers up first.

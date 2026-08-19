@@ -11,3 +11,7 @@ CLAUDE.md
 /**/build/
 /frontcache-server/server/frontcache-base/webapps/
 /frontcache-server/server/lib/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/cache/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/logs/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/cache/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/
