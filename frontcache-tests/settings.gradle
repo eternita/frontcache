@@ -1,5 +1,0 @@
-rootProject.name = 'frontcache-tests'
-
-// Composite build: resolve org.frontcache:frontcache-core / -agent from the sibling
-// checkout, compiled from source. Keep ~/git/frontcache next to this repo.
-includeBuild('../frontcache')

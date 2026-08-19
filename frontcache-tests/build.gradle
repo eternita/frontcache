@@ -1,7 +1,7 @@
-// Standalone frontcache-tests build. The frontcache-core / frontcache-agent
-// libraries are resolved from the sibling ../frontcache checkout via the
-// composite build declared in settings.gradle (includeBuild), so they compile
-// from source with no publish step.
+// End-to-end / integration test suite. frontcache-core / frontcache-agent are
+// consumed as project dependencies from this same build (they used to come from
+// a sibling checkout via a composite build, back when this suite lived in its
+// own repository).
 //
 // Topology (see tests.sh):
 //   tests -> FC standalone (localhost:9080) -> FC webfilter (localhost:8080) -> web app (localhost:8080)
@@ -9,13 +9,11 @@
 // + web app (:8080, serving src/main/webapp) run in embedded Jetty 12 via the
 // org.frontcache.tests.FrontcacheStandaloneServer launcher. tests.sh starts both,
 // runs the integration suite, then kills them.
+//
+// The java-library / jacoco plugins, the Java 25 toolchain, the 'provided'
+// configuration and the repositories all come from the root build's subprojects {} block.
 
-plugins {
-	id 'war'
-}
-
-// Jetty 12 (Jakarta EE10).
-ext.jettyVersion = '12.0.37'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
+apply plugin: 'war'
 
 // Spawns a (long-running) server process and blocks only until it prints its
 // "ready" line, then keeps draining its stdout on a daemon thread so its pipe
@@ -54,32 +52,7 @@ class ExecWait extends DefaultTask {
 	}
 }
 
-apply plugin: 'java-library'
-apply plugin: 'jacoco'
-group = 'org.frontcache'
-
-// Build/test with Java 25 via a toolchain (Jetty 12 / Jakarta EE10 need Java 17
-// as a baseline; we target the 25 LTS).
-java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
-	}
-}
-tasks.withType(JavaCompile).configureEach {
-	options.release = 25
-}
-
-// 'provided' deps (e.g. servlet-api, the Jetty launcher jars) are on compile &
-// test classpaths but NOT on runtimeClasspath, so they stay out of the war.
-configurations {
-	provided
-}
-
 sourceSets {
-	main.compileClasspath += configurations.provided
-	test.compileClasspath += configurations.provided
-	test.runtimeClasspath += configurations.provided
-
 	integrationTest {
 		java.srcDir file('src/test-integration/java')
 		resources.srcDir file('src/test-integration/resources')
@@ -88,16 +61,9 @@ sourceSets {
 	}
 }
 
-repositories {
-	mavenLocal()
-	mavenCentral()
-}
-
-jacoco.toolVersion = '0.8.13'   // 0.8.13+ understands Java 25 class files
-
 dependencies {
-	implementation 'org.frontcache:frontcache-core:2.2.3'   // from ../frontcache (composite build)
-	implementation 'org.frontcache:frontcache-agent:2.2.3'  // from ../frontcache (composite build)
+	implementation project(':frontcache-core')
+	implementation project(':frontcache-agent')
 
 	implementation('net.sourceforge.htmlunit:htmlunit:2.18') {
 		exclude group: 'org.eclipse.jetty'
@@ -112,23 +78,8 @@ dependencies {
 	provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
 	provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 
-	provided 'junit:junit:4.12'
-	testImplementation 'junit:junit:4.12'
-}
-
-tasks.withType(Test) {
-	testLogging {
-		showStandardStreams = true
-		exceptionFormat = 'full'
-	}
-}
-
-jacocoTestReport {
-	reports {
-		html.required = true
-		xml.required = true
-		csv.required = false
-	}
+	// src/main/java holds the shared test base classes, so junit is a compile dep here
+	provided 'junit:junit:4.13.2'
 }
 
 def integrationTest = tasks.register('integrationTest', Test) {
@@ -166,15 +117,15 @@ tasks.register('webfilterJetty', JavaExec) {
 }
 
 tasks.register('startStandaloneFrontcache', ExecWait) {
-	command = './gradlew standaloneJetty'
+	command = './gradlew :frontcache-tests:standaloneJetty'
 	ready = 'has been started successfully'
-	directory = '.'
+	directory = rootDir.absolutePath
 }
 
 tasks.register('startWebfilterFrontcache', ExecWait) {
-	command = './gradlew webfilterJetty'
+	command = './gradlew :frontcache-tests:webfilterJetty'
 	ready = 'has been started successfully'
-	directory = '.'
+	directory = rootDir.absolutePath
 }
 
 tasks.register('end2endTests') {

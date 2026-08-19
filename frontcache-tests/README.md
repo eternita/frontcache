@@ -1,6 +1,7 @@
 # frontcache-tests
 
-End-to-end / integration test suite for Frontcache. It exercises the **same set of
+The `:frontcache-tests` subproject of the Frontcache build — an
+end-to-end / integration test suite for Frontcache. It exercises the **same set of
 behaviours twice** — once against Frontcache running as a **standalone reverse-proxy**
 and once against Frontcache running as a **servlet filter** embedded in the origin app
 — to guarantee both deployment modes behave identically.
@@ -30,7 +31,7 @@ Key facts:
   the :8080 container. Whether a request is actually cached at each hop depends on which
   of the two Frontcache instances is switched ON — see [§1.1 Test modes](#11-test-modes-the-2×2-onoff-matrix).
 - The standalone server is launched as a `JavaExec` task
-  (`standaloneFrontcacheJetty`) pointed at the webapp directory
+  (`standaloneJetty`) pointed at the webapp directory
   `src/test-integration/webapp` and serving on `:9080`.
 - Both Frontcache instances use the default cache stack:
   `L1L2CacheProcessor` (Ehcache L1 + Lucene L2) and `ConcurrentIncludeProcessor`.
@@ -237,20 +238,22 @@ integration tests must run **sequentially** (see §7).
 ### Full e2e suite (recommended)
 
 ```sh
-./tests.sh
+./frontcache-tests/tests.sh
 ```
 
-`tests.sh` performs the full lifecycle:
+`tests.sh` can be invoked from anywhere — it cds to the repo root and drives the
+`:frontcache-tests` subproject — and performs the full lifecycle:
 
 1. Cleans the L2 Lucene index + logs under both FRONTCACHE_HOME dirs.
 2. Stops any Gradle daemons.
-3. `./gradlew clean :frontcache-tests:startStandaloneFrontcache` — boots the standalone
-   server on :9080 and **blocks until** it logs
-   `"Frontcache Standalone Server has been started successfully ..."` (the `ExecWait`
-   ready string).
-4. `./gradlew :frontcache-tests:end2endTests` — runs `integrationTest` against the
-   already-running filter + web app on :8080 (booted by `startWebfilterFrontcache`).
-5. Kills the standalone server process and stops Gradle daemons.
+3. `./gradlew :frontcache-tests:clean :frontcache-tests:startWebfilterFrontcache` — boots
+   the filter + web app on :8080.
+4. `./gradlew :frontcache-tests:startStandaloneFrontcache` — boots the standalone
+   server on :9080. Both start tasks **block until** the server logs
+   `"... has been started successfully ..."` (the `ExecWait` ready string).
+5. `./gradlew :frontcache-tests:end2endTests` — runs `integrationTest` against the two
+   running servers.
+6. Kills both server processes (by port, via `lsof`) and stops Gradle daemons.
 
 ### Gradle tasks
 
@@ -259,6 +262,7 @@ integration tests must run **sequentially** (see §7).
 | `:frontcache-tests:integrationTest` | Runs the `src/test-integration` suite (both modes). Sequential: `maxParallelForks=1`, `forkEvery=1` (each test wipes the cache). Reports under `build/reports/tests/integration`. |
 | `:frontcache-tests:end2endTests` | Alias that `dependsOn integrationTest`. |
 | `:frontcache-tests:startStandaloneFrontcache` | `ExecWait` wrapper that launches `standaloneJetty` and waits for the ready line. |
+| `:frontcache-tests:startWebfilterFrontcache` | `ExecWait` wrapper that launches `webfilterJetty` and waits for the ready line. |
 | `:frontcache-tests:standaloneJetty` | `JavaExec` → `FrontcacheStandaloneServer` on :9080. |
 | `:frontcache-tests:webfilterJetty` | `JavaExec` → `FrontcacheStandaloneServer` (filter + web app) on :8080. Run **only** this for manual poking: `./gradlew clean :frontcache-tests:webfilterJetty`. |
 
@@ -284,18 +288,17 @@ tests are `@Ignore`d (they pass on Tomcat in production).
 ## 8. Constraints & gotchas
 
 - **Java 25** source level (toolchain + `options.release = 25`); Gradle wrapper pinned to
-  **Gradle 9.1.0** (`gradle/wrapper/gradle-wrapper.properties`) — always use `./gradlew`.
+  **Gradle 9.7.0** (the repo-root `gradle/wrapper/gradle-wrapper.properties`) — always use
+  the root `./gradlew`.
 - Tests **must** run sequentially; do not raise `maxParallelForks` — concurrent runs
   corrupt each other's cache because every test clears it on setup.
 - `/etc/hosts` must contain the entries in §5 or the domain-scoped tests fail.
 - `./tests.sh` binds **9080** (standalone) and **8080** (filter + web app); both embedded-Jetty
   launchers open HTTP only — there are no HTTPS ports (`8443`/`9443`) — so a conflict on either
   breaks the run; stop other servers first. The console (`7080`) is not started by the
-  integration run. After the suite, `tests.sh`
-  force-kills the standalone server with
-  `ps -e | grep standaloneFrontcacheJetty | ... | xargs kill -9`; this PID-by-grep cleanup
-  is fragile, so if a prior run crashed, check for a leftover process on :9080 before
-  re-running.
+  integration run. After the suite, `tests.sh` force-kills whatever holds those ports
+  (`lsof -ti tcp:9080 | xargs kill -9`, same for 8080), so if a prior run crashed, check
+  for leftover processes on :8080 / :9080 before re-running.
 - New behavioural tests go into the **abstract base classes** so they run in both modes;
   reserve the concrete subclasses for mode-specific assertions.
 - The filter and origin app share one JVM. Each Frontcache instance is independently

@@ -307,8 +307,8 @@ project(':frontcache-console') {
 	}
 }
 
-// The end-to-end / integration test suite (frontcache-tests) lives in its own
-// repository now: https://github.com/eternita/frontcache-tests (checked out as a
-// sibling ../frontcache-tests). It consumes frontcache-core / frontcache-agent
-// from this build via a Gradle composite build (includeBuild) and is run with its
-// own ./tests.sh.
+// The end-to-end / integration test suite lives in the ':frontcache-tests'
+// subproject. It depends on frontcache-core / frontcache-agent as project
+// dependencies and is run with frontcache-tests/tests.sh, which starts the two
+// embedded Jetty servers, runs the suite, then kills them. It is deliberately
+// NOT wired into `check` — the suite needs those servers up first.
