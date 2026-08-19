@@ -43,8 +43,13 @@ PORT="${FRONTCACHE_CONSOLE_PORT:-7080}"
 export FRONTCACHE_CONFIG="${FRONTCACHE_CONFIG:-$CONF_DIR/frontcache-console.conf}"
 
 # ---- java --------------------------------------------------------------------
+# Same precedence as the server launcher: an explicit FRONTCACHE_JAVA_HOME first, then a
+# runtime bundled with this distribution, then the host's JAVA_HOME. A per-platform bundle
+# must not be at the mercy of whatever JVM the host happens to point at.
 if [ -n "${FRONTCACHE_JAVA_HOME:-}" ]; then
   JAVA="$FRONTCACHE_JAVA_HOME/bin/java"
+elif [ -x "$BASE_DIR/runtime/bin/java" ]; then
+  JAVA="$BASE_DIR/runtime/bin/java"
 elif [ -n "${JAVA_HOME:-}" ]; then
   JAVA="$JAVA_HOME/bin/java"
 else
@@ -68,6 +73,7 @@ fi
 echo "Starting Frontcache console on embedded Jetty 12 (port=$PORT)"
 echo "  FRONTCACHE_CONFIG=$FRONTCACHE_CONFIG"
 echo "  webapp=$WEBAPP"
+echo "  java=$JAVA"
 
 exec "$JAVA" \
   -cp "$LIB_DIR/*" \

@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+#
+# Boot test for the per-platform bundles that carry an embedded Java runtime.
+#
+# The point of those bundles is that they run on a host with NO JDK installed, so that is
+# exactly what this tests: it unpacks the bundle somewhere with no java on PATH, starts it,
+# and asserts that the launcher chose the BUNDLED runtime rather than anything on the host.
+#
+#   ./scripts/dist/smoke-test-runtime-bundles.sh                       # every built target
+#   ./scripts/dist/smoke-test-runtime-bundles.sh linux-x64             # one target
+#   ./scripts/dist/smoke-test-runtime-bundles.sh --only server
+#
+# A target matching the build host is tested directly. A linux-* target on a non-Linux host
+# is tested inside `docker run --platform linux/<arch>` - which is the honest way to do it,
+# since a macOS host cannot execute a Linux launcher. macos-* targets can only be tested on
+# macOS, and are skipped elsewhere with a clear message.
+#
+# Companion to smoke-test-dist.sh, which covers the portable (JDK-required) bundles.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+log()  { printf '>>> %s\n' "$*" >&2; }
+warn() { printf 'WARNING: %s\n' "$*" >&2; }
+die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+have() { command -v "$1" > /dev/null 2>&1; }
+
+VERSION="$(sed -n 's/^version=//p' "$REPO_ROOT/version.properties" | tr -d '[:space:]')"
+[ -n "$VERSION" ] || die "could not read version from version.properties"
+
+case "$(uname -s)" in Darwin) HOST_OS=macos ;; Linux) HOST_OS=linux ;; *) die "unsupported host" ;; esac
+case "$(uname -m)" in arm64|aarch64) HOST_ARCH=aarch64 ;; x86_64|amd64) HOST_ARCH=x64 ;; *) die "unsupported arch" ;; esac
+HOST_TARGET="$HOST_OS-$HOST_ARCH"
+
+# ---- one bundle, in place (used both locally and inside the container) --------
+# This branch is re-entered via --_inner when running inside Docker.
+if [ "${1:-}" = "--_inner" ]; then
+  archive="$2"; module="$3"; port="$4"
+  workdir="$(mktemp -d)"
+  tar -xzf "$archive" -C "$workdir"
+  root="$workdir/$module-$VERSION"
+  [ -d "$root" ] || { echo "INNER-FAIL: archive did not expand to $module-$VERSION"; exit 1; }
+  [ -x "$root/runtime/bin/java" ] || { echo "INNER-FAIL: no executable runtime/bin/java in the bundle"; exit 1; }
+
+  if [ "$module" = "frontcache-server" ]; then
+    launcher="$root/bin/frontcache"; portvar="FRONTCACHE_HTTP_PORT"
+  else
+    launcher="$root/bin/frontcache-console"; portvar="FRONTCACHE_CONSOLE_PORT"
+  fi
+
+  # env -i is the crux: no PATH-inherited java, and critically no JAVA_HOME, so if the
+  # launcher did not pick the bundled runtime nothing would start at all.
+  env -i HOME="$HOME" PATH=/usr/bin:/bin "$portvar=$port" "$launcher" > "$workdir/out.log" 2>&1 &
+  pid=$!
+  # Kill the JVM on EVERY exit path. Without this a failed assertion exits before the kill
+  # below, leaking a running server that holds the port - which then makes the NEXT run of
+  # this script fail to bind and report a bogus "process died".
+  trap 'kill "$pid" 2>/dev/null || true; rm -rf "$workdir"' EXIT
+  waited=0
+  while [ "$waited" -lt 90 ]; do
+    grep -q "started successfully" "$workdir/out.log" 2>/dev/null && break
+    kill -0 "$pid" 2>/dev/null || { echo "INNER-FAIL: process died"; sed -n '1,40p' "$workdir/out.log"; exit 1; }
+    sleep 2; waited=$((waited + 2))
+  done
+  grep -q "started successfully" "$workdir/out.log" || { echo "INNER-FAIL: did not start in ${waited}s"; sed -n '1,40p' "$workdir/out.log"; exit 1; }
+
+  # the assertion that matters: the JVM in use is the one inside the bundle.
+  # Compare against the PHYSICAL path: the launcher resolves its own location with `cd -P`,
+  # and on macOS $TMPDIR lives under /var -> /private/var, so the unresolved path never
+  # matches what the launcher prints.
+  root_resolved="$(cd -P "$root" && pwd)"
+  if ! grep -q "java=$root_resolved/runtime/bin/java" "$workdir/out.log"; then
+    echo "INNER-FAIL: launcher did not select the bundled runtime"
+    grep "java=" "$workdir/out.log" || true
+    exit 1
+  fi
+  (exec 3<>"/dev/tcp/127.0.0.1/$port" && exec 3>&-) 2>/dev/null \
+    || { echo "INNER-FAIL: nothing accepting connections on :$port"; exit 1; }
+
+  echo "INNER-OK: $module-$VERSION on its embedded runtime ($("$root/runtime/bin/java" -version 2>&1 | head -1))"
+  exit 0   # the EXIT trap stops the JVM and removes the workdir
+fi
+
+# ---- args --------------------------------------------------------------------
+TARGETS=""
+ONLY="all"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --only)    ONLY="${2:?--only needs server|console|all}"; shift ;;
+    -h|--help) sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*)        die "unknown option: $1" ;;
+    *)         TARGETS="${TARGETS:+$TARGETS }$1" ;;
+  esac
+  shift
+done
+
+MODULES=""
+[ "$ONLY" = "all" ] || [ "$ONLY" = "server" ]  && MODULES="frontcache-server"
+[ "$ONLY" = "all" ] || [ "$ONLY" = "console" ] && MODULES="${MODULES:+$MODULES }frontcache-console"
+
+# Default to whatever has actually been built, so this never fails on a target you did not ask
+# build-runtime-bundles.sh for.
+if [ -z "$TARGETS" ]; then
+  TARGETS="$(ls "$REPO_ROOT"/frontcache-server/build/distributions/frontcache-server-"$VERSION"-*.tar.gz 2>/dev/null \
+             | sed "s|.*/frontcache-server-$VERSION-||; s|\.tar\.gz$||" | sort -u | tr '\n' ' ')"
+  [ -n "$TARGETS" ] || die "no runtime bundles found - run ./scripts/dist/build-runtime-bundles.sh first"
+  log "Testing the targets that are built: $TARGETS"
+fi
+
+PORT_BASE=19180
+FAILED=0
+PASSED=0
+
+for target in $TARGETS; do
+  for module in $MODULES; do
+    archive="$REPO_ROOT/$module/build/distributions/$module-$VERSION-$target.tar.gz"
+    if [ ! -f "$archive" ]; then
+      warn "skipping $module/$target - $(basename "$archive") not built"
+      continue
+    fi
+    PORT_BASE=$((PORT_BASE + 1))
+    log "----- $module / $target -----"
+
+    if [ "$target" = "$HOST_TARGET" ]; then
+      if bash "${BASH_SOURCE[0]}" --_inner "$archive" "$module" "$PORT_BASE"; then
+        PASSED=$((PASSED + 1))
+      else
+        FAILED=$((FAILED + 1))
+      fi
+      continue
+    fi
+
+    case "$target" in
+      linux-x64|linux-aarch64)
+        have docker || { warn "skipping $target - needs Docker to run a Linux launcher from $HOST_TARGET"; continue; }
+        plat="linux/amd64"; [ "$target" = "linux-aarch64" ] && plat="linux/arm64"
+        if docker run --rm --platform "$plat" \
+             -v "$REPO_ROOT/$module/build/distributions:/dist:ro" \
+             -v "$SCRIPT_DIR:/scripts:ro" \
+             -v "$REPO_ROOT/version.properties:/version.properties:ro" \
+             ubuntu:24.04 \
+             bash -c "mkdir -p /repo && ln -sf /version.properties /repo/version.properties \
+                      && cp -r /scripts /repo/scripts \
+                      && bash /repo/scripts/smoke-test-runtime-bundles.sh --_inner \
+                           /dist/$module-$VERSION-$target.tar.gz $module $PORT_BASE"; then
+          PASSED=$((PASSED + 1))
+        else
+          FAILED=$((FAILED + 1))
+        fi
+        ;;
+      macos-*)
+        warn "skipping $target - a macOS bundle can only be booted on macOS"
+        ;;
+      *)
+        warn "skipping unknown target $target"
+        ;;
+    esac
+  done
+done
+
+echo
+if [ "$FAILED" -gt 0 ]; then
+  die "$FAILED bundle(s) failed, $PASSED passed"
+fi
+[ "$PASSED" -gt 0 ] || die "nothing was tested"
+log "All $PASSED runtime bundle(s) booted on their embedded runtime."

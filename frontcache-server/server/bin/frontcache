@@ -32,8 +32,14 @@ export FRONTCACHE_HOME="$BASE_DIR/FRONTCACHE_HOME"
 PORT="${FRONTCACHE_HTTP_PORT:-9080}"
 
 # ---- java --------------------------------------------------------------------
+# A per-platform bundle ships its own jlinked runtime in ./runtime, and that wins over
+# $JAVA_HOME: the point of such a bundle is to be self-contained, and a host JAVA_HOME
+# pointing at an older JVM would break it (the webapp is Java 25 bytecode). An explicit
+# FRONTCACHE_JAVA_HOME still overrides everything, so an operator can force a specific JVM.
 if [ -n "${FRONTCACHE_JAVA_HOME:-}" ]; then
   JAVA="$FRONTCACHE_JAVA_HOME/bin/java"
+elif [ -x "$BASE_DIR/runtime/bin/java" ]; then
+  JAVA="$BASE_DIR/runtime/bin/java"
 elif [ -n "${JAVA_HOME:-}" ]; then
   JAVA="$JAVA_HOME/bin/java"
 else
@@ -53,6 +59,7 @@ fi
 echo "Starting Frontcache on embedded Jetty 12 (port=$PORT)"
 echo "  FRONTCACHE_HOME=$FRONTCACHE_HOME"
 echo "  webapp=$WEBAPP"
+echo "  java=$JAVA"
 
 exec "$JAVA" \
   -cp "$LIB_DIR/*" \

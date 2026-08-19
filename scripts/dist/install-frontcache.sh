@@ -39,6 +39,9 @@
 #   --port PORT          Frontcache HTTP port (default 9080)
 #   --origin-host HOST   backend for cache misses; written into frontcache.properties
 #   --origin-port PORT   origin https port (default 443)
+#   --with-runtime       install the bundle that CARRIES ITS OWN Java runtime, picked for this
+#                        host's platform, and skip the JDK step entirely. No JDK is installed
+#                        or required. Adds ~50 MB to the download.
 #   --with-console       also install the console (its own service on 7080, loopback only)
 #   --with-nginx         install nginx as the 80/443 front door, terminating TLS
 #   --origin-paths "..." space-separated paths nginx proxies straight to the origin
@@ -66,6 +69,8 @@ ORIGIN_PORT="443"
 ORIGIN_PATHS="/o9r/ /fs/ /pi/ /st/ /images/ /css/ /js/ /page-cache/"
 WITH_CONSOLE=0
 WITH_NGINX=0
+WITH_RUNTIME=0
+RUNTIME_TARGET=""
 SKIP_JDK=0
 DRY_RUN=0
 ASSUME_YES=0
@@ -85,6 +90,7 @@ while [ $# -gt 0 ]; do
     --origin-host)  ORIGIN_HOST="${2:?--origin-host needs a value}"; shift ;;
     --origin-port)  ORIGIN_PORT="${2:?--origin-port needs a value}"; shift ;;
     --origin-paths) ORIGIN_PATHS="${2:?--origin-paths needs a value}"; shift ;;
+    --with-runtime) WITH_RUNTIME=1 ;;
     --with-console) WITH_CONSOLE=1 ;;
     --with-nginx)   WITH_NGINX=1 ;;
     --skip-jdk)     SKIP_JDK=1 ;;
@@ -201,7 +207,9 @@ if [ -n "$ARCHIVE" ]; then
   [ -f "$ARCHIVE" ] || die "--archive not found: $ARCHIVE"
   # frontcache-server-2.5.0.tar.gz -> 2.5.0
   if [ -z "$VERSION" ]; then
+    # strip the extension, then a trailing platform classifier if the file is a runtime bundle
     VERSION="$(basename "$ARCHIVE" | sed -n 's/^frontcache-server-\(.*\)\.tar\.gz$/\1/p')"
+    VERSION="$(printf '%s' "$VERSION" | sed -E 's/-(linux|macos)-(x64|aarch64)$//')"
     [ -n "$VERSION" ] || die "cannot infer the version from $(basename "$ARCHIVE") - pass --version"
   fi
   log "Installing version $VERSION from the local archive $ARCHIVE"
@@ -222,6 +230,31 @@ LINK_DIR="$INSTALL_DIR/frontcache"
 CONSOLE_TARGET_DIR="$INSTALL_DIR/frontcache-console-$VERSION"
 CONSOLE_LINK_DIR="$INSTALL_DIR/frontcache-console"
 
+# ---- platform (for --with-runtime) -------------------------------------------
+# The runtime bundles are per-OS/arch because jlink cannot cross-link, so the installer has
+# to name the right one. Detected rather than asked for: getting it wrong yields a bundle
+# whose launcher cannot execute at all.
+detect_runtime_target() {
+  local os arch
+  case "$(uname -s)" in
+    Linux)  os=linux ;;
+    Darwin) os=macos ;;
+    *)      die "--with-runtime: no runtime bundle is published for $(uname -s)" ;;
+  esac
+  case "$(uname -m)" in
+    x86_64|amd64)  arch=x64 ;;
+    aarch64|arm64) arch=aarch64 ;;
+    *)             die "--with-runtime: no runtime bundle is published for $(uname -m)" ;;
+  esac
+  echo "$os-$arch"
+}
+
+if [ "$WITH_RUNTIME" = 1 ]; then
+  RUNTIME_TARGET="$(detect_runtime_target)"
+  log "--with-runtime: this host is $RUNTIME_TARGET; the bundle will carry its own Java runtime"
+  SKIP_JDK=1
+fi
+
 # ---- JDK ---------------------------------------------------------------------
 java_is_25() {
   local java_bin="${1:-java}"
@@ -232,6 +265,10 @@ java_is_25() {
 }
 
 install_jdk() {
+  if [ "$WITH_RUNTIME" = 1 ]; then
+    log "Skipping the JDK: the bundle brings its own runtime (the launcher prefers it over \$JAVA_HOME)"
+    return 0
+  fi
   if java_is_25; then
     log "A Java 25+ runtime is already present ($(java -version 2>&1 | head -1))"
     return 0
@@ -325,6 +362,12 @@ stage_archive() {
       warn "no $local_copy.sha256 beside the archive - installing it UNVERIFIED"
     fi
   else
+    # --with-runtime swaps in the per-platform artifact. It unpacks to the SAME internal
+    # directory name as the portable bundle, so nothing downstream changes - only `runtime/`
+    # is extra.
+    if [ -n "$RUNTIME_TARGET" ]; then
+      tgz="$module-$VERSION-$RUNTIME_TARGET.tar.gz"
+    fi
     local base="$MAVEN_BASE/$module/$VERSION"
     if [ "$DRY_RUN" = 1 ]; then
       # a dry run must not touch the network either
@@ -616,6 +659,7 @@ cat <<REPORT
     config     $LINK_DIR/FRONTCACHE_HOME/conf
     logs       $LINK_DIR/FRONTCACHE_HOME/logs
     listening  http://127.0.0.1:$FC_PORT$([ "$WITH_NGINX" = 1 ] && echo "  (behind nginx on 80/443)")
+    java       $([ "$WITH_RUNTIME" = 1 ] && echo "$LINK_DIR/runtime (bundled - no host JDK involved)" || echo "the host's JDK")
 
     Verify:
       systemctl status $SERVICE_NAME

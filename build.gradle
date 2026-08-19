@@ -585,6 +585,33 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 		}
 	}
 
+	// Per-platform bundles with an embedded Java runtime (phase 4). They are produced by
+	// scripts/dist/build-runtime-bundles.sh, not by Gradle, because building them means
+	// downloading a JDK per target and running jlink on that target's platform (jlink cannot
+	// cross-link) - work that has no business inside a routine `./gradlew build`.
+	//
+	// Publishing them is therefore OPT-IN, so a release can never half-publish a platform:
+	//   ./scripts/dist/build-runtime-bundles.sh
+	//   ./gradlew publish -PwithRuntimeBundles
+	// The property makes the artifacts part of the publication; without it the publication is
+	// exactly what phases 1-3 produced.
+	def runtimeTargets = ['linux-x64', 'linux-aarch64', 'macos-aarch64']
+	def wantRuntimeBundles = project.hasProperty('withRuntimeBundles')
+
+	if (wantRuntimeBundles) {
+		def missing = runtimeTargets.collectMany { t ->
+			['tar.gz', 'zip'].collect { ext ->
+				layout.buildDirectory.file("distributions/${project.name}-${project.version}-${t}.${ext}").get().asFile
+			}
+		}.findAll { !it.exists() }
+		if (missing) {
+			throw new GradleException(
+				"-PwithRuntimeBundles was given but these are not built:\n  " +
+				missing.collect { it.name }.join('\n  ') +
+				"\nRun ./scripts/dist/build-runtime-bundles.sh first.")
+		}
+	}
+
 	publishing {
 		publications {
 			dist(MavenPublication) {
@@ -593,6 +620,23 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 				artifact tasks.named('distTar')
 				artifact(zipSha) { extension = 'zip.sha256'; builtBy distChecksums }
 				artifact(tarSha) { extension = 'tar.gz.sha256'; builtBy distChecksums }
+
+				// classifier = the platform, so the coordinates read
+				// org.frontcache:frontcache-server:<v>:linux-x64@tar.gz
+				if (wantRuntimeBundles) {
+					runtimeTargets.each { t ->
+						['tar.gz', 'zip'].each { ext ->
+							artifact(layout.buildDirectory.file("distributions/${project.name}-${project.version}-${t}.${ext}")) {
+								classifier = t
+								extension  = ext
+							}
+							artifact(layout.buildDirectory.file("distributions/${project.name}-${project.version}-${t}.${ext}.sha256")) {
+								classifier = t
+								extension  = "${ext}.sha256"
+							}
+						}
+					}
+				}
 
 				releaseAssets.each { asset ->
 					artifact(asset.file) {
