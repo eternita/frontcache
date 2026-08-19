@@ -23,7 +23,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import org.htmlunit.html.HtmlPage;
 
 /**
  *
@@ -76,7 +76,7 @@ public class StandaloneCacheStorageTests extends TestsBase {
 		// 1st request to the standalone node -> FC1 -> origin (FC2 filter) -> web app.
 		// FC1 cache is empty, so this request must be served dynamically.
 		HtmlPage page = webClient.getPage(getStandaloneBaseURLDomainFC1() + PATH);
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		String trace1 = page.getWebResponse().getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
 		assertEquals("1st request must be dynamic (FC1 cache miss): " + trace1,
@@ -97,7 +97,7 @@ public class StandaloneCacheStorageTests extends TestsBase {
 
 		// 2nd request - FC1 now serves the page from its own cache.
 		page = webClient.getPage(getStandaloneBaseURLDomainFC1() + PATH);
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		String trace2 = page.getWebResponse().getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
 		assertEquals("2nd request must be served from cache: " + trace2,

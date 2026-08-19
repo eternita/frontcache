@@ -39,7 +39,7 @@ class ExecWait extends DefaultTask {
 			println line
 			if (line.contains(ready)) {
 				println "$command is ready"
-				break;
+				break
 			}
 		}
 
@@ -65,7 +65,7 @@ dependencies {
 	implementation project(':frontcache-core')
 	implementation project(':frontcache-agent')
 
-	implementation('net.sourceforge.htmlunit:htmlunit:2.18') {
+	implementation('org.htmlunit:htmlunit:4.21.0') {
 		exclude group: 'org.eclipse.jetty'
 		exclude group: 'org.eclipse.jetty.websocket'
 	}

@@ -26,9 +26,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.gargoylesoftware.htmlunit.JavaScriptPage;
-import com.gargoylesoftware.htmlunit.TextPage;
-import com.gargoylesoftware.htmlunit.WebResponse;
+import org.htmlunit.Page;
+import org.htmlunit.TextPage;
+import org.htmlunit.WebResponse;
 
 /**
  *
@@ -76,9 +76,12 @@ public abstract class StaticReadTests extends TestsBase {
 	public void js() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "*/*");
 
-		JavaScriptPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/jquery.js");
-		String pageAsText = page.getContent();
+		// htmlunit 4.x dropped JavaScriptPage; which concrete Page a .js response maps to now
+		// depends on the mime type the container sends (text/javascript -> TextPage,
+		// application/javascript -> UnexpectedPage), so read the body off the response instead.
+		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/jquery.js");
 		WebResponse webResponse = page.getWebResponse();
+		String pageAsText = webResponse.getContentAsString();
 		printHeaders(webResponse);
 		Assert.assertTrue(pageAsText.startsWith("(function(){var _jQuery=window.jQuery"));
 		Assert.assertTrue(pageAsText.endsWith("br):0);};});})();"));

@@ -6,8 +6,8 @@ import org.frontcache.core.FCHeaders;
 import org.frontcache.tests.base.CommonTests;
 import org.junit.Test;
 
-import com.gargoylesoftware.htmlunit.Page;
-import com.gargoylesoftware.htmlunit.WebResponse;
+import org.htmlunit.Page;
+import org.htmlunit.WebResponse;
 
 public class FilterCommonTests extends CommonTests {
 

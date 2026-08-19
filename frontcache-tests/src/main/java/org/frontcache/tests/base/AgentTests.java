@@ -20,8 +20,8 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.gargoylesoftware.htmlunit.WebResponse;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import org.htmlunit.WebResponse;
+import org.htmlunit.html.HtmlPage;
 
 /**
  *
@@ -62,14 +62,14 @@ public abstract class AgentTests extends TestsBase {
 
 		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();
 		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
 		// second request - the same request - response should be from the cache now
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
@@ -81,7 +81,7 @@ public abstract class AgentTests extends TestsBase {
 
 		// third request - the same request - response is dynamic
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 
 		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
@@ -99,14 +99,14 @@ public abstract class AgentTests extends TestsBase {
 
 		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();
 		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
 		// second request - the same request - response should be from the cache now
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
@@ -116,7 +116,7 @@ public abstract class AgentTests extends TestsBase {
 
 		// third request - the same request - response is dynamic
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + TEST_URI);
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 
 		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
@@ -137,14 +137,14 @@ public abstract class AgentTests extends TestsBase {
 //
 //		// the first request a - response should be cached
 //		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_A);
-//		assertEquals("a", page.getPage().asText());
+//		assertEquals("a", page.getPage().asNormalizedText());
 //		WebResponse webResponse = page.getWebResponse();
 //		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 //		assertEquals("false", debugCached);
 //
 //		// the first request b - response should be cached
 //		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_B);
-//		assertEquals("b", page.getPage().asText());
+//		assertEquals("b", page.getPage().asNormalizedText());
 //		webResponse = page.getWebResponse();
 //		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 //		assertEquals("false", debugCached);
@@ -175,14 +175,14 @@ public abstract class AgentTests extends TestsBase {
 //
 //		// the first request a - response should be cached
 //		HtmlPage page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_A);
-//		assertEquals("a", page.getPage().asText());
+//		assertEquals("a", page.getPage().asNormalizedText());
 //		WebResponse webResponse = page.getWebResponse();
 //		String debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 //		assertEquals("false", debugCached);
 //
 //		// the first request b - response should be cached
 //		page = webClient.getPage(getFrontCacheBaseURL() + TEST_URI_B);
-//		assertEquals("b", page.getPage().asText());
+//		assertEquals("b", page.getPage().asNormalizedText());
 //		webResponse = page.getWebResponse();
 //		debugCached = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_DEBUG_CACHED);
 //		assertEquals("false", debugCached);

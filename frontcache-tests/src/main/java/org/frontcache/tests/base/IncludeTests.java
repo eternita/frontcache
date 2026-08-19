@@ -16,7 +16,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import org.htmlunit.html.HtmlPage;
 
 public abstract class IncludeTests extends TestsBase {
 
@@ -43,7 +43,7 @@ public abstract class IncludeTests extends TestsBase {
 	public void includeAsync1() throws Exception {
 
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/a1.jsp");
-		assertEquals("a", page.getPage().asText()); // no 'b' in response because 'b' included in async mode
+		assertEquals("a", page.getPage().asNormalizedText()); // no 'b' in response because 'b' included in async mode
 	}
 
 
@@ -51,7 +51,7 @@ public abstract class IncludeTests extends TestsBase {
 	public void includeAsync2() throws Exception {
 
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/a.jsp");
-		assertEquals("abcd", page.getPage().asText()); // no 'ef' in response because 'e' included in async mode
+		assertEquals("abcd", page.getPage().asNormalizedText()); // no 'ef' in response because 'e' included in async mode
 
 	}
 
@@ -72,7 +72,7 @@ public abstract class IncludeTests extends TestsBase {
 		for (int attempt = 0; attempt < 20 && null == resp; attempt++)
 		{
 			HtmlPage page = webClient.getPage(baseURL + "a.jsp");
-			assertEquals("abcd", page.getPage().asText()); // no 'ef' in response because 'e' included in async mode
+			assertEquals("abcd", page.getPage().asNormalizedText()); // no 'ef' in response because 'e' included in async mode
 			resp = getFromCacheWithWait(baseURL + "e.jsp", 1000);
 		}
 
@@ -119,12 +119,12 @@ public abstract class IncludeTests extends TestsBase {
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 
 		// request as browser
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 	}
 
 	@Test
@@ -133,12 +133,12 @@ public abstract class IncludeTests extends TestsBase {
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a1.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 
 		// request as browser
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a1.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 	}
 
 	@Test
@@ -147,12 +147,12 @@ public abstract class IncludeTests extends TestsBase {
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a2.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		// request as browser
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a2.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 	}
 
 	@Test
@@ -161,12 +161,12 @@ public abstract class IncludeTests extends TestsBase {
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a3.jsp");
-		assertEquals(page.getPage().asText(), "a");
+		assertEquals(page.getPage().asNormalizedText(), "a");
 
 		// request as browser
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a3.jsp");
-		assertEquals(page.getPage().asText(), "a");
+		assertEquals(page.getPage().asNormalizedText(), "a");
 	}
 
 }

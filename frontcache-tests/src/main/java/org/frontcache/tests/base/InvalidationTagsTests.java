@@ -15,8 +15,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.gargoylesoftware.htmlunit.WebResponse;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import org.htmlunit.WebResponse;
+import org.htmlunit.html.HtmlPage;
 
 /**
  *
@@ -47,7 +47,7 @@ public abstract class InvalidationTagsTests extends TestsBase {
 	public void staticInvalidationTags() throws Exception {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/invalidation-tags/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();
 
@@ -63,7 +63,7 @@ public abstract class InvalidationTagsTests extends TestsBase {
 	public void dynamicInvalidationTags() throws Exception {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/invalidation-tags/b.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();
 

@@ -32,9 +32,9 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.gargoylesoftware.htmlunit.WebResponse;
-import com.gargoylesoftware.htmlunit.util.NameValuePair;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import org.htmlunit.WebResponse;
+import org.htmlunit.util.NameValuePair;
+import org.htmlunit.html.HtmlPage;
 
 /**
  *
@@ -69,7 +69,7 @@ public abstract class CommonTests extends TestsBase {
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/jsp-read/a.jsp");
 		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
-		assertEquals("Hi from JSP", page.getPage().asText());
+		assertEquals("Hi from JSP", page.getPage().asNormalizedText());
 
 	}
 
@@ -79,7 +79,7 @@ public abstract class CommonTests extends TestsBase {
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/jsp-include/a.jsp");
 		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 
 	}
 
@@ -87,7 +87,7 @@ public abstract class CommonTests extends TestsBase {
 	public void jspIncludeAndCache1() throws Exception {
 
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/6ci/a.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 
 	}
 
@@ -95,7 +95,7 @@ public abstract class CommonTests extends TestsBase {
 	public void jspIncludeAndCache2() throws Exception {
 
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/7ci/a.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 
 	}
 
@@ -103,7 +103,7 @@ public abstract class CommonTests extends TestsBase {
 	public void jspDeepInclude() throws Exception {
 
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/deep-include/a.jsp");
-		assertEquals("abcdef", page.getPage().asText());
+		assertEquals("abcdef", page.getPage().asNormalizedText());
 
 	}
 
@@ -111,7 +111,7 @@ public abstract class CommonTests extends TestsBase {
 	public void redirect() throws Exception {
 
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/redirect/a.jsp");
-		assertEquals("redirecred", page.getPage().asText());
+		assertEquals("redirecred", page.getPage().asNormalizedText());
 
 	}
 
@@ -127,7 +127,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/debug/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();
 
@@ -142,7 +142,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// second request - the same request - response should be from the cache now
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/debug/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 
 		logStr = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
@@ -159,7 +159,7 @@ public abstract class CommonTests extends TestsBase {
 	public void httpHeadersMode() throws Exception {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/fc-headers/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();
 
@@ -172,7 +172,7 @@ public abstract class CommonTests extends TestsBase {
 	public void l1l2Cache() throws Exception {
 
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/l1-l2-cache-level/a1.jsp");
-		assertEquals("abc", page.getPage().asText());
+		assertEquals("abc", page.getPage().asNormalizedText());
 
 		Map<String, String> state = frontcacheClient.getCacheState();
 
@@ -208,7 +208,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// call with User-Agent GoogleBot -> dynamic
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		WebResponse webResponse = page.getWebResponse();
 		String maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
@@ -216,7 +216,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// call with User-Agent GoogleBot -> cached
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 		maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
@@ -229,7 +229,7 @@ public abstract class CommonTests extends TestsBase {
 		for (int i = 0; i<3; i++)
 		{
 			page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a.jsp");
-			assertEquals("a", page.getPage().asText());
+			assertEquals("a", page.getPage().asNormalizedText());
 			webResponse = page.getWebResponse();
 			maxage = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 			assertEquals("bot:60", maxage);
@@ -257,7 +257,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// call with User-Agent Chrome -> include is in cache
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a1.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 		org.frontcache.core.WebResponse webResponse = frontcacheClient.getFromCache( getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/b1.jsp");
 		// b1.jsp has "bot:60"
 		// request was from browser -> so, page is not cached
@@ -265,8 +265,8 @@ public abstract class CommonTests extends TestsBase {
 
 		// call with User-Agent Chrome to include -> it's dynamic
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/b1.jsp");
-		assertEquals("b", page.getPage().asText());
-		com.gargoylesoftware.htmlunit.WebResponse pageWebResponse = page.getWebResponse();
+		assertEquals("b", page.getPage().asNormalizedText());
+		org.htmlunit.WebResponse pageWebResponse = page.getWebResponse();
 		String maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
 		assertEquals(false, TestUtils.isRequestFromCache(pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
@@ -276,7 +276,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// call with User-Agent GoogleBot -> include is in cache
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a1.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 		webResponse = frontcacheClient.getFromCache( getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/b1.jsp");
 		assertEquals("b", new String(webResponse.getContent()));
 		maxage = webResponse.getHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
@@ -284,7 +284,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// call with User-Agent GoogleBot to include -> it's from cache
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/b1.jsp");
-		assertEquals("b", page.getPage().asText());
+		assertEquals("b", page.getPage().asNormalizedText());
 		pageWebResponse = page.getWebResponse();
 		maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
 		assertEquals("bot:60", maxage);
@@ -296,7 +296,7 @@ public abstract class CommonTests extends TestsBase {
 	public void includeSync() throws Exception {
 
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/a2.jsp");
-		assertEquals("ab", page.getPage().asText());
+		assertEquals("ab", page.getPage().asNormalizedText());
 
 		//  b2 has maxage="0" -> should not be cached
 		org.frontcache.core.WebResponse resp = frontcacheClient.getFromCache( getFrontCacheBaseURLDomainFC1() + "common/client-bot-browser/b2.jsp");
@@ -310,7 +310,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// call
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/refresh-regular-soft/a.jsp");
-		long timestamp1 = Long.parseLong(page.getPage().asText());
+		long timestamp1 = Long.parseLong(page.getPage().asNormalizedText());
 
 		// common/refresh-regular-soft/b.jsp has maxage 3sec
 		// so, aster sleep it's expired
@@ -320,14 +320,14 @@ public abstract class CommonTests extends TestsBase {
 		// because of soft cache refresh expired data is returned
 		// and will be refreshed in background
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/refresh-regular-soft/a.jsp");
-		long timestamp2 = Long.parseLong(page.getPage().asText());
+		long timestamp2 = Long.parseLong(page.getPage().asNormalizedText());
 
 		assertEquals(timestamp1, timestamp2);
 
 		Thread.sleep(1000); // wait a sec to make sure background update completed
 
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/refresh-regular-soft/a.jsp");
-		long timestamp3 = Long.parseLong(page.getPage().asText());
+		long timestamp3 = Long.parseLong(page.getPage().asNormalizedText());
 
 		assertNotEquals(timestamp1, timestamp3);
 	}
@@ -340,7 +340,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// call
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/refresh-regular-soft/a1.jsp");
-		long timestamp1 = Long.parseLong(page.getPage().asText());
+		long timestamp1 = Long.parseLong(page.getPage().asNormalizedText());
 
 		// common/refresh-regular-soft/b1.jsp has maxage=bot:3
 		// so, aster sleep it's expired
@@ -349,7 +349,7 @@ public abstract class CommonTests extends TestsBase {
 		// call the same page as browser (data should be dynamic)
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/refresh-regular-soft/a1.jsp");
-		long timestamp21 = Long.parseLong(page.getPage().asText());
+		long timestamp21 = Long.parseLong(page.getPage().asNormalizedText());
 
 		assertNotEquals(timestamp1, timestamp21);
 
@@ -358,14 +358,14 @@ public abstract class CommonTests extends TestsBase {
 		// and will be refreshed in background
 		webClient.addRequestHeader("User-Agent", "Googlebot");
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/refresh-regular-soft/a1.jsp");
-		long timestamp22 = Long.parseLong(page.getPage().asText());
+		long timestamp22 = Long.parseLong(page.getPage().asNormalizedText());
 
 		assertEquals(timestamp1, timestamp22);
 
 		Thread.sleep(1000); // wait a sec to make sure background update completed
 
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/refresh-regular-soft/a1.jsp");
-		long timestamp3 = Long.parseLong(page.getPage().asText());
+		long timestamp3 = Long.parseLong(page.getPage().asNormalizedText());
 
 		assertNotEquals(timestamp1, timestamp3);
 	}
@@ -386,13 +386,13 @@ public abstract class CommonTests extends TestsBase {
 
 		// 1st request - nothing cached yet -> dynamic
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/proxy-cased-header/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		WebResponse webResponse = page.getWebResponse();
 		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 
 		// 2nd request - the title-cased maxage="1h" must have been honored -> from cache
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/proxy-cased-header/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 	}
@@ -413,14 +413,14 @@ public abstract class CommonTests extends TestsBase {
 
 		// 1st request - nothing cached yet -> dynamic, and the cookie must reach this visitor
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/set-cookie/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		WebResponse webResponse = page.getWebResponse();
 		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		assertTrue("cache miss must pass the origin's Set-Cookie through to the client", hasTestCookie(webResponse));
 
 		// 2nd request - served from cache, and the previous visitor's cookie must be gone
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/set-cookie/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
 		assertFalse("Set-Cookie must not be cached/replayed on a cache hit", hasTestCookie(webResponse));
@@ -442,7 +442,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// the first request - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/methods/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();
 
@@ -451,7 +451,7 @@ public abstract class CommonTests extends TestsBase {
 
 		// second request - the same request - response should be from the cache now
 		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/methods/a.jsp");
-		assertEquals("a", page.getPage().asText());
+		assertEquals("a", page.getPage().asNormalizedText());
 		webResponse = page.getWebResponse();
 
 		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));

@@ -13,8 +13,8 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.gargoylesoftware.htmlunit.Page;
-import com.gargoylesoftware.htmlunit.WebResponse;
+import org.htmlunit.Page;
+import org.htmlunit.WebResponse;
 
 public abstract class HTTPResponseCodeTests extends TestsBase {
 
