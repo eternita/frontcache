@@ -61,11 +61,16 @@ subprojects {
         mavenCentral()
     }
 
+    // Unit-test coverage. Output mirrors the test reports' unit/integration split
+    // (reports/tests/unit), so this lands in reports/jacoco/unit — the e2e suite's
+    // report is reports/jacoco/integration in frontcache-tests/build.gradle.
     jacocoTestReport {
         reports {
             html.required = true
             xml.required = true
             csv.required = false
+            html.outputLocation = layout.buildDirectory.dir('reports/jacoco/unit')
+            xml.outputLocation = layout.buildDirectory.file('reports/jacoco/unit/jacocoTestReport.xml')
         }
     }
 	tasks.withType(Test) {
@@ -86,6 +91,9 @@ subprojects {
 	}
 
 	check.dependsOn jacocoTestReport
+
+	// Also emit the report for a bare `gradlew :module:test`, not only via check/build.
+	test.finalizedBy jacocoTestReport
 }
 
 
