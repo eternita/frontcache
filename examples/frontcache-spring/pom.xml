@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Frontcache "Spring Boot servlet-filter" example - use case #1.
+
+  Runs a small Spring MVC + JSP app with FrontCacheFilter registered as a servlet filter:
+
+      mvn spring-boot:run        then open http://localhost:8080/example
+
+  Requires a JDK 25 and Maven 3.6.3+. Frontcache 2.5.0 is Java 25 bytecode and Jakarta EE 10
+  (jakarta.servlet), which is why this example is on Spring Boot 3.x - Boot 2.x and earlier are
+  javax.servlet and cannot load it.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>org.frontcache.example</groupId>
+	<artifactId>frontcache-spring</artifactId>
+	<version>1.0-SNAPSHOT</version>
+	<packaging>war</packaging>
+	<name>frontcache-spring</name>
+	<description>Frontcache as a servlet filter in a Spring Boot app</description>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.5.12</version>
+		<relativePath/>
+	</parent>
+
+	<properties>
+		<java.version>25</java.version>
+		<frontcache.version>2.5.0</frontcache.version>
+	</properties>
+
+	<repositories>
+		<!-- Frontcache artifacts. Public read - no credentials needed. -->
+		<repository>
+			<id>eternita</id>
+			<url>https://repo.eternita.co/maven2</url>
+		</repository>
+	</repositories>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!-- JSP support. JSPs need a real servlet container, so this app is packaged as a war
+		     and tomcat-embed-jasper compiles the views; both are 'provided' because the
+		     container supplies them at deploy time. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat.embed</groupId>
+			<artifactId>tomcat-embed-jasper</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<!-- JSTL, for the c: tags used by the views -->
+		<dependency>
+			<groupId>jakarta.servlet.jsp.jstl</groupId>
+			<artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.glassfish.web</groupId>
+			<artifactId>jakarta.servlet.jsp.jstl</artifactId>
+		</dependency>
+
+		<!-- Frontcache. Carries FrontCacheFilter and the fc.tld taglib. -->
+		<dependency>
+			<groupId>org.frontcache</groupId>
+			<artifactId>frontcache-core</artifactId>
+			<version>${frontcache.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<!-- Frontcache reads its configuration from FRONTCACHE_HOME. -->
+					<jvmArguments>
+						-Dfrontcache.home=${project.basedir}/FRONTCACHE_HOME
+						-Dlogback.configurationFile=${project.basedir}/FRONTCACHE_HOME/conf/fc-logback.xml
+					</jvmArguments>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>

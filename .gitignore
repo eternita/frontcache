@@ -1,0 +1,12 @@
+/.idea
+/.claude
+CLAUDE.md
+
+# Build outputs and runtime state of the examples. None of this belongs in the repo: a fresh
+# clone should build its own, and a committed build/ leaves stale jars and Gradle report files
+# lying around for the next reader.
+/examples/*/build/
+/examples/*/target/
+/examples/*/.gradle/
+/examples/*/FRONTCACHE_HOME/cache/
+/examples/*/FRONTCACHE_HOME/logs/

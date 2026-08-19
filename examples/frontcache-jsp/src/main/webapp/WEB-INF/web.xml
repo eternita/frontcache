@@ -1,0 +1,18 @@
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         metadata-complete="false" version="6.0">
+  <display-name>Frontcache Example</display-name>
+
+    <filter>
+        <description>Front Cache Filter</description>
+        <filter-name>FrontCacheFilter</filter-name>
+        <filter-class>org.frontcache.FrontCacheFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>FrontCacheFilter</filter-name>
+        <url-pattern>/example/*</url-pattern>
+    </filter-mapping>
+
+</web-app>

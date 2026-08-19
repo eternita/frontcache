@@ -1,0 +1,70 @@
+// Frontcache "JSP servlet-filter" example - use case #1.
+//
+// Runs a small JSP webapp with FrontCacheFilter (see src/main/webapp/WEB-INF/web.xml) on
+// embedded Jetty 12 (Jakarta EE10) via the `appRun` task below:
+//
+//     ./gradlew appRun          then open http://localhost:8080/example/index.jsp
+//
+// It depends on the PUBLISHED frontcache-core, so it builds standalone and you can copy this
+// directory anywhere as the starting point for your own app. Requires a JDK 25 - Frontcache
+// 2.5.0 is Java 25 bytecode and Jakarta EE 10.
+
+plugins {
+	id 'war'
+}
+
+ext.frontcacheVersion = '2.5.0'
+ext.jettyVersion = '12.0.38'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+repositories {
+	mavenCentral()
+	// Frontcache artifacts. Public read - no credentials needed.
+	maven { url = 'https://repo.eternita.co/maven2' }
+	// so a locally-built `./gradlew publishToMavenLocal` is picked up when developing Frontcache itself
+	mavenLocal()
+}
+
+// 'provided' deps are on the compile classpath (and the embedded-Jetty run classpath)
+// but NOT bundled into the war — the servlet container supplies them at deploy time.
+configurations {
+	provided
+}
+
+sourceSets {
+	main.compileClasspath += configurations.provided
+}
+
+dependencies {
+	// Frontcache core, bundled into the war's WEB-INF/lib - which is where FrontCacheFilter
+	// and the fc.tld taglib are picked up at runtime.
+	implementation "org.frontcache:frontcache-core:${frontcacheVersion}"
+
+	provided 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+
+	// Embedded Jetty 12 (EE10): needed to compile & run ExampleJettyServer, kept out of the war.
+	provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
+}
+
+// Run the example on embedded Jetty 12. Deploys the assembled war so frontcache-core
+// (and the fc taglib) live in WEB-INF/lib exactly as they would in a real container.
+tasks.register('appRun', JavaExec) {
+	group = 'application'
+	description = 'Run the Frontcache JSP example on embedded Jetty 12 (:8080)'
+	dependsOn tasks.named('war')
+	mainClass = 'org.frontcache.example.ExampleJettyServer'
+	// Only the launcher class + the Jetty EE10 jars — frontcache-core comes from the war.
+	classpath = sourceSets.main.output + configurations.provided
+	systemProperty 'frontcache.jetty.port', '8080'
+	systemProperty 'frontcache.jetty.webapp', tasks.named('war').get().archiveFile.get().asFile.absolutePath
+	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME"
+	systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME/conf/fc-logback.xml"
+}

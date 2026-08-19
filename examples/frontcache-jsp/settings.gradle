@@ -1,0 +1,8 @@
+rootProject.name = 'frontcache-jsp'
+
+// This example resolves org.frontcache:frontcache-core from the published artifact - see the
+// repositories block in build.gradle - so it builds standalone, wherever you copy it to.
+//
+// It used to declare `includeBuild('../..')` to compile against the repo's own source. That
+// composite build cannot work here: this repository ships docs and examples only, with no
+// Gradle build at its root, so the line made the example unbuildable.
