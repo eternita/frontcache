@@ -208,6 +208,48 @@ configure([project(':frontcache-core'), project(':frontcache-agent')]) {
 
 project(':frontcache-core') {
 
+	// ---- FRONTCACHE_HOME skeleton for filter mode (use case #1) ---------------
+	// Filter-mode customers put frontcache-core on their app's classpath, but they still need
+	// a conf/ directory - and they cannot clone this repo to get one. So the skeleton is
+	// published alongside the jar:
+	//     org.frontcache:frontcache-core:<v>:home@zip
+	//
+	// Everything except frontcache.properties is taken from the server's conf/ so there is one
+	// copy of bots.conf, guard-rules.conf, hystrix.properties and friends. frontcache.properties
+	// is the one file that genuinely differs: in filter mode the app IS the origin, so the
+	// standalone template's origin-host/origin-port section would be actively misleading.
+	def frontcacheHomeZip = tasks.register('frontcacheHomeZip', Zip) {
+		group = 'distribution'
+		description = 'FRONTCACHE_HOME skeleton for servlet-filter mode'
+		archiveBaseName = 'frontcache-home'
+		archiveClassifier = ''
+		destinationDirectory = layout.buildDirectory.dir('distributions')
+
+		into('FRONTCACHE_HOME') {
+			from(rootProject.file('frontcache-server/FRONTCACHE_HOME')) {
+				include 'conf/**', 'fallbacks/**', 'cache/**'
+				// the standalone properties template, this node's identity, and the stale
+				// pre-2.0 ReadMe are all replaced or dropped below
+				exclude 'conf/frontcache.properties', 'conf/frontcache.id', 'ReadMe.txt'
+				exclude 'cache/l2-lucene-index/*', 'logs/*'
+				exclude '**/.DS_Store'
+			}
+			from('src/dist/frontcache.properties') { into 'conf' }
+		}
+		from('src/dist/README-FILTER.md')
+		from(rootProject.file('LICENSE'))
+	}
+
+	// Attached to the existing library publication, so `./gradlew publish` ships it with the jar.
+	afterEvaluate {
+		publishing.publications.named('mavenJava') {
+			artifact(frontcacheHomeZip) {
+				classifier = 'home'
+				extension  = 'zip'
+			}
+		}
+	}
+
     dependencies {
         provided        'jakarta.servlet:jakarta.servlet-api:6.0.0'
 		provided        'jakarta.servlet.jsp:jakarta.servlet.jsp-api:3.1.1'
@@ -681,7 +723,8 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 tasks.register('dist') {
 	group = 'distribution'
 	description = 'Build the server + console distribution archives and their checksums'
-	dependsOn ':frontcache-server:distZip', ':frontcache-server:distTar', ':frontcache-server:distChecksums',
+	dependsOn ':frontcache-core:frontcacheHomeZip',
+	          ':frontcache-server:distZip', ':frontcache-server:distTar', ':frontcache-server:distChecksums',
 	          ':frontcache-server:assetChecksums',
 	          ':frontcache-console:distZip', ':frontcache-console:distTar', ':frontcache-console:distChecksums'
 }
