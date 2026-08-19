@@ -136,7 +136,7 @@ read position).
 
 Fed by `frontcache-failed-requests*.log`: everything a **guard rule**
 (`org.frontcache.guard`, see
-[the protection design](../../docs/frontcache-protection-tech-design.md)) did before
+[the protection design](../../docs/archive/frontcache-protection-tech-design.md)) did before
 cache/origin — rejected (400 / 414), redirected (301 / 302), or matched in dry-run —
 plus requests that completed through a Hystrix fallback. **`reject_reason` is the
 headline dimension: it holds the rule name**, so a new rule appears in every panel
