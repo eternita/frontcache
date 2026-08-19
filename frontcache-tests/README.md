@@ -238,11 +238,12 @@ integration tests must run **sequentially** (see §7).
 ### Full e2e suite (recommended)
 
 ```sh
-./frontcache-tests/tests.sh
+./tests.sh
 ```
 
-`tests.sh` can be invoked from anywhere — it cds to the repo root and drives the
-`:frontcache-tests` subproject — and performs the full lifecycle:
+`tests.sh` lives at the repo root and can be invoked from anywhere — it cds to the
+repo root and drives the `:frontcache-tests` subproject — and performs the full
+lifecycle:
 
 1. Cleans the L2 Lucene index + logs under both FRONTCACHE_HOME dirs.
 2. Stops any Gradle daemons.

@@ -2,8 +2,8 @@
 
 # Runs the end-to-end suite. Can be invoked from anywhere; gradle runs from the
 # repo root and the :frontcache-tests: subproject holds the servers + suite.
-TESTS_DIR=$(cd "$(dirname "$0")" && pwd)
-ROOT_DIR=$(cd "$TESTS_DIR/.." && pwd)
+ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
+TESTS_DIR="$ROOT_DIR/frontcache-tests"
 cd "$ROOT_DIR" || exit 1
 
 # cleanup cache dirs & logs

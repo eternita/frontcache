@@ -309,6 +309,6 @@ project(':frontcache-console') {
 
 // The end-to-end / integration test suite lives in the ':frontcache-tests'
 // subproject. It depends on frontcache-core / frontcache-agent as project
-// dependencies and is run with frontcache-tests/tests.sh, which starts the two
+// dependencies and is run with the repo-root tests.sh, which starts the two
 // embedded Jetty servers, runs the suite, then kills them. It is deliberately
 // NOT wired into `check` — the suite needs those servers up first.
