@@ -6,7 +6,7 @@ behaviours twice** — once against Frontcache running as a **standalone reverse
 and once against Frontcache running as a **servlet filter** embedded in the origin app
 — to guarantee both deployment modes behave identically.
 
-![topology](img/tests2.png)
+![topology](docs/img/tests2.png)
 
 ```
 Tests  →  FC standalone (:9080)  →  FC web filter (:8080)  →  Web app (:8080)
