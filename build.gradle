@@ -607,11 +607,25 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 		enabled = isServer
 		def assets = releaseAssets
 		def outDir = layout.buildDirectory.dir('release-assets')
+		def assetVersion = project.version.toString()
+		def assetName = { a -> "${project.name}-${assetVersion}-${a.classifier}.${a.extension}" }
+
 		inputs.files(assets.collect { it.file })
-		outputs.dir(outDir)
+		// The version is part of every OUTPUT FILE NAME but of no input, so it has to be
+		// declared explicitly - both as an input property and by naming the real output files
+		// rather than the directory holding them. Declaring only `outputs.dir(...)` made a
+		// version bump look up-to-date: the source scripts were unchanged and the directory
+		// still existed (full of the PREVIOUS version's files), so the task was skipped and
+		// publishing then failed on a .sha256 that had never been written.
+		inputs.property('version', assetVersion)
+		outputs.files(assets.collect { outDir.get().file("${assetName(it)}.sha256") })
+
 		doLast {
 			def dir = outDir.get().asFile
 			dir.mkdirs()
+			// drop any earlier version's checksums, so the directory only ever describes
+			// the version actually being built
+			dir.listFiles()?.each { f -> if (f.name.endsWith('.sha256') && !f.name.startsWith("${project.name}-${assetVersion}-")) f.delete() }
 			assets.each { asset ->
 				def digest = java.security.MessageDigest.getInstance('SHA-256')
 				asset.file.withInputStream { ins ->
@@ -619,7 +633,7 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 					int read
 					while ((read = ins.read(buf)) > 0) digest.update(buf, 0, read)
 				}
-				def name = "${project.name}-${project.version}-${asset.classifier}.${asset.extension}"
+				def name = assetName(asset)
 				new File(dir, "${name}.sha256").text =
 					digest.digest().encodeHex().toString() + '  ' + name + '\n'
 				logger.lifecycle("sha256: ${name}.sha256")
