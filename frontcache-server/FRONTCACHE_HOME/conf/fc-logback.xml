@@ -122,8 +122,19 @@ front-cache.request-logs-config=fc-logback.xml
 		<appender-ref ref="STDOUT" />
 	</root>
 
-	<!-- for request logger -->
-	<logger name="org.frontcache.reqlog.RequestLogger">
+	<!-- Request logger. additivity="false" keeps these TRACE lines in
+	     logs/frontcache-requests.log and OFF stdout - otherwise every request is duplicated
+	     into journald / `docker logs` as well as the request log.
+
+	     A parent's level does not filter an event propagated from a child (the level check
+	     happens once, at the logger the event was created on), so the root's INFO level does
+	     nothing to stop a TRACE line from a logger set to TRACE. Cutting propagation is the
+	     only way.
+
+	     Safe with respect to error.log: this logger is used at TRACE and nothing else
+	     (RequestLogger.java has exactly one call, logger.trace), so the Error appender's
+	     WARN ThresholdFilter never accepted these events anyway. -->
+	<logger name="org.frontcache.reqlog.RequestLogger" additivity="false">
 	    <level value="TRACE" />
 		<appender-ref ref="ReguestLoggerFile" />
 	</logger>
@@ -134,8 +145,10 @@ front-cache.request-logs-config=fc-logback.xml
 		<appender-ref ref="FailedRequestLoggerFile" />
 	</logger>
 
-    <!-- for fallback logger -->
-    <logger name="org.frontcache.hystrix.FallbackLogger">
+    <!-- Fallback logger. Same reasoning as the request logger above: additivity="false" keeps
+         these TRACE lines in logs/fallback.log and off stdout. Also TRACE-only - every call on
+         it (FileBasedFallbackResolver, DefaultFallbackResolver) is fallbackLogger.trace. -->
+    <logger name="org.frontcache.hystrix.FallbackLogger" additivity="false">
         <level value="TRACE" />
         <appender-ref ref="FallbackLoggerFile" />
     </logger>

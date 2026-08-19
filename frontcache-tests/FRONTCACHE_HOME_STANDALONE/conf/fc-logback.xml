@@ -99,8 +99,18 @@ front-cache.request-logs-config=fc-logback.xml
 		<appender-ref ref="STDOUT" />
 	</root>
 
-	<!-- for request logger -->
-	<logger name="org.frontcache.reqlog.RequestLogger">
+	<!-- Request logger. additivity="false" keeps these TRACE lines in
+	     logs/frontcache-requests.log and OFF the console.
+
+	     Without it the events still reach the root logger's appenders, STDOUT among them: a
+	     parent's level does not filter an event propagated from a child, because the level
+	     check happens once, at the logger the event was created on. So a root at INFO does
+	     nothing to stop a TRACE line from a logger set to TRACE.
+
+	     Nothing is lost from the other files by cutting propagation - root's Error and Info
+	     appenders use exact-match LevelFilters (ERROR only / INFO only), so neither ever
+	     accepted these TRACE events anyway. -->
+	<logger name="org.frontcache.reqlog.RequestLogger" additivity="false">
 	    <level value="TRACE" />
 		<appender-ref ref="ReguestLoggerFile" />
 	</logger>
