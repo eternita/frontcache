@@ -303,7 +303,13 @@ project(':frontcache-server') {
 		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 	}
 
-	def copyWar = tasks.register('copyWar', Copy) {
+	// Sync, not Copy: the launcher deploys exactly ONE webapp (ROOT.war), so nothing else
+	// belongs in this directory - and a Copy leaves whatever was there before. A stale
+	// frontcache-console.war, hand-copied here long ago, survived that way: harmless to the
+	// distribution archive (which is built from task outputs, not from this tree) but shipped
+	// to remote hosts by deploy-dev-build-remote.sh, which tars the whole tree. Sync deletes
+	// anything that is not ROOT.war on the next build, on every machine.
+	def copyWar = tasks.register('copyWar', Sync) {
 		  from tasks.named('war')
 		  into 'server/frontcache-base/webapps'
 		  rename '(.*).war', 'ROOT.war'
