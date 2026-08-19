@@ -1,30 +1,57 @@
 #!/usr/bin/env bash
 #
-# Build and start the fc-server container (nginx + Frontcache standalone).
+# Build the images from this checkout and start the Frontcache stack.
 #
-# 1. builds a fresh WAR + server/lib   (./gradlew :frontcache-server:build)
-# 2. builds the fc-server image        (docker compose build)
-# 3. starts it                         (docker compose up -d)
+# 1. builds the distribution archives + the images, tagged :local
+#    (build-push-images.sh -> ./gradlew dist -> docker buildx --load)
+# 2. starts the compose project
 #
 # Config comes from fc-server/.env (copy fc-server/.env.example first).
+#
+#   ./start-fc-server.sh                  # server only
+#   ./start-fc-server.sh --with-console    # server + console (loopback :7080)
+#   ./start-fc-server.sh --no-build        # reuse the images already loaded
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_DIR="$SCRIPT_DIR/fc-server"
 
-echo ">>> Building fresh WAR (./gradlew :frontcache-server:build) ..."
-( cd "$REPO_ROOT" && ./gradlew :frontcache-server:build )
+WITH_CONSOLE=0
+BUILD=1
+for arg in "$@"; do
+  case "$arg" in
+    --with-console) WITH_CONSOLE=1 ;;
+    --no-build)     BUILD=0 ;;
+    -h|--help)      sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *)              echo >&2 "unknown option: $arg"; exit 1 ;;
+  esac
+done
 
-ROOT_WAR="$REPO_ROOT/frontcache-server/server/frontcache-base/webapps/ROOT.war"
-if [ ! -f "$ROOT_WAR" ]; then
-  echo "ERROR: build did not produce $ROOT_WAR" >&2
-  exit 1
+# The compose file runs published images by tag, so a local run needs locally-built ones.
+# ':local' is what .env.example ships as FC_VERSION.
+if [ "$BUILD" = 1 ]; then
+  echo ">>> Building the :local images ..."
+  "$SCRIPT_DIR/build-push-images.sh" local
+else
+  echo ">>> --no-build: using the images already in the local store"
 fi
 
-echo ">>> Building and starting fc-server ..."
-( cd "$COMPOSE_DIR" && docker compose build && docker compose up -d )
+COMPOSE_ARGS=()
+[ "$WITH_CONSOLE" = 1 ] && COMPOSE_ARGS+=(--profile console)
 
-echo ">>> fc-server is up."
-echo "    http://localhost:${FC_HTTP_PORT:-80}   https://localhost:${FC_HTTPS_PORT:-443} (self-signed)"
-echo "    logs: docker logs -f fc-server"
+
+echo ">>> Starting the stack ..."
+( cd "$COMPOSE_DIR" && docker compose "${COMPOSE_ARGS[@]}" up -d )
+
+# Ask compose for the published ports rather than re-reading .env here: its .env parser
+# accepts unquoted values with spaces (ORIGIN_PATHS), which `source` does not.
+published() { ( cd "$COMPOSE_DIR" && docker compose port "$1" "$2" 2>/dev/null ) || true; }
+
+echo
+echo ">>> Frontcache is up."
+echo "    http://$(published fc-server 80)   https://$(published fc-server 443) (self-signed demo cert)"
+if [ "$WITH_CONSOLE" = 1 ]; then
+  echo "    console: http://$(published fc-console 7080)/"
+fi
+echo "    health:  docker inspect --format '{{.State.Health.Status}}' fc-server"
+echo "    logs:    docker logs -f fc-server"
