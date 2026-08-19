@@ -1,0 +1,15 @@
+/.idea
+/.claude
+CLAUDE.md
+/build/
+/.gradle/
+/gradle.properties
+.DS_Store
+/target/
+/distribution/
+/**/target/
+/**/build/
+/FRONTCACHE_HOME_FILTER/cache/
+/FRONTCACHE_HOME_FILTER/logs/
+/FRONTCACHE_HOME_STANDALONE/cache/
+/FRONTCACHE_HOME_STANDALONE/logs/

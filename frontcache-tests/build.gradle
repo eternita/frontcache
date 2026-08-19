@@ -1,0 +1,182 @@
+// Standalone frontcache-tests build. The frontcache-core / frontcache-agent
+// libraries are resolved from the sibling ../frontcache checkout via the
+// composite build declared in settings.gradle (includeBuild), so they compile
+// from source with no publish step.
+//
+// Topology (see tests.sh):
+//   tests -> FC standalone (localhost:9080) -> FC webfilter (localhost:8080) -> web app (localhost:8080)
+// Both FC standalone (:9080, serving src/test-integration/webapp) and FC webfilter
+// + web app (:8080, serving src/main/webapp) run in embedded Jetty 12 via the
+// org.frontcache.tests.FrontcacheStandaloneServer launcher. tests.sh starts both,
+// runs the integration suite, then kills them.
+
+plugins {
+	id 'war'
+}
+
+// Jetty 12 (Jakarta EE10).
+ext.jettyVersion = '12.0.37'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
+
+// Spawns a (long-running) server process and blocks only until it prints its
+// "ready" line, then keeps draining its stdout on a daemon thread so its pipe
+// buffer never fills and hangs it mid-test.
+class ExecWait extends DefaultTask {
+	@Internal String command
+	@Internal String ready
+	@Internal String directory
+
+	@TaskAction
+	def spawnProcess() {
+
+		ProcessBuilder builder = new ProcessBuilder(command.split(' '))
+		builder.redirectErrorStream(true)
+		builder.directory(new File(directory))
+		Process process = builder.start()
+
+		InputStream stdout = process.getInputStream()
+		BufferedReader reader = new BufferedReader(new InputStreamReader(stdout))
+
+		def line
+		while ((line = reader.readLine()) != null) {
+			println line
+			if (line.contains(ready)) {
+				println "$command is ready"
+				break;
+			}
+		}
+
+		Thread.startDaemon {
+			def l
+			while ((l = reader.readLine()) != null) {
+				println l
+			}
+		}
+	}
+}
+
+apply plugin: 'java-library'
+apply plugin: 'jacoco'
+group = 'org.frontcache'
+
+// Build/test with Java 25 via a toolchain (Jetty 12 / Jakarta EE10 need Java 17
+// as a baseline; we target the 25 LTS).
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+tasks.withType(JavaCompile).configureEach {
+	options.release = 25
+}
+
+// 'provided' deps (e.g. servlet-api, the Jetty launcher jars) are on compile &
+// test classpaths but NOT on runtimeClasspath, so they stay out of the war.
+configurations {
+	provided
+}
+
+sourceSets {
+	main.compileClasspath += configurations.provided
+	test.compileClasspath += configurations.provided
+	test.runtimeClasspath += configurations.provided
+
+	integrationTest {
+		java.srcDir file('src/test-integration/java')
+		resources.srcDir file('src/test-integration/resources')
+		compileClasspath = sourceSets.main.output + configurations.testRuntimeClasspath + configurations.provided
+		runtimeClasspath = output + compileClasspath
+	}
+}
+
+repositories {
+	mavenLocal()
+	mavenCentral()
+}
+
+jacoco.toolVersion = '0.8.13'   // 0.8.13+ understands Java 25 class files
+
+dependencies {
+	implementation 'org.frontcache:frontcache-core:2.2.3'   // from ../frontcache (composite build)
+	implementation 'org.frontcache:frontcache-agent:2.2.3'  // from ../frontcache (composite build)
+
+	implementation('net.sourceforge.htmlunit:htmlunit:2.18') {
+		exclude group: 'org.eclipse.jetty'
+		exclude group: 'org.eclipse.jetty.websocket'
+	}
+	implementation 'org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1'
+	implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0'
+
+	// Embedded Jetty 12 launcher deps (compile + launcher runtime; not bundled in the war)
+	provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
+	provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
+
+	provided 'junit:junit:4.12'
+	testImplementation 'junit:junit:4.12'
+}
+
+tasks.withType(Test) {
+	testLogging {
+		showStandardStreams = true
+		exceptionFormat = 'full'
+	}
+}
+
+jacocoTestReport {
+	reports {
+		html.required = true
+		xml.required = true
+		csv.required = false
+	}
+}
+
+def integrationTest = tasks.register('integrationTest', Test) {
+	description = 'Runs the integration tests.'
+	group = 'verification'
+	maxParallelForks = 1 // run all tests sequentially (due to cache cleanup before every test)
+	forkEvery = 1        // run all tests sequentially (due to cache cleanup before every test)
+	testClassesDirs = sourceSets.integrationTest.output.classesDirs
+	classpath = sourceSets.integrationTest.runtimeClasspath
+	reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/integration')
+	reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/integration')
+
+	//	jvmArgs = ['-Dfrontcache-tests.home=' + projectDir, '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8003']
+	jvmArgs '-Dfrontcache-tests.home=' + projectDir
+}
+
+// FC standalone (:9080) — embedded Jetty 12 serving the reverse-proxy webapp
+tasks.register('standaloneJetty', JavaExec) {
+	mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
+	classpath = sourceSets.main.runtimeClasspath + configurations.provided
+	systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/test-integration/webapp"
+	systemProperty 'frontcache.jetty.port', '9080'
+	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_STANDALONE"
+	systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_STANDALONE/conf/fc-logback.xml"
+}
+
+// FC webfilter + web app (:8080) — embedded Jetty 12 serving the main webapp
+tasks.register('webfilterJetty', JavaExec) {
+	mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
+	classpath = sourceSets.main.runtimeClasspath + configurations.provided
+	systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+	systemProperty 'frontcache.jetty.port', '8080'
+	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_FILTER"
+	systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml"
+}
+
+tasks.register('startStandaloneFrontcache', ExecWait) {
+	command = './gradlew standaloneJetty'
+	ready = 'has been started successfully'
+	directory = '.'
+}
+
+tasks.register('startWebfilterFrontcache', ExecWait) {
+	command = './gradlew webfilterJetty'
+	ready = 'has been started successfully'
+	directory = '.'
+}
+
+tasks.register('end2endTests') {
+	dependsOn integrationTest
+}
