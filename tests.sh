@@ -28,10 +28,40 @@ rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/logs/*
 
 ./gradlew :frontcache-tests:end2endTests
 
+# Stop the servers with SIGTERM first so their JVM shutdown hooks run — that is what
+# flushes each one's jacoco .exec file. SIGKILL only as a fallback for a hung JVM.
 echo "Stopping embedded Jetty servers ..."
-lsof -ti tcp:9080 | xargs kill -9 2>/dev/null
-lsof -ti tcp:8080 | xargs kill -9 2>/dev/null
+for port in 9080 8080; do
+	pids=$(lsof -ti tcp:$port)
+	[ -n "$pids" ] || continue
+	echo "$pids" | xargs kill 2>/dev/null
+done
+# Each server JVM flushes its jacoco .exec from a shutdown hook. Wait for both files to
+# appear and stop growing, then force the JVMs down: they hold non-daemon threads and do
+# not exit on their own after the hook runs, so waiting on the ports would only stall.
+STANDALONE_EXEC="$TESTS_DIR/build/jacoco/standaloneJetty.exec"
+WEBFILTER_EXEC="$TESTS_DIR/build/jacoco/webfilterJetty.exec"
+prev=""
+i=0
+while [ $i -lt 20 ]; do
+	if [ -f "$STANDALONE_EXEC" ] && [ -f "$WEBFILTER_EXEC" ]; then
+		cur=$(( $(wc -c < "$STANDALONE_EXEC") + $(wc -c < "$WEBFILTER_EXEC") ))
+		[ "$cur" = "$prev" ] && break
+		prev=$cur
+	fi
+	sleep 1
+	i=$((i + 1))
+done
+for port in 9080 8080; do
+	pids=$(lsof -ti tcp:$port)
+	[ -n "$pids" ] || continue
+	echo "$pids" | xargs kill -9 2>/dev/null
+done
 echo "Embedded Jetty servers have been stopped"
+
+# Coverage report. Runs AFTER the kill above, because the server JVMs only write their
+# .exec files on shutdown — running it earlier would report 0% for all engine-side code.
+./gradlew :frontcache-tests:jacocoIntegrationTestReport
 
 # cleanup / stop gradle daemons
 ./gradlew -stop

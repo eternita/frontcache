@@ -131,3 +131,64 @@ tasks.register('startWebfilterFrontcache', ExecWait) {
 tasks.register('end2endTests') {
 	dependsOn integrationTest
 }
+
+// Coverage for the integration suite, configured like the root build's
+// jacocoTestReport (html + xml on, csv off). The jacoco plugin already instruments
+// every Test task, so integrationTest writes build/jacoco/integrationTest.exec on its
+// own; this is the report over that data.
+//
+// The suite drives frontcache-core / -agent, not this project's own code, so the
+// report spans those modules' sources too. Note the two Jetty servers run in
+// SEPARATE JVMs (see startWebfilterFrontcache / startStandaloneFrontcache), so the
+// engine-side code they execute is only counted when those JVMs are instrumented as
+// well — see jacocoAgent / the jettyJacoco* wiring below.
+def coveredProjects = [project, project(':frontcache-core'), project(':frontcache-agent')]
+
+def jacocoIntegrationTestReport = tasks.register('jacocoIntegrationTestReport', JacocoReport) {
+	description = 'Generates a code coverage report for the integration tests.'
+	group = 'verification'
+
+	// integrationTest.exec (the test-client JVM) plus whatever the two server JVMs
+	// dumped. Missing files are ignored so the report still builds if a server was
+	// never started.
+	executionData.from fileTree(layout.buildDirectory.dir('jacoco')) {
+		include '*.exec'
+	}
+	sourceDirectories.from files({ coveredProjects.collect { it.sourceSets.main.allSource.srcDirs } })
+	classDirectories.from files({ coveredProjects.collect { it.sourceSets.main.output.classesDirs } })
+
+	reports {
+		html.required = true
+		xml.required = true
+		csv.required = false
+		html.outputLocation = layout.buildDirectory.dir('reports/jacoco/integration')
+		xml.outputLocation = layout.buildDirectory.file('reports/jacoco/integration/jacocoIntegrationTestReport.xml')
+	}
+}
+
+// Report whenever the suite runs, mirroring the root build's
+// `check.dependsOn jacocoTestReport`. It hangs off integrationTest rather than check
+// because integrationTest itself is deliberately out of check — it needs the two
+// servers up first. This pass only sees the test-client JVM's data; tests.sh runs the
+// task again after stopping the servers, which is when their .exec files land and the
+// report gets its engine-side numbers.
+integrationTest.configure {
+	finalizedBy jacocoIntegrationTestReport
+}
+
+
+// The two Jetty servers run in their own JVMs, so they need the jacoco agent attached
+// individually — without this every engine-side class (FrontCacheEngine, the cache
+// processors, includes, hystrix) reports 0% no matter what the suite exercises, since
+// the integrationTest JVM only ever runs the HtmlUnit client and the FC client/agent.
+// Each writes its own .exec, which jacocoIntegrationTestReport picks up by glob.
+// The agent flushes on JVM shutdown, so tests.sh must stop these servers with SIGTERM
+// (not SIGKILL) and generate the report afterwards.
+// applyTo() is the hook for non-Test JVM tasks: only Test tasks get a
+// JacocoTaskExtension automatically, so a bare `jacoco { }` here would resolve to the
+// PROJECT extension and fail on 'destinationFile'.
+tasks.withType(JavaExec).matching { it.name in ['standaloneJetty', 'webfilterJetty'] }.configureEach { task ->
+	project.extensions.getByType(JacocoPluginExtension).applyTo(task)
+	task.extensions.getByType(JacocoTaskExtension).destinationFile =
+		layout.buildDirectory.file("jacoco/${task.name}.exec").get().asFile
+}
