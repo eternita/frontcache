@@ -11,6 +11,3 @@ CLAUDE.md
 /**/build/
 /frontcache-server/server/frontcache-base/webapps/
 /frontcache-server/server/lib/
-/examples/frontcache-jsp/FRONTCACHE_HOME/cache
-/examples/frontcache-jsp/FRONTCACHE_HOME/logs
-/examples/frontcache-jsp/.gradle
