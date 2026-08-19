@@ -82,7 +82,18 @@ front-cache.request-logs-config=fc-logback.xml
 
 
 
-	<root>
+	<!-- INFO, not logback's default. With no level here the root defaults to DEBUG, which put
+	     every Jetty internal (WriteFlusher, ConcurrentPool, ServletChannelState, ...) on the
+	     console: an e2e run produced ~280k lines, burying the actual test output.
+
+	     Nothing is lost from the log FILES by raising it: the Error and Info appenders use
+	     exact-match LevelFilters (ERROR only / INFO only), so neither ever captured DEBUG.
+	     Raising it at the root is also cheaper than filtering at the appender, because the
+	     events are never created in the first place.
+
+	     To debug a failing test, drop this back to DEBUG (or add a <logger> for just the one
+	     package you care about, which is usually what you actually want). -->
+	<root level="INFO">
 		<appender-ref ref="Error" />
 		<appender-ref ref="Info" />	
 		<appender-ref ref="STDOUT" />
