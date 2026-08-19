@@ -37,6 +37,15 @@ public interface CacheProcessor {
 
 	public void removeFromCacheAll(String domain);
 
+	/**
+	 * Removes every entry from this node, whatever domain it was cached under.
+	 *
+	 * {@link #removeFromCacheAll(String)} only drops entries stamped with the given domain, and
+	 * replicated entries carry the domain of the edge they came from - so a domain-scoped
+	 * "invalidate all" leaves them behind. Callers that mean "empty this node" must use this method.
+	 */
+	public void removeFromCacheAll();
+
 	public WebResponse processRequest(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException;
 
 	public Map<String, String> getCacheStatus();

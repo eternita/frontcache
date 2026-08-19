@@ -120,6 +120,12 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}
 
 	@Override
+	public void removeFromCacheAll() {
+		// single flat map - no domain scoping to begin with
+		cache.clear();
+	}
+
+	@Override
 	public Map<String, String> getCacheStatus() {
 		Map<String, String> status = super.getCacheStatus();
 

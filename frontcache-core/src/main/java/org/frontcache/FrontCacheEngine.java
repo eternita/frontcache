@@ -15,8 +15,10 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -187,6 +189,29 @@ public class FrontCacheEngine {
 
 	public DomainContext getDomainContexByOrigin(String origin) {
 		return getDomainContext(origin);
+	}
+
+	/**
+	 * Domains this node is configured to serve (the default domain plus any listed in
+	 * front-cache.domains). Used by the management API to tell a domain this node owns from a
+	 * domain that only appears on entries pushed in from another edge by replication.
+	 */
+	public Set<String> getConfiguredDomains()
+	{
+		Set<String> domains = new HashSet<String>();
+		for (DomainContext domainContext : domainConfigMap.values())
+			if (null != domainContext.getDomain())
+				domains.add(domainContext.getDomain());
+
+		return domains;
+	}
+
+	/**
+	 * @return true when {@code domain} is one this node serves itself
+	 */
+	public boolean isConfiguredDomain(String domain)
+	{
+		return null != domain && getConfiguredDomains().contains(domain);
 	}
 
 	// synchronized on the same monitor as getFrontCache() so a shutdown/reload can't interleave with
