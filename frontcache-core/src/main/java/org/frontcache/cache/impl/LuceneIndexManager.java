@@ -922,6 +922,40 @@ public class LuceneIndexManager {
 	}
 
 	/**
+	 * Removes every document from the index, whatever domain it was indexed under.
+	 *
+	 * Needed because {@link #deleteAll(String)} only matches the DOMAIN_FIELD term: entries pushed in
+	 * by index replication carry the SOURCE edge's domain, so a domain-scoped "invalidate all" issued
+	 * at the target edge silently walks past them and they stay served forever. Callers that mean
+	 * "empty this node" must use this method.
+	 */
+	public void deleteAll() {
+
+		IndexWriter iWriter = null;
+		try {
+			iWriter = getIndexWriter();
+			if (iWriter == null){
+				return ;
+			}
+		} catch (Exception e1) {
+			logger.debug("Error during getting indexWriter. " + e1.getMessage());
+			return;
+		}
+
+		try {
+			long count = iWriter.deleteAll();
+			logger.info("Removed all {} documents (all domains).", count);
+		} catch (IOException e) {
+			if (!discardWriterIfLockLost(e, "deleteAll"))
+				logger.error(e.getMessage(), e);
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, "deleteAll");
+		} finally {
+			commitQuietly(iWriter, "delete/commit");
+		}
+	}
+
+	/**
 	 * Removes all documents whose effective expiration timestamp is in the past.
 	 *
 	 * "Cache forever" entries are indexed with Long.MAX_VALUE (see indexDoc()) so

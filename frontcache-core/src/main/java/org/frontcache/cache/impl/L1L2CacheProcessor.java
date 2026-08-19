@@ -311,7 +311,14 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 			for(Object key : ehCache.getKeys())
 			{
-				String objDomain = ((WebResponse) ehCache.get(key).getObjectValue()).getDomain();
+				// the element can be evicted/expired between getKeys() and get() - skipping a vanished
+				// element is right, and it keeps an NPE here from aborting the method before the L2
+				// deletion below ever runs (which would leave an "invalidate all" silently half-done).
+				Element el = ehCache.get(key);
+				if (null == el || null == el.getObjectValue())
+					continue;
+
+				String objDomain = ((WebResponse) el.getObjectValue()).getDomain();
 				if (null != domain && domain.equals(objDomain))
 					removeList.add(key);
 			}
@@ -321,6 +328,14 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		}
 
 		luceneIndexManager.deleteAll(domain);
+	}
+
+	@Override
+	public void removeFromCacheAll() {
+		logger.debug("truncate cache - all domains");
+
+		ehCache.removeAll();
+		luceneIndexManager.deleteAll();
 	}
 
 

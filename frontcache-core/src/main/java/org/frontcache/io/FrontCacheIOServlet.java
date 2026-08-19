@@ -232,14 +232,34 @@ public class FrontCacheIOServlet extends HttpServlet {
 		String siteKey = req.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
 		String domain = null;
 
-		DomainContext domainContext = FrontCacheEngine.getFrontCache().getDomainContexBySiteKey(siteKey);
+		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
+		DomainContext domainContext = fcEngine.getDomainContexBySiteKey(siteKey);
 		if (null != domainContext)
 			domain = domainContext.getDomain();
 
 		if ("*".equals(filter))
-			CacheManager.getInstance().removeFromCacheAll(domain);
-		else
-			CacheManager.getInstance().removeFromCache(domain, filter);
+		{
+			// A domain-scoped delete only drops entries stamped with this node's domain. Entries
+			// pushed in by index replication carry the SOURCE edge's domain, so they survive every
+			// "*" and keep being served (reads are by URL only, domain is not consulted). On a
+			// single-domain node "*" can only mean "empty this node", so do exactly that; a
+			// multi-domain node keeps the per-domain behaviour unless all-domains=true is passed.
+			boolean allDomains = "true".equalsIgnoreCase(req.getParameter("all-domains"))
+					|| fcEngine.getConfiguredDomains().size() < 2;
+
+			if (allDomains)
+			{
+				CacheManager.getInstance().removeFromCacheAll();
+				logger.info("Invalidation for filter: {} (all domains)", filter);
+			} else {
+				CacheManager.getInstance().removeFromCacheAll(domain);
+				logger.info("Invalidation for filter: {} (domain: {})", filter, domain);
+			}
+
+			return aResponse;
+		}
+
+		CacheManager.getInstance().removeFromCache(domain, filter);
 
 		logger.info("Invalidation for filter: " + filter);
 		return aResponse;
@@ -315,17 +335,19 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse putToCache(HttpServletRequest req)
 	{
 		String key = req.getParameter("key");
-		String domain = req.getParameter("domain");
+		String requestedDomain = req.getParameter("domain");
 		String webResponseJson = req.getParameter("webResponse");
 
-		PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key, domain);
-
-		if (key == null || domain == null || webResponseJson == null)
+		if (key == null || requestedDomain == null || webResponseJson == null)
 		{
+			PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key, requestedDomain);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 			aResponse.setErrorDescription("Required parameters: key, domain, webResponse");
 			return aResponse;
 		}
+
+		String domain = resolveLocalDomain(req, requestedDomain);
+		PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key, domain);
 
 		try
 		{
@@ -341,6 +363,34 @@ public class FrontCacheIOServlet extends HttpServlet {
 		}
 
 		return aResponse;
+	}
+
+	/**
+	 * Maps the domain a caller asked for onto a domain THIS node serves.
+	 *
+	 * Replication sends the source entry's domain, so an entry copied from another edge would be
+	 * stored under a domain this node knows nothing about - invisible to "invalidate all" and to the
+	 * per-domain counters, though still served (lookups are by URL). A requested domain this node
+	 * actually serves is kept as-is, so a multi-domain edge can still replicate per domain.
+	 *
+	 * @param requestedDomain domain from the request (never null here)
+	 * @return the domain to store the entry under
+	 */
+	private String resolveLocalDomain(HttpServletRequest req, String requestedDomain)
+	{
+		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
+
+		if (fcEngine.isConfiguredDomain(requestedDomain))
+			return requestedDomain;
+
+		DomainContext domainContext = fcEngine.getDomainContexBySiteKey(req.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY));
+		if (null == domainContext || null == domainContext.getDomain())
+			return requestedDomain; // nothing better to map onto - keep the caller's value
+
+		logger.debug("put-to-cache: domain {} is not served here - storing under {}",
+				requestedDomain, domainContext.getDomain());
+
+		return domainContext.getDomain();
 	}
 
 	/**

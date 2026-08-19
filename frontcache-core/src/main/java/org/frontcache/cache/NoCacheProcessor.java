@@ -77,6 +77,12 @@ public class NoCacheProcessor implements CacheProcessor {
 	}
 
 	@Override
+	public void removeFromCacheAll() {
+		// nothing is cached
+
+	}
+
+	@Override
 	public Map<String, String> getCacheStatus() {
 		Map<String, String> status = new HashMap<String, String>();
 		status.put("impl", this.getClass().getName());
