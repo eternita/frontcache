@@ -1,10 +1,6 @@
-## Frontcache - utility to increase Web App performance.
+## Frontcache - (development project).
 
 ### [it's page fragment cache + remote includes + concurrent execution]
-
-- Licensing: https://www.eternita.co/frontcache-license.html
-
-Frontcache is a [source available](https://en.wikipedia.org/wiki/Source-available_software) product. Please refer to [www.eternita.co](https://www.eternita.co/frontcache-license.html) for details on licensing.
 
 
 #### Features
@@ -21,12 +17,5 @@ Frontcache is a [source available](https://en.wikipedia.org/wiki/Source-availabl
 ![Alt](docs/images/how-it-works.png "Frontcache overview")
 
 
-### Frontcache console - realtime stats
-
-![Alt](docs/images/fc-console-screen.png "Frontcache console demo")
-
-
 Frontcache developed & tested with Java based Web apps but can be used with other languages/technologies as well. 
-
-### Technical details - [check Wiki](https://github.com/eternita/frontcache/wiki "check Wiki")
 
