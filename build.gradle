@@ -541,6 +541,50 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 		}
 	}
 
+	// The installer and the compose files ride along with the SERVER bundle's coordinates, so
+	// a customer needs exactly one place to look. They are checked-in scripts rather than build
+	// output, so they are published as classified artifacts with their own checksums.
+	//
+	//   frontcache-server-<v>-installer.sh        scripts/dist/install-frontcache.sh
+	//   frontcache-server-<v>-nginx-site.sh       scripts/dist/render-nginx-site.sh  (the
+	//                                            installer needs this next to it for --with-nginx)
+	//   frontcache-server-<v>-compose.yml         the compose project
+	//   frontcache-server-<v>-env.example         its .env template
+	def releaseAssets = isServer ? [
+		[file: rootProject.file('scripts/dist/install-frontcache.sh'),                classifier: 'installer',   extension: 'sh'],
+		[file: rootProject.file('scripts/dist/render-nginx-site.sh'),                 classifier: 'nginx-site',  extension: 'sh'],
+		[file: rootProject.file('scripts/docker/fc-server/docker-compose.yml'),        classifier: 'compose',     extension: 'yml'],
+		[file: rootProject.file('scripts/docker/fc-server/.env.example'),              classifier: 'env',         extension: 'example'],
+	] : []
+
+	// One .sha256 per asset, so `shasum -c` works on the installer too - it is a script the
+	// customer is about to run as root.
+	def assetChecksums = tasks.register('assetChecksums') {
+		group = 'distribution'
+		description = 'Write .sha256 files for the published release assets'
+		enabled = isServer
+		def assets = releaseAssets
+		def outDir = layout.buildDirectory.dir('release-assets')
+		inputs.files(assets.collect { it.file })
+		outputs.dir(outDir)
+		doLast {
+			def dir = outDir.get().asFile
+			dir.mkdirs()
+			assets.each { asset ->
+				def digest = java.security.MessageDigest.getInstance('SHA-256')
+				asset.file.withInputStream { ins ->
+					byte[] buf = new byte[1 << 16]
+					int read
+					while ((read = ins.read(buf)) > 0) digest.update(buf, 0, read)
+				}
+				def name = "${project.name}-${project.version}-${asset.classifier}.${asset.extension}"
+				new File(dir, "${name}.sha256").text =
+					digest.digest().encodeHex().toString() + '  ' + name + '\n'
+				logger.lifecycle("sha256: ${name}.sha256")
+			}
+		}
+	}
+
 	publishing {
 		publications {
 			dist(MavenPublication) {
@@ -549,6 +593,19 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 				artifact tasks.named('distTar')
 				artifact(zipSha) { extension = 'zip.sha256'; builtBy distChecksums }
 				artifact(tarSha) { extension = 'tar.gz.sha256'; builtBy distChecksums }
+
+				releaseAssets.each { asset ->
+					artifact(asset.file) {
+						classifier = asset.classifier
+						extension  = asset.extension
+					}
+					artifact(layout.buildDirectory.file(
+							"release-assets/${project.name}-${project.version}-${asset.classifier}.${asset.extension}.sha256")) {
+						classifier = asset.classifier
+						extension  = "${asset.extension}.sha256"
+						builtBy assetChecksums
+					}
+				}
 				pom {
 					packaging = 'zip'
 					name = "${project.group}:${project.name}"
@@ -581,5 +638,6 @@ tasks.register('dist') {
 	group = 'distribution'
 	description = 'Build the server + console distribution archives and their checksums'
 	dependsOn ':frontcache-server:distZip', ':frontcache-server:distTar', ':frontcache-server:distChecksums',
+	          ':frontcache-server:assetChecksums',
 	          ':frontcache-console:distZip', ':frontcache-console:distTar', ':frontcache-console:distChecksums'
 }

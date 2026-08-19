@@ -128,6 +128,9 @@ build_image() {
 
   mkdir -p "$stage"
   cp "$srcdir"/Dockerfile "$srcdir"/*.sh "$stage/"
+  # the shared nginx template lives with the installer, not with the image, because both
+  # channels render from it - see scripts/dist/render-nginx-site.sh
+  cp "$REPO_ROOT/scripts/dist/render-nginx-site.sh" "$stage/"
   # hardlink when possible so a 30-40 MB archive is not copied for every image
   ln "$tarball" "$stage/$archive" 2>/dev/null || cp "$tarball" "$stage/$archive"
 

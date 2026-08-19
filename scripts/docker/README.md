@@ -6,8 +6,10 @@ Container images for Frontcache, plus an ELK stack for browsing its logs.
   Two variants out of one multi-stage Dockerfile:
   - **full** (default) — nginx + Frontcache in one container. nginx terminates TLS on 443,
     serves 80, proxies `/` to the embedded Frontcache (Jetty 12, HTTP on 9080) and the
-    configured origin paths to your backend. The containerized equivalent of
-    `scripts/bash/install-frontcache-server-remote.sh`.
+    configured origin paths to your backend. The containerized equivalent of a VM installed
+    with [`scripts/dist/install-frontcache.sh --with-nginx`](../dist/install-frontcache.sh) -
+    both render their nginx site from the same
+    [shared template](../dist/render-nginx-site.sh).
   - **slim** — Frontcache alone on 9080, no nginx and no TLS. For Kubernetes, an ALB, or any
     deployment whose ingress already terminates TLS.
 - **`fc-console/`** — the **Frontcache console** image (realtime stats and cache management,

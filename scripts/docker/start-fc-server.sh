@@ -39,9 +39,10 @@ fi
 COMPOSE_ARGS=()
 [ "$WITH_CONSOLE" = 1 ] && COMPOSE_ARGS+=(--profile console)
 
-
 echo ">>> Starting the stack ..."
-( cd "$COMPOSE_DIR" && docker compose "${COMPOSE_ARGS[@]}" up -d )
+# ${A[@]+"${A[@]}"} rather than plain "${A[@]}": expanding an EMPTY array is an unbound
+# variable under `set -u` in bash 3.2, which is what macOS ships.
+( cd "$COMPOSE_DIR" && docker compose ${COMPOSE_ARGS[@]+"${COMPOSE_ARGS[@]}"} up -d )
 
 # Ask compose for the published ports rather than re-reading .env here: its .env parser
 # accepts unquoted values with spaces (ORIGIN_PATHS), which `source` does not.

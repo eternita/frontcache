@@ -72,8 +72,10 @@ RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nginx openssl \
  && rm -rf /var/lib/apt/lists/*
 
-COPY entrypoint.sh /opt/fc-server/entrypoint.sh
-RUN chmod +x /opt/fc-server/entrypoint.sh
+# render-nginx-site.sh is the shared nginx template, also used by the VM installer; the
+# build script stages it into the context from scripts/dist/.
+COPY entrypoint.sh render-nginx-site.sh /opt/fc-server/
+RUN chmod +x /opt/fc-server/entrypoint.sh /opt/fc-server/render-nginx-site.sh
 
 # 80/443 public (nginx). 9080 stays internal (Frontcache HTTP).
 EXPOSE 80 443

@@ -4,13 +4,14 @@
 # standalone in one container.
 #
 # Runs the same two processes as the single-host VM install
-# (scripts/bash/install-frontcache-server-remote.sh + configure-nginx-remote.sh):
+# (scripts/dist/install-frontcache.sh --with-nginx):
 #   1. Frontcache standalone (embedded Jetty 12, HTTP only) on $FRONTCACHE_HTTP_PORT
 #   2. nginx on 80/443 - terminates TLS, proxies / -> Frontcache and $ORIGIN_PATHS -> $ORIGIN_HOST
 #
-# The nginx site config and the TLS cert are generated here at startup from env vars, so a
-# single image serves any deployment. Config seeding and origin resolution are shared with
-# the slim image - see seed-conf.sh.
+# The nginx site config and the TLS cert are generated at startup from env vars, so a single
+# image serves any deployment. Three pieces are shared rather than duplicated: config seeding
+# and origin resolution with the slim image (seed-conf.sh), and the nginx site template with
+# the VM installer (render-nginx-site.sh).
 #
 # For an ingress/ALB deployment that needs no nginx, use the -slim image instead.
 set -euo pipefail
@@ -55,121 +56,30 @@ else
   rm -rf "$TMP"
 fi
 
-# ---- nginx site config (rendered from env) -----------------------------------
-# Common proxy headers - single-quoted so nginx runtime vars stay literal.
-PROXY_HDRS='        proxy_http_version 1.1;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Port $server_port;'
-
-# Frontcache serves plaintext (can't emit brotli), so nginx gzips proxied responses.
-GZIP_CONF='    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 5;
-    gzip_min_length 256;
-    gzip_http_version 1.1;
-    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml application/rss+xml image/svg+xml;'
-
-# One location block per origin path -> $ORIGIN_HOST (https).
-# The origin host is assigned to an nginx variable so it is resolved at request
-# time via the Docker embedded DNS (resolver, below) rather than at config-load
-# time. That keeps `nginx -t` and startup working even if the origin is briefly
-# unresolvable, so an origin DNS blip never takes down cache serving on `/`.
+# ---- nginx site config -------------------------------------------------------
+# Rendered by the shared template render-nginx-site.sh (copied into the image), which is the
+# SAME renderer the VM installer uses. This config used to be duplicated once per delivery
+# channel, which is exactly the kind of thing that drifts apart.
 #
-# With no origin host known, the blocks are skipped entirely rather than rendered against
-# an empty name - everything then goes through Frontcache on `/`, which is the correct
-# degradation and keeps `nginx -t` valid.
-ORIGIN_LOCATIONS=""
-if [ -n "${ORIGIN_HOST:-}" ]; then
-  for p in $ORIGIN_PATHS; do
-    ORIGIN_LOCATIONS+="    location ${p} {
-${PROXY_HDRS}
-        proxy_set_header Host ${ORIGIN_HOST};
-        proxy_ssl_server_name on;
-        proxy_ssl_name ${ORIGIN_HOST};
-        set \$fc_origin \"${ORIGIN_HOST}\";
-        proxy_pass https://\$fc_origin;
-    }
-
-"
-  done
-else
-  echo ">>> No origin host known - skipping the origin-path passthrough blocks."
+# NGINX_RESOLVER points at Docker's embedded DNS, which makes the renderer emit the origin
+# host through an nginx variable so it is resolved per request rather than at config-load
+# time. An origin DNS blip then cannot stop nginx from loading, and so never takes down cache
+# serving on '/'. With no origin host known at all, the renderer omits the origin-path blocks
+# entirely rather than rendering them against an empty name.
+if [ -z "${ORIGIN_HOST:-}" ]; then
+  echo ">>> No origin host known - the origin-path passthrough blocks will be omitted."
   echo "    Every path will be served through Frontcache on '/'. Set ORIGIN_HOST (or"
-  echo "    front-cache.origin-host in the mounted conf) to proxy \$ORIGIN_PATHS directly."
+  echo "    front-cache.origin-host in the mounted conf) to proxy the origin paths directly."
 fi
 
-# Docker's embedded DNS resolver; used for the variable-based origin proxy_pass above.
-RESOLVER='    resolver 127.0.0.11 ipv6=off valid=30s;'
-
 echo ">>> Rendering nginx site config (origin: ${ORIGIN_HOST:-<none>}) ..."
-# Unquoted heredoc: our shell vars expand; nginx runtime vars are escaped as \$.
-cat > /etc/nginx/sites-available/default <<EOF
-# Managed by the fc-server entrypoint - do not edit by hand.
-# /                        -> local Frontcache (80 and TLS-terminated 443 -> http ${FRONTCACHE_HTTP_PORT})
-# ${ORIGIN_PATHS} -> ${ORIGIN_HOST:-<not proxied: no origin host configured>}
-
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name _;
-
-    ignore_invalid_headers off;
-
-${RESOLVER}
-
-${GZIP_CONF}
-
-${ORIGIN_LOCATIONS}    # Hystrix SSE metrics stream - must NOT be buffered.
-    location = /hystrix.stream {
-${PROXY_HDRS}
-        proxy_set_header Host \$host;
-        proxy_pass http://127.0.0.1:${FRONTCACHE_HTTP_PORT};
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 3600s;
-    }
-
-    location / {
-${PROXY_HDRS}
-        proxy_set_header Host \$host;
-        proxy_pass http://127.0.0.1:${FRONTCACHE_HTTP_PORT};
-    }
-}
-
-server {
-    listen 443 ssl default_server;
-    listen [::]:443 ssl default_server;
-    server_name _;
-
-    ignore_invalid_headers off;
-
-${RESOLVER}
-
-${GZIP_CONF}
-
-    ssl_certificate     /etc/nginx/ssl/frontcache.crt;
-    ssl_certificate_key /etc/nginx/ssl/frontcache.key;
-
-${ORIGIN_LOCATIONS}    # Hystrix SSE metrics stream - must NOT be buffered.
-    location = /hystrix.stream {
-${PROXY_HDRS}
-        proxy_set_header Host \$host;
-        proxy_pass http://127.0.0.1:${FRONTCACHE_HTTP_PORT};
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 3600s;
-    }
-
-    location / {
-${PROXY_HDRS}
-        proxy_set_header Host \$host;
-        proxy_pass http://127.0.0.1:${FRONTCACHE_HTTP_PORT};
-    }
-}
-EOF
+FRONTCACHE_HTTP_PORT="$FRONTCACHE_HTTP_PORT" \
+ORIGIN_HOST="${ORIGIN_HOST:-}" \
+ORIGIN_PATHS="$ORIGIN_PATHS" \
+NGINX_RESOLVER="${NGINX_RESOLVER:-127.0.0.11 ipv6=off valid=30s}" \
+TLS_CERT=/etc/nginx/ssl/frontcache.crt \
+TLS_KEY=/etc/nginx/ssl/frontcache.key \
+  bash /opt/fc-server/render-nginx-site.sh > /etc/nginx/sites-available/default
 
 ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 nginx -t

@@ -106,6 +106,9 @@ function Build-Image {
     New-Item -ItemType Directory -Path $stage | Out-Null
     Copy-Item (Join-Path $SrcDir 'Dockerfile') $stage
     Copy-Item (Join-Path $SrcDir '*.sh') $stage
+    # the shared nginx template lives with the installer, not with the image, because both
+    # channels render from it - see scripts/dist/render-nginx-site.sh
+    Copy-Item (Join-Path $RepoRoot 'scripts\dist\render-nginx-site.sh') $stage
     Copy-Item $Tarball (Join-Path $stage $Archive)
 
     # not $args: that is a PowerShell automatic variable
