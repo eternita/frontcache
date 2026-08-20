@@ -173,8 +173,26 @@ where Kibana stores saved objects. If you ever start the stack with raw
 `docker compose up` instead, import the `.ndjson` files from `fc-elk/kibana/`
 manually via Kibana → Stack Management → Saved Objects → Import.
 
-`./stop-fc-elk.sh` stops the stack (add `-v` to wipe indexed data and the Logstash
-read position).
+`./stop-fc-elk.sh` stops the stack. Add `-v` for a full clean slate: it drops the
+data volumes (indexed logs **and** the Logstash sincedb read position) *and* empties
+the `fc-elk/logs` drop zone — the pulled logs run to gigabytes per host and are
+easily the bulk of what the stack costs on disk.
+
+The drop zone is deliberately tied to `-v` rather than cleaned on every stop.
+`pull-logs.sh` copies the **whole** remote log each time, and incremental ingest
+works only because Logstash remembers a read offset per file; delete the pulled
+files while keeping that offset and the next pull re-indexes every line into an
+index that already has them — duplicates. Wiping volumes and drop zone together
+keeps indices, sincedb, and pulled files consistent.
+
+| Flag | Effect |
+| --- | --- |
+| *(none)* | stop the containers; keep volumes and pulled logs |
+| `-v` | drop data volumes **and** empty `fc-elk/logs` |
+| `-v --keep-logs` | drop data volumes, keep the pulled logs (re-ingested on next start) |
+| `--logs` | stop and empty `fc-elk/logs` only — frees disk, but the kept sincedb means the next pull re-indexes everything |
+
+Any other flag is passed straight through to `docker compose down`.
 
 ### Dashboard: "Frontcache Overview"
 
@@ -290,7 +308,7 @@ equivalent; the table lists the Bash names.
 | `stop-fc-server.sh` | Stop/remove the stack (`-v` drops volumes) |
 | `build-push-images.sh "<tag>"` | Build both images from the release archives; `--push` to publish |
 | `start-fc-elk.sh` | Start Elasticsearch + Kibana + Logstash |
-| `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes) |
+| `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes **and** empties `fc-elk/logs`; `--logs`, `--keep-logs`) |
 | `pull-logs.sh "<hosts>"` | rsync FC request, error, fallback, and rejected-request logs into `fc-elk/logs` |
 
 ### Windows (PowerShell)
@@ -306,7 +324,7 @@ cd scripts\docker
 .\build-push-images.ps1 2.5.0 -Push -Latest # build both images, push 2.5.0 / 2.5 / latest
 .\start-fc-elk.ps1
 .\pull-logs.ps1 "fc-edge fc-eu"
-.\stop-fc-elk.ps1 -v
+.\stop-fc-elk.ps1 -v                        # stop, drop volumes, empty fc-elk\logs
 ```
 
 Windows is also the answer to "how do I run the server bundle on Windows": the launcher
