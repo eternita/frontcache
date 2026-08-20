@@ -14,7 +14,9 @@
 #   BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 #   curl -fLO $BASE/frontcache-server-$V-installer.sh
 #   curl -fLO $BASE/frontcache-server-$V-installer.sh.sha256
-#   shasum -a 256 -c frontcache-server-$V-installer.sh.sha256
+#   # the published checksum may be a bare hash, so compare the hash field, not `shasum -c`:
+#   [ "$(shasum -a 256 frontcache-server-$V-installer.sh | cut -d' ' -f1)" \
+#     = "$(cut -d' ' -f1 < frontcache-server-$V-installer.sh.sha256)" ] && echo OK
 #   sudo bash frontcache-server-$V-installer.sh --version $V \
 #        --origin-host origin.example.com
 #
