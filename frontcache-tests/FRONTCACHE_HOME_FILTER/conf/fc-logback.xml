@@ -82,14 +82,35 @@ front-cache.request-logs-config=fc-logback.xml
 
 
 
-	<root>
+	<!-- INFO, not logback's default. With no level here the root defaults to DEBUG, which put
+	     every Jetty internal (WriteFlusher, ConcurrentPool, ServletChannelState, ...) on the
+	     console: an e2e run produced ~280k lines, burying the actual test output.
+
+	     Nothing is lost from the log FILES by raising it: the Error and Info appenders use
+	     exact-match LevelFilters (ERROR only / INFO only), so neither ever captured DEBUG.
+	     Raising it at the root is also cheaper than filtering at the appender, because the
+	     events are never created in the first place.
+
+	     To debug a failing test, drop this back to DEBUG (or add a <logger> for just the one
+	     package you care about, which is usually what you actually want). -->
+	<root level="INFO">
 		<appender-ref ref="Error" />
 		<appender-ref ref="Info" />	
 		<appender-ref ref="STDOUT" />
 	</root>
 
-	<!-- for request logger -->
-	<logger name="org.frontcache.reqlog.RequestLogger">
+	<!-- Request logger. additivity="false" keeps these TRACE lines in
+	     logs/frontcache-requests.log and OFF the console.
+
+	     Without it the events still reach the root logger's appenders, STDOUT among them: a
+	     parent's level does not filter an event propagated from a child, because the level
+	     check happens once, at the logger the event was created on. So a root at INFO does
+	     nothing to stop a TRACE line from a logger set to TRACE.
+
+	     Nothing is lost from the other files by cutting propagation - root's Error and Info
+	     appenders use exact-match LevelFilters (ERROR only / INFO only), so neither ever
+	     accepted these TRACE events anyway. -->
+	<logger name="org.frontcache.reqlog.RequestLogger" additivity="false">
 	    <level value="TRACE" />
 		<appender-ref ref="ReguestLoggerFile" />
 	</logger>

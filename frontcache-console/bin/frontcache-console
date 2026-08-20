@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+#
+# Launch the Frontcache console on embedded Jetty 12 (Jakarta EE10).
+#
+# The console is a SEPARATE process from the standalone server: the server's
+# FrontcacheJettyServer launcher deploys exactly one webapp at context "/", so the
+# console cannot be hosted alongside it. It listens on 7080 by default and talks to one
+# or more Frontcache nodes over their management API - the node URLs and the shared
+# site-key come from conf/frontcache-console.conf.
+#
+# Layout this script expects (as unpacked from frontcache-console-<version>.zip):
+#   bin/frontcache-console   this script
+#   lib/*.jar                launcher classpath (Jetty 12 EE10 + frontcache-console.jar)
+#   webapps/ROOT.war         the console webapp (Spring + frontcache-core in WEB-INF/lib)
+#   conf/                    frontcache-console.conf, fc-logback.xml
+#
+# Environment:
+#   FRONTCACHE_CONSOLE_PORT  listen port (default 7080)
+#   FRONTCACHE_CONFIG        console config file (default conf/frontcache-console.conf)
+#   FRONTCACHE_JAVA_HOME     JDK to run with (falls back to JAVA_HOME, then `java`)
+#
+set -euo pipefail
+
+# ---- resolve this script's location (following symlinks) ---------------------
+SCRIPT="${BASH_SOURCE[0]}"
+while [ -h "$SCRIPT" ]; do
+  DIR="$(cd -P "$(dirname "$SCRIPT")" && pwd)"
+  SCRIPT="$(readlink "$SCRIPT")"
+  [[ "$SCRIPT" != /* ]] && SCRIPT="$DIR/$SCRIPT"
+done
+BIN_DIR="$(cd -P "$(dirname "$SCRIPT")" && pwd)"
+BASE_DIR="$(cd "$BIN_DIR/.." && pwd)"
+
+# ---- layout ------------------------------------------------------------------
+LIB_DIR="$BASE_DIR/lib"
+WEBAPP="$BASE_DIR/webapps/ROOT.war"
+CONF_DIR="$BASE_DIR/conf"
+PORT="${FRONTCACHE_CONSOLE_PORT:-7080}"
+
+# FrontcacheService reads FRONTCACHE_CONFIG first, then the
+# org.frontcache.console.config system property. Set the env var so a value the
+# operator exported wins over the bundled default.
+export FRONTCACHE_CONFIG="${FRONTCACHE_CONFIG:-$CONF_DIR/frontcache-console.conf}"
+
+# ---- java --------------------------------------------------------------------
+# Same precedence as the server launcher: an explicit FRONTCACHE_JAVA_HOME first, then a
+# runtime bundled with this distribution, then the host's JAVA_HOME. A per-platform bundle
+# must not be at the mercy of whatever JVM the host happens to point at.
+if [ -n "${FRONTCACHE_JAVA_HOME:-}" ]; then
+  JAVA="$FRONTCACHE_JAVA_HOME/bin/java"
+elif [ -x "$BASE_DIR/runtime/bin/java" ]; then
+  JAVA="$BASE_DIR/runtime/bin/java"
+elif [ -n "${JAVA_HOME:-}" ]; then
+  JAVA="$JAVA_HOME/bin/java"
+else
+  JAVA="java"
+fi
+
+# ---- sanity checks -----------------------------------------------------------
+if [ ! -d "$LIB_DIR" ] || [ -z "$(ls -A "$LIB_DIR" 2>/dev/null)" ]; then
+  echo >&2 "ERROR: $LIB_DIR is missing/empty. Run './gradlew :frontcache-console:installDist' to assemble it."
+  exit 1
+fi
+if [ ! -f "$WEBAPP" ]; then
+  echo >&2 "ERROR: war not found: $WEBAPP. Run './gradlew :frontcache-console:installDist'."
+  exit 1
+fi
+if [ ! -f "$FRONTCACHE_CONFIG" ]; then
+  echo >&2 "WARNING: console config not found: $FRONTCACHE_CONFIG"
+  echo >&2 "         The console will start with no Frontcache nodes configured."
+fi
+
+echo "Starting Frontcache console on embedded Jetty 12 (port=$PORT)"
+echo "  FRONTCACHE_CONFIG=$FRONTCACHE_CONFIG"
+echo "  webapp=$WEBAPP"
+echo "  java=$JAVA"
+
+exec "$JAVA" \
+  -cp "$LIB_DIR/*" \
+  -Dfrontcache.jetty.port="$PORT" \
+  -Dfrontcache.jetty.webapp="$WEBAPP" \
+  -Dlogback.configurationFile="$CONF_DIR/fc-logback.xml" \
+  org.frontcache.console.ConsoleJettyServer

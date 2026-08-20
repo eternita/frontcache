@@ -14,4 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-sh ../server/bin/frontcache
+#
+# Convenience wrapper: the real launcher is ../server/bin/frontcache. Resolve this
+# script's own directory rather than trusting the CWD (the previous
+# `sh ../server/bin/frontcache` only worked when invoked from inside bin/), and exec it
+# so signals and the exit status pass straight through.
+set -euo pipefail
+
+SCRIPT="${BASH_SOURCE[0]}"
+while [ -h "$SCRIPT" ]; do
+  DIR="$(cd -P "$(dirname "$SCRIPT")" && pwd)"
+  SCRIPT="$(readlink "$SCRIPT")"
+  [[ "$SCRIPT" != /* ]] && SCRIPT="$DIR/$SCRIPT"
+done
+BIN_DIR="$(cd -P "$(dirname "$SCRIPT")" && pwd)"
+
+exec "$BIN_DIR/../server/bin/frontcache" "$@"
