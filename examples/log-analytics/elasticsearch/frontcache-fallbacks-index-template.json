@@ -1,0 +1,19 @@
+{
+  "index_patterns": ["frontcache-fallbacks-*"],
+  "_meta": {
+    "note": "priority must exceed the frontcache-* template (200); frontcache-* also matches frontcache-fallbacks-* and ES rejects equal-priority overlaps."
+  },
+  "priority": 300,
+  "template": {
+    "settings": {
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "properties": {
+        "fallback_source": { "type": "keyword" },
+        "fallback_status": { "type": "keyword" },
+        "fallback_url":    { "type": "keyword" }
+      }
+    }
+  }
+}

@@ -175,12 +175,11 @@ status sent:
 2026-08-18T10:49:14,638-0600 5606c79f … direct redirected 0 -1 "127.0.0.1/whatever.htm" "160.202.254.65" fc-us-1 browser "curl/8.7.1" "ip-access" 301
 ```
 
-**Kibana** — pull the logs into the ELK stack that ships with the Frontcache product
-source (`scripts/docker/fc-elk`, driven by the scripts beside it) and open the
-**Frontcache Rejected Requests** dashboard:
+**Kibana** — pull the logs into the [log-analytics example](../examples/log-analytics)
+and open the **Frontcache Rejected Requests** dashboard:
 
 ```bash
-cd scripts/docker          # in the Frontcache product source
+cd examples/log-analytics
 ./start-fc-elk.sh
 ./pull-logs.sh "fc-us fc-eu"
 # http://localhost:5601/app/dashboards#/view/fc-rejected
@@ -188,7 +187,8 @@ cd scripts/docker          # in the Frontcache product source
 
 It breaks everything down by rule, HTTP status, node, domain, country, client IP, URL
 and user agent, and separates *rejected* / *redirected* / *dry-run* / Hystrix
-fallbacks; the `scripts/docker/README.md` beside those scripts covers the setup.
+fallbacks; that example's
+[README](../examples/log-analytics/README.md) covers the setup and every parsed field.
 
 Hit counts are in memory: they reset when the node restarts or when you reload the
 rules. The logs and dashboard are the durable record.

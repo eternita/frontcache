@@ -1,0 +1,14 @@
+# Run the four Frontcache log parsers as SEPARATE pipelines.
+#
+# Without this file Logstash concatenates every *.conf under pipeline/ into a
+# single pipeline, so all inputs feed all outputs and every event is written to
+# all four indices (requests + errors + fallbacks + rejected). Isolating them
+# here keeps each log type flowing only into its own index.
+- pipeline.id: fc-requests
+  path.config: "/usr/share/logstash/pipeline/fc-logstash.conf"
+- pipeline.id: fc-errors
+  path.config: "/usr/share/logstash/pipeline/fc-logstash-errors.conf"
+- pipeline.id: fc-fallbacks
+  path.config: "/usr/share/logstash/pipeline/fc-logstash-fallbacks.conf"
+- pipeline.id: fc-rejected
+  path.config: "/usr/share/logstash/pipeline/fc-logstash-rejected.conf"

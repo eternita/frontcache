@@ -1,0 +1,22 @@
+{
+  "index_patterns": ["frontcache-errors-*"],
+  "_meta": {
+    "note": "priority must exceed the frontcache-* template (200); frontcache-* also matches frontcache-errors-* and ES rejects equal-priority overlaps."
+  },
+  "priority": 300,
+  "template": {
+    "settings": {
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "properties": {
+        "server":         { "type": "keyword" },
+        "log_level":      { "type": "keyword" },
+        "logger":         { "type": "keyword" },
+        "thread":         { "type": "keyword" },
+        "exception_class": { "type": "keyword" },
+        "error_url":      { "type": "keyword" }
+      }
+    }
+  }
+}

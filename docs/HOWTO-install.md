@@ -448,8 +448,8 @@ archive, a container, or point `FRONTCACHE_JAVA_HOME` at a JDK 25.
 
 **Logs.** `FRONTCACHE_HOME/logs/`: `frontcache-requests.log` (one line per request/fragment),
 `error.log`, `fallback.log`, `frontcache-failed-requests.log` (guard-rule rejections and Hystrix
-fallbacks). The ELK stack that ships with the Frontcache product source
-(`scripts/docker/fc-elk`) indexes all four with ready-made dashboards.
+fallbacks). The [log-analytics example](../examples/log-analytics) indexes all four into
+Elasticsearch + Kibana with ready-made dashboards.
 
 ---
 
