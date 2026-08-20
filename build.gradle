@@ -333,7 +333,7 @@ project(':frontcache-server') {
 	// bundle under build/distributions: the launcher, its Jetty 12 EE10 classpath, the
 	// war and a config skeleton. This is the base artifact of every delivery channel -
 	// the Docker image and the VM installer unpack THIS rather than re-running Gradle.
-	// See docs/frontcache-distribution-proposal.md.
+	// See docs/archive/frontcache-distribution-proposal.md.
 	//
 	// The archive is built from the task outputs (war / jar / configurations.provided)
 	// rather than from the in-place server/ tree, so a developer's leftovers there -
@@ -492,7 +492,7 @@ project(':frontcache-console') {
 
 // ---- distribution bundles: checksums, verification, publishing ----------------
 // The two runnable modules ship as downloadable archives (see
-// docs/frontcache-distribution-proposal.md, channel B). They are published to the same
+// docs/archive/frontcache-distribution-proposal.md, channel B). They are published to the same
 // public-read S3 Maven repo as the jars, so no extra hosting is needed:
 //   https://repo.eternita.co/maven2/org/frontcache/frontcache-server/<v>/frontcache-server-<v>.zip
 // Release step:  ./gradlew dist && ./gradlew publish
@@ -599,7 +599,7 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 	//
 	// There used to be a fourth, frontcache-server-<v>-nginx-site.sh, which the installer
 	// fetched for --with-nginx. The nginx front door moved to the public repo's
-	// examples/front-door - see docs/move-out-nginx-plan.md. Already-published versions of
+	// examples/front-door - see docs/archive/move-out-nginx-plan.md. Already-published versions of
 	// that artifact stay where they are; older installers keep resolving them.
 	def releaseAssets = isServer ? [
 		[file: rootProject.file('scripts/dist/install-frontcache.sh'),                classifier: 'installer',   extension: 'sh'],
