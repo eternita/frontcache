@@ -6,13 +6,14 @@ Container images for Frontcache, plus an ELK stack for browsing its logs.
   Frontcache alone (embedded Jetty 12), plain HTTP on 9080, no TLS. Whatever terminates TLS
   goes in front of it: a Kubernetes ingress, an ALB, Cloudflare, or nginx.
 
-  > The image used to come in two variants — the default was nginx + Frontcache on 80/443, and
-  > `-slim` was Frontcache alone. **There is now one image, and it is what `-slim` was.** The
-  > nginx front door moved to the public repo's
+  > Through 2.5.1 this image came in two variants — the default was nginx + Frontcache on
+  > 80/443, and `-slim` was Frontcache alone. **There is now one image, and it is what `-slim`
+  > was.** The nginx front door lives in the public repo's
   > [`examples/front-door`](https://github.com/eternita/frontcache/tree/master/examples/front-door),
   > which has both a two-container compose stack and a script for a VM. See
-  > [the plan](../../docs/move-out-nginx-plan.md). The `-slim` tags are still published for now
-  > so pinned deployments keep working.
+  > [the plan](../../docs/move-out-nginx-plan.md). 2.6.0 was published under the `-slim` names as
+  > well, as a compatibility alias; from 2.7.0 only the plain tag is pushed. Nothing was deleted,
+  > so every existing `-slim` tag still resolves.
 - **`fc-console/`** — the **Frontcache console** image (realtime stats and cache management,
   port 7080). It is a separate container because it is a separate process: the server's
   launcher deploys exactly one webapp at context `/`.
@@ -98,10 +99,6 @@ Two images are produced:
 A semver tag also publishes its `X.Y` alias, so `2.5.0` pushes `2.5` as well and a customer
 can track patch releases without tracking `:latest`. Customer-facing docs always name the
 exact tag.
-
-The server image is **also** pushed under the `<tag>-slim` names, which used to be a separate
-build. Same image, two names, so a deployment pinned to `-slim` keeps working without anyone
-touching it. Set `SLIM_ALIAS=0` to stop once the overlap is over.
 
 `--push` implies a **multi-platform** build, which cannot be loaded into the local image
 store, so it goes straight to the registry (`docker login` first). It runs on a dedicated

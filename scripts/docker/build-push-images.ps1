@@ -128,15 +128,9 @@ function Build-Image {
 
 try {
     if ($Only -eq 'all' -or $Only -eq 'server') {
-        # One image, tagged twice during the overlap: <tag> (+ its X.Y / latest aliases) and
-        # the transitional <tag>-slim set. Same build, so the two names cannot drift.
-        $serverExtras = @(Get-ExtraTags $Tag)
-        if ($env:SLIM_ALIAS -ne '0') {
-            $serverExtras += @("$Tag-slim") + @(Get-ExtraTags $Tag '-slim')
-        }
         Build-Image -Name 'server' -SrcDir (Join-Path $ScriptDir 'fc-server') `
             -Tarball $ServerTgz -Archive 'frontcache-server.tar.gz' `
-            -Image $ImageServer -ImageTag $Tag -Extras $serverExtras
+            -Image $ImageServer -ImageTag $Tag -Extras (Get-ExtraTags $Tag)
     }
     if ($Only -eq 'all' -or $Only -eq 'console') {
         Build-Image -Name 'console' -SrcDir (Join-Path $ScriptDir 'fc-console') `

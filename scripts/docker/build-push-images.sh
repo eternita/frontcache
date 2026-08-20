@@ -19,10 +19,10 @@
 #   $NS/frontcache-console:<tag>        console, 7080
 #
 # The server image used to come in two variants - `<tag>` was nginx + Frontcache on 80/443 and
-# `<tag>-slim` was Frontcache alone. The nginx front door now lives in the public repo under
-# examples/front-door, so there is ONE server image and it is what -slim used to be. During the
-# overlap it is ALSO pushed under the -slim tags, so pinned -slim deployments keep working
-# unattended; set SLIM_ALIAS=0 to stop (phase 4 of docs/move-out-nginx-plan.md).
+# `<tag>-slim` was Frontcache alone. The nginx front door moved to the public repo under
+# examples/front-door, so there is ONE server image and it is what -slim used to be. 2.6.0 was
+# published under both names as a compatibility alias; from 2.7.0 only the plain tag is pushed.
+# The -slim tags up to 2.6.0 still exist and still resolve - nothing was deleted.
 #
 # Env knobs:
 #   NS              registry namespace (default pavlikovskiy - see the follow-up doc for the
@@ -31,7 +31,6 @@
 #   IMAGE_CONSOLE   console image name, overriding $NS/frontcache-console
 #   PLATFORMS       push platforms (default linux/amd64,linux/arm64)
 #   NO_BUILD=1      skip ./gradlew dist and use the archives already on disk
-#   SLIM_ALIAS=0    stop publishing the transitional -slim alias tags
 #
 # --push implies a multi-platform build, which cannot be loaded into the local image store,
 # so it goes straight to the registry (a prior `docker login` is required). Without --push
@@ -48,7 +47,6 @@ IMAGE_SERVER="${IMAGE_SERVER:-$NS/frontcache-server}"
 IMAGE_CONSOLE="${IMAGE_CONSOLE:-$NS/frontcache-console}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 BUILDER="frontcache"          # buildx builder used for multi-platform pushes
-SLIM_ALIAS="${SLIM_ALIAS:-1}"  # also tag the server image -slim, for deployments pinned to it
 
 # the bundle version - always from version.properties, independent of the image tag
 FC_VERSION="$(sed -n 's/^version=//p' "$REPO_ROOT/version.properties" | tr -d '[:space:]')"
@@ -84,12 +82,12 @@ esac
 # A semver tag also gets its X.Y alias, so 2.5.0 publishes 2.5 as well and a customer can
 # track patch releases without tracking :latest. Customer docs always name the exact tag.
 extra_tags() {
-  local tag="$1" suffix="${2:-}" out=""
+  local tag="$1" out=""
   if [[ "$tag" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    out="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}${suffix}"
+    out="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
   fi
   if [ "$PUSH_LATEST" = 1 ]; then
-    out="${out}${out:+ }latest${suffix}"
+    out="${out}${out:+ }latest"
   fi
   echo "$out"
 }
@@ -155,14 +153,8 @@ build_image() {
 }
 
 if [ "$ONLY" = "all" ] || [ "$ONLY" = "server" ]; then
-  # One image, tagged twice during the overlap: <tag> (+ its X.Y / latest aliases) and the
-  # transitional <tag>-slim set. Same build, so the two names cannot drift.
-  SERVER_EXTRAS="$(extra_tags "$TAG")"
-  if [ "$SLIM_ALIAS" = 1 ]; then
-    SERVER_EXTRAS="${SERVER_EXTRAS}${SERVER_EXTRAS:+ }$TAG-slim $(extra_tags "$TAG" -slim)"
-  fi
   build_image server "$SCRIPT_DIR/fc-server" "$SERVER_TGZ" frontcache-server.tar.gz \
-    "$IMAGE_SERVER" "$TAG" "$SERVER_EXTRAS"
+    "$IMAGE_SERVER" "$TAG" "$(extra_tags "$TAG")"
 fi
 
 if [ "$ONLY" = "all" ] || [ "$ONLY" = "console" ]; then

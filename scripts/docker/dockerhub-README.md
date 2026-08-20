@@ -35,16 +35,16 @@ https://github.com/eternita/frontcache/tree/master/examples/front-door.
 | Tag | |
 | --- | --- |
 | `2.6.0`, `2.6` | the release, and its patch-tracking alias |
-| `2.6.0-slim`, `2.6-slim` | **the same image**, kept so deployments pinned to `-slim` keep working |
-| `latest` | still 2.5.x — see below |
+| `latest` | currently 2.6.0 |
+| `2.6.0-slim`, `2.6-slim` | **the same image** as `2.6.0`. A compatibility alias for deployments pinned to `-slim`; **2.6.0 is the last release to publish it** |
 
 Multi-arch (`linux/amd64`, `linux/arm64`). Pin an exact version.
 
 > **Changed in 2.6.0: this image no longer contains nginx.** Through 2.5.1, `frontcache-server:<v>`
 > was nginx + Frontcache on 80/443 and `-slim` was Frontcache alone. There is now one image and it
 > is what `-slim` was, so **`-p 80:80` no longer works** — publish 9080 instead, and put your own
-> front door in front. Deployments pinned to `-slim`, or to any older tag, are unaffected; no tag
-> was deleted or rewritten. `latest` stays on 2.5.x until the cutoff announced with 2.7.0.
+> front door in front. Any tag you already pinned is untouched; nothing was deleted or rewritten.
+> If you pin `-slim`, move to the plain tag: 2.6.0 is the last release published under it.
 > Details: https://github.com/eternita/frontcache/blob/master/docs/release-notes-2.6.0.md
 
 ## Configuration
