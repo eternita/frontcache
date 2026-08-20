@@ -1,27 +1,22 @@
 # syntax=docker/dockerfile:1
 #
-# Frontcache server images, built FROM the published distribution archive.
+# The Frontcache server image, built FROM the published distribution archive.
 #
-# Two targets out of one Dockerfile, so both are guaranteed to carry the identical
-# Frontcache bundle and JDK:
-#
-#   --target slim  ->  Frontcache alone, plain HTTP on 9080, no nginx.
-#                      For Kubernetes / an existing ingress / ALB - the use case #3 edges.
-#   --target full  ->  nginx (80/443, terminates TLS) + Frontcache. The containerized
-#                      equivalent of the single-host VM install. This is the default.
+# Frontcache alone: plain HTTP on 9080, no TLS and no front door. Put it behind whatever
+# terminates TLS for you - an ingress, an ALB, Cloudflare, or nginx. A worked nginx example
+# (two containers, or a VM script) lives in the public repo under examples/front-door.
 #
 # The build context is a small STAGING DIRECTORY assembled by
-# scripts/docker/build-push-images.sh: this Dockerfile, the entrypoints, and the
-# distribution tarball renamed to frontcache-server.tar.gz. Building from the release
-# archive rather than from the repo working tree means the image is reproducible from a
-# published artifact, and the build host needs no JDK and no Gradle run.
+# scripts/docker/build-push-images.sh: this Dockerfile, the entrypoint, and the distribution
+# tarball renamed to frontcache-server.tar.gz. Building from the release archive rather than
+# from the repo working tree means the image is reproducible from a published artifact, and
+# the build host needs no JDK and no Gradle run.
 #
 # Build it with the script, not by hand:
 #   ./scripts/docker/build-push-images.sh 2.5.0
 ARG FRONTCACHE_VERSION=2.5.0
 
-# ---- base: the unpacked bundle on a JDK 25 -----------------------------------
-FROM eclipse-temurin:25-jdk AS base
+FROM eclipse-temurin:25-jdk
 ARG FRONTCACHE_VERSION
 
 # curl backs the HEALTHCHECK below and makes the container debuggable from inside.
@@ -44,14 +39,9 @@ RUN test -d "/opt/frontcache-server-${FRONTCACHE_VERSION}" \
 RUN mkdir -p /opt/frontcache-defaults \
  && cp -a /opt/frontcache-server/FRONTCACHE_HOME/conf /opt/frontcache-defaults/conf
 
-COPY seed-conf.sh /opt/fc-server/seed-conf.sh
-RUN chmod +x /opt/frontcache-server/server/bin/frontcache /opt/frontcache-server/bin/frontcache
-
-# ---- slim: Frontcache only ---------------------------------------------------
-FROM base AS slim
-
-COPY entrypoint-slim.sh /opt/fc-server/entrypoint-slim.sh
-RUN chmod +x /opt/fc-server/entrypoint-slim.sh
+COPY seed-conf.sh entrypoint.sh /opt/fc-server/
+RUN chmod +x /opt/fc-server/entrypoint.sh \
+             /opt/frontcache-server/server/bin/frontcache /opt/frontcache-server/bin/frontcache
 
 ENV FRONTCACHE_HTTP_PORT=9080
 EXPOSE 9080
@@ -61,27 +51,5 @@ EXPOSE 9080
 # proves Jetty + the webapp + the engine are up without needing a site key.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
   CMD curl -fsS -o /dev/null "http://127.0.0.1:${FRONTCACHE_HTTP_PORT}/frontcache-io?action=get-cache-state"
-
-ENTRYPOINT ["/opt/fc-server/entrypoint-slim.sh"]
-
-# ---- full: nginx front door + Frontcache (default target) --------------------
-FROM slim AS full
-
-# nginx for the public front door; openssl for keystore -> PEM extraction at startup.
-RUN apt-get update \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nginx openssl \
- && rm -rf /var/lib/apt/lists/*
-
-# render-nginx-site.sh is the shared nginx template, also used by the VM installer; the
-# build script stages it into the context from scripts/dist/.
-COPY entrypoint.sh render-nginx-site.sh /opt/fc-server/
-RUN chmod +x /opt/fc-server/entrypoint.sh /opt/fc-server/render-nginx-site.sh
-
-# 80/443 public (nginx). 9080 stays internal (Frontcache HTTP).
-EXPOSE 80 443
-
-# Probe THROUGH nginx, so one check covers both processes.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD curl -fsS -o /dev/null "http://127.0.0.1/frontcache-io?action=get-cache-state"
 
 ENTRYPOINT ["/opt/fc-server/entrypoint.sh"]

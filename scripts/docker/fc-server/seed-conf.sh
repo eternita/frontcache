@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #
-# Shared config handling for the Frontcache server images. Sourced by
-# entrypoint.sh (nginx + Frontcache) and entrypoint-slim.sh (Frontcache only).
+# Config handling for the Frontcache server image. Sourced by entrypoint.sh.
 #
 # Two jobs:
 #
@@ -13,9 +12,9 @@
 #
 #  2. resolve_origin_host - decide the origin, and who owns the setting. When ORIGIN_HOST
 #     is set it is authoritative and gets written into frontcache.properties. When it is
-#     NOT set, the properties file is left exactly as the operator wrote it and we only
-#     read the value out of it (for the nginx origin-path blocks). That is what makes a
-#     hand-managed conf mount safe: nothing rewrites it behind the operator's back.
+#     NOT set, the properties file is left exactly as the operator wrote it and is only
+#     read. That is what makes a hand-managed conf mount safe: nothing rewrites it behind
+#     the operator's back.
 
 # seed_conf <defaults-dir> <live-conf-dir>
 seed_conf() {

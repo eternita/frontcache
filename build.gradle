@@ -594,13 +594,15 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 	// output, so they are published as classified artifacts with their own checksums.
 	//
 	//   frontcache-server-<v>-installer.sh        scripts/dist/install-frontcache.sh
-	//   frontcache-server-<v>-nginx-site.sh       scripts/dist/render-nginx-site.sh  (the
-	//                                            installer needs this next to it for --with-nginx)
 	//   frontcache-server-<v>-compose.yml         the compose project
 	//   frontcache-server-<v>-env.example         its .env template
+	//
+	// There used to be a fourth, frontcache-server-<v>-nginx-site.sh, which the installer
+	// fetched for --with-nginx. The nginx front door moved to the public repo's
+	// examples/front-door - see docs/move-out-nginx-plan.md. Already-published versions of
+	// that artifact stay where they are; older installers keep resolving them.
 	def releaseAssets = isServer ? [
 		[file: rootProject.file('scripts/dist/install-frontcache.sh'),                classifier: 'installer',   extension: 'sh'],
-		[file: rootProject.file('scripts/dist/render-nginx-site.sh'),                 classifier: 'nginx-site',  extension: 'sh'],
 		[file: rootProject.file('scripts/docker/fc-server/docker-compose.yml'),        classifier: 'compose',     extension: 'yml'],
 		[file: rootProject.file('scripts/docker/fc-server/.env.example'),              classifier: 'env',         extension: 'example'],
 	] : []

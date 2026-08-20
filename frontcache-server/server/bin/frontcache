@@ -9,8 +9,9 @@
 # its Jetty 12 EE10 jars live in ./server/lib (assembled by the Gradle
 # copyServerLibs task) and it deploys server/frontcache-base/webapps/ROOT.war.
 #
-# The launcher listens on HTTP only (default 9080). TLS is terminated by nginx,
-# which proxies 443 -> http://127.0.0.1:9080 (see configure-nginx-remote.sh).
+# The launcher listens on HTTP only (default 9080). TLS is terminated by whatever fronts it -
+# an ingress, an ALB, or nginx proxying 443 -> http://127.0.0.1:9080. A worked nginx front door
+# is at https://github.com/eternita/frontcache/tree/master/examples/front-door.
 #
 set -euo pipefail
 

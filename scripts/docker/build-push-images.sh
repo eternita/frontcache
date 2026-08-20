@@ -11,13 +11,18 @@
 #                                                   # for the host arch and load it locally
 #   ./build-push-images.sh 2.5.0 --push             # multi-arch (amd64 + arm64), push 2.5.0 + 2.5
 #   ./build-push-images.sh 2.5.0 --push --latest    # ... and :latest
-#   ./build-push-images.sh local --only server      # just the two server images, tagged :local
+#   ./build-push-images.sh local --only server      # just the server image, tagged :local
 #   ./build-push-images.sh 2.5.0 --push --dry-run   # print the buildx commands and stop
 #
 # Images built (namespace from NS=, or override a name outright):
-#   $NS/frontcache-server:<tag>         nginx + Frontcache, 80/443   (Dockerfile --target full)
-#   $NS/frontcache-server:<tag>-slim    Frontcache only, 9080        (Dockerfile --target slim)
+#   $NS/frontcache-server:<tag>         Frontcache, plain HTTP on 9080
 #   $NS/frontcache-console:<tag>        console, 7080
+#
+# The server image used to come in two variants - `<tag>` was nginx + Frontcache on 80/443 and
+# `<tag>-slim` was Frontcache alone. The nginx front door now lives in the public repo under
+# examples/front-door, so there is ONE server image and it is what -slim used to be. During the
+# overlap it is ALSO pushed under the -slim tags, so pinned -slim deployments keep working
+# unattended; set SLIM_ALIAS=0 to stop (phase 4 of docs/move-out-nginx-plan.md).
 #
 # Env knobs:
 #   NS              registry namespace (default pavlikovskiy - see the follow-up doc for the
@@ -26,6 +31,7 @@
 #   IMAGE_CONSOLE   console image name, overriding $NS/frontcache-console
 #   PLATFORMS       push platforms (default linux/amd64,linux/arm64)
 #   NO_BUILD=1      skip ./gradlew dist and use the archives already on disk
+#   SLIM_ALIAS=0    stop publishing the transitional -slim alias tags
 #
 # --push implies a multi-platform build, which cannot be loaded into the local image store,
 # so it goes straight to the registry (a prior `docker login` is required). Without --push
@@ -42,6 +48,7 @@ IMAGE_SERVER="${IMAGE_SERVER:-$NS/frontcache-server}"
 IMAGE_CONSOLE="${IMAGE_CONSOLE:-$NS/frontcache-console}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 BUILDER="frontcache"          # buildx builder used for multi-platform pushes
+SLIM_ALIAS="${SLIM_ALIAS:-1}"  # also tag the server image -slim, for deployments pinned to it
 
 # the bundle version - always from version.properties, independent of the image tag
 FC_VERSION="$(sed -n 's/^version=//p' "$REPO_ROOT/version.properties" | tr -d '[:space:]')"
@@ -128,9 +135,6 @@ build_image() {
 
   mkdir -p "$stage"
   cp "$srcdir"/Dockerfile "$srcdir"/*.sh "$stage/"
-  # the shared nginx template lives with the installer, not with the image, because both
-  # channels render from it - see scripts/dist/render-nginx-site.sh
-  cp "$REPO_ROOT/scripts/dist/render-nginx-site.sh" "$stage/"
   # hardlink when possible so a 30-40 MB archive is not copied for every image
   ln "$tarball" "$stage/$archive" 2>/dev/null || cp "$tarball" "$stage/$archive"
 
@@ -151,10 +155,14 @@ build_image() {
 }
 
 if [ "$ONLY" = "all" ] || [ "$ONLY" = "server" ]; then
-  build_image server-full "$SCRIPT_DIR/fc-server" "$SERVER_TGZ" frontcache-server.tar.gz \
-    "$IMAGE_SERVER" "$TAG" "$(extra_tags "$TAG")" full
-  build_image server-slim "$SCRIPT_DIR/fc-server" "$SERVER_TGZ" frontcache-server.tar.gz \
-    "$IMAGE_SERVER" "$TAG-slim" "$(extra_tags "$TAG" -slim)" slim
+  # One image, tagged twice during the overlap: <tag> (+ its X.Y / latest aliases) and the
+  # transitional <tag>-slim set. Same build, so the two names cannot drift.
+  SERVER_EXTRAS="$(extra_tags "$TAG")"
+  if [ "$SLIM_ALIAS" = 1 ]; then
+    SERVER_EXTRAS="${SERVER_EXTRAS}${SERVER_EXTRAS:+ }$TAG-slim $(extra_tags "$TAG" -slim)"
+  fi
+  build_image server "$SCRIPT_DIR/fc-server" "$SERVER_TGZ" frontcache-server.tar.gz \
+    "$IMAGE_SERVER" "$TAG" "$SERVER_EXTRAS"
 fi
 
 if [ "$ONLY" = "all" ] || [ "$ONLY" = "console" ]; then
@@ -167,8 +175,11 @@ echo
 if [ "$PUSH" = 1 ]; then
   echo ">>> Pushed. On the target host:"
   echo "    docker run -d --name fc-server --restart unless-stopped \\"
-  echo "      -p 80:80 -p 443:443 -e ORIGIN_HOST=origin.example.com \\"
+  echo "      -p 9080:9080 -e ORIGIN_HOST=origin.example.com \\"
   echo "      $IMAGE_SERVER:$TAG"
+  echo
+  echo "    Frontcache serves plain HTTP and no TLS. For an nginx front door on 80/443 see"
+  echo "    examples/front-door in the public repo."
 else
   echo ">>> Loaded locally. Start the stack with:"
   echo "    FC_VERSION=$TAG ./start-fc-server.sh              # server only"

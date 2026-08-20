@@ -16,11 +16,12 @@
 #   curl -fLO $BASE/frontcache-server-$V-installer.sh.sha256
 #   shasum -a 256 -c frontcache-server-$V-installer.sh.sha256
 #   sudo bash frontcache-server-$V-installer.sh --version $V \
-#        --origin-host origin.example.com --with-nginx
+#        --origin-host origin.example.com
 #
-# --with-nginx also needs the shared nginx renderer. It is fetched and checksum-verified
-# automatically; to supply it yourself, put frontcache-server-$V-nginx-site.sh next to this
-# script (or point RENDERER_PATH at it).
+# It installs Frontcache and nothing else. Frontcache speaks plain HTTP and terminates no TLS,
+# so put your own front door on 80/443 in front of it - an ALB, Cloudflare, or nginx. A worked
+# nginx front door (a script for exactly this layout) is in the public repo under
+# examples/front-door.
 #
 # Usage:
 #   install-frontcache.sh [options]
@@ -43,8 +44,6 @@
 #                        host's platform, and skip the JDK step entirely. No JDK is installed
 #                        or required. Adds ~50 MB to the download.
 #   --with-console       also install the console (its own service on 7080, loopback only)
-#   --with-nginx         install nginx as the 80/443 front door, terminating TLS
-#   --origin-paths "..." space-separated paths nginx proxies straight to the origin
 #   --skip-jdk           do not touch the JDK; one that can run Java 25 is already present
 #   --dry-run            print what would happen and change nothing
 #   --yes                do not prompt (required for unattended uninstall)
@@ -66,9 +65,7 @@ SERVICE_USER="frontcache"
 FC_PORT="9080"
 ORIGIN_HOST=""
 ORIGIN_PORT="443"
-ORIGIN_PATHS="/o9r/ /fs/ /pi/ /st/ /images/ /css/ /js/ /page-cache/"
 WITH_CONSOLE=0
-WITH_NGINX=0
 WITH_RUNTIME=0
 RUNTIME_TARGET=""
 SKIP_JDK=0
@@ -89,14 +86,12 @@ while [ $# -gt 0 ]; do
     --port)         FC_PORT="${2:?--port needs a value}"; shift ;;
     --origin-host)  ORIGIN_HOST="${2:?--origin-host needs a value}"; shift ;;
     --origin-port)  ORIGIN_PORT="${2:?--origin-port needs a value}"; shift ;;
-    --origin-paths) ORIGIN_PATHS="${2:?--origin-paths needs a value}"; shift ;;
     --with-runtime) WITH_RUNTIME=1 ;;
     --with-console) WITH_CONSOLE=1 ;;
-    --with-nginx)   WITH_NGINX=1 ;;
     --skip-jdk)     SKIP_JDK=1 ;;
     --dry-run)      DRY_RUN=1 ;;
     --yes|-y)       ASSUME_YES=1 ;;
-    -h|--help)      sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)      sed -n '2,44p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)              echo >&2 "unknown option: $1  (try --help)"; exit 1 ;;
   esac
   shift
@@ -489,14 +484,10 @@ else
 fi
 
 # front-cache.http-port / https-port are what redirect rewriting uses, so they must be the
-# CLIENT-FACING ports. With nginx in front that is 80/443; without it, Frontcache is what
-# clients hit directly, so it is $FC_PORT.
-if [ "$WITH_NGINX" = 1 ]; then
-  set_prop 'front-cache.http-port'  '80'
-  set_prop 'front-cache.https-port' '443'
-else
-  set_prop 'front-cache.http-port'  "$FC_PORT"
-fi
+# CLIENT-FACING ports - what a browser sees, not what Frontcache binds. With nothing in front,
+# that is $FC_PORT. Put a front door on 80/443 in front of it and these have to change to
+# 80/443, or redirects will send users to $FC_PORT (examples/front-door does this for you).
+set_prop 'front-cache.http-port' "$FC_PORT"
 
 run chown -R "$SERVICE_USER:$SERVICE_USER" "$TARGET_DIR"
 run ln -sfn "$TARGET_DIR" "$LINK_DIR"
@@ -564,85 +555,12 @@ if [ "$WITH_CONSOLE" = 1 ]; then
     "Environment=FRONTCACHE_CONSOLE_PORT=7080"
 fi
 
-# ---- nginx (optional) --------------------------------------------------------
-if [ "$WITH_NGINX" = 1 ]; then
-  log "Configuring the nginx front door ..."
-  have nginx || { run_sh 'apt-get update -y'; run_sh 'DEBIAN_FRONTEND=noninteractive apt-get install -y nginx'; }
-  have openssl || run_sh 'DEBIAN_FRONTEND=noninteractive apt-get install -y openssl'
-
-  run mkdir -p /etc/nginx/ssl
-  if [ -s /etc/nginx/ssl/frontcache.crt ] && [ -s /etc/nginx/ssl/frontcache.key ]; then
-    log "Using the TLS certificate already at /etc/nginx/ssl"
-  else
-    warn "no cert at /etc/nginx/ssl - extracting the bundled Jetty DEMO keystore."
-    warn "It is SELF-SIGNED. Replace /etc/nginx/ssl/frontcache.{crt,key} before serving real traffic."
-    run_sh "TMPD=\$(mktemp -d) \
-      && keytool -importkeystore -noprompt \
-           -srckeystore '$LINK_DIR/server/frontcache-base/etc/keystore' \
-           -srcstorepass storepwd -srckeypass keypwd -srcalias jetty \
-           -destkeystore \"\$TMPD/fc.p12\" -deststoretype PKCS12 -deststorepass storepwd \
-      && openssl pkcs12 -in \"\$TMPD/fc.p12\" -passin pass:storepwd -nokeys -out /etc/nginx/ssl/frontcache.crt \
-      && openssl pkcs12 -in \"\$TMPD/fc.p12\" -passin pass:storepwd -nodes -nocerts -out /etc/nginx/ssl/frontcache.key \
-      && chmod 600 /etc/nginx/ssl/frontcache.key \
-      && rm -rf \"\$TMPD\""
-  fi
-
-  # A resolver lets nginx resolve the origin per request, so an origin DNS blip cannot stop
-  # nginx from loading or from serving cache hits on '/'. Take the host's own nameservers.
-  NGINX_RESOLVER="$(awk '/^nameserver/ {printf "%s ", $2} END {print "ipv6=off valid=30s"}' /etc/resolv.conf 2>/dev/null || true)"
-  case "$NGINX_RESOLVER" in
-    "ipv6=off valid=30s") NGINX_RESOLVER="" ; warn "no nameserver in /etc/resolv.conf - the origin host will be resolved once, at nginx config-load time" ;;
-  esac
-
-  # Find the shared nginx renderer. It may sit beside this script under its repo name, or
-  # under the name it is PUBLISHED as (frontcache-server-<v>-nginx-site.sh), or not be present
-  # at all - in which case we fetch and verify it, the same as any other release asset.
-  RENDERER=""
-  SELF_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [ -n "${RENDERER_PATH:-}" ]; then
-    RENDERER="$RENDERER_PATH"
-  elif [ -f "$SELF_DIR/render-nginx-site.sh" ]; then
-    RENDERER="$SELF_DIR/render-nginx-site.sh"
-  else
-    for candidate in "$SELF_DIR"/*-nginx-site.sh; do
-      [ -f "$candidate" ] && { RENDERER="$candidate"; break; }
-    done
-  fi
-  if [ -z "$RENDERER" ]; then
-    RENDERER_NAME="frontcache-server-$VERSION-nginx-site.sh"
-    RENDERER_URL="$MAVEN_BASE/frontcache-server/$VERSION/$RENDERER_NAME"
-    log "Fetching the nginx site renderer ($RENDERER_NAME) ..."
-    fetch "$RENDERER_URL" "$WORK_DIR/$RENDERER_NAME" \
-      || die "could not fetch $RENDERER_URL.
-       Download it yourself and pass its path in RENDERER_PATH, or drop it next to this script."
-    if fetch "$RENDERER_URL.sha256" "$WORK_DIR/$RENDERER_NAME.sha256"; then
-      verify_sha256 "$WORK_DIR/$RENDERER_NAME" "$WORK_DIR/$RENDERER_NAME.sha256"
-    else
-      die "checksum missing for $RENDERER_NAME - refusing to run an unverified script"
-    fi
-    RENDERER="$WORK_DIR/$RENDERER_NAME"
-  fi
-  log "Rendering the nginx site from $(basename "$RENDERER")"
-
-  if [ "$DRY_RUN" = 1 ]; then
-    printf '    [dry-run] render the nginx site config to /etc/nginx/sites-available/default\n' >&2
-  else
-    FRONTCACHE_HTTP_PORT="$FC_PORT" ORIGIN_HOST="$ORIGIN_HOST" ORIGIN_PATHS="$ORIGIN_PATHS" \
-    NGINX_RESOLVER="$NGINX_RESOLVER" \
-    TLS_CERT=/etc/nginx/ssl/frontcache.crt TLS_KEY=/etc/nginx/ssl/frontcache.key \
-      bash "$RENDERER" > /etc/nginx/sites-available/default
-    ln -sfn /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
-    nginx -t
-  fi
-fi
-
 # ---- start -------------------------------------------------------------------
 if [ "$HAVE_SYSTEMD" = 1 ]; then
   run systemctl daemon-reload
   run systemctl enable "$SERVICE_NAME"
   run systemctl restart "$SERVICE_NAME"
   [ "$WITH_CONSOLE" = 1 ] && { run systemctl enable "$CONSOLE_SERVICE_NAME"; run systemctl restart "$CONSOLE_SERVICE_NAME"; }
-  [ "$WITH_NGINX" = 1 ] && { run systemctl enable nginx; run systemctl restart nginx; }
 else
   warn "systemd is not available here, so the units were written but nothing was started."
   warn "Start it by hand with:"
@@ -658,7 +576,7 @@ cat <<REPORT
     active     $LINK_DIR -> $TARGET_DIR
     config     $LINK_DIR/FRONTCACHE_HOME/conf
     logs       $LINK_DIR/FRONTCACHE_HOME/logs
-    listening  http://127.0.0.1:$FC_PORT$([ "$WITH_NGINX" = 1 ] && echo "  (behind nginx on 80/443)")
+    listening  http://127.0.0.1:$FC_PORT  (plain HTTP - put your front door in front of it)
     java       $([ "$WITH_RUNTIME" = 1 ] && echo "$LINK_DIR/runtime (bundled - no host JDK involved)" || echo "the host's JDK")
 
     Verify:
@@ -669,9 +587,12 @@ cat <<REPORT
         # arrives on front-cache.management.port - that is expected, and is why this works
         # as a liveness check without a site key)
 $([ "$WITH_CONSOLE" = 1 ] && printf '      systemctl status %s        # console on http://127.0.0.1:7080/\n' "$CONSOLE_SERVICE_NAME")
-$([ "$WITH_NGINX" = 1 ] && printf '      nginx -t && systemctl status nginx\n')
     Roll back to a previously installed version:
       ln -sfn $INSTALL_DIR/frontcache-server-<older> $LINK_DIR && systemctl restart $SERVICE_NAME
+
+    Frontcache terminates no TLS. Put a front door on 80/443 in front of it and set
+    front-cache.http-port / front-cache.https-port to the ports CLIENTS see - see
+    examples/front-door in the public repo for a worked nginx one.
 
     Before serving real traffic, review $LINK_DIR/FRONTCACHE_HOME/conf/frontcache.properties -
     at minimum front-cache.site-key and front-cache.default-domain, and give this node a

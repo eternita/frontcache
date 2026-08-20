@@ -106,9 +106,6 @@ function Build-Image {
     New-Item -ItemType Directory -Path $stage | Out-Null
     Copy-Item (Join-Path $SrcDir 'Dockerfile') $stage
     Copy-Item (Join-Path $SrcDir '*.sh') $stage
-    # the shared nginx template lives with the installer, not with the image, because both
-    # channels render from it - see scripts/dist/render-nginx-site.sh
-    Copy-Item (Join-Path $RepoRoot 'scripts\dist\render-nginx-site.sh') $stage
     Copy-Item $Tarball (Join-Path $stage $Archive)
 
     # not $args: that is a PowerShell automatic variable
@@ -131,12 +128,15 @@ function Build-Image {
 
 try {
     if ($Only -eq 'all' -or $Only -eq 'server') {
-        Build-Image -Name 'server-full' -SrcDir (Join-Path $ScriptDir 'fc-server') `
+        # One image, tagged twice during the overlap: <tag> (+ its X.Y / latest aliases) and
+        # the transitional <tag>-slim set. Same build, so the two names cannot drift.
+        $serverExtras = @(Get-ExtraTags $Tag)
+        if ($env:SLIM_ALIAS -ne '0') {
+            $serverExtras += @("$Tag-slim") + @(Get-ExtraTags $Tag '-slim')
+        }
+        Build-Image -Name 'server' -SrcDir (Join-Path $ScriptDir 'fc-server') `
             -Tarball $ServerTgz -Archive 'frontcache-server.tar.gz' `
-            -Image $ImageServer -ImageTag $Tag -Extras (Get-ExtraTags $Tag) -Target 'full'
-        Build-Image -Name 'server-slim' -SrcDir (Join-Path $ScriptDir 'fc-server') `
-            -Tarball $ServerTgz -Archive 'frontcache-server.tar.gz' `
-            -Image $ImageServer -ImageTag "$Tag-slim" -Extras (Get-ExtraTags $Tag '-slim') -Target 'slim'
+            -Image $ImageServer -ImageTag $Tag -Extras $serverExtras
     }
     if ($Only -eq 'all' -or $Only -eq 'console') {
         Build-Image -Name 'console' -SrcDir (Join-Path $ScriptDir 'fc-console') `
@@ -152,8 +152,11 @@ Write-Host ""
 if ($Push) {
     Write-Host ">>> Pushed. On the target host:"
     Write-Host "    docker run -d --name fc-server --restart unless-stopped ``"
-    Write-Host "      -p 80:80 -p 443:443 -e ORIGIN_HOST=origin.example.com ``"
+    Write-Host "      -p 9080:9080 -e ORIGIN_HOST=origin.example.com ``"
     Write-Host "      ${ImageServer}:${Tag}"
+    Write-Host ""
+    Write-Host "    Frontcache serves plain HTTP and no TLS. For an nginx front door on 80/443"
+    Write-Host "    see examples/front-door in the public repo."
 } else {
     Write-Host ">>> Loaded locally. Start the stack with:"
     Write-Host "    `$env:FC_VERSION='$Tag'; .\start-fc-server.ps1"

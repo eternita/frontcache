@@ -76,6 +76,10 @@ report the fragments as coming from cache. Logs are under `FRONTCACHE_HOME/logs/
    Forward `X-Forwarded-*` — the launcher honours them, which is what keeps the
    management-port check and absolute-URL rewriting correct behind a proxy.
    Do **not** buffer `/hystrix.stream`; it is a Server-Sent-Events stream.
+   Set `front-cache.http-port` / `front-cache.https-port` to the ports **clients** see
+   (80/443), not this one, or redirects will send users to `:9080`.
+   A worked nginx front door — two containers, or a script for this exact layout — is at
+   <https://github.com/eternita/frontcache/tree/master/examples/front-door>.
 2. Move DNS to the Frontcache host and restrict the origin so only Frontcache can reach it.
 3. Run it under a supervisor. A minimal systemd unit:
 

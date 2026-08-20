@@ -1,5 +1,8 @@
 # Frontcache stack: the standalone server, plus the console under an opt-in profile.
 #
+# Frontcache alone, plain HTTP on 9080. It does not terminate TLS and has no front door of
+# its own - see examples/front-door in the public repo for a worked nginx one.
+#
 # Both services run PUBLISHED images - the images are built by
 # scripts/docker/build-push-images.sh from the release archives, not by compose. That is
 # what lets a customer run this file with nothing but Docker and a `docker compose pull`.
@@ -18,18 +21,14 @@ services:
     container_name: fc-server
     restart: unless-stopped
     ports:
-      - "${FC_HTTP_PORT:-80}:80"
-      - "${FC_HTTPS_PORT:-443}:443"
+      # Plain HTTP. Frontcache does not terminate TLS - put your front door in front of this
+      # port, and publish it on loopback (FC_BIND=127.0.0.1) when you do.
+      - "${FC_BIND:-0.0.0.0}:${FC_HTTP_PORT:-9080}:${FRONTCACHE_HTTP_PORT:-9080}"
     environment:
-      # Origin for the paths nginx proxies straight through. Leave ORIGIN_HOST empty to let
-      # the mounted frontcache.properties own the setting - see seed-conf.sh.
+      # The backend. Leave ORIGIN_HOST empty to let the mounted frontcache.properties own the
+      # setting - see seed-conf.sh.
       ORIGIN_HOST: "${ORIGIN_HOST:-}"
-      ORIGIN_PATHS: "${ORIGIN_PATHS:-/o9r/ /fs/ /pi/ /st/ /images/ /css/ /js/ /page-cache/}"
       FRONTCACHE_HTTP_PORT: "${FRONTCACHE_HTTP_PORT:-9080}"
-      # Jetty demo keystore creds. Mount a real cert at /etc/nginx/ssl instead for production.
-      KEYSTORE_STOREPASS: "${KEYSTORE_STOREPASS:-storepwd}"
-      KEYSTORE_KEYPASS: "${KEYSTORE_KEYPASS:-keypwd}"
-      KEYSTORE_ALIAS: "${KEYSTORE_ALIAS:-jetty}"
     volumes:
       # conf: a named volume by default; set FC_CONF_DIR=./conf in .env for a host bind
       # mount instead, which is the production recommendation (inspectable, and it can live

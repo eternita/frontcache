@@ -41,10 +41,9 @@ try {
     docker compose @composeArgs up -d
     if ($LASTEXITCODE -ne 0) { throw "docker compose up failed (exit $LASTEXITCODE)" }
 
-    # Ask compose for the published ports rather than re-reading .env here: its .env parser
-    # accepts unquoted values with spaces (ORIGIN_PATHS), which a naive parser does not.
-    $http    = (docker compose port fc-server 80)  2>$null
-    $https   = (docker compose port fc-server 443) 2>$null
+    # Ask compose for the published port rather than re-reading .env here.
+    $fcPort  = if ($env:FRONTCACHE_HTTP_PORT) { $env:FRONTCACHE_HTTP_PORT } else { '9080' }
+    $http    = (docker compose port fc-server $fcPort) 2>$null
     $console = if ($WithConsole) { (docker compose port fc-console 7080) 2>$null } else { $null }
 }
 finally {
@@ -53,7 +52,8 @@ finally {
 
 Write-Host ""
 Write-Host ">>> Frontcache is up."
-Write-Host "    http://$http   https://$https (self-signed demo cert)"
+Write-Host "    http://$http  (plain HTTP - no TLS here; put a front door in front of it,"
+Write-Host "     e.g. examples/front-door in the public repo)"
 if ($console) { Write-Host "    console: http://$console/" }
 Write-Host "    health:  docker inspect --format '{{.State.Health.Status}}' fc-server"
 Write-Host "    logs:    docker logs -f fc-server"

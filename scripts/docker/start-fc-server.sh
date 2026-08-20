@@ -44,13 +44,13 @@ echo ">>> Starting the stack ..."
 # variable under `set -u` in bash 3.2, which is what macOS ships.
 ( cd "$COMPOSE_DIR" && docker compose ${COMPOSE_ARGS[@]+"${COMPOSE_ARGS[@]}"} up -d )
 
-# Ask compose for the published ports rather than re-reading .env here: its .env parser
-# accepts unquoted values with spaces (ORIGIN_PATHS), which `source` does not.
+# Ask compose for the published port rather than re-reading .env here.
 published() { ( cd "$COMPOSE_DIR" && docker compose port "$1" "$2" 2>/dev/null ) || true; }
 
 echo
 echo ">>> Frontcache is up."
-echo "    http://$(published fc-server 80)   https://$(published fc-server 443) (self-signed demo cert)"
+echo "    http://$(published fc-server "${FRONTCACHE_HTTP_PORT:-9080}")  (plain HTTP - no TLS here;"
+echo "     put a front door in front of it, e.g. examples/front-door in the public repo)"
 if [ "$WITH_CONSOLE" = 1 ]; then
   echo "    console: http://$(published fc-console 7080)/"
 fi

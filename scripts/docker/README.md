@@ -2,16 +2,17 @@
 
 Container images for Frontcache, plus an ELK stack for browsing its logs.
 
-- **`fc-server/`** — the **Frontcache server** images and the compose project that runs them.
-  Two variants out of one multi-stage Dockerfile:
-  - **full** (default) — nginx + Frontcache in one container. nginx terminates TLS on 443,
-    serves 80, proxies `/` to the embedded Frontcache (Jetty 12, HTTP on 9080) and the
-    configured origin paths to your backend. The containerized equivalent of a VM installed
-    with [`scripts/dist/install-frontcache.sh --with-nginx`](../dist/install-frontcache.sh) -
-    both render their nginx site from the same
-    [shared template](../dist/render-nginx-site.sh).
-  - **slim** — Frontcache alone on 9080, no nginx and no TLS. For Kubernetes, an ALB, or any
-    deployment whose ingress already terminates TLS.
+- **`fc-server/`** — the **Frontcache server** image and the compose project that runs it.
+  Frontcache alone (embedded Jetty 12), plain HTTP on 9080, no TLS. Whatever terminates TLS
+  goes in front of it: a Kubernetes ingress, an ALB, Cloudflare, or nginx.
+
+  > The image used to come in two variants — the default was nginx + Frontcache on 80/443, and
+  > `-slim` was Frontcache alone. **There is now one image, and it is what `-slim` was.** The
+  > nginx front door moved to the public repo's
+  > [`examples/front-door`](https://github.com/eternita/frontcache/tree/master/examples/front-door),
+  > which has both a two-container compose stack and a script for a VM. See
+  > [the plan](../../docs/move-out-nginx-plan.md). The `-slim` tags are still published for now
+  > so pinned deployments keep working.
 - **`fc-console/`** — the **Frontcache console** image (realtime stats and cache management,
   port 7080). It is a separate container because it is a separate process: the server's
   launcher deploys exactly one webapp at context `/`.
@@ -44,9 +45,8 @@ cd ..
 `start-fc-server.sh` builds the archives and the `:local` images, then brings up the compose
 project. Then:
 
-- `http://localhost` and `https://localhost` (self-signed cert from the bundled Jetty demo
-  keystore — mount a real `frontcache.crt`/`frontcache.key` pair at `/etc/nginx/ssl`, or
-  terminate TLS upstream and run the slim image)
+- `http://localhost:9080` — plain HTTP. There is no TLS here and nothing on 80/443; that is
+  the front door's job, and the front door is not in this repo.
 - `docker inspect --format '{{.State.Health.Status}}' fc-server`
 - `docker logs -f fc-server`
 - `./stop-fc-server.sh` (add `-v` to drop the conf/cache/log volumes)
@@ -63,7 +63,7 @@ that matter most:
 | --- | --- |
 | `FC_VERSION` | the image tag to run (`local` for images you built; otherwise an exact release) |
 | `ORIGIN_HOST` | the backend. **Leave it empty** to let the mounted `frontcache.properties` own `front-cache.origin-host` — the entrypoint then reads the value and never rewrites the file. Set it, and it is authoritative and gets written into the file on every start. |
-| `ORIGIN_PATHS` | paths nginx proxies straight to `ORIGIN_HOST` instead of caching |
+| `FC_HTTP_PORT` / `FC_BIND` | the published port and bind address. Keep it on `127.0.0.1` when the front door is on the same host |
 | `FC_CONF_DIR` | where the config lives. Default is the `fc-conf` named volume; point it at a host directory (`./conf`) to own the config on the host — recommended for production |
 | `FC_NODES` / `FC_SITE_KEY` | the nodes the console monitors, and the shared site-key |
 | `FC_CONSOLE_BIND` | console bind address, **loopback by default** |
@@ -88,17 +88,20 @@ upgrades would silently keep running on old config. Files you have edited are ne
 ./build-push-images.sh 2.5.0 --push --dry-run   # print the buildx commands and stop
 ```
 
-Three images are produced:
+Two images are produced:
 
 | Image | Contents | Ports |
 | --- | --- | --- |
-| `pavlikovskiy/frontcache-server:<tag>` | nginx + Frontcache | 80, 443 |
-| `pavlikovskiy/frontcache-server:<tag>-slim` | Frontcache only | 9080 |
+| `pavlikovskiy/frontcache-server:<tag>` | Frontcache | 9080 |
 | `pavlikovskiy/frontcache-console:<tag>` | console | 7080 |
 
 A semver tag also publishes its `X.Y` alias, so `2.5.0` pushes `2.5` as well and a customer
 can track patch releases without tracking `:latest`. Customer-facing docs always name the
 exact tag.
+
+The server image is **also** pushed under the `<tag>-slim` names, which used to be a separate
+build. Same image, two names, so a deployment pinned to `-slim` keeps working without anyone
+touching it. Set `SLIM_ALIAS=0` to stop once the overlap is over.
 
 `--push` implies a **multi-platform** build, which cannot be loaded into the local image
 store, so it goes straight to the registry (`docker login` first). It runs on a dedicated
@@ -114,23 +117,21 @@ is just two runs with different `NS`.
 
 ```sh
 docker run -d --name fc-server --restart unless-stopped \
-  -p 80:80 -p 443:443 \
+  -p 9080:9080 \
   -e ORIGIN_HOST=origin.example.com \
   -v /srv/frontcache/conf:/opt/frontcache-server/FRONTCACHE_HOME/conf \
   -v fc-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache \
   pavlikovskiy/frontcache-server:2.5.0
-
-# slim: no nginx, plain HTTP for an ingress to front
-docker run -d --name fc-edge --restart unless-stopped \
-  -p 9080:9080 -e ORIGIN_HOST=origin.example.com \
-  pavlikovskiy/frontcache-server:2.5.0-slim
 ```
 
-Both images carry a `HEALTHCHECK` that GETs `/frontcache-io?action=get-cache-state` locally.
+The image carries a `HEALTHCHECK` that GETs `/frontcache-io?action=get-cache-state` locally.
 That endpoint answers `200` with an "access denied" JSON body when the request does not
 arrive on `front-cache.management.port`, which makes it a liveness probe that needs no site
-key: a `200` proves Jetty, the webapp and the engine are up. The full image probes *through*
-nginx, so one check covers both processes.
+key: a `200` proves Jetty, the webapp and the engine are up.
+
+Remember `front-cache.http-port` / `front-cache.https-port` in the mounted config: they are
+what redirect rewriting uses, so they must be the ports **clients** see (80/443 behind a front
+door), not 9080.
 
 ---
 
@@ -290,7 +291,7 @@ equivalent; the table lists the Bash names.
 | --- | --- |
 | `start-fc-server.sh` | Build the `:local` images and start the stack (`--with-console`, `--no-build`) |
 | `stop-fc-server.sh` | Stop/remove the stack (`-v` drops volumes) |
-| `build-push-images.sh "<tag>"` | Build all three images from the release archives; `--push` to publish |
+| `build-push-images.sh "<tag>"` | Build both images from the release archives; `--push` to publish |
 | `start-fc-elk.sh` | Start Elasticsearch + Kibana + Logstash |
 | `stop-fc-elk.sh` | Stop fc-elk (`-v` drops data volumes) |
 | `pull-logs.sh "<hosts>"` | rsync FC request, error, fallback, and rejected-request logs into `fc-elk/logs` |
@@ -305,7 +306,7 @@ cd scripts\docker
 .\start-fc-server.ps1                       # gradle dist -> image build -> up -d
 .\start-fc-server.ps1 -WithConsole          # ... and the console
 .\stop-fc-server.ps1 -v                     # stop + drop volumes
-.\build-push-images.ps1 2.5.0 -Push -Latest # build all three images, push 2.5.0 / 2.5 / latest
+.\build-push-images.ps1 2.5.0 -Push -Latest # build both images, push 2.5.0 / 2.5 / latest
 .\start-fc-elk.ps1
 .\pull-logs.ps1 "fc-edge fc-eu"
 .\stop-fc-elk.ps1 -v
