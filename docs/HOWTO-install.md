@@ -129,7 +129,10 @@ BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V.tar.gz
 curl -fLO $BASE/frontcache-server-$V.tar.gz.sha256
-shasum -a 256 -c frontcache-server-$V.tar.gz.sha256      # sha256sum -c on Linux
+# the published checksum may be a bare hash, so compare the hash field
+# rather than using `shasum -c`, which needs the `hash  filename` form:
+[ "$(shasum -a 256 frontcache-server-$V.tar.gz | cut -d' ' -f1)" \
+  = "$(cut -d' ' -f1 < frontcache-server-$V.tar.gz.sha256)" ] && echo "checksum OK"
 
 sudo tar -xzf frontcache-server-$V.tar.gz -C /opt
 sudo ln -sfn /opt/frontcache-server-$V /opt/frontcache
@@ -228,7 +231,10 @@ BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V-installer.sh
 curl -fLO $BASE/frontcache-server-$V-installer.sh.sha256
-shasum -a 256 -c frontcache-server-$V-installer.sh.sha256
+# the published checksum may be a bare hash, so compare the hash field
+# rather than using `shasum -c`, which needs the `hash  filename` form:
+[ "$(shasum -a 256 frontcache-server-$V-installer.sh | cut -d' ' -f1)" \
+  = "$(cut -d' ' -f1 < frontcache-server-$V-installer.sh.sha256)" ] && echo "checksum OK"
 
 sudo bash frontcache-server-$V-installer.sh --version $V \
      --origin-host origin.example.com
@@ -314,7 +320,7 @@ docker compose -f frontcache-server-$V-compose.yml --profile console up -d   # +
 - **TLS is not this container's job.** It serves plain HTTP; terminate TLS in front of it.
 - **Upgrade** with `docker compose pull && docker compose up -d` on a new tag. The `cache` volume
   is pure cache and can be dropped at any time.
-- Pin the exact version. `latest` exists; naming it in production is how you get surprised.
+- Pin the exact version. There is no `latest` tag, and relying on one is how you get surprised.
 
 ---
 
@@ -336,7 +342,10 @@ V=2.6.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-console/$V
 curl -fLO $BASE/frontcache-console-$V.tar.gz
 curl -fLO $BASE/frontcache-console-$V.tar.gz.sha256
-shasum -a 256 -c frontcache-console-$V.tar.gz.sha256
+# the published checksum may be a bare hash, so compare the hash field
+# rather than using `shasum -c`, which needs the `hash  filename` form:
+[ "$(shasum -a 256 frontcache-console-$V.tar.gz | cut -d' ' -f1)" \
+  = "$(cut -d' ' -f1 < frontcache-console-$V.tar.gz.sha256)" ] && echo "checksum OK"
 tar -xzf frontcache-console-$V.tar.gz
 $EDITOR frontcache-console-$V/conf/frontcache-console.conf     # node urls + siteKey
 ./frontcache-console-$V/bin/frontcache-console                 # :7080

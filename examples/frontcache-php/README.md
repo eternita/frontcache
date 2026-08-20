@@ -31,7 +31,10 @@ V=2.6.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 curl -fLO $BASE/frontcache-server-$V.tar.gz
 curl -fLO $BASE/frontcache-server-$V.tar.gz.sha256
-shasum -a 256 -c frontcache-server-$V.tar.gz.sha256
+# the published checksum may be a bare hash, so compare the hash field
+# rather than using `shasum -c`, which needs the `hash  filename` form:
+[ "$(shasum -a 256 frontcache-server-$V.tar.gz | cut -d' ' -f1)" \
+  = "$(cut -d' ' -f1 < frontcache-server-$V.tar.gz.sha256)" ] && echo "checksum OK"
 tar -xzf frontcache-server-$V.tar.gz
 ```
 
