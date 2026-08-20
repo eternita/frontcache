@@ -17,9 +17,9 @@
 Quickest look, if you have Docker:
 
 ```sh
-docker run -d --name frontcache -p 8080:80 \
+docker run -d --name frontcache -p 8080:9080 \
   -e ORIGIN_HOST=your-origin.example.com \
-  pavlikovskiy/frontcache-server:2.5.0
+  pavlikovskiy/frontcache-server:2.6.0
 ```
 
 

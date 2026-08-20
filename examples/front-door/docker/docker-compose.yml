@@ -57,7 +57,7 @@ services:
   # Deliberately publishes NO host port: nginx is the only way in. Reach it directly for
   # debugging with `docker compose exec nginx curl -s http://fc-server:9080/...`.
   fc-server:
-    image: "${FC_IMAGE:-pavlikovskiy/frontcache-server:2.5.0-slim}"
+    image: "${FC_IMAGE:-pavlikovskiy/frontcache-server:2.6.0}"
     container_name: fd-fc-server
     restart: unless-stopped
     environment:

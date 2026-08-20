@@ -28,7 +28,7 @@ PROJECT="fd-smoke"
 # Unprivileged ports, so this needs no root and cannot collide with a real front door.
 export FD_HTTP_PORT="${FD_HTTP_PORT:-8080}"
 export FD_HTTPS_PORT="${FD_HTTPS_PORT:-8443}"
-export FC_IMAGE="${FC_IMAGE:-pavlikovskiy/frontcache-server:2.5.0-slim}"
+export FC_IMAGE="${FC_IMAGE:-pavlikovskiy/frontcache-server:2.6.0}"
 export ORIGIN_SCHEME=http
 export ORIGIN_HOST=origin
 export ORIGIN_PATHS="/images/ /css/ /js/"

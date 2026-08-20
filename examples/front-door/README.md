@@ -167,7 +167,9 @@ shape.
 
 ## Version note
 
-`FC_IMAGE` in [`docker/.env.example`](docker/.env.example) pins the **`-slim`** Frontcache image,
-which is Frontcache alone with no nginx inside it. Once the distribution's plain
-`frontcache-server:<version>` tag becomes that same image, this pin becomes the plain tag.
-Pin an exact version either way.
+`FC_IMAGE` in [`docker/.env.example`](docker/.env.example) pins `frontcache-server:2.6.0`, which
+is Frontcache alone — plain HTTP on 9080, no nginx inside it.
+
+On **2.5.1 and earlier** that plain tag was nginx + Frontcache on 80/443, and the image you want
+here is the `-slim` one (`pavlikovskiy/frontcache-server:2.5.1-slim`). 2.6.0 is still published
+under `-slim` too, so either name works from here on. Pin an exact version either way.

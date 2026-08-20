@@ -34,7 +34,7 @@ flowchart TD
 | **D. Container** | a Docker image | Docker | containers, Kubernetes, quickest trial, **and Windows** |
 | **E. Console** | the management UI | JDK 25 or Docker | realtime stats, cache invalidation |
 
-Frontcache 2.5.0 requires **Java 25** and is **Jakarta EE 10** (`jakarta.servlet`, Servlet 6.0).
+Frontcache 2.6.0 requires **Java 25** and is **Jakarta EE 10** (`jakarta.servlet`, Servlet 6.0).
 It will not load in a `javax.servlet` container or on an older JVM. The container images and the
 bundled-runtime archives carry their own runtime, so those two need no JDK at all.
 
@@ -52,8 +52,8 @@ repositories {
     maven { url = 'https://repo.eternita.co/maven2' }
 }
 dependencies {
-    implementation 'org.frontcache:frontcache-core:2.5.0'
-    implementation 'org.frontcache:frontcache-agent:2.5.0'   // optional: invalidate from app code
+    implementation 'org.frontcache:frontcache-core:2.6.0'
+    implementation 'org.frontcache:frontcache-agent:2.6.0'   // optional: invalidate from app code
 }
 ```
 
@@ -62,7 +62,7 @@ dependencies {
   <repository><id>eternita</id><url>https://repo.eternita.co/maven2</url></repository>
 </repositories>
 <dependency>
-  <groupId>org.frontcache</groupId><artifactId>frontcache-core</artifactId><version>2.5.0</version>
+  <groupId>org.frontcache</groupId><artifactId>frontcache-core</artifactId><version>2.6.0</version>
 </dependency>
 ```
 
@@ -71,8 +71,8 @@ dependencies {
 Frontcache reads its configuration from a directory, not from your app's config:
 
 ```sh
-curl -fLO https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.5.0/frontcache-core-2.5.0-home.zip
-unzip frontcache-core-2.5.0-home.zip
+curl -fLO https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.6.0/frontcache-core-2.6.0-home.zip
+unzip frontcache-core-2.6.0-home.zip
 ```
 
 It contains a filter-mode `conf/frontcache.properties` plus `README-FILTER.md` with the rest of
@@ -124,7 +124,7 @@ command and show cached vs. dynamic fragments in the response headers.
 Use case #2: a standalone reverse proxy in front of an app in any language.
 
 ```sh
-V=2.5.0
+V=2.6.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V.tar.gz
@@ -201,7 +201,10 @@ without a site key.
 1. Terminate TLS upstream (nginx, ALB) on 80/443 and proxy to `http://127.0.0.1:9080`. Forward
    the `X-Forwarded-*` headers — Frontcache honours them, which is what keeps redirect rewriting
    and the management-port check correct behind a proxy. Do **not** buffer `/hystrix.stream`; it
-   is a Server-Sent-Events stream.
+   is a Server-Sent-Events stream. Set `front-cache.http-port` / `front-cache.https-port` to the
+   ports **clients** see (80/443), not 9080, or redirects will send users to `:9080`.
+   A worked nginx front door — a two-container compose stack, or a script for a VM — is in
+   [examples/front-door](../examples/front-door).
 2. Move DNS to the Frontcache host, and restrict the origin so only Frontcache can reach it.
 3. Run it under a supervisor — `README-INSTALL.md` inside the bundle carries a systemd unit, or
    use channel C, which writes it for you.
@@ -215,10 +218,12 @@ Never let a new bundle's `conf/` overwrite a live one. `cache/` is pure cache �
 
 ## C. Installer — a systemd service on a VM
 
-Everything in channel B, scripted, including the JDK, the service user and nginx.
+Everything in channel B, scripted, including the JDK and the service user. It installs
+Frontcache and nothing else — a front door on 80/443 is a separate, optional step, see
+[examples/front-door](../examples/front-door).
 
 ```sh
-V=2.5.0
+V=2.6.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V-installer.sh
@@ -226,8 +231,7 @@ curl -fLO $BASE/frontcache-server-$V-installer.sh.sha256
 shasum -a 256 -c frontcache-server-$V-installer.sh.sha256
 
 sudo bash frontcache-server-$V-installer.sh --version $V \
-     --origin-host origin.example.com \
-     --with-nginx
+     --origin-host origin.example.com
 ```
 
 Download it, check it, then run it — deliberately **not** `curl | sudo bash`. The checksum step
@@ -238,7 +242,6 @@ Useful flags:
 | Flag | Effect |
 | --- | --- |
 | `--with-runtime` | install the build that carries its own Java runtime; no JDK is installed or needed |
-| `--with-nginx` | install nginx as the 80/443 front door, terminating TLS |
 | `--with-console` | also install the console as a second service on 7080 (loopback) |
 | `--archive PATH` | install from a local file instead of downloading — air-gapped hosts |
 | `--dry-run` | print every step, change nothing |
@@ -267,31 +270,30 @@ The fastest way in, and the answer on Windows.
 
 ```sh
 docker run -d --name frontcache --restart unless-stopped \
-  -p 80:80 -p 443:443 \
+  -p 9080:9080 \
   -e ORIGIN_HOST=origin.example.com \
   -v /srv/frontcache/conf:/opt/frontcache-server/FRONTCACHE_HOME/conf \
   -v fc-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache \
-  pavlikovskiy/frontcache-server:2.5.0
+  pavlikovskiy/frontcache-server:2.6.0
 ```
 
-That image is **nginx + Frontcache**: nginx terminates TLS on 443, serves 80, proxies `/` to
-Frontcache and `ORIGIN_PATHS` straight to your backend.
+The image is **Frontcache alone** — plain HTTP on 9080, no TLS. That is what a Kubernetes
+ingress, an ALB, or Cloudflare wants in front of it. For a front door of your own on 80/443, see
+[examples/front-door](../examples/front-door): nginx and Frontcache as two containers, or a
+script for a VM.
 
-For Kubernetes, an ALB, or anything with its own ingress, use the **slim** image — Frontcache
-alone on 9080, no nginx and no TLS:
+> **Changed in 2.6.0.** Through 2.5.1 this tag was nginx + Frontcache on 80/443, and `-slim` was
+> Frontcache alone. There is now one image and it is what `-slim` was, so `-p 80:80` no longer
+> works — publish 9080. 2.6.0 is still pushed under the `-slim` tags, so a deployment pinned to
+> those needs no change, and no older tag was altered. See the
+> [release note](https://github.com/eternita/frontcache/blob/master/docs/release-notes-2.6.0.md).
 
-```sh
-docker run -d --name fc-edge -p 9080:9080 \
-  -e ORIGIN_HOST=origin.example.com \
-  pavlikovskiy/frontcache-server:2.5.0-slim
-```
-
-Both are multi-arch (amd64 + arm64) and carry a `HEALTHCHECK`.
+It is multi-arch (amd64 + arm64) and carries a `HEALTHCHECK`.
 
 ### With compose
 
 ```sh
-V=2.5.0
+V=2.6.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 curl -fLO $BASE/frontcache-server-$V-compose.yml
 curl -fL  $BASE/frontcache-server-$V-env.example -o .env
@@ -309,9 +311,7 @@ docker compose -f frontcache-server-$V-compose.yml --profile console up -d   # +
 - **`ORIGIN_HOST` decides who owns the setting.** Set it, and it is written into
   `frontcache.properties` on every start. Leave it unset, and your mounted file is the source of
   truth and is never rewritten.
-- **Replace the TLS certificate.** The bundled one is a self-signed demo cert. Mount a real
-  `frontcache.crt`/`frontcache.key` pair at `/etc/nginx/ssl`, or terminate TLS upstream and run
-  the slim image.
+- **TLS is not this container's job.** It serves plain HTTP; terminate TLS in front of it.
 - **Upgrade** with `docker compose pull && docker compose up -d` on a new tag. The `cache` volume
   is pure cache and can be dropped at any time.
 - Pin the exact version. `latest` exists; naming it in production is how you get surprised.
@@ -326,13 +326,13 @@ The console is a **separate process** from the server, on port 7080.
 docker run -d --name frontcache-console --restart unless-stopped \
   -p 127.0.0.1:7080:7080 \
   -e FC_NODES=http://fc-server:9080/ -e FC_SITE_KEY=YOUR_SITE_KEY \
-  pavlikovskiy/frontcache-console:2.5.0
+  pavlikovskiy/frontcache-console:2.6.0
 ```
 
 Or as an archive:
 
 ```sh
-V=2.5.0
+V=2.6.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-console/$V
 curl -fLO $BASE/frontcache-console-$V.tar.gz
 curl -fLO $BASE/frontcache-console-$V.tar.gz.sha256
@@ -403,17 +403,16 @@ a companion `.sha256`.
 
 | What | Coordinate / file |
 | --- | --- |
-| Library (filter mode) | `org.frontcache:frontcache-core:2.5.0` |
-| Config skeleton | `frontcache-core-2.5.0-home.zip` |
-| Invalidation client | `org.frontcache:frontcache-agent:2.5.0` |
-| Standalone server | `frontcache-server-2.5.0.tar.gz` / `.zip` |
-| Server, bundled runtime | `frontcache-server-2.5.0-{linux-x64,linux-aarch64,macos-aarch64}.tar.gz` |
-| Console | `frontcache-console-2.5.0.tar.gz` / `.zip` (+ the same platform builds) |
-| Installer | `frontcache-server-2.5.0-installer.sh` |
-| Compose + env | `frontcache-server-2.5.0-compose.yml`, `-env.example` |
-| Container, all-in-one | `pavlikovskiy/frontcache-server:2.5.0` |
-| Container, no nginx | `pavlikovskiy/frontcache-server:2.5.0-slim` |
-| Container, console | `pavlikovskiy/frontcache-console:2.5.0` |
+| Library (filter mode) | `org.frontcache:frontcache-core:2.6.0` |
+| Config skeleton | `frontcache-core-2.6.0-home.zip` |
+| Invalidation client | `org.frontcache:frontcache-agent:2.6.0` |
+| Standalone server | `frontcache-server-2.6.0.tar.gz` / `.zip` |
+| Server, bundled runtime | `frontcache-server-2.6.0-{linux-x64,linux-aarch64,macos-aarch64}.tar.gz` |
+| Console | `frontcache-console-2.6.0.tar.gz` / `.zip` (+ the same platform builds) |
+| Installer | `frontcache-server-2.6.0-installer.sh` |
+| Compose + env | `frontcache-server-2.6.0-compose.yml`, `-env.example` |
+| Container, server | `pavlikovskiy/frontcache-server:2.6.0` (also pushed as `:2.6.0-slim`) |
+| Container, console | `pavlikovskiy/frontcache-console:2.6.0` |
 
 ---
 
