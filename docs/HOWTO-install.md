@@ -453,6 +453,6 @@ fallbacks). The ELK stack that ships with the Frontcache product source
 
 ---
 
-Wiki: <https://github.com/eternita/frontcache/wiki> ·
 Topologies: [HOWTO-deployment-usecases.md](HOWTO-deployment-usecases.md) ·
+Guard rules: [frontcache-guard-getting-started.md](frontcache-guard-getting-started.md) ·
 Licensing: <https://www.eternita.co/frontcache-license.html>

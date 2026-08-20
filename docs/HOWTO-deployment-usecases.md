@@ -1,7 +1,7 @@
 # Frontcache — Deployment How-To & Use-Case Spec
 
 > Detailed how-to guide and diagrams for the three primary deployment topologies of
-> [Frontcache](https://github.com/eternita/frontcache/wiki).
+> Frontcache.
 >
 > Frontcache is a reverse-proxy / web-filter page-fragment cache. It serves cached page
 > fragments, stitches together `<fc:include url="..."/>` fragments (optionally concurrently),
@@ -527,4 +527,7 @@ ships documentation and examples only:
 - Sample props: `frontcache-core/src/main/resources/front-cache.template.properties`
 - Agent: `frontcache-agent/.../agent/{FrontCacheAgent,FrontCacheAgentCluster}.java`
 
-Wiki: https://github.com/eternita/frontcache/wiki
+---
+
+Install: [HOWTO-install.md](HOWTO-install.md) ·
+Licensing: <https://www.eternita.co/frontcache-license.html>
