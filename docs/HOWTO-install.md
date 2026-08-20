@@ -290,8 +290,8 @@ script for a VM.
 
 > **Changed in 2.6.0.** Through 2.5.1 this tag was nginx + Frontcache on 80/443, and `-slim` was
 > Frontcache alone. There is now one image and it is what `-slim` was, so `-p 80:80` no longer
-> works — publish 9080. 2.6.0 is still pushed under the `-slim` tags, so a deployment pinned to
-> those needs no change, and no older tag was altered. See the
+> works — publish 9080. No existing tag was altered. If you pin `-slim`, move to the plain tag:
+> 2.6.0 is published under both names and is the last release to carry `-slim`. See the
 > [release note](https://github.com/eternita/frontcache/blob/master/docs/release-notes-2.6.0.md).
 
 It is multi-arch (amd64 + arm64) and carries a `HEALTHCHECK`.
@@ -320,7 +320,7 @@ docker compose -f frontcache-server-$V-compose.yml --profile console up -d   # +
 - **TLS is not this container's job.** It serves plain HTTP; terminate TLS in front of it.
 - **Upgrade** with `docker compose pull && docker compose up -d` on a new tag. The `cache` volume
   is pure cache and can be dropped at any time.
-- Pin the exact version. There is no `latest` tag, and relying on one is how you get surprised.
+- Pin the exact version. `latest` exists and currently points at 2.6.0; naming it in production is how you get surprised.
 
 ---
 
@@ -420,7 +420,7 @@ a companion `.sha256`.
 | Console | `frontcache-console-2.6.0.tar.gz` / `.zip` (+ the same platform builds) |
 | Installer | `frontcache-server-2.6.0-installer.sh` |
 | Compose + env | `frontcache-server-2.6.0-compose.yml`, `-env.example` |
-| Container, server | `pavlikovskiy/frontcache-server:2.6.0` (also pushed as `:2.6.0-slim`) |
+| Container, server | `pavlikovskiy/frontcache-server:2.6.0` |
 | Container, console | `pavlikovskiy/frontcache-console:2.6.0` |
 
 ---
