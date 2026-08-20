@@ -24,9 +24,6 @@ client ──▶ nginx :80  │                     (cached)
 | **A** | [`docker/`](docker/) | nginx and Frontcache as two containers. Nothing to build. Start here. |
 | **C** | [`vm/`](vm/) | nginx on an Ubuntu host, next to a Frontcache installed by `install-frontcache.sh`. |
 
-There is no one-box (single container running both) shape on purpose — see
-[Why there is no combined image](#why-there-is-no-combined-image).
-
 ---
 
 ## A. Two containers
@@ -156,14 +153,6 @@ directly, and 443 answers. `KEEP=1 ./smoke-test.sh` leaves it running to poke at
 | redirects send users to `:9080` | `front-cache.http-port` / `https-port` are not the client-facing ports — see shape C above |
 | the console dashboard is empty | `/hystrix.stream` is being buffered somewhere |
 | nothing is compressed | `gzip_proxied any` — nginx skips proxied responses without it |
-
-## Why there is no combined image
-
-The Frontcache distribution used to ship one container running nginx *and* Frontcache, with a
-watchdog to make two processes behave like one. Shape A deletes that problem instead of moving
-it here: two containers, one process each, independent restarts. If you genuinely need a single
-container, everything you need is in this directory — but it is not carried here as a supported
-shape.
 
 ## Version note
 
