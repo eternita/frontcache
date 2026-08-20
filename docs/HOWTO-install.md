@@ -291,8 +291,8 @@ script for a VM.
 > **Changed in 2.6.0.** Through 2.5.1 this tag was nginx + Frontcache on 80/443, and `-slim` was
 > Frontcache alone. There is now one image and it is what `-slim` was, so `-p 80:80` no longer
 > works — publish 9080. No existing tag was altered. If you pin `-slim`, move to the plain tag:
-> 2.6.0 is published under both names and is the last release to carry `-slim`. See the
-> [release note](https://github.com/eternita/frontcache/blob/master/docs/release-notes-2.6.0.md).
+> 2.6.0 is published under both names and is the last release to carry `-slim`. The
+> [front-door example](../examples/front-door) covers the same change from the nginx side.
 
 It is multi-arch (amd64 + arm64) and carries a `HEALTHCHECK`.
 
@@ -448,8 +448,8 @@ archive, a container, or point `FRONTCACHE_JAVA_HOME` at a JDK 25.
 
 **Logs.** `FRONTCACHE_HOME/logs/`: `frontcache-requests.log` (one line per request/fragment),
 `error.log`, `fallback.log`, `frontcache-failed-requests.log` (guard-rule rejections and Hystrix
-fallbacks). The [ELK stack under `scripts/docker/fc-elk`](https://github.com/eternita/frontcache/wiki)
-in the main repo indexes all four with ready-made dashboards.
+fallbacks). The ELK stack that ships with the Frontcache product source
+(`scripts/docker/fc-elk`) indexes all four with ready-made dashboards.
 
 ---
 

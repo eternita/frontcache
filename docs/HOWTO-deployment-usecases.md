@@ -7,8 +7,8 @@
 > fragments, stitches together `<fc:include url="..."/>` fragments (optionally concurrently),
 > serves bots differently from users, and provides circuit-breaking / fallbacks via Hystrix.
 
-All class names, properties, headers, ports, and tag syntax below are taken from the actual
-repo (paths cited inline) so the snippets are copy-paste accurate.
+All class names, properties, headers, ports, and tag syntax below are taken from the Frontcache
+product source (paths named inline) so the snippets are copy-paste accurate.
 
 ---
 
@@ -22,7 +22,7 @@ repo (paths cited inline) so the snippets are copy-paste accurate.
 | **Standalone** | `org.frontcache.FrontCacheServlet` | Reverse proxy to a configured origin host | Separate host/process (in front of any-language app) |
 
 Both delegate to the singleton **`FrontCacheEngine`**, which orchestrates three pluggable
-subsystems (see [CLAUDE.md](../CLAUDE.md) / `frontcache-core`):
+subsystems, all implemented in `frontcache-core`:
 
 1. **CacheProcessor** — `front-cache.cache-processor.impl`; default `L1L2CacheProcessor`
    (L1 = Ehcache in-memory, L2 = Lucene on-disk index under `FRONTCACHE_HOME/cache/`).
@@ -94,7 +94,7 @@ Source: `frontcache-core/.../core/FCHeaders.java`, taglib `META-INF/fc.tld`.
 <fc:include url="/seo/footer" client="bot" />
 ```
 
-### 0.4 Standard ports (from the `build.gradle` embedded-Jetty launcher config)
+### 0.4 Standard ports (the embedded-Jetty launcher defaults)
 
 | Component | HTTP | HTTPS |
 |-----------|------|-------|
@@ -136,11 +136,12 @@ passing the request down the filter chain.
 
 ### 1.2 How-to steps
 
-1. **Add the dependency.** Put `frontcache-core` on the app's classpath
-   (`./gradlew :frontcache-core:build` → jar, or `publishToMavenLocal`).
+1. **Add the dependency.** Put the published `org.frontcache:frontcache-core` on the app's
+   classpath — channel A of the [install guide](HOWTO-install.md) has the Gradle and Maven
+   snippets, including the repository to add.
 
-2. **Register the filter** in `WEB-INF/web.xml`
-   (see `examples/frontcache-jsp/src/main/webapp/WEB-INF/web.xml`):
+2. **Register the filter** in `WEB-INF/web.xml` (see
+   [the JSP example's `web.xml`](../examples/frontcache-jsp/src/main/webapp/WEB-INF/web.xml)):
 
    ```xml
    <filter>
@@ -157,9 +158,10 @@ passing the request down the filter chain.
    Scope the `url-pattern` to the cacheable surface; leave admin/login/POST paths out (or list
    them in `dynamic-urls.conf`).
 
-3. **Provision `FRONTCACHE_HOME`.** Copy a `FRONTCACHE_HOME/conf` skeleton (model it on
-   `frontcache-tests/FRONTCACHE_HOME_FILTER/conf`). In **filter mode you do NOT set an
-   origin host** — the app itself is the origin. Minimal `frontcache.properties`:
+3. **Provision `FRONTCACHE_HOME`.** Copy a `FRONTCACHE_HOME/conf` skeleton — unpack the
+   published `frontcache-core-<version>-home.zip`, or start from the one in
+   [the JSP example](../examples/frontcache-jsp/FRONTCACHE_HOME). In **filter mode you do NOT
+   set an origin host** — the app itself is the origin. Minimal `frontcache.properties`:
 
    ```properties
    front-cache.cache-processor.impl=org.frontcache.cache.impl.L1L2CacheProcessor
@@ -196,7 +198,8 @@ passing the request down the filter chain.
 
 Hit a `/example/*` URL twice; second response should carry Frontcache trace headers
 (`x-frontcache-id`, and with `front-cache.log-to-headers=true`, timing headers). The e2e
-harness for this mode is `frontcache-tests` (`./tests.sh`).
+harness for this mode — the `frontcache-tests` module, run by `./tests.sh` — lives in the
+Frontcache product source repository.
 
 ---
 
@@ -230,12 +233,12 @@ flowchart LR
 
 ### 2.2 How-to steps
 
-1. **Get the standalone server.** Build `frontcache-server` (`./gradlew :frontcache-server:build`,
-   produces `ROOT.war` + standalone Jetty), or download binaries and run `./bin/frontcache`.
-   It listens on **:9080** (HTTP) / **:9443** (HTTPS).
+1. **Get the standalone server.** Download and unpack the `frontcache-server` archive and run
+   `./bin/frontcache` — channel B of the [install guide](HOWTO-install.md), or channel D there
+   for the container image. It listens on **:9080** (HTTP) / **:9443** (HTTPS).
 
-   > To deploy to a remote Ubuntu host as a `systemd` service, see
-   > [`install-frontcache-server-remote.sh`](../scripts/bash/install-frontcache-server-remote.sh). 
+   > To install it on a Linux host as a `systemd` service, use the published installer script —
+   > channel C of the [install guide](HOWTO-install.md).
 
 2. **Point it at your origin** in `$FRONTCACHE_HOME/conf/frontcache.properties`:
 
@@ -503,15 +506,25 @@ flowchart TD
 
 ---
 
-### References (repo)
+### References
+
+In this repository:
+- Installation, downloads, published artifacts: [HOWTO-install.md](HOWTO-install.md)
+- Hystrix command graph: [hystrix-command-flow.md](hystrix-command-flow.md)
+- Guard rules: [frontcache-guard-getting-started.md](frontcache-guard-getting-started.md)
+- nginx in front of Frontcache: [examples/front-door](../examples/front-door)
+- `web.xml` with the filter registered: [the JSP example](../examples/frontcache-jsp/src/main/webapp/WEB-INF/web.xml)
+- A filter-mode `FRONTCACHE_HOME`: [the JSP example's](../examples/frontcache-jsp/FRONTCACHE_HOME) and
+  [the Spring example's](../examples/frontcache-spring/FRONTCACHE_HOME)
+- Ports: §0.4 above
+
+In the Frontcache product source repository — named for orientation, since this repository
+ships documentation and examples only:
 - Filter / Servlet entry: `frontcache-core/.../org/frontcache/{FrontCacheFilter,FrontCacheServlet}.java`
 - Headers: `frontcache-core/.../core/FCHeaders.java`
 - Taglib: `frontcache-core/src/main/resources/META-INF/fc.tld`
 - IO API actions: `frontcache-core/.../io/FrontcacheAction.java`
-- Sample props: `frontcache-core/src/main/resources/front-cache.template.properties`, `frontcache-tests/FRONTCACHE_HOME_FILTER/conf/`
+- Sample props: `frontcache-core/src/main/resources/front-cache.template.properties`
 - Agent: `frontcache-agent/.../agent/{FrontCacheAgent,FrontCacheAgentCluster}.java`
-- web.xml example: `examples/frontcache-jsp/src/main/webapp/WEB-INF/web.xml`
-- Ports: `build.gradle` (embedded-Jetty launcher configs)
-- Remote install script: `scripts/bash/install-frontcache-server-remote.sh`
-- Standalone deployment debugging log: [`docs/log-frontcache-standalone-deployment.md`](log-frontcache-standalone-deployment.md)
-- Wiki: https://github.com/eternita/frontcache/wiki
+
+Wiki: https://github.com/eternita/frontcache/wiki
