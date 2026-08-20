@@ -51,7 +51,7 @@ set -euo pipefail
 FRONTCACHE_HOST="${FRONTCACHE_HOST:-127.0.0.1}"
 FRONTCACHE_HTTP_PORT="${FRONTCACHE_HTTP_PORT:-9080}"
 ORIGIN_HOST="${ORIGIN_HOST:-}"
-ORIGIN_PATHS="${ORIGIN_PATHS:-/o9r/ /fs/ /pi/ /st/ /images/ /css/ /js/ /page-cache/}"
+ORIGIN_PATHS="${ORIGIN_PATHS:-/images/ /css/ /js/}"
 ORIGIN_SCHEME="${ORIGIN_SCHEME:-https}"
 TLS_CERT="${TLS_CERT:-/etc/nginx/ssl/frontcache.crt}"
 TLS_KEY="${TLS_KEY:-/etc/nginx/ssl/frontcache.key}"
