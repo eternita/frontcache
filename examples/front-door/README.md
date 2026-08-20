@@ -71,6 +71,12 @@ sudo ./vm/configure-nginx.sh --origin-host origin.example.com \
      --origin-paths "/images/ /css/ /js/"
 ```
 
+Driving it from your laptop instead, across a handful of hosts:
+
+```sh
+REMOTE_HOST=fc-us ./vm/configure-nginx-remote.sh --origin-host origin.example.com
+```
+
 `--dry-run` prints the config it would write and changes nothing. **Ubuntu/Debian only** — it
 installs nginx with `apt-get`. On RHEL-family hosts the rendered config is identical; the
 package step and the `sites-available` layout differ.
