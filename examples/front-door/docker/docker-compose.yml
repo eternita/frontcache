@@ -1,0 +1,85 @@
+# Shape A - nginx in front of Frontcache, as TWO containers.
+#
+#   client -> nginx :80/:443 --+--> fc-server :9080 --> origin      (cached)
+#                              |
+#                              +--> origin                          (ORIGIN_PATHS, uncached)
+#
+# Both images are stock and unmodified: the official nginx image renders its site config from
+# a /docker-entrypoint.d hook, and Frontcache is the published server image. There is nothing
+# to build here, and nothing in this file is Frontcache-specific except which env vars the
+# renderer reads.
+#
+#   cp .env.example .env && $EDITOR .env
+#   docker compose up -d
+#
+# The `origin` service is a STAND-IN so the stack runs with nothing else installed. Delete it
+# and point ORIGIN_HOST at your own app.
+name: frontcache-front-door
+
+services:
+  # ---- the front door -------------------------------------------------------
+  nginx:
+    image: "${NGINX_IMAGE:-nginx:1.27}"
+    container_name: fd-nginx
+    restart: unless-stopped
+    ports:
+      - "${FD_HTTP_PORT:-80}:80"
+      - "${FD_HTTPS_PORT:-443}:443"
+    environment:
+      # where Frontcache is - the service name below, not 127.0.0.1
+      FRONTCACHE_HOST: "fc-server"
+      FRONTCACHE_HTTP_PORT: "${FRONTCACHE_HTTP_PORT:-9080}"
+      # paths nginx sends STRAIGHT to the origin, never through the cache
+      ORIGIN_HOST: "${ORIGIN_HOST:-origin}"
+      ORIGIN_PATHS: "${ORIGIN_PATHS:-/images/ /css/ /js/}"
+      ORIGIN_SCHEME: "${ORIGIN_SCHEME:-http}"
+      # Docker's embedded DNS. This makes the renderer resolve the ORIGIN per request, so an
+      # origin that is down or unresolvable cannot stop nginx from starting or from serving
+      # cache hits on '/'.
+      NGINX_RESOLVER: "127.0.0.11 ipv6=off valid=30s"
+      TLS_CERT: /etc/nginx/ssl/frontcache.crt
+      TLS_KEY: /etc/nginx/ssl/frontcache.key
+      TLS_CN: "${TLS_CN:-localhost}"
+    volumes:
+      # the renderer and the cert helper, read-only - this is the whole customization
+      - ../render-nginx-site.sh:/opt/front-door/render-nginx-site.sh:ro
+      - ../tls/make-self-signed.sh:/opt/front-door/make-self-signed.sh:ro
+      - ./render-site.sh:/docker-entrypoint.d/40-render-frontcache-site.sh:ro
+      # TLS material. Default is a named volume holding a generated self-signed cert; point
+      # FD_TLS_DIR at a host directory containing frontcache.crt + frontcache.key to serve
+      # your own - existing files are never overwritten.
+      - "${FD_TLS_DIR:-fd-tls}:/etc/nginx/ssl"
+    depends_on:
+      fc-server:
+        condition: service_healthy
+
+  # ---- Frontcache ------------------------------------------------------------
+  # Deliberately publishes NO host port: nginx is the only way in. Reach it directly for
+  # debugging with `docker compose exec nginx curl -s http://fc-server:9080/...`.
+  fc-server:
+    image: "${FC_IMAGE:-pavlikovskiy/frontcache-server:2.6.0}"
+    container_name: fd-fc-server
+    restart: unless-stopped
+    environment:
+      ORIGIN_HOST: "${ORIGIN_HOST:-origin}"
+      FRONTCACHE_HTTP_PORT: "${FRONTCACHE_HTTP_PORT:-9080}"
+    volumes:
+      # conf: the entrypoint seeds only MISSING files, so this survives an image upgrade.
+      # Point FD_CONF_DIR at a host directory to own the config yourself.
+      - "${FD_CONF_DIR:-fd-conf}:/opt/frontcache-server/FRONTCACHE_HOME/conf"
+      - fd-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache
+      - fd-logs:/opt/frontcache-server/FRONTCACHE_HOME/logs
+
+  # ---- a stand-in origin (DELETE THIS and use your own app) -------------------
+  origin:
+    image: "${NGINX_IMAGE:-nginx:1.27}"
+    container_name: fd-origin
+    restart: unless-stopped
+    volumes:
+      - ./origin/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  fd-tls:
+  fd-conf:
+  fd-cache:
+  fd-logs:
