@@ -1,24 +1,24 @@
-## Frontcache - utility to increase Web App performance.
+## Frontcache = [includes + fragment cache] x edge side
 
-### [it's page fragment cache + remote includes + concurrent execution]
 
 - Licensing: https://www.eternita.co/frontcache-license.html
 
 #### Get started
 
-| | |
-| --- | --- |
-| **Install it** | [Install guide](docs/HOWTO-install.md) — library, archive, installer script, or container |
-| **Choose a topology** | [Deployment use cases](docs/HOWTO-deployment-usecases.md) — filter, standalone proxy, or multi-region |
-| **See it work** | [JSP](examples/frontcache-jsp) · [Spring Boot](examples/frontcache-spring) · [PHP](examples/frontcache-php) — each runs with one command |
-| **Protect a node** | [Guard rules](docs/frontcache-guard-getting-started.md) |
+|                       |                                                                                                                |
+|-----------------------|----------------------------------------------------------------------------------------------------------------|
+| **Understand it**     | [Concepts](docs/frontcache-concept.md) — fragment caching, request lifecycle, ...                              |
+| **Install it**        | [Install guide](docs/install-guide.md) — library, archive, installer script, or container                      |
+| **Choose a topology** | [Deployment use cases](docs/deployment-usecases.md) — filter, standalone proxy, or multi-region                |
+| **See it work**       | [Java / Spring Boot](examples/frontcache-spring) · [PHP](examples/frontcache-php) — each runs with one command |
+| **Read more**         | [Documentation index](docs/doc-index.md)         |
 
 Quickest look, if you have Docker:
 
 ```sh
-docker run -d --name frontcache -p 8080:80 \
+docker run -d --name frontcache -p 8080:9080 \
   -e ORIGIN_HOST=your-origin.example.com \
-  pavlikovskiy/frontcache-server:2.5.0
+  pavlikovskiy/frontcache-server:2.6.0
 ```
 
 
@@ -34,13 +34,5 @@ docker run -d --name frontcache -p 8080:80 \
 
 
 ![Alt](docs/images/how-it-works.png "Frontcache overview")
-
-
-### Frontcache console - realtime stats
-
-![Alt](docs/images/fc-console-screen.png "Frontcache console demo")
-
-
-Frontcache developed & tested with Java based Web apps but can be used with other languages/technologies as well. 
 
 

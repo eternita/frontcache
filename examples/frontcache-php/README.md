@@ -14,24 +14,27 @@ Browser ──▶ Frontcache :9080 ──▶ Apache + PHP :80
 **1. Get the Frontcache standalone server**
 
 Two ways; pick either. Both are described in full in the
-[install guide](../../docs/HOWTO-install.md).
+[install guide](../../docs/install-guide.md).
 
 *Container (nothing to install but Docker):*
 
 ```sh
-docker run -d --name frontcache -p 9080:80 \
+docker run -d --name frontcache -p 9080:9080 \
   -e ORIGIN_HOST=host.docker.internal \
-  pavlikovskiy/frontcache-server:2.5.0
+  pavlikovskiy/frontcache-server:2.6.0
 ```
 
 *Archive:*
 
 ```sh
-V=2.5.0
+V=2.6.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 curl -fLO $BASE/frontcache-server-$V.tar.gz
 curl -fLO $BASE/frontcache-server-$V.tar.gz.sha256
-shasum -a 256 -c frontcache-server-$V.tar.gz.sha256
+# the published checksum may be a bare hash, so compare the hash field
+# rather than using `shasum -c`, which needs the `hash  filename` form:
+[ "$(shasum -a 256 frontcache-server-$V.tar.gz | cut -d' ' -f1)" \
+  = "$(cut -d' ' -f1 < frontcache-server-$V.tar.gz.sha256)" ] && echo "checksum OK"
 tar -xzf frontcache-server-$V.tar.gz
 ```
 
@@ -62,7 +65,7 @@ Copy everything in this directory into your web server's `DocumentRoot`.
 **4. Start Frontcache**
 
 ```sh
-./frontcache-server-2.5.0/bin/frontcache        # listens on 9080
+./frontcache-server-2.6.0/bin/frontcache        # listens on 9080
 ```
 
 **5. Open it**

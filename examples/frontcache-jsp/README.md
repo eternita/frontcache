@@ -9,7 +9,7 @@ Example project path: ./examples/frontcache-jsp
         ./gradlew clean appRun
 
 The `appRun` task builds the war and runs it on an embedded Jetty 12 (Jakarta EE10) launcher
-(`ExampleJettyServer`) on port 8080. Requires a **JDK 25** — Frontcache 2.5.0 is Java 25
+(`ExampleJettyServer`) on port 8080. Requires a **JDK 25** — Frontcache 2.6.0 is Java 25
 bytecode and Jakarta EE 10.
 
 `frontcache-core` comes from the published artifact (see the `repositories` block in

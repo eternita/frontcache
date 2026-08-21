@@ -1,0 +1,35 @@
+{
+  "index_patterns": ["frontcache-rejected-*"],
+  "_meta": {
+    "note": "priority must exceed the frontcache-* template (200); frontcache-* also matches frontcache-rejected-* and ES rejects equal-priority overlaps. The highest-priority template wins outright (mappings are NOT merged), so geoip/numeric mappings are repeated here."
+  },
+  "priority": 300,
+  "template": {
+    "settings": {
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "properties": {
+        "geoip": {
+          "properties": {
+            "location": { "type": "geo_point" }
+          }
+        },
+        "runtime_millis": { "type": "long" },
+        "length_bytes":   { "type": "long" },
+        "clientip":       { "type": "ip" },
+        "domain":         { "type": "keyword" },
+        "server":         { "type": "keyword" },
+        "request_method": { "type": "keyword" },
+        "request_type":   { "type": "keyword" },
+        "is_cacheable":   { "type": "keyword" },
+        "is_cached":      { "type": "keyword" },
+        "hystrix_error":  { "type": "keyword" },
+        "browserBot":     { "type": "keyword" },
+        "reject_reason":  { "type": "keyword" },
+        "http_status":    { "type": "keyword" },
+        "failure_type":   { "type": "keyword" }
+      }
+    }
+  }
+}

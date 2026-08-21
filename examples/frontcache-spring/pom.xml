@@ -6,7 +6,7 @@
 
       mvn spring-boot:run        then open http://localhost:8080/example
 
-  Requires a JDK 25 and Maven 3.6.3+. Frontcache 2.5.0 is Java 25 bytecode and Jakarta EE 10
+  Requires a JDK 25 and Maven 3.6.3+. Frontcache 2.6.0 is Java 25 bytecode and Jakarta EE 10
   (jakarta.servlet), which is why this example is on Spring Boot 3.x - Boot 2.x and earlier are
   javax.servlet and cannot load it.
 -->
@@ -29,7 +29,7 @@
 
 	<properties>
 		<java.version>25</java.version>
-		<frontcache.version>2.5.0</frontcache.version>
+		<frontcache.version>2.6.0</frontcache.version>
 	</properties>
 
 	<repositories>

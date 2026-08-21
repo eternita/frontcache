@@ -1,0 +1,72 @@
+# fc-elk: Elasticsearch + Kibana + Logstash for browsing Frontcache request,
+# error, fallback, and rejected-request logs.
+#
+# Logs are pulled from the FC servers into ./logs by ./pull-logs.sh; Logstash
+# tails that directory with four pipelines (requests, errors, fallbacks,
+# rejected), parses each line, and indexes into Elasticsearch; Kibana
+# visualizes it.
+#
+# Security is disabled to keep local use frictionless; this stack is meant to run on
+# your workstation, not on a shared host.
+# To harden, enable xpack.security on elasticsearch and wire credentials into
+# kibana + logstash.
+
+# Pinned project name: it prefixes the volumes (fc-elk_es-data, fc-elk_ls-data) and
+# without it Compose would derive it from the directory, so renaming or copying this
+# directory would silently orphan the indexed data.
+name: fc-elk
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION:-8.15.3}
+    container_name: fc-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms${ES_HEAP:-2g} -Xmx${ES_HEAP:-2g}"
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ports:
+      - "${ES_PORT:-9200}:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION:-8.15.3}
+    container_name: fc-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION:-8.15.3}
+    container_name: fc-logstash
+    environment:
+      - "LS_JAVA_OPTS=-Xms${LS_HEAP:-1g} -Xmx${LS_HEAP:-1g}"
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      # pipelines.yml runs requests/errors/fallbacks/rejected as separate
+      # pipelines so a log line is indexed only into its own index (not fanned
+      # out to all four)
+      - ./logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      # drop zone that pull-logs.sh fills; Logstash tails it
+      - ./logs:/var/log/fc:ro
+      # persist sincedb so a restart doesn't re-ingest already-read files
+      - ls-data:/usr/share/logstash/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+volumes:
+  es-data:
+  ls-data:

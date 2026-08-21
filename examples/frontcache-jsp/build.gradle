@@ -7,13 +7,13 @@
 //
 // It depends on the PUBLISHED frontcache-core, so it builds standalone and you can copy this
 // directory anywhere as the starting point for your own app. Requires a JDK 25 - Frontcache
-// 2.5.0 is Java 25 bytecode and Jakarta EE 10.
+// 2.6.0 is Java 25 bytecode and Jakarta EE 10.
 
 plugins {
 	id 'war'
 }
 
-ext.frontcacheVersion = '2.5.0'
+ext.frontcacheVersion = '2.6.0'
 ext.jettyVersion = '12.0.38'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
 
 java {

@@ -9,8 +9,7 @@ command so it gets circuit-breaking, timeouts, and metrics.
 ## Commands, in order
 
 ### `FC_Total`
-The outer wrapper. [`FrontCacheEngine.processRequest`](../frontcache-core/src/main/java/org/frontcache/FrontCacheEngine.java)
-runs every request through it.
+The outer wrapper. `FrontCacheEngine.processRequest` runs every request through it.
 
 - Group key = the request domain; command key = `Input-Requests`.
 - Runs as a **semaphore** (not a thread pool), so it executes on the caller
@@ -18,8 +17,7 @@ runs every request through it.
 - `getFallback()` writes a fallback page.
 
 ### `FC_ThroughCache`
-Only cacheable GETs reach it, via
-[`CacheProcessorBase`](../frontcache-core/src/main/java/org/frontcache/cache/CacheProcessorBase.java).
+Only cacheable GETs reach it, via `CacheProcessorBase`.
 
 - Group key = the request domain; command key = `Cache-Hits`; `run()` does the
   L1 (Ehcache) / L2 (Lucene) lookup.
@@ -31,9 +29,7 @@ Only cacheable GETs reach it, via
   **not** serve a fallback page.
 
 ### `FC_ThroughCache_WebFilter` / `FC_ThroughCache_HttpClient`
-On a cache miss/expiry,
-[`FCUtils.dynamicCall`](../frontcache-core/src/main/java/org/frontcache/core/FCUtils.java)
-picks one of these to fetch from origin. They carry distinct command keys so
+On a cache miss/expiry, `FCUtils.dynamicCall` picks one of these to fetch from origin. They carry distinct command keys so
 their origin traffic shows up separately in the Hystrix metrics stream.
 
 - `FC_ThroughCache_WebFilter` — filter mode (`chain.doFilter` to the origin app
@@ -50,8 +46,7 @@ its own `coreSize`.
 
 ### `FC_BypassCache`
 Everything else (non-GET verbs, `dynamic-urls.conf` matches, dynamic requests)
-skips the cache entirely, via
-[`FrontCacheEngine`](../frontcache-core/src/main/java/org/frontcache/FrontCacheEngine.java).
+skips the cache entirely, via `FrontCacheEngine`.
 
 - Command key = `Origin-Hits`; forwards any verb to origin (filter chain or HTTP
   client). Runs on the shared `OriginHitsPool` thread pool.

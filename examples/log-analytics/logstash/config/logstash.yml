@@ -1,0 +1,3 @@
+http.host: "0.0.0.0"
+# We manage the pipeline as files under pipeline/; disable X-Pack central mgmt.
+xpack.monitoring.enabled: false
