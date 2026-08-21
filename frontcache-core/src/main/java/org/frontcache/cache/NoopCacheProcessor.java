@@ -21,7 +21,7 @@ import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.reqlog.RequestLogger;
 
-public class NoCacheProcessor implements CacheProcessor {
+public class NoopCacheProcessor implements CacheProcessor {
 
 	@Override
 	public WebResponse processRequest(String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
