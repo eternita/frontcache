@@ -13,6 +13,7 @@
 | **See it work** | [JSP](examples/frontcache-jsp) · [Spring Boot](examples/frontcache-spring) · [PHP](examples/frontcache-php) — each runs with one command |
 | **Protect a node** | [Guard rules](docs/frontcache-guard-getting-started.md) |
 | **Put it behind nginx** | [Front door](examples/front-door) — nginx on 80/443 in front of Frontcache, as containers or on a VM |
+| **See what it is doing** | [Log analytics](examples/log-analytics) — pull the logs into Elasticsearch + Kibana, with four ready-made dashboards |
 
 Quickest look, if you have Docker:
 

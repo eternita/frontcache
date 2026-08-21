@@ -1,0 +1,4 @@
+# Log drop zone filled by ./pull-logs.sh and tailed by Logstash.
+# Keep the directory, ignore the pulled logs.
+*
+!.gitignore

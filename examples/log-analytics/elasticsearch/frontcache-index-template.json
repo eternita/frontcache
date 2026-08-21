@@ -1,0 +1,29 @@
+{
+  "index_patterns": ["frontcache-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "properties": {
+        "geoip": {
+          "properties": {
+            "location": { "type": "geo_point" }
+          }
+        },
+        "runtime_millis": { "type": "long" },
+        "length_bytes":   { "type": "long" },
+        "clientip":       { "type": "ip" },
+        "domain":         { "type": "keyword" },
+        "server":         { "type": "keyword" },
+        "request_method": { "type": "keyword" },
+        "request_type":   { "type": "keyword" },
+        "is_cacheable":   { "type": "keyword" },
+        "is_cached":      { "type": "keyword" },
+        "hystrix_error":  { "type": "keyword" },
+        "browserBot":     { "type": "keyword" }
+      }
+    }
+  }
+}
