@@ -24,7 +24,7 @@
 		    <div class="">
 		        <div style="padding-left: 20px;">
 		        <p style="height: 10px">&nbsp;</p>
-		        <h2 style="font-size: 22px;">Configure Frontcache Edges</h2>  
+		        <h2 style="font-size: 22px;">Configure Frontcache Edges</h2>
 		        <br/>
 		        
         <div style="font-size: 18px;">
@@ -74,26 +74,6 @@
 
 		    </div>
 		    <hr>
-		<div>
-		<b>Steps to load edges on startup:</b>
- <p/>		 
-		<br/>1. create a file with list of edges.
-		E.g. frontcache-console.properties 
-		<br/>http://frontcache-1.example.com:8888/
-        <br/>http://frontcache-2.example.com:8888/
- 
- <p/>
-		<br/>2. update startup scripts with Java property 'org.frontcache.console.config' pointed to console config file. For example:
-		
-		<br/>JAVA_OPTS="-Dorg.frontcache.console.config=/opt/frontcache/conf/frontcache-console.properties"
-		
-		</div>
-			
-		
-			<hr>
-			<footer>
-				<p><a href="https://github.com/eternita/frontcache/wiki/Console-UI" target="_blank">Online documentation about Frontcache Console</a></p>
-			</footer>
 		</div>
 
 		</div>
