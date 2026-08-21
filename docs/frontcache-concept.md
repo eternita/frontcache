@@ -184,15 +184,6 @@ all four into Elasticsearch + Kibana with ready-made dashboards.
 - Circuit breakers in detail: [hystrix-command-flow.md](hystrix-command-flow.md)
 - Run something: [JSP](../examples/frontcache-jsp) · [Spring Boot](../examples/frontcache-spring) · [PHP](../examples/frontcache-php)
 
-In the Frontcache product source repository — named for orientation, since this repository ships
-documentation and examples only:
-
-- Filter / Servlet entry: `frontcache-core/.../org/frontcache/{FrontCacheFilter,FrontCacheServlet}.java`
-- Headers: `frontcache-core/.../core/FCHeaders.java`
-- Taglib: `frontcache-core/src/main/resources/META-INF/fc.tld`
-- Sample props: `frontcache-core/src/main/resources/front-cache.template.properties`
-- Agent: `frontcache-agent/.../agent/{FrontCacheAgent,FrontCacheAgentCluster}.java`
-
 ---
 
 Topologies: [deployment-usecases.md](deployment-usecases.md) ·
