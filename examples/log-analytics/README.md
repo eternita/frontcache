@@ -68,7 +68,7 @@ directory and indexes into `frontcache-YYYY.MM.dd`, `frontcache-errors-YYYY.MM.d
 
 It finds the remote log directory itself, probing (in order)
 `/opt/frontcache/FRONTCACHE_HOME/logs` — where the installer script of
-[the install guide](../../docs/HOWTO-install.md) puts it —
+[the install guide](../../docs/install-guide.md) puts it —
 `~/opt/frontcache-server/FRONTCACHE_HOME/logs`, and
 `/opt/frontcache-server/FRONTCACHE_HOME/logs`. Set `REMOTE_LOG_DIR` to pin it instead; a host
 that then does not have that directory is an error rather than a fallback.
@@ -280,6 +280,6 @@ because it does.
 
 ---
 
-Install and run Frontcache: [docs/HOWTO-install.md](../../docs/HOWTO-install.md) ·
+Install and run Frontcache: [docs/HOWTO-install.md](../../docs/install-guide.md) ·
 Guard rules, which feed the Rejected Requests dashboard:
 [docs/frontcache-guard-getting-started.md](../../docs/frontcache-guard-getting-started.md)

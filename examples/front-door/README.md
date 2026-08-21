@@ -22,7 +22,7 @@ client ──▶ nginx :80  │                     (cached)
 | | | |
 | --- | --- | --- |
 | **A** | [`docker/`](docker/) | nginx and Frontcache as two containers. Nothing to build. Start here. |
-| **C** | [`vm/`](vm/) | nginx on an Ubuntu host, next to a Frontcache installed by the [installer script](../../docs/HOWTO-install.md) (channel C). |
+| **C** | [`vm/`](vm/) | nginx on an Ubuntu host, next to a Frontcache installed by the [installer script](../../docs/install-guide.md) (channel C). |
 
 ---
 
@@ -61,7 +61,7 @@ docker compose exec nginx curl -si http://fc-server:9080/ | head -20
 
 ## C. On a VM, next to an installed Frontcache
 
-Once the installer script (channel C of the [install guide](../../docs/HOWTO-install.md)) has
+Once the installer script (channel C of the [install guide](../../docs/install-guide.md)) has
 put Frontcache on the host as a systemd service:
 
 ```sh

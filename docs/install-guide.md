@@ -1,38 +1,14 @@
 # Frontcache — Install Guide
 
-How to get Frontcache running, whichever way suits you. Five ways in, and the first question is
-just which one you need.
 
-> Every download below is public — no credentials, no licence key. Licensing terms are at
-> <https://www.eternita.co/frontcache-license.html>.
->
-> For *what* Frontcache does and the topologies it supports, read
-> [HOWTO-deployment-usecases.md](HOWTO-deployment-usecases.md) first. This page is only about
-> installation.
 
----
-
-## 1. Pick a channel
-
-```mermaid
-flowchart TD
-    Q1{"Is your app Java / servlet-based?"}
-    Q1 -- yes --> Q2{"Want caching inside the app,<br/>with no extra tier?"}
-    Q2 -- yes --> A["**A. Library**<br/>add a jar, register a filter"]
-    Q2 -- no --> Q3
-    Q1 -- no --> Q3{"How do you run servers?"}
-    Q3 -- "containers / Kubernetes" --> D["**D. Container image**"]
-    Q3 -- "VMs, with root" --> C["**C. Installer script**"]
-    Q3 -- "by hand, or air-gapped" --> B["**B. Archive**"]
-```
-
-| | What you install | Prerequisites | Best for |
-|---|---|---|---|
-| **A. Library** | `frontcache-core` on your app's classpath | your build tool, JDK 25 | a Java app that should cache itself (use case #1) |
-| **B. Archive** | a `.tar.gz`/`.zip` you unpack | JDK 25 — or **nothing**, with a bundled-runtime build | manual installs, air-gapped hosts, evaluation |
-| **C. Installer** | the same archive, as a systemd service | root on Linux | VMs and fleets (use cases #2, #3) |
-| **D. Container** | a Docker image | Docker | containers, Kubernetes, quickest trial, **and Windows** |
-| **E. Console** | the management UI | JDK 25 or Docker | realtime stats, cache invalidation |
+| | What you install | Prerequisites | Best for                                                    |
+|---|---|---|-------------------------------------------------------------|
+| **A. Library** | `frontcache-core` on your app's classpath | your build tool, JDK 25 | a Java based web app that should cache itself (use case #1) |
+| **B. Archive** | a `.tar.gz`/`.zip` you unpack | JDK 25 — or **nothing**, with a bundled-runtime build | manual installs, air-gapped hosts, evaluation               |
+| **C. Installer** | the same archive, as a systemd service | root on Linux | VMs and fleets (use cases #2, #3)                           |
+| **D. Container** | a Docker image | Docker | containers, Kubernetes, quickest trial, **and Windows**     |
+| **E. Console** | the management UI | JDK 25 or Docker | realtime stats, cache invalidation                          |
 
 Frontcache 2.6.0 requires **Java 25** and is **Jakarta EE 10** (`jakarta.servlet`, Servlet 6.0).
 It will not load in a `javax.servlet` container or on an older JVM. The container images and the
@@ -288,12 +264,6 @@ ingress, an ALB, or Cloudflare wants in front of it. For a front door of your ow
 [examples/front-door](../examples/front-door): nginx and Frontcache as two containers, or a
 script for a VM.
 
-> **Changed in 2.6.0.** Through 2.5.1 this tag was nginx + Frontcache on 80/443, and `-slim` was
-> Frontcache alone. There is now one image and it is what `-slim` was, so `-p 80:80` no longer
-> works — publish 9080. No existing tag was altered. If you pin `-slim`, move to the plain tag:
-> 2.6.0 is published under both names and is the last release to carry `-slim`. The
-> [front-door example](../examples/front-door) covers the same change from the nginx side.
-
 It is multi-arch (amd64 + arm64) and carries a `HEALTHCHECK`.
 
 ### With compose
@@ -412,7 +382,7 @@ a companion `.sha256`.
 
 | What | Coordinate / file |
 | --- | --- |
-| Library (filter mode) | `org.frontcache:frontcache-core:2.6.0` |
+| Library | `org.frontcache:frontcache-core:2.6.0` |
 | Config skeleton | `frontcache-core-2.6.0-home.zip` |
 | Invalidation client | `org.frontcache:frontcache-agent:2.6.0` |
 | Standalone server | `frontcache-server-2.6.0.tar.gz` / `.zip` |
@@ -453,6 +423,6 @@ Elasticsearch + Kibana with ready-made dashboards.
 
 ---
 
-Topologies: [HOWTO-deployment-usecases.md](HOWTO-deployment-usecases.md) ·
-Guard rules: [frontcache-guard-getting-started.md](frontcache-guard-getting-started.md) ·
+Concepts: [frontcache-concept.md](frontcache-concept.md) ·
+Topologies: [deployment-usecases.md](deployment-usecases.md) ·
 Licensing: <https://www.eternita.co/frontcache-license.html>
