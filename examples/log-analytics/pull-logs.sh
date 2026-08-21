@@ -44,6 +44,7 @@ LOG_DIR_CANDIDATES=(
   /opt/frontcache/FRONTCACHE_HOME/logs             # installer script (the default --dir)
   '~/opt/frontcache-server/FRONTCACHE_HOME/logs'   # archive unpacked into the ssh user's home
   /opt/frontcache-server/FRONTCACHE_HOME/logs      # archive unpacked under /opt
+  /opt/frontcache/logs                             # logs symlinked/relocated out of FRONTCACHE_HOME
 )
 DEST_DIR="${DEST_DIR:-$SCRIPT_DIR/logs}"
 STAGE_DIR="${STAGE_DIR:-${TMPDIR:-/tmp}/fc-pull-logs}"

@@ -49,6 +49,7 @@ $LogDirCandidates = @(
     '/opt/frontcache/FRONTCACHE_HOME/logs'           # installer script (the default --dir)
     '~/opt/frontcache-server/FRONTCACHE_HOME/logs'   # archive unpacked into the ssh user's home
     '/opt/frontcache-server/FRONTCACHE_HOME/logs'    # archive unpacked under /opt
+    '/opt/frontcache/logs'                           # logs symlinked/relocated out of FRONTCACHE_HOME
 )
 $DestDir      = if ($env:DEST_DIR)       { $env:DEST_DIR }       else { Join-Path $ScriptDir 'logs' }
 $StageRoot    = if ($env:STAGE_DIR)      { $env:STAGE_DIR }      else { Join-Path ([System.IO.Path]::GetTempPath()) 'fc-pull-logs' }
