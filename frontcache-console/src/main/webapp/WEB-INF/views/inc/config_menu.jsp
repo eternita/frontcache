@@ -5,4 +5,5 @@
   <li role="presentation" class="${activeConfig == 'bot' ? 'active' : ''}"><a href="bot-configs">Bot Config</a></li>
   <li role="presentation" class="${activeConfig == 'dynamic' ? 'active' : ''}"><a href="dynamic-urls-configs">Dynamic URLs Config</a></li>
   <li role="presentation" class="${activeConfig == 'hystrix' ? 'active' : ''}"><a href="hystrix-configs">Hystrix Configs</a></li>
+  <li role="presentation" class="${activeConfig == 'guard' ? 'active' : ''}"><a href="guard-configs">Guard Configs</a></li>
 </ul>

@@ -56,6 +56,7 @@ import org.frontcache.io.GetDynamicURLsActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.GetGuardRulesActionResponse;
+import org.frontcache.io.GetGuardConfigActionResponse;
 import org.frontcache.io.GetHystrixConfigActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
@@ -450,6 +451,37 @@ public class FrontCacheClient {
 			return null;
 
 		return actionResponse.getGuardRules();
+	}
+
+	/**
+	 *
+	 * @return
+	 */
+	public GetGuardConfigActionResponse getGuardConfigActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_GUARD_CONFIG));
+
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			GetGuardConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetGuardConfigActionResponse.class);
+			return actionResponse;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	public String getGuardConfig()
+	{
+		GetGuardConfigActionResponse actionResponse = getGuardConfigActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getGuardConfig();
 	}
 
 	/**
