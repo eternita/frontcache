@@ -14,7 +14,7 @@ Browser ──▶ Frontcache :9080 ──▶ Apache + PHP :80
 **1. Get the Frontcache standalone server**
 
 Two ways; pick either. Both are described in full in the
-[install guide](../../docs/HOWTO-install.md).
+[install guide](../../docs/install-guide.md).
 
 *Container (nothing to install but Docker):*
 

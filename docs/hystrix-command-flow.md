@@ -4,10 +4,6 @@ How HTTP requests flow through the `HystrixCommand` wrappers in the
 `org.frontcache.hystrix` package. Every origin/cache touch is wrapped in a
 command so it gets circuit-breaking, timeouts, and metrics.
 
-> The classes named below live in `frontcache-core`, in the Frontcache product source
-> repository. This repository ships documentation and examples only, so they are named
-> here rather than linked.
-
 ![Hystrix command flow](diagrams/10-hystrix-command-flow.svg)
 
 ## Commands, in order
