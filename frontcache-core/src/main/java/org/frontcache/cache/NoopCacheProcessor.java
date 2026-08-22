@@ -8,103 +8,45 @@
  */
 package org.frontcache.cache;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-
-import org.apache.http.client.HttpClient;
-import org.frontcache.core.FCUtils;
-import org.frontcache.core.FrontCacheException;
-import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
-import org.frontcache.reqlog.RequestLogger;
 
-public class NoopCacheProcessor implements CacheProcessor {
+import java.util.List;
 
-	@Override
-	public WebResponse processRequest(String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
+public class NoopCacheProcessor extends CacheProcessorBase implements CacheProcessor {
 
-		long start = System.currentTimeMillis();
-		boolean isRequestCacheable = true;
-		boolean isCached = false;
-		long lengthBytes = -1;
-
-		WebResponse cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context);
-
-		lengthBytes = cachedWebResponse.getContentLenth();
-
-		RequestLogger.logRequest(originUrlStr, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
-
-		return cachedWebResponse;
-	}
 
 	@Override
-	public void init(Properties properties) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void destroy() {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void putToCache(String domain, String url, WebResponse component) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public WebResponse getFromCache(String url, RequestContext context) {
-		// TODO Auto-generated method stub
+	public WebResponse getFromCacheImpl(String url) {
 		return null;
 	}
 
 	@Override
+	public void putToCacheImpl(String domain, String url, WebResponse component) {
+
+	}
+
+	@Override
 	public void removeFromCache(String domain, String filter) {
-		// TODO Auto-generated method stub
 
 	}
 
 	@Override
 	public void removeFromCacheAll(String domain) {
-		// TODO Auto-generated method stub
 
 	}
 
 	@Override
 	public void removeFromCacheAll() {
-		// nothing is cached
 
-	}
-
-	@Override
-	public Map<String, String> getCacheStatus() {
-		Map<String, String> status = new HashMap<String, String>();
-		status.put("impl", this.getClass().getName());
-
-		return status;
 	}
 
 	@Override
 	public List<String> getCachedKeys() {
-		return new ArrayList<String>();
-	}
-
-	@Override
-	public void doSoftInvalidation(String currentRequestURL, String originUrlStr,
-			Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
-
-		return;
+		return List.of();
 	}
 
 	@Override
 	public void patch() {
-		// TODO Auto-generated method stub
 
 	}
 
@@ -112,7 +54,6 @@ public class NoopCacheProcessor implements CacheProcessor {
 	public void purge() {
 
 	}
-
 }
 
 

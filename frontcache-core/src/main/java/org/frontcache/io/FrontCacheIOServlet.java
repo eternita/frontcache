@@ -188,6 +188,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = getGuardRules(request);
 			break;
 
+		case FrontcacheAction.GET_GUARD_CONFIG:
+			aResponse = getGuardConfig(request);
+			break;
+
 		case FrontcacheAction.RELOAD_GUARD_RULES:
 			aResponse = reloadGuardRules(request);
 			break;
@@ -583,6 +587,35 @@ public class FrontCacheIOServlet extends HttpServlet {
 			}
 		} catch (IOException e) {
 			logger.error("Can't read hystrix.properties", e);
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription(e.getMessage());
+		}
+
+		return aResponse;
+	}
+
+	/**
+	 * Reads the raw ./conf/guard-rules.conf file (comments and empty lines
+	 * preserved) so it can be displayed as-is in the console.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getGuardConfig(HttpServletRequest req)
+	{
+		GetGuardConfigActionResponse aResponse = new GetGuardConfigActionResponse();
+
+		try (InputStream is = FCConfig.getConfigInputStream("guard-rules.conf"))
+		{
+			if (null == is)
+			{
+				aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+				aResponse.setErrorDescription("guard-rules.conf not found");
+			} else {
+				aResponse.setGuardConfig(new String(is.readAllBytes(), StandardCharsets.UTF_8));
+			}
+		} catch (IOException e) {
+			logger.error("Can't read guard-rules.conf", e);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 			aResponse.setErrorDescription(e.getMessage());
 		}

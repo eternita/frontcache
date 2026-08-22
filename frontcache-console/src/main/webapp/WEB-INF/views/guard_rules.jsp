@@ -1,18 +1,12 @@
 <%@taglib uri="http://www.springframework.org/tags/form" prefix="form"%>
 <%@ include file="/WEB-INF/views/inc/header.jsp"%>
 
-<c:set var="activeConfig" value="guard"/>
-<%@ include file="/WEB-INF/views/inc/config_menu.jsp"%>
-
-   <hr>
     <p class="text-muted">
       Checks that run <b>before cache and origin</b>, in evaluation order &mdash; first match wins.
       The two built-ins (<code>uri-too-long</code>, <code>bad-request</code>) come first, then the
       rules from <code>FRONTCACHE_HOME/conf/guard-rules.conf</code>.
       <b>Hits</b> counts the requests each rule matched since the node started (or since the last
       reload); a rule with no hits is doing nothing.
-      Rules are read-only here &mdash; edit the file and apply it with the
-      <code>reload-guard-rules</code> action.
     </p>
 
     <!-- one tab per edge; tab order follows the edge order from the console config -->

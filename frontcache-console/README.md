@@ -1,16 +1,4 @@
 
-* Configure nodes for console (frontcache-console.properties)
-
-```
-# format
-#http://localhost:8080/
-#https://www.example.com/
-
-https://or.example.com:443/
-https://sg.example.com:443/
-https://origin.example.com:443/
-```
-
 
 * Add following environment variable (e.g. to catalina.sh in case of Tomcat)
 ```
@@ -20,5 +8,5 @@ https://origin.example.com:443/
 
 * Run Frontcache console (in Jetty container) with FRONTCACHE_CONFIG environment variable
 ```
-FRONTCACHE_CONFIG=/path/to/frontcache-console.conf ./gradlew clean :frontcache-console:jettyRun
+FRONTCACHE_CONFIG=/path/to/frontcache-console.conf ./gradlew clean :frontcache-console:appRun
 ```
