@@ -131,7 +131,7 @@ indices, sincedb and pulled files consistent.
 ### Frontcache Rejected Requests
 
 Fed by `frontcache-failed-requests*.log`: everything a
-[guard rule](../../docs/frontcache-guard-getting-started.md) did before cache or origin —
+[guard rule](../../docs/guard-getting-started.md) did before cache or origin —
 rejected (400 / 414), redirected (301 / 302), or matched in dry-run — plus requests that
 completed through a Hystrix fallback. **`reject_reason` is the headline dimension: it holds the
 rule name**, so a new rule appears in every panel without touching the dashboard.
@@ -282,4 +282,4 @@ because it does.
 
 Install and run Frontcache: [docs/HOWTO-install.md](../../docs/install-guide.md) ·
 Guard rules, which feed the Rejected Requests dashboard:
-[docs/frontcache-guard-getting-started.md](../../docs/frontcache-guard-getting-started.md)
+[docs/guard-getting-started.md](../../docs/guard-getting-started.md)
