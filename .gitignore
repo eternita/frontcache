@@ -15,3 +15,4 @@ CLAUDE.md
 /frontcache-tests/FRONTCACHE_HOME_FILTER/logs/
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/cache/
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/
+/benchmark/requests/requests.txt
