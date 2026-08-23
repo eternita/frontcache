@@ -138,9 +138,9 @@ All of the following run in **both** filter and standalone modes unless noted.
 |------------|---------------------|
 | **CommonTests** | Plain JSP read; `<fc:include>` stitching (`jspInclude`); include + cache (`6ci`, `7ci`); deep nested includes; redirects; **debug/trace mode** headers; `log-to-headers` (`x-frontcache-component-maxage`); **L1/L2 cache-level accounting** (entry counts per layer, impl names); **client-type-specific caching** (`bot:60` — bots cached, browsers dynamic); client-type-specific includes; sync includes with `maxage=0` (not cached); soft cache refresh (`@Ignore` — works on Tomcat, not the Jetty test container); **HTTP method caching** incl. `HEAD`. |
 | **IncludeTests** | Async include resolution (`includeAsync1..3`); client-specific include behaviour (`includeClientSpecific1..4`). |
-| **ClientTests** | `FrontCacheClient` API: `getFromCache` (hit/null), deep-include caching, `getCacheStatus`; single-node and **cluster** invalidation; invalidate-all (single + cluster); **multi-domain** invalidate-all (fc1 vs fc2 isolation); response-header de-duplication. |
+| **ClientTests** | `FrontCacheClient` API: `getFromCache` (hit/null), deep-include caching, `getCacheStatus`; single-node and **cluster** invalidation; invalidate-all (single + cluster); response-header de-duplication. |
 | **AgentTests** | `FrontCacheAgent` / `FrontCacheAgentCluster` remote invalidation (single node + cluster). |
-| **FallbackHystrixTests** | Hystrix circuit-breaking & fallbacks: custom timeouts; timeout failure (localhost + custom domain); timeout inside an include; file-based custom fallback; fallback loaded from URL; URL-pattern fallback. Covers both the `localhost` and `fc1-test.org` domains. |
+| **FallbackHystrixTests** | Hystrix circuit-breaking & fallbacks: custom timeouts; timeout failure (localhost + custom domain); timeout inside an include; file-based custom fallback; fallback loaded from URL; URL-pattern fallback. |
 | **StaticReadTests** | Static asset proxying & caching: `.txt`, `.js`, `.jpg`. |
 | **InvalidationTagsTests** | Tag-based invalidation — static tags and dynamically-emitted tags. |
 | **HTTPResponseCodeTests** | Origin status passthrough (`404`). |
@@ -180,7 +180,7 @@ client & agent talk to).
 
 ---
 
-## 5. Configuration & multi-domain setup
+## 5. Configuration & address space
 
 `TestConfig` defines the address space. Tests address Frontcache through **virtual
 hostnames**, which must resolve to loopback:
@@ -191,25 +191,34 @@ hostnames**, which must resolve to loopback:
 | standalone base URLs | `http://localhost:9080/`, `http://www.fc1-test.org:9080/`, `http://www.fc2-test.org:9080/` |
 | filter base URLs | `http://localhost:8080/`, `http://www.fc1-test.org:8080/`, `http://www.fc2-test.org:8080/` |
 
-Site keys (`SiteKeys`): `test-site-key-localhost`, `test-site-key-1` (fc1),
-`test-site-key-2` (fc2). These match `front-cache.site-key` / `front-cache.domain.*.site-key`
-in the `frontcache.properties` of both FRONTCACHE_HOME dirs and gate the management API.
+`SiteKeys` holds one key, `test-site-key-localhost`. It matches `front-cache.site-key` in the
+`frontcache.properties` of both FRONTCACHE_HOME dirs and gates the management API. The site key
+is **per node**, not per domain — every management-API call in the suite uses this one key
+whichever hostname it dials.
 
-Both `frontcache.properties` files declare `front-cache.domains=fc1-test.org,fc2-test.org`
-with per-domain origin host overrides (`origin.fc1-test.org`, `origin.fc2-test.org`).
-The multi-domain tests (`ClientTests.invalidationAllMultidomain…`) rely on this to prove
-cache isolation between domains.
+### Multi-domain is retired
+
+Both FRONTCACHE_HOME dirs used to declare `front-cache.domains=fc1-test.org,fc2-test.org` with
+per-domain origin overrides. That is gone: a node configured for multi-domain now **refuses to
+start** (`FrontCacheEngine.rejectRetiredDomainConfig`). Both nodes serve a single site and reach
+their origin through `front-cache.origin-host` / `front-cache.origin-http-port`.
+
+The FC1/FC2 hostnames remain in use, but only as *additional* virtual hosts on the same node —
+they no longer select a config. `ClientTests`' cluster tests still use the FC1 and FC2 base URLs
+as the two "cluster nodes", which is why the `/etc/hosts` aliases below are still required. See
+[docs/multi-domain-retirement-proposal.md](../docs/multi-domain-retirement-proposal.md).
 
 ### Required `/etc/hosts` entries
 
-The virtual hosts and origin hosts must resolve to `127.0.0.1`:
+The virtual hosts must resolve to `127.0.0.1`:
 
 ```
 127.0.0.1   fc1-test.org www.fc1-test.org fc2-test.org www.fc2-test.org
 127.0.0.1   origin.fc1-test.org origin.fc2-test.org
 ```
 
-Without these the `*FC1` / `*FC2` / multi-domain tests fail to connect.
+Without these the `*FC1` / `*FC2` tests fail to connect. (The `origin.*` aliases are no longer
+routed to by config, but the suite's fallback fixtures still reference them as init URLs.)
 
 ---
 
@@ -293,7 +302,7 @@ tests are `@Ignore`d (they pass on Tomcat in production).
   the root `./gradlew`.
 - Tests **must** run sequentially; do not raise `maxParallelForks` — concurrent runs
   corrupt each other's cache because every test clears it on setup.
-- `/etc/hosts` must contain the entries in §5 or the domain-scoped tests fail.
+- `/etc/hosts` must contain the entries in §5 or the `*FC1` / `*FC2` tests fail.
 - `./tests.sh` binds **9080** (standalone) and **8080** (filter + web app); both embedded-Jetty
   launchers open HTTP only — there are no HTTPS ports (`8443`/`9443`) — so a conflict on either
   breaks the run; stop other servers first. The console (`7080`) is not started by the

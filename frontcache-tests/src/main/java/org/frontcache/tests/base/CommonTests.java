@@ -51,7 +51,7 @@ public abstract class CommonTests extends TestsBase {
 	public void setUp() throws Exception {
 		super.setUp();
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLDomainFC1(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLDomainFC1(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
 		frontcacheClient.removeFromCacheAll(); // clean up
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");

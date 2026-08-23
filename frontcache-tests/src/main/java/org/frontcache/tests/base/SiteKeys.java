@@ -8,8 +8,10 @@
  */
 package org.frontcache.tests.base;
 
+/**
+ * The node's management-API site key. There is one per node - per-domain site keys went away with
+ * multi-domain support (see docs/multi-domain-retirement-proposal.md).
+ */
 public interface SiteKeys {
 	public static final String TEST_SITE_KEY_LOCALHOST = "test-site-key-localhost";
-	public static final String TEST_SITE_KEY_1 = "test-site-key-1";
-	public static final String TEST_SITE_KEY_2 = "test-site-key-2";
 }

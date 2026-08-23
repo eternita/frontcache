@@ -27,7 +27,7 @@ public abstract class IncludeTests extends TestsBase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLDomainFC1(), SiteKeys.TEST_SITE_KEY_1);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLDomainFC1(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
 		frontcacheClient.removeFromCacheAll(); // clean up
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");

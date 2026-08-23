@@ -14,15 +14,19 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import jakarta.servlet.FilterChain;
@@ -248,8 +252,101 @@ public class FrontCacheEngine {
 		return httpClient;
 	}
 
+	// Retired multi-domain config. One node serves one site; these keys used to make a node serve
+	// several. See docs/multi-domain-retirement-proposal.md.
+	private static final String RETIRED_DOMAIN_LIST_KEY = "front-cache.domains";
+	private static final String RETIRED_DOMAIN_KEY_PREFIX = "front-cache.domain.";
+
+	// The engine is rebuilt on every getFrontCache() until construction succeeds, so a rejected
+	// config would otherwise re-log this whole message once per request.
+	private static final AtomicBoolean retiredDomainConfigLogged = new AtomicBoolean(false);
+
+	/**
+	 * Retired multi-domain keys that are set to a non-blank value, sorted, {@code front-cache.domains}
+	 * first. A blank value counts as absent, so an operator can neutralize a key by emptying it.
+	 *
+	 * Per-domain overrides are reported even without {@code front-cache.domains}: on their own they
+	 * were silently ignored, so whoever set them never learned they did nothing.
+	 */
+	// package-private for FrontCacheEngineRetiredDomainConfigTest
+	static List<String> findRetiredDomainKeys()
+	{
+		List<String> retiredKeys = new ArrayList<String>();
+
+		String domainList = FCConfig.getProperty(RETIRED_DOMAIN_LIST_KEY);
+		if (isSet(domainList))
+			retiredKeys.add(RETIRED_DOMAIN_LIST_KEY + "=" + domainList.trim());
+
+		List<String> overrideKeys = new ArrayList<String>();
+		Properties props = FCConfig.getProperties();
+		for (String key : props.stringPropertyNames())
+			if (key.startsWith(RETIRED_DOMAIN_KEY_PREFIX) && isSet(props.getProperty(key)))
+				overrideKeys.add(key);
+
+		Collections.sort(overrideKeys);
+		retiredKeys.addAll(overrideKeys);
+
+		return retiredKeys;
+	}
+
+	private static boolean isSet(String value)
+	{
+		return null != value && 0 < value.trim().length();
+	}
+
+	// package-private for FrontCacheEngineRetiredDomainConfigTest
+	static String retiredDomainConfigMessage(List<String> retiredKeys)
+	{
+		StringBuilder sb = new StringBuilder();
+		sb.append("Multi-domain configuration is no longer supported - refusing to start.")
+		  .append("\n\nRetired keys found in conf/frontcache.properties:");
+
+		for (String key : retiredKeys)
+			sb.append("\n    ").append(key);
+
+		sb.append("\n\nA node serving several domains shared one cache and one set of circuit breakers")
+		  .append("\nacross all of them: cache entries are keyed by request path only, so a request to one")
+		  .append("\ndomain could be served another domain's cached page, and one domain's failing origin")
+		  .append("\nopened the circuit breaker for every other domain on the node.")
+		  .append("\n\nFix: remove the keys above and run one Frontcache node per site. Set this node's own")
+		  .append("\ndomain with front-cache.default-domain and its origin with front-cache.origin-host")
+		  .append("\n(front-cache.origin-http-port / front-cache.origin-https-port).")
+		  .append("\n\nSee docs/multi-domain-retirement-proposal.md");
+
+		return sb.toString();
+	}
+
+	/**
+	 * Refuses to start a node configured for multi-domain.
+	 *
+	 * Serving several domains from one node was never sound: L2 cache entries are keyed by request
+	 * PATH only (see LuceneIndexManager.toPathKey), so a request to one domain can be served another
+	 * domain's cached page, and Hystrix keys circuit breakers by command name only, so one domain's
+	 * failing origin opens the breaker for every other domain on the node.
+	 *
+	 * Failing closed rather than ignoring the keys: they ask for per-domain origin routing, and a node
+	 * that silently sent every domain to one origin would be a worse outcome than one that does not
+	 * start. Removing the keys is a config edit and a restart.
+	 *
+	 * @throws IllegalStateException when any retired key is set
+	 */
+	private void rejectRetiredDomainConfig()
+	{
+		List<String> retiredKeys = findRetiredDomainKeys();
+		if (retiredKeys.isEmpty())
+			return;
+
+		String message = retiredDomainConfigMessage(retiredKeys);
+
+		if (retiredDomainConfigLogged.compareAndSet(false, true))
+			logger.error(message);
+
+		throw new IllegalStateException(message);
+	}
+
 	private void loadDomainConfigs()
 	{
+		rejectRetiredDomainConfig();
 
 		String defaultDomain = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
 		String defaultSiteKey = FCConfig.getProperty("front-cache.site-key", "");
