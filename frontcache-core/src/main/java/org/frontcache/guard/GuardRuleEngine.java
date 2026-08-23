@@ -257,7 +257,8 @@ public class GuardRuleEngine {
 	{
 		checkReachable("http://127.0.0.1/fc-ping.jsp", "GSLB health check (/fc-ping.jsp)");
 		checkReachable("http://127.0.0.1/frontcache-io?action=ping", "management API (/frontcache-io) used by frontcache-agent, the console and replication");
-		checkReachable("http://127.0.0.1/hystrix.stream", "Hystrix metrics stream (/hystrix.stream) read by the console");
+		checkReachable("http://127.0.0.1/hystrix.stream", "metrics stream (/hystrix.stream) read by the console");
+		checkReachable("http://127.0.0.1/fc-metrics", "Prometheus scrape endpoint (/fc-metrics)");
 	}
 
 	private void checkReachable(String url, String what)

@@ -72,6 +72,15 @@ public class FcCommandMetrics {
 	private final int bucketCount;
 
 	private final LongAdder[][] buckets;              // [bucket][event ordinal]
+	/**
+	 * Monotonic lifetime totals per event, alongside the rolling ring.
+	 *
+	 * The ring exists because the dashboard wants a 10-second window; Prometheus wants the opposite - a
+	 * counter that only ever goes up, so rate() can be computed over any window the query asks for.
+	 * Exporting the rolling value as a counter would be a lie (it decreases), and exporting it as a gauge
+	 * would make every useful PromQL query wrong. Two cheap counters beat one that fits neither consumer.
+	 */
+	private final LongAdder[] totals;
 	private final ConcurrentHistogram[] latencyBuckets;
 	private volatile int currentBucket = 0;
 
@@ -87,6 +96,9 @@ public class FcCommandMetrics {
 
 		this.buckets = new LongAdder[bucketCount][];
 		this.latencyBuckets = new ConcurrentHistogram[bucketCount];
+		this.totals = new LongAdder[FcEventType.values().length];
+		for (int e = 0; e < this.totals.length; e++)
+			this.totals[e] = new LongAdder();
 		for (int i = 0; i < bucketCount; i++)
 		{
 			this.buckets[i] = new LongAdder[FcEventType.values().length];
@@ -147,6 +159,7 @@ public class FcCommandMetrics {
 	public void markEvent(FcEventType event)
 	{
 		buckets[currentBucket][event.ordinal()].increment();
+		totals[event.ordinal()].increment();
 	}
 
 	public void recordLatency(long millis)
@@ -198,6 +211,12 @@ public class FcCommandMetrics {
 	}
 
 	// ---- reading ------------------------------------------------------------
+
+	/** Monotonic count since JVM start - what the Prometheus exporter reads. */
+	public long getTotalCount(FcEventType event)
+	{
+		return totals[event.ordinal()].sum();
+	}
 
 	public long getRollingCount(FcEventType event)
 	{

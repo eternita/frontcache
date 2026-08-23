@@ -40,5 +40,16 @@
         <servlet-name>HystrixMetricsStreamServlet</servlet-name>
         <url-pattern>/hystrix.stream</url-pattern>
     </servlet-mapping>
+
+    <!-- Prometheus scrape, so the e2e suite covers the gating and the exposition format. -->
+    <servlet>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <servlet-class>org.frontcache.metrics.FcMetricsServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <url-pattern>/fc-metrics</url-pattern>
+    </servlet-mapping>
     
 </web-app>

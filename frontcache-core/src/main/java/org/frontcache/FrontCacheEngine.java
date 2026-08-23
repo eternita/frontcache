@@ -68,6 +68,7 @@ import org.frontcache.hystrix.FC_Total;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
+import org.frontcache.metrics.FcMetricsExport;
 import org.frontcache.reqlog.RequestLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -471,6 +472,11 @@ public class FrontCacheEngine {
 			}
 		});
 		t.start();
+
+		// Prometheus / OTLP export. A no-op unless front-cache.metrics.export says otherwise, which is
+		// why this is called unconditionally: the node's lifecycle owner is the right place to start a
+		// background push loop, and gating the call here would just duplicate the config read.
+		FcMetricsExport.start();
 
 		return;
 	}

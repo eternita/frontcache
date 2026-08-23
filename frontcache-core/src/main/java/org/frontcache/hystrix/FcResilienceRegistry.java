@@ -52,6 +52,26 @@ public class FcResilienceRegistry {
 	}
 
 	/**
+	 * The registries themselves, for the Micrometer binders in {@code org.frontcache.metrics}. Exposed
+	 * rather than re-wrapped: resilience4j-micrometer binds to a registry and picks up entries added
+	 * later, which is what makes a command that starts serving after startup show up on its own.
+	 */
+	public static CircuitBreakerRegistry circuitBreakerRegistry()
+	{
+		return CIRCUIT_BREAKERS;
+	}
+
+	public static BulkheadRegistry bulkheadRegistry()
+	{
+		return BULKHEADS;
+	}
+
+	public static TimeLimiterRegistry timeLimiterRegistry()
+	{
+		return TIME_LIMITERS;
+	}
+
+	/**
 	 * The breaker for a command key if one was ever created, else null. The metrics stream uses this
 	 * for {@code isCircuitBreakerOpen} - reading live state rather than tracking a copy.
 	 */

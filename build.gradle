@@ -270,6 +270,16 @@ project(':frontcache-core') {
 		// via hystrix-core (2.1.9); declared explicitly at a current version so it survives the
 		// removal of Hystrix and stops being an accident of someone else's dependency tree.
 		api         	'org.hdrhistogram:HdrHistogram:2.2.2'
+
+		// Prometheus / OTLP export (docs/hystrix-to-resilience4j-proposal.md section 7.5). Additive:
+		// the /hystrix.stream SSE contract is unaffected, and export defaults to none, so an upgrade
+		// starts no listener and no push loop until front-cache.metrics.export says so.
+		// 1.17.1 is the current STABLE micrometer; 1.18.0-M1 exists and is deliberately not used - a
+		// milestone build on the request path is the opposite of what blocker 1 is about.
+		api         	'io.github.resilience4j:resilience4j-micrometer:2.4.0'
+		api         	'io.micrometer:micrometer-core:1.17.1'
+		api         	'io.micrometer:micrometer-registry-prometheus:1.17.1'
+		api         	'io.micrometer:micrometer-registry-otlp:1.17.1'
         api         	'net.sf.ehcache:ehcache:2.10.9.2'
         api         	'com.google.code.gson:gson:2.14.0'
         api         	'org.apache.lucene:lucene-core:10.5.1'

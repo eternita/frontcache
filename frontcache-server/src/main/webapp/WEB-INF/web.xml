@@ -39,6 +39,18 @@
         <url-pattern>/hystrix.stream</url-pattern>
     </servlet-mapping>
 
+    <!-- Prometheus scrape. Serves nothing unless front-cache.metrics.export enables it, and answers
+         only on front-cache.management.port when that is set. -->
+    <servlet>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <servlet-class>org.frontcache.metrics.FcMetricsServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <url-pattern>/fc-metrics</url-pattern>
+    </servlet-mapping>
+
     <!-- session timeout: 1 year (365 * 24 * 60 = 525600 minutes) -->
     <session-config>
         <session-timeout>525600</session-timeout>
