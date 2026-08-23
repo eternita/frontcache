@@ -260,8 +260,19 @@ project(':frontcache-core') {
         api         	'commons-io:commons-io:2.22.0'
         api         	'ch.qos.logback:logback-classic:1.5.38'
 		api         	'com.netflix.hystrix:hystrix-core:1.5.18'
-		api         	'com.netflix.hystrix:hystrix-metrics-event-stream:1.5.18'
 		api         	'com.netflix.hystrix:hystrix-serialization:1.5.18' // provides com.netflix.hystrix.serial.SerialHystrixDashboardData (not pulled transitively)
+
+		// Resilience4j - the replacement for Hystrix. Additive for now: the new org.frontcache.hystrix
+		// Fc* machinery is built and tested against it, but no production code path uses it yet
+		// (see docs/hystrix-to-resilience4j-proposal.md, PR 1). Each of these declares only
+		// resilience4j-core + slf4j-api.
+		api         	'io.github.resilience4j:resilience4j-circuitbreaker:2.4.0'
+		api         	'io.github.resilience4j:resilience4j-timelimiter:2.4.0'
+		api         	'io.github.resilience4j:resilience4j-bulkhead:2.4.0'
+		// Latency percentiles for the dashboard JSON. Already on the runtime classpath transitively
+		// via hystrix-core (2.1.9); declared explicitly at a current version so it survives the
+		// removal of Hystrix and stops being an accident of someone else's dependency tree.
+		api         	'org.hdrhistogram:HdrHistogram:2.2.2'
         api         	'net.sf.ehcache:ehcache:2.10.9.2'
         api         	'com.google.code.gson:gson:2.14.0'
         api         	'org.apache.lucene:lucene-core:10.5.1'
@@ -278,6 +289,11 @@ project(':frontcache-core') {
         // (NoClassDefFoundError), making the failure depend on test-execution order. Pin a minimal
         // fixture home so init always succeeds regardless of which test runs first.
         systemProperty 'frontcache.home', "${projectDir}/src/test/resources/fallback-home"
+
+        // Opt-in switch for DashboardJsonKeysTest to rewrite its own golden file. Forwarded explicitly
+        // because Gradle does not pass -D through to the test JVM; default false so the normal build
+        // can only compare, never regenerate.
+        systemProperty 'fc.dashboard.keys.regenerate', System.getProperty('fc.dashboard.keys.regenerate', 'false')
     }
 }
 
