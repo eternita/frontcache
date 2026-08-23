@@ -18,9 +18,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
+import org.frontcache.FCConfig;
 import org.frontcache.hystrix.FcCommandConfig.Isolation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.HystrixCommandKey;
+import com.netflix.hystrix.HystrixEventType;
+import com.netflix.hystrix.HystrixThreadPoolKey;
+import com.netflix.hystrix.exception.HystrixBadRequestException;
+import com.netflix.hystrix.exception.HystrixRuntimeException;
 
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
@@ -51,19 +59,54 @@ import io.github.resilience4j.timelimiter.TimeLimiter;
  *
  * An {@link FcBadRequestException} is rethrown to the caller without resolving a fallback and without
  * moving the circuit breaker's failure rate, matching HystrixBadRequestException.
+ *
+ * <h2>The kill switch</h2>
+ *
+ * For one release, {@code front-cache.resilience.impl=hystrix|resilience4j} (default
+ * {@code resilience4j}) selects which library actually executes the call, so a rollback on a live site
+ * is a config edit and a restart rather than a redeploy. The branch lives here, in one method, and the
+ * five FC_* commands are single-implementation regardless - they never learn which backend ran them.
+ *
+ * Two things make that work:
+ *
+ * - {@link FcCommandMetrics} is recorded in {@link #execute()}, ABOVE the branch, so both backends
+ *   populate the same counters. Without that, flipping to {@code hystrix} after the metrics stream is
+ *   rewritten would blank the dashboard, because the new emitter reads these counters and not Hystrix's.
+ *   It also means the golden-key test proves both backends emit identical JSON.
+ * - The legacy path is an inner {@link com.netflix.hystrix.HystrixCommand} built from the same keys,
+ *   whose run() and getFallback() call straight back into this instance. It reproduces today's behavior
+ *   faithfully, including the parts the migration is meant to fix: the semaphore-path fallback still
+ *   runs on the Hystrix timer thread concurrently with run() (see
+ *   HystrixSemaphoreTimeoutMeasurementTest), and thread-pool metrics still come from Hystrix's own
+ *   pools rather than {@link FcThreadPools}. That is the point of a rollback path - it is today, not a
+ *   better version of today.
+ *
+ * PR 4 deletes this branch along with the rest of Hystrix.
  */
 public abstract class FcCommand<T> {
 
 	private static final Logger logger = LoggerFactory.getLogger(FcCommand.class);
 
+	/** The kill switch (proposal section 14.1). Removed with the rest of Hystrix in PR 4. */
+	static final String RESILIENCE_IMPL_KEY = "front-cache.resilience.impl";
+	static final String IMPL_RESILIENCE4J = "resilience4j";
+	static final String IMPL_HYSTRIX = "hystrix";
+
+	private static final java.util.concurrent.atomic.AtomicBoolean backendLogged =
+			new java.util.concurrent.atomic.AtomicBoolean(false);
+
 	private final String groupKey;
 	private final String commandKey;
 	private final String threadPoolKey;
+	/** Null when the command declared no pool - the legacy path needs to know the difference. */
+	private final String declaredThreadPoolKey;
 	private final FcCommandConfig config;
 	private final FcCommandMetrics metrics;
 
 	private final List<FcEventType> executionEvents = new CopyOnWriteArrayList<FcEventType>();
 	private volatile Throwable failedExecutionException = null;
+	/** Set by the legacy path's fallback, which may run on the Hystrix timer thread. */
+	private volatile boolean fallbackInvoked = false;
 
 	protected FcCommand(Setter setter) {
 		if (null == setter || null == setter.groupKey || null == setter.commandKey)
@@ -72,6 +115,7 @@ public abstract class FcCommand<T> {
 		this.groupKey = setter.groupKey;
 		this.commandKey = setter.commandKey;
 		this.config = FcResilienceConfig.getInstance().forCommand(setter.commandKey, setter.threadPoolKey);
+		this.declaredThreadPoolKey = setter.threadPoolKey;
 		this.threadPoolKey = (null != setter.threadPoolKey) ? setter.threadPoolKey : setter.commandKey;
 		this.metrics = FcCommandMetrics.getInstance(setter.commandKey, setter.groupKey, config.getRollingStatsMs());
 	}
@@ -128,12 +172,50 @@ public abstract class FcCommand<T> {
 
 	public T execute()
 	{
-		// Only the semaphore path is watched. The thread path has a real TimeLimiter, so watching it
-		// too would report the same overrun twice - see proposal section 6.2.
-		long budgetMs = (Isolation.SEMAPHORE == config.getIsolation()) ? config.getTimeoutMs() : 0;
+		final boolean legacy = isHystrixBackend();
+
+		// Only the Resilience4j semaphore path is watched. The thread path has a real TimeLimiter, and
+		// the legacy path has Hystrix's own timeout - watching either would double-report the same
+		// overrun. See proposal section 6.2.
+		long budgetMs = (!legacy && Isolation.SEMAPHORE == config.getIsolation()) ? config.getTimeoutMs() : 0;
 		long executionId = metrics.markStart(budgetMs, getExecutionDescription());
 		long startNanos = System.nanoTime();
 
+		try {
+			return legacy ? executeViaHystrix() : executeViaResilience4j();
+		} finally {
+			metrics.recordLatency(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
+			metrics.markEnd(executionId);
+		}
+	}
+
+	/**
+	 * Which library executes the call. Read per execution rather than cached, so a rollback drill on a
+	 * running node is a property change away; the read is a map lookup.
+	 *
+	 * A system property wins over frontcache.properties, which is what lets the test suites run
+	 * end-to-end against both backends without editing every FRONTCACHE_HOME in the repo.
+	 */
+	static boolean isHystrixBackend()
+	{
+		String impl = System.getProperty(RESILIENCE_IMPL_KEY);
+		if (null == impl)
+			impl = FCConfig.getProperty(RESILIENCE_IMPL_KEY, IMPL_RESILIENCE4J);
+
+		boolean hystrix = IMPL_HYSTRIX.equalsIgnoreCase(impl.trim());
+
+		// Reported once, from the one place that resolves the value. Which library is executing the
+		// request path is not something anyone should have to infer from a stack trace - and a rollback
+		// drill needs a line in the log confirming the flip actually took effect.
+		if (backendLogged.compareAndSet(false, true))
+			logger.info("Resilience implementation: " + (hystrix ? IMPL_HYSTRIX : IMPL_RESILIENCE4J)
+					+ " (" + RESILIENCE_IMPL_KEY + "=" + impl.trim() + ")");
+
+		return hystrix;
+	}
+
+	private T executeViaResilience4j()
+	{
 		try {
 			T result = (Isolation.SEMAPHORE == config.getIsolation()) ? executeSemaphore() : executeThread();
 			recordEvent(FcEventType.SUCCESS);
@@ -152,10 +234,129 @@ public abstract class FcCommand<T> {
 				this.failedExecutionException = cause;
 
 			return resolveFallback(failure, cause);
-		} finally {
-			metrics.recordLatency(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
-			metrics.markEnd(executionId);
 		}
+	}
+
+	/**
+	 * The rollback path: Hystrix executes, this class still records the metrics and still resolves the
+	 * fallback, so everything above the library boundary is unchanged.
+	 */
+	private T executeViaHystrix()
+	{
+		LegacyHystrixCommand legacy = new LegacyHystrixCommand();
+
+		try {
+			T result = legacy.execute();
+
+			// The fallback path records its own events (on whichever thread Hystrix ran it on), so a
+			// SUCCESS here means the value came from run().
+			if (!fallbackInvoked)
+				recordEvent(FcEventType.SUCCESS);
+
+			return result;
+		} catch (HystrixBadRequestException e) {
+			recordEvent(FcEventType.BAD_REQUEST);
+			throw asBadRequest(e);
+		} catch (HystrixRuntimeException e) {
+			// run() failed and so did the fallback - the events are already recorded by whichever of
+			// them ran. Surface the same exception type the Resilience4j path would.
+			if (e.getCause() instanceof FcBadRequestException)
+			{
+				recordEvent(FcEventType.BAD_REQUEST);
+				throw (FcBadRequestException) e.getCause();
+			}
+
+			FcEventType failure = translateFailure(legacy.getExecutionEvents());
+			throw new FcCommandException(commandKey, failure,
+					commandKey + " failed and has no usable fallback: " + failure, unwrap(e));
+		}
+	}
+
+	private FcBadRequestException asBadRequest(HystrixBadRequestException e)
+	{
+		return (e.getCause() instanceof FcBadRequestException)
+				? (FcBadRequestException) e.getCause()
+				: new FcBadRequestException(e.getMessage(), e);
+	}
+
+	/**
+	 * Collapses a Hystrix event list to the single failure outcome that caused the fallback, using the
+	 * same precedence {@link FallbackLogger#failureType} applies - so the two agree by construction.
+	 */
+	private static FcEventType translateFailure(java.util.List<HystrixEventType> events)
+	{
+		if (null == events)
+			return FcEventType.FAILURE;
+
+		if (events.contains(HystrixEventType.SHORT_CIRCUITED))
+			return FcEventType.SHORT_CIRCUITED;
+		if (events.contains(HystrixEventType.TIMEOUT))
+			return FcEventType.TIMEOUT;
+		if (events.contains(HystrixEventType.THREAD_POOL_REJECTED))
+			return FcEventType.THREAD_POOL_REJECTED;
+		if (events.contains(HystrixEventType.SEMAPHORE_REJECTED))
+			return FcEventType.SEMAPHORE_REJECTED;
+		if (events.contains(HystrixEventType.BAD_REQUEST))
+			return FcEventType.BAD_REQUEST;
+
+		return FcEventType.FAILURE;
+	}
+
+	/** The inner Hystrix command of the legacy path - constructed per execution, as Hystrix requires. */
+	private class LegacyHystrixCommand extends com.netflix.hystrix.HystrixCommand<T> {
+
+		LegacyHystrixCommand() {
+			super(buildLegacySetter());
+		}
+
+		@Override
+		protected T run() throws Exception
+		{
+			try {
+				return FcCommand.this.run();
+			} catch (FcBadRequestException e) {
+				// Hystrix only skips the fallback and the failure counters for its own bad-request type.
+				throw new HystrixBadRequestException(e.getMessage(), e);
+			}
+		}
+
+		@Override
+		protected T getFallback()
+		{
+			fallbackInvoked = true;
+
+			FcEventType failure = translateFailure(getExecutionEvents());
+			recordEvent(failure);
+
+			// Hystrix already returns null here for timeouts and short-circuits, which is the contract
+			// the existing fallbacks rely on - so this is assigned verbatim rather than filtered.
+			FcCommand.this.failedExecutionException = getFailedExecutionException();
+
+			try {
+				T fallback = FcCommand.this.getFallback();
+				recordEvent(FcEventType.FALLBACK_SUCCESS);
+				return fallback;
+			} catch (Throwable t) {
+				recordEvent(FcEventType.FALLBACK_FAILURE);
+				recordEvent(FcEventType.EXCEPTION_THROWN);
+				throw t;
+			}
+		}
+	}
+
+	private com.netflix.hystrix.HystrixCommand.Setter buildLegacySetter()
+	{
+		com.netflix.hystrix.HystrixCommand.Setter setter = com.netflix.hystrix.HystrixCommand.Setter
+				.withGroupKey(HystrixCommandGroupKey.Factory.asKey(groupKey))
+				.andCommandKey(HystrixCommandKey.Factory.asKey(commandKey));
+
+		// Only set the pool key when the command actually declared one: Hystrix defaults a
+		// thread-pool key to the group key, and inventing one here would register a pool per domain
+		// that today's deployment does not have.
+		if (null != declaredThreadPoolKey)
+			setter = setter.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey(declaredThreadPoolKey));
+
+		return setter;
 	}
 
 	private T executeSemaphore()

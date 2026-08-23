@@ -28,12 +28,7 @@ import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.netflix.hystrix.HystrixCommand;
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixThreadPoolKey;
-
-public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
+public class FC_ThroughCache_HttpClient extends FcCommand<WebResponse> {
 
 	private String currentRequestURL = "open-circuit-default-key"; // when circuit is open
 	private String originRequestURL = null;
@@ -47,9 +42,9 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     public FC_ThroughCache_HttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
 
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomain()))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Origin-http"))
-                .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool")));
+                .withGroupKey(context.getDomain())
+                .andCommandKey("Cache-Origin-http")
+                .andThreadPoolKey("OriginHitsPool"));
 
         this.originRequestURL = urlStr;
         this.currentRequestURL = context.getCurrentRequestURL();

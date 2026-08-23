@@ -15,7 +15,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import com.netflix.hystrix.HystrixThreadPoolKey;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
@@ -26,11 +25,8 @@ import org.frontcache.wrapper.HttpResponseWrapperImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.netflix.hystrix.HystrixCommand;
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixCommandKey;
 
-public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
+public class FC_ThroughCache_WebFilter extends FcCommand<WebResponse> {
 
 
 	String url = "open-circuit-default-key"; // when circuit is open - the value is not overriden during run() call
@@ -40,9 +36,9 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
     public FC_ThroughCache_WebFilter(RequestContext context) {
 
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomain()))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Origin-filter"))
-				.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool"))
+                .withGroupKey(context.getDomain())
+                .andCommandKey("Cache-Origin-filter")
+				.andThreadPoolKey("OriginHitsPool")
         		);
 
         this.context = context;

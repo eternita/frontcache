@@ -104,6 +104,12 @@ tasks.register('standaloneJetty', JavaExec) {
 	systemProperty 'frontcache.jetty.port', '9080'
 	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_STANDALONE"
 	systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_STANDALONE/conf/fc-logback.xml"
+	// The kill switch (front-cache.resilience.impl) has to reach the SERVER JVMs, not the test JVM:
+	// the FC_* commands execute inside these two Jetty processes. Forwarded from the Gradle
+	// invocation so the whole e2e suite can be run against either backend without editing any
+	// FRONTCACHE_HOME - which is what proposal section 10 asks for while the switch exists:
+	//   ./tests.sh -Dfront-cache.resilience.impl=hystrix
+	systemProperty 'front-cache.resilience.impl', System.getProperty('front-cache.resilience.impl', 'resilience4j')
 }
 
 // FC webfilter + web app (:8080) — embedded Jetty 12 serving the main webapp
@@ -114,16 +120,28 @@ tasks.register('webfilterJetty', JavaExec) {
 	systemProperty 'frontcache.jetty.port', '8080'
 	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_FILTER"
 	systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME_FILTER/conf/fc-logback.xml"
+	// The kill switch (front-cache.resilience.impl) has to reach the SERVER JVMs, not the test JVM:
+	// the FC_* commands execute inside these two Jetty processes. Forwarded from the Gradle
+	// invocation so the whole e2e suite can be run against either backend without editing any
+	// FRONTCACHE_HOME - which is what proposal section 10 asks for while the switch exists:
+	//   ./tests.sh -Dfront-cache.resilience.impl=hystrix
+	systemProperty 'front-cache.resilience.impl', System.getProperty('front-cache.resilience.impl', 'resilience4j')
 }
 
+// ExecWait spawns a NESTED gradle invocation, and -D on the outer command line does not reach the
+// inner daemon - so without forwarding it explicitly the servers silently run the default backend and
+// a "both backends green" acceptance run would test the same one twice and report a false pass.
+def resilienceImpl = System.getProperty('front-cache.resilience.impl')
+def resilienceImplArg = resilienceImpl ? " -Dfront-cache.resilience.impl=${resilienceImpl}" : ''
+
 tasks.register('startStandaloneFrontcache', ExecWait) {
-	command = './gradlew :frontcache-tests:standaloneJetty'
+	command = "./gradlew${resilienceImplArg} :frontcache-tests:standaloneJetty"
 	ready = 'has been started successfully'
 	directory = rootDir.absolutePath
 }
 
 tasks.register('startWebfilterFrontcache', ExecWait) {
-	command = './gradlew :frontcache-tests:webfilterJetty'
+	command = "./gradlew${resilienceImplArg} :frontcache-tests:webfilterJetty"
 	ready = 'has been started successfully'
 	directory = rootDir.absolutePath
 }

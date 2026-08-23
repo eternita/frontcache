@@ -16,16 +16,12 @@ import org.frontcache.core.WebResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.netflix.hystrix.HystrixCommand;
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixCommandKey;
-
 /**
  *
  * All GET requests which flows through cache (cached & not)
  *
  */
-public class FC_ThroughCache extends HystrixCommand<WebResponse> {
+public class FC_ThroughCache extends FcCommand<WebResponse> {
 
 	private final String originUrlStr;
 	private final CacheProcessorBase cacheProcessorBase;
@@ -39,11 +35,10 @@ public class FC_ThroughCache extends HystrixCommand<WebResponse> {
         // directly. This used to read front-cache.origin-host, which put admin lookups in a group of
         // their own named after the origin - not what the comment said, and a bogus dashboard entry.
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(
-                		null != context
+                .withGroupKey(null != context
                                 ? context.getDomain()
-                                : FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN)))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Hits"))
+                                : FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN))
+                .andCommandKey("Cache-Hits")
         		);
 
         this.originUrlStr = originUrlStr;

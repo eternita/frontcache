@@ -16,6 +16,10 @@ rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/cache/l2-lucene-index/*
 rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/logs/*
 # end cleanup cache dirs & logs
 
+# Any arguments are forwarded to the gradle invocations below, so the suite can be run against
+# either resilience backend while the kill switch exists:
+#   ./tests.sh -Dfront-cache.resilience.impl=hystrix
+
 # stop gradle daemons
 ./gradlew -stop
 
@@ -23,10 +27,10 @@ rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/logs/*
 #   FC webfilter + web app (:8080)  <-  FC standalone reverse-proxy (:9080)
 # Each start task blocks until the server prints its "started successfully" line,
 # then leaves the server JVM running in the background.
-./gradlew :frontcache-tests:clean :frontcache-tests:startWebfilterFrontcache
-./gradlew :frontcache-tests:startStandaloneFrontcache
+./gradlew "$@" :frontcache-tests:clean :frontcache-tests:startWebfilterFrontcache
+./gradlew "$@" :frontcache-tests:startStandaloneFrontcache
 
-./gradlew :frontcache-tests:end2endTests
+./gradlew "$@" :frontcache-tests:end2endTests
 
 # Stop the servers with SIGTERM first so their JVM shutdown hooks run — that is what
 # flushes each one's jacoco .exec file. SIGKILL only as a fallback for a hung JVM.
