@@ -273,4 +273,4 @@ sequenceDiagram
 
 Concepts: [concept.md](concept.md) ·
 Install: [install-guide.md](install-guide.md) ·
-Licensing: <https://www.eternita.co/frontcache-license.html>
+Licensing: <https://www.eternita.co/frontcache.html>

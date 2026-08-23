@@ -425,4 +425,4 @@ Elasticsearch + Kibana with ready-made dashboards.
 
 Concepts: [concept.md](concept.md) ·
 Topologies: [deployment-usecases.md](deployment-usecases.md) ·
-Licensing: <https://www.eternita.co/frontcache-license.html>
+Licensing: <https://www.eternita.co/frontcache.html>
