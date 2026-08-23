@@ -191,16 +191,19 @@ public class GuardRuleEngine {
 	}
 
 	/**
-	 * Hosts an absolute redirect target may point at: the explicitly allowed ones plus every domain
-	 * this node serves (a redirect to your own site is the normal case and should not need extra
-	 * config).
+	 * Hosts an absolute redirect target may point at, from
+	 * front-cache.guard-rules.allowed-redirect-hosts.
+	 *
+	 * This used to also add front-cache.domains. That key is retired (a node configured with it
+	 * refuses to start - see docs/multi-domain-retirement-proposal.md), so the read is gone. Note
+	 * that front-cache.default-domain has never been added here either, despite what this javadoc
+	 * used to claim: a redirect to your own site must be listed explicitly.
 	 */
 	private Set<String> allowedRedirectHosts()
 	{
 		Set<String> hosts = new HashSet<String>();
 
 		addHosts(hosts, FCConfig.getProperty("front-cache.guard-rules.allowed-redirect-hosts", ""));
-		addHosts(hosts, FCConfig.getProperty("front-cache.domains", ""));
 
 		return hosts;
 	}
