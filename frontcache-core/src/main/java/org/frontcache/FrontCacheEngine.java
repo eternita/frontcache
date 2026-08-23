@@ -27,7 +27,6 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -56,7 +55,6 @@ import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.guard.GuardAction;
 import org.frontcache.guard.GuardOutcome;
@@ -78,7 +76,12 @@ import org.slf4j.LoggerFactory;
 public class FrontCacheEngine {
 
 
-	private Map<String, DomainContext> domainConfigMap = new ConcurrentHashMap<String, DomainContext>(); // <DomainStr, DomainConfig>
+	// This node's site. One node serves one site - see docs/multi-domain-retirement-proposal.md.
+	private String domain;          // front-cache.default-domain
+	private String siteKey;         // front-cache.site-key
+	private String originHost;      // front-cache.origin-host
+	private String originHttpPort;  // front-cache.origin-http-port
+	private String originHttpsPort; // front-cache.origin-https-port
 
 	private String frontcacheHttpPort = null;
 
@@ -184,40 +187,43 @@ public class FrontCacheEngine {
 		return localInstance;
 	}
 
-	public DomainContext getDomainContexBySiteKey(String siteKey)
+	/**
+	 * The site this node serves (front-cache.default-domain). Stamped on every request context and
+	 * on every cache entry this node writes.
+	 */
+	public String getDomain()
 	{
-		for (DomainContext domainContext : domainConfigMap.values())
-			if (null != domainContext.getSiteKey() && domainContext.getSiteKey().equals(siteKey))
-				return domainContext;
-
-		return null;
-	}
-
-	public DomainContext getDomainContexByOrigin(String origin) {
-		return getDomainContext(origin);
+		return domain;
 	}
 
 	/**
-	 * Domains this node is configured to serve (the default domain plus any listed in
-	 * front-cache.domains). Used by the management API to tell a domain this node owns from a
-	 * domain that only appears on entries pushed in from another edge by replication.
+	 * @return true when {@code siteKey} is this node's configured management site key
+	 */
+	public boolean isNodeSiteKey(String siteKey)
+	{
+		return null != siteKey && 0 < siteKey.length() && siteKey.equals(this.siteKey);
+	}
+
+	/**
+	 * The single domain this node serves. Kept set-shaped for the management API, which still
+	 * distinguishes a domain this node owns from one that only appears on entries pushed in by
+	 * index replication.
 	 */
 	public Set<String> getConfiguredDomains()
 	{
 		Set<String> domains = new HashSet<String>();
-		for (DomainContext domainContext : domainConfigMap.values())
-			if (null != domainContext.getDomain())
-				domains.add(domainContext.getDomain());
+		if (null != domain)
+			domains.add(domain);
 
 		return domains;
 	}
 
 	/**
-	 * @return true when {@code domain} is one this node serves itself
+	 * @return true when {@code domain} is the one this node serves itself
 	 */
 	public boolean isConfiguredDomain(String domain)
 	{
-		return null != domain && getConfiguredDomains().contains(domain);
+		return null != domain && domain.equals(this.domain);
 	}
 
 	// synchronized on the same monitor as getFrontCache() so a shutdown/reload can't interleave with
@@ -388,55 +394,27 @@ public class FrontCacheEngine {
 		throw new IllegalStateException(message);
 	}
 
-	private void loadDomainConfigs()
+	private void loadOriginConfig()
 	{
 		rejectRetiredDomainConfig();
 
-		String defaultDomain = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
-		String defaultSiteKey = FCConfig.getProperty("front-cache.site-key", "");
-		String defaultOriginHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
-		String defaultOriginHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
-		String defaultOriginHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
+		domain          = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
+		siteKey         = FCConfig.getProperty("front-cache.site-key", "");
+		originHost      = FCConfig.getProperty("front-cache.origin-host", "localhost");
+		originHttpPort  = FCConfig.getProperty("front-cache.origin-http-port", "80");
+		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 
-		domainConfigMap.put(FCConfig.DEFAULT_DOMAIN,
-				new DomainContext(defaultDomain, defaultSiteKey, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
-
-		logger.info("Loaded following origin configurations: ");
-
-		for (String domain : domainConfigMap.keySet())
-			logger.info(" -- " + domainConfigMap.get(domain));
+		logger.info("Serving domain " + domain + " from origin " + originHost
+				+ " (http " + originHttpPort + " / https " + originHttpsPort + ")");
 
 		return;
-	}
-
-	/**
-	 *
-	 * @param requestDomainName
-	 * @return
-	 */
-	private DomainContext getDomainContext(String requestDomainName)
-	{
-		for (String domainSuffix : domainConfigMap.keySet())
-		{
-			if (requestDomainName.endsWith(domainSuffix))
-			{
-				if (requestDomainName.equals(domainSuffix))
-					return domainConfigMap.get(domainSuffix);
-				//case for abc.com & bc.com
-				if (requestDomainName.endsWith("." + domainSuffix))
-					return domainConfigMap.get(domainSuffix);
-			}
-		}
-
-		// default
-		return domainConfigMap.get(FCConfig.DEFAULT_DOMAIN);
 	}
 
 	private void initialize() {
 
 		logger = LoggerFactory.getLogger(FrontCacheEngine.class);
 
-		loadDomainConfigs();
+		loadOriginConfig();
 
 		frontcacheHttpPort = FCConfig.getProperty("front-cache.http-port", "80");
 		frontcacheHttpsPort = FCConfig.getProperty("front-cache.https-port", "443");
@@ -559,16 +537,15 @@ public class FrontCacheEngine {
 
 	private URL getOriginUrl(RequestContext context) {
 		boolean isSecure = context.getRequest().isSecure();
-		DomainContext domainCtx = context.getDomainContext();
 
-		String port = isSecure ? domainCtx.getHttpsPort() : domainCtx.getHttpPort();
+		String port = isSecure ? originHttpsPort : originHttpPort;
 
-		String urlStr = makeURL(isSecure, domainCtx.getHost(), port);
+		String urlStr = makeURL(isSecure, originHost, port);
 		try {
 			URL routeUrl = new URL(urlStr);
 			return  routeUrl;
 		} catch (MalformedURLException e) {
-			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + domainCtx.getHost() + ")", e);
+			throw new RuntimeException("Invalid front-cache.origin-host (" + originHost + ")", e);
 		}
 
 	}
@@ -731,8 +708,7 @@ public class FrontCacheEngine {
 		context.setFrontCacheHttpPort(frontcacheHttpPort);
 		context.setFrontCacheHttpsPort(frontcacheHttpsPort);
 
-		DomainContext domainContex = getDomainContext(context.getRequest().getServerName());
-		context.setDomainContext(domainContex);
+		context.setDomain(domain);
 
 		String protocol = "https".equalsIgnoreCase(servletRequest.getScheme()) ? "https" : "http";
 		context.setFrontCacheProtocol(protocol);

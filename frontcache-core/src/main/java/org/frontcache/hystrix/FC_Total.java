@@ -39,7 +39,7 @@ public class FC_Total extends HystrixCommand<Object> {
     public FC_Total(FrontCacheEngine frontCacheEngine, RequestContext context) {
 
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Input-Requests"))
                 );
         this.frontCacheEngine = frontCacheEngine;
@@ -61,7 +61,7 @@ public class FC_Total extends HystrixCommand<Object> {
 
 		try {
 			context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
-			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
+			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
 			if (null != webResponse)
 			{
 				FCUtils.applyFallbackHeaders(httpResponse, webResponse);

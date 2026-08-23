@@ -133,7 +133,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					doSoftInvalidation(currentRequestURL, originUrlStr, requestHeaders, client, context);
 				} else {
 					// regular expiration
-					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
+					removeFromCache(context.getDomain(), currentRequestURL);
 					cachedWebResponse = null; // refresh from origin
 				}
 			}
@@ -163,7 +163,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				{
 					WebResponse copy4cache = cachedWebResponse.copy(); // copy - putToCache strips headers in place
 					copy4cache.setUrl(currentRequestURL);
-					putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
+					putToCache(context.getDomain(), currentRequestURL, copy4cache); // put to cache copy
 				}
 			} catch (FrontCacheException ex) {
 				throw ex;
@@ -211,7 +211,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				try {
 
 //					logger.info("Soft invalidation: removing form cache: " + currentRequestURL);
-					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
+					removeFromCache(context.getDomain(), currentRequestURL);
 
 					RequestContext ctxCopy = context.copy();
 					ctxCopy.setFilterChain(null); // async calls for ServletFilter doesnt works (some objects already disposed), so use http calls for soft resets
@@ -223,7 +223,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					copy4cache.setUrl(currentRequestURL);
 
 					if (!ctxCopy.isHystrixFallback()) // don't cache hystrix fallbacks
-						putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
+						putToCache(context.getDomain(), currentRequestURL, copy4cache); // put to cache copy
 
 				} catch (Exception e) {
 

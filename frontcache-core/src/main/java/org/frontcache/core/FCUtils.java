@@ -751,22 +751,22 @@ public class FCUtils {
 		}
 	}
 
+	/**
+	 * The domain a metrics-stream subscriber is allowed to see, from its site-key header.
+	 *
+	 * A matching site key resolves to this node's domain; anything else resolves to DEFAULT_DOMAIN,
+	 * which matches no command group - so an unauthenticated subscriber sees an empty stream.
+	 */
 	public static String getDomainFromSiteKeyHeader(HttpServletRequest request) {
 		String siteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
-		if (siteKey == null) {
-			return FCConfig.DEFAULT_DOMAIN;
-		}
 
-		String domain = null;
-
-		DomainContext domainContext = FrontCacheEngine.getFrontCache().getDomainContexBySiteKey(siteKey);
-		if (null != domainContext)
-			domain = domainContext.getDomain();
-
-		if (domain == null)
+		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
+		if (!fcEngine.isNodeSiteKey(siteKey))
 			return FCConfig.DEFAULT_DOMAIN;
 
-		return domain;
+		String domain = fcEngine.getDomain();
+
+		return (null == domain) ? FCConfig.DEFAULT_DOMAIN : domain;
 	}
 
 	/**

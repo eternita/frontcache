@@ -52,7 +52,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     public FC_BypassCache(HttpClient client, RequestContext context) {
 
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
 				.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool"))
         		);
@@ -94,7 +94,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 
 			logger.error("FC - ORIGIN ERROR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents(), getFailedExecutionException());
 
-			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
+			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
 
 			// Park the fallback for the request thread to write - don't write it here. This runs on a
 			// Hystrix thread while the request thread is about to write the response itself, and two

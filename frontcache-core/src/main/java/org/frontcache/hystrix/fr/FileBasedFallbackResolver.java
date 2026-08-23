@@ -35,7 +35,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.frontcache.FCConfig;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.StringUtils;
@@ -102,10 +101,8 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		return configMap;
 	}
 
-	// `domain` is unused: one node serves one site, so there is a single fallback set. The parameter
-	// stays until the FallbackResolver interface drops it - see docs/multi-domain-retirement-proposal.md.
 	@Override
-	public WebResponse getFallback(DomainContext domain, String fallbackSource, String urlStr)
+	public WebResponse getFallback(String fallbackSource, String urlStr)
 	{
 		FallbackConfigEntryImpl currentFallbackConfigEntry = null;
 

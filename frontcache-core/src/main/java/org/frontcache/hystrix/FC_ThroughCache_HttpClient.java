@@ -47,7 +47,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
     public FC_ThroughCache_HttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
 
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Origin-http"))
                 .andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool")));
 
@@ -122,7 +122,7 @@ public class FC_ThroughCache_HttpClient extends HystrixCommand<WebResponse> {
 		// timeout/short-circuit fallbacks getFailedExecutionException() is null -> message only.
 		logger.error("FC_ThroughCache_HttpClient - ERROR FOR - " + includeCurrentURL + " / " + originRequestURL + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context, getFailedExecutionException());
 
-		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), includeCurrentURL);
+		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), includeCurrentURL);
 
 		return webResponse;
     }

@@ -16,7 +16,6 @@ import java.io.File;
 import java.net.URL;
 
 import org.frontcache.FCConfig;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.WebResponse;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -41,11 +40,6 @@ import org.junit.Test;
  */
 public class FileBasedFallbackResolverTest {
 
-	// No `front-cache.domains` in the fixture -> every fallback lives under DEFAULT_DOMAIN, and
-	// getFallback() falls back to that map for any DomainContext whose domain isn't configured.
-	private static final DomainContext DOMAIN =
-			new DomainContext("example.com", "test-site-key-fallback", "origin.example.com", "80", "443");
-
 	private static FileBasedFallbackResolver resolver;
 
 	@BeforeClass
@@ -66,7 +60,7 @@ public class FileBasedFallbackResolverTest {
 
 	/** Resolve a fallback and return its body as a trimmed UTF-8 string. */
 	private String fallbackBody(String url) throws Exception {
-		WebResponse response = resolver.getFallback(DOMAIN, "test", url);
+		WebResponse response = resolver.getFallback("test", url);
 		assertNotNull("resolver returned null for " + url, response);
 		return new String(response.getContent(), "UTF-8").trim();
 	}
@@ -161,7 +155,7 @@ public class FileBasedFallbackResolverTest {
 	/** Fallbacks must be non-cacheable 503s so downstream caches/CDNs don't pin them. */
 	@Test
 	public void fallbackIsNonCacheable503() throws Exception {
-		WebResponse response = resolver.getFallback(DOMAIN, "test", "https://www.example.com/search.htm");
+		WebResponse response = resolver.getFallback("test", "https://www.example.com/search.htm");
 		assertEquals(FileBasedFallbackResolver.FALLBACK_HTTP_STATUS, response.getStatusCode());
 		assertTrue(response.getHeader("Cache-Control").contains("no-store"));
 	}

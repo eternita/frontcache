@@ -671,12 +671,16 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 		return copy;
 	}
 
-    public void setDomainContext(DomainContext domainContext) {
-        set("domainContext", domainContext);
+    /**
+     * The site this node serves (front-cache.default-domain), stamped on the context by the engine.
+     * Used for request logging, cache-entry ownership and the Hystrix command group.
+     */
+    public void setDomain(String domain) {
+        set("domain", domain);
     }
 
-    public DomainContext getDomainContext() {
-        return (DomainContext) get("domainContext");
+    public String getDomain() {
+        return (String) get("domain");
     }
 
     public void setLogToHTTPHeaders() {

@@ -40,7 +40,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
     public FC_ThroughCache_WebFilter(RequestContext context) {
 
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomain()))
                 .andCommandKey(HystrixCommandKey.Factory.asKey("Cache-Origin-filter"))
 				.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool"))
         		);
@@ -80,7 +80,7 @@ public class FC_ThroughCache_WebFilter extends HystrixCommand<WebResponse> {
 
 		logger.error("FC_ThroughCache_WebFilter - ERROR FOR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context, getFailedExecutionException());
 
-		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
+		WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
 		return webResponse;
     }
 

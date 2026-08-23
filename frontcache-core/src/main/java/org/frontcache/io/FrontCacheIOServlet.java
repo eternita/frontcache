@@ -33,7 +33,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheManager;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
@@ -114,14 +113,13 @@ public class FrontCacheIOServlet extends HttpServlet {
 			return;
 		}
 
-		// site-key validation is active only when a site key is configured.
-		// A request is authorized when its X_FRONTCACHE_SITE_KEY header matches the
-		// global site key or any per-domain site key (the management API is multi-domain aware).
+		// site-key validation is active only when a site key is configured. A request is authorized
+		// when its X_FRONTCACHE_SITE_KEY header matches this node's site key - there is one per node.
 		if (siteKey.length() > 0)
 		{
 			String requestSiteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
 			boolean authorized = null != requestSiteKey && requestSiteKey.length() > 0
-					&& (siteKey.equals(requestSiteKey) || null != fcEngine.getDomainContexBySiteKey(requestSiteKey));
+					&& siteKey.equals(requestSiteKey);
 			if (!authorized)
 			{
 				response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
@@ -233,13 +231,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 			return aResponse;
 		}
 
-		String siteKey = req.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
-		String domain = null;
-
 		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
-		DomainContext domainContext = fcEngine.getDomainContexBySiteKey(siteKey);
-		if (null != domainContext)
-			domain = domainContext.getDomain();
+		String domain = fcEngine.getDomain(); // the request already passed site-key validation
 
 		if ("*".equals(filter))
 		{
@@ -374,8 +367,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 *
 	 * Replication sends the source entry's domain, so an entry copied from another edge would be
 	 * stored under a domain this node knows nothing about - invisible to "invalidate all" and to the
-	 * per-domain counters, though still served (lookups are by URL). A requested domain this node
-	 * actually serves is kept as-is, so a multi-domain edge can still replicate per domain.
+	 * per-domain counters, though still served (lookups are by URL).
 	 *
 	 * @param requestedDomain domain from the request (never null here)
 	 * @return the domain to store the entry under
@@ -387,14 +379,14 @@ public class FrontCacheIOServlet extends HttpServlet {
 		if (fcEngine.isConfiguredDomain(requestedDomain))
 			return requestedDomain;
 
-		DomainContext domainContext = fcEngine.getDomainContexBySiteKey(req.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY));
-		if (null == domainContext || null == domainContext.getDomain())
+		String localDomain = fcEngine.getDomain();
+		if (null == localDomain)
 			return requestedDomain; // nothing better to map onto - keep the caller's value
 
 		logger.debug("put-to-cache: domain {} is not served here - storing under {}",
-				requestedDomain, domainContext.getDomain());
+				requestedDomain, localDomain);
 
-		return domainContext.getDomain();
+		return localDomain;
 	}
 
 	/**
