@@ -64,8 +64,8 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 //	# record description
 //	# URI pattern it serves | file with data located in fallbacks dir | request for data (optional)
 
-	// Map <Domain, Map <URI patern, Pattern>>
-	private Map <String, Set<FallbackConfigEntryImpl>> uri2fallbackMap = new LinkedHashMap<String, Set<FallbackConfigEntryImpl>>();
+	// URI pattern -> fallback, in conf/fallbacks.conf order (first match wins)
+	private Set<FallbackConfigEntryImpl> fallbackConfigs = new LinkedHashSet<FallbackConfigEntryImpl>();
 
 	private HttpClient client;
 
@@ -80,48 +80,36 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 		populateFallbacksFromOrigin();
 	}
 
+	/**
+	 * Keyed by domain for the console, which aggregates several edges - each possibly serving a
+	 * different site. One node serves one site, so the map holds exactly one entry.
+	 */
 	@Override
 	public Map <String, Set<FallbackConfigEntry>> getFallbackConfigs() {
 
-		Map <String, Set<FallbackConfigEntry>> configMap = new LinkedHashMap<String, Set<FallbackConfigEntry>>();
-		for (String domain : uri2fallbackMap.keySet())
+		Set<FallbackConfigEntry> configs = new LinkedHashSet<FallbackConfigEntry>();
+		for (FallbackConfigEntryImpl fallbackConfigOriginal : fallbackConfigs)
 		{
-			Set<FallbackConfigEntry> domainConfigs = new LinkedHashSet<FallbackConfigEntry>();
-			for (FallbackConfigEntryImpl fallbackConfigOriginal : uri2fallbackMap.get(domain))
-			{
-				FallbackConfigEntry fallbackConfig = new FallbackConfigEntry();
-				fallbackConfig.setFileName(fallbackConfigOriginal.getFileName());
-				fallbackConfig.setInitUrl(fallbackConfigOriginal.getInitUrl());
-				fallbackConfig.setUrlPattern(fallbackConfigOriginal.getUrlPattern());
-				domainConfigs.add(fallbackConfig);
-			}
-
-			configMap.put(domain, domainConfigs);
+			FallbackConfigEntry fallbackConfig = new FallbackConfigEntry();
+			fallbackConfig.setFileName(fallbackConfigOriginal.getFileName());
+			fallbackConfig.setInitUrl(fallbackConfigOriginal.getInitUrl());
+			fallbackConfig.setUrlPattern(fallbackConfigOriginal.getUrlPattern());
+			configs.add(fallbackConfig);
 		}
+
+		Map <String, Set<FallbackConfigEntry>> configMap = new LinkedHashMap<String, Set<FallbackConfigEntry>>();
+		configMap.put(FCConfig.DEFAULT_DOMAIN, configs);
 		return configMap;
 	}
 
+	// `domain` is unused: one node serves one site, so there is a single fallback set. The parameter
+	// stays until the FallbackResolver interface drops it - see docs/multi-domain-retirement-proposal.md.
 	@Override
 	public WebResponse getFallback(DomainContext domain, String fallbackSource, String urlStr)
 	{
-		String fallbackDomain = domain.getDomain();
-
-		Set <FallbackConfigEntryImpl> fallbackConfig = uri2fallbackMap.get(domain.getDomain());
-
-		if (null == fallbackConfig)
-		{
-			fallbackConfig = uri2fallbackMap.get(FCConfig.DEFAULT_DOMAIN);
-			fallbackDomain = FCConfig.DEFAULT_DOMAIN;
-		}
-
 		FallbackConfigEntryImpl currentFallbackConfigEntry = null;
 
-        if (null == fallbackConfig)
-        {
-            return getDefault(fallbackSource, urlStr);
-        }
-
-		for (FallbackConfigEntryImpl fallbackConfigEntry : fallbackConfig)
+		for (FallbackConfigEntryImpl fallbackConfigEntry : fallbackConfigs)
 		{
     		if (fallbackConfigEntry.getUrlRegexpPattern().matcher(urlStr).matches())
     		{
@@ -137,8 +125,6 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 
 
 		String fileName = currentFallbackConfigEntry.fileName;
-		if (fallbackDomain != FCConfig.DEFAULT_DOMAIN)
-			fileName = fallbackDomain + "/" + fileName;
 
 		if (null == fileName)
 		{
@@ -266,83 +252,77 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	private void populateFallbacksFromOrigin()
 	{
 		String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
-		for (String domain : uri2fallbackMap.keySet())
+		for (FallbackConfigEntryImpl fallbackConfig : fallbackConfigs)
 		{
+			String fileName = fallbackConfig.getFileName();
 
-			for (FallbackConfigEntryImpl fallbackConfig : uri2fallbackMap.get(domain))
-			{
-				String fileName = fallbackConfig.getFileName();
-				if (!domain.equals(FCConfig.DEFAULT_DOMAIN))
-					fileName = domain + "/" + fileName;
+			File fallbackDataFile = new File(new File(frontcacheHome), "fallbacks/" + fileName);
+			if (fallbackDataFile.exists())
+				continue;
 
-				File fallbackDataFile = new File(new File(frontcacheHome), "fallbacks/" + fileName);
-				if (fallbackDataFile.exists())
+			fallbackDataFile.getParentFile().mkdirs(); // create dirs when needed
+
+			String fetchURL = fallbackConfig.getInitUrl(); // init URL is optional -> skip if missed
+			if (null == fetchURL)
+				continue;
+
+			// get content from URL
+			HttpResponse response = null;
+
+			try {
+				HttpHost httpHost = FCUtils.getHttpHost(new URL(fetchURL));
+				HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(fetchURL));
+
+				response = client.execute(httpHost, httpRequest);
+
+				int httpResponseCode = response.getStatusLine().getStatusCode();
+
+				if (httpResponseCode < 200 || httpResponseCode > 299)
 					continue;
 
-				fallbackDataFile.getParentFile().mkdirs(); // create dirs when needed
+				OutputStream fos = new FileOutputStream(fallbackDataFile);
 
-				String fetchURL = fallbackConfig.getInitUrl(); // init URL is optional -> skip if missed
-				if (null == fetchURL)
-					continue;
+				Header contentTypeHeader = response.getFirstHeader(FCHeaders.CONTENT_TYPE);
+				if (null != contentTypeHeader)
+				{
+					String contentType = contentTypeHeader.getValue();
+					fos.write((FCHeaders.CONTENT_TYPE + ":" + contentType + "\n").getBytes());
+				}
 
-				// get content from URL
-				HttpResponse response = null;
-
+				// save response to file
+				InputStream is = response.getEntity().getContent();
 				try {
-					HttpHost httpHost = FCUtils.getHttpHost(new URL(fetchURL));
-					HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(fetchURL));
-
-					response = client.execute(httpHost, httpRequest);
-
-					int httpResponseCode = response.getStatusLine().getStatusCode();
-
-					if (httpResponseCode < 200 || httpResponseCode > 299)
-						continue;
-
-					OutputStream fos = new FileOutputStream(fallbackDataFile);
-
-					Header contentTypeHeader = response.getFirstHeader(FCHeaders.CONTENT_TYPE);
-					if (null != contentTypeHeader)
-					{
-						String contentType = contentTypeHeader.getValue();
-						fos.write((FCHeaders.CONTENT_TYPE + ":" + contentType + "\n").getBytes());
-					}
-
-					// save response to file
-					InputStream is = response.getEntity().getContent();
-					try {
-						int bytesRead = 0;
+					int bytesRead = 0;
 			            int bufferSize = 4000;
-				         byte[] byteBuffer = new byte[bufferSize];
-				         while ((bytesRead = is.read(byteBuffer)) != -1) {
-				             fos.write(byteBuffer, 0, bytesRead);
-				         }
-					} catch (Exception e) {
-						e.printStackTrace();
-					} finally {
-						try
-						{
-							fos.flush();
-							fos.close();
-						} catch (Exception ex) {
-							ex.printStackTrace();
-						}
-					}
-
-				} catch (Exception ioe) {
-					ioe.printStackTrace();
+			         byte[] byteBuffer = new byte[bufferSize];
+			         while ((bytesRead = is.read(byteBuffer)) != -1) {
+			             fos.write(byteBuffer, 0, bytesRead);
+			         }
+				} catch (Exception e) {
+					e.printStackTrace();
 				} finally {
-					if (null != response)
+					try
 					{
-						try {
-							((CloseableHttpResponse) response).close();
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
+						fos.flush();
+						fos.close();
+					} catch (Exception ex) {
+						ex.printStackTrace();
 					}
 				}
-			} // for (FallbackConfigEntryImpl fallbackConfig : uri2fallbackMap.get(domain))
-		} // for (String domain : uri2fallbackMap.keySet())
+
+			} catch (Exception ioe) {
+				ioe.printStackTrace();
+			} finally {
+				if (null != response)
+				{
+					try {
+						((CloseableHttpResponse) response).close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		} // for (FallbackConfigEntryImpl fallbackConfig : fallbackConfigs)
 
 		return;
 	}
@@ -351,30 +331,16 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	 *
 	 */
 	private void loadFallbackConfig() {
-		uri2fallbackMap.clear();
+		fallbackConfigs.clear();
 
 		logger.info("Starting fallback configs loading ...");
-		for (String domain : FCConfig.getDomains())
+		Set<FallbackConfigEntryImpl> configs = loadFallbackConfig(FALLBACKS_CONFIG_FILE);
+		if (null != configs)
 		{
-			Set<FallbackConfigEntryImpl> fallbackConfigs = loadFallbackConfig(domain + "/" + FALLBACKS_CONFIG_FILE);
-
-			if (null != fallbackConfigs)
-			{
-				uri2fallbackMap.put(domain, fallbackConfigs);
-				logger.info("   " + domain + " -> loaded " + fallbackConfigs.size() + " fallbacks from domain configs");
-			} else {
-				logger.info("   " + domain + " -> no fallbacks configs found - use default configuration");
-			}
-		}
-
-		// default bot configs
-		Set<FallbackConfigEntryImpl> fallbackConfigs = loadFallbackConfig(FALLBACKS_CONFIG_FILE);
-		if (null != fallbackConfigs)
-		{
-			uri2fallbackMap.put(FCConfig.DEFAULT_DOMAIN, fallbackConfigs);
-			logger.info("   " + FCConfig.DEFAULT_DOMAIN + " -> loaded " + fallbackConfigs.size() + " fallbacks from domain configs");
+			fallbackConfigs.addAll(configs);
+			logger.info("   loaded " + configs.size() + " fallbacks from " + FALLBACKS_CONFIG_FILE);
 		} else {
-			logger.info("   " + FCConfig.DEFAULT_DOMAIN + " -> no fallbacks configs found - use default configuration");
+			logger.info("   no fallbacks configs found in " + FALLBACKS_CONFIG_FILE + " - the built-in default fallback is used");
 		}
 		logger.info("Fallback configs loading is completed ...");
 		return;

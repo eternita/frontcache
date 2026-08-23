@@ -501,6 +501,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 	/**
+	 * Bot keywords, keyed by domain for the console - which aggregates several edges, each possibly
+	 * serving a different site. One node serves one site, so the map holds exactly one entry.
 	 *
 	 * @param req
 	 * @return
@@ -508,7 +510,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse getBots(HttpServletRequest req)
 	{
 		Map<String, Set<String>> bots = new HashMap<String, Set<String>>();
-		bots.putAll(FCConfig.getBotUserAgentKeywords());
+		bots.put(FCConfig.DEFAULT_DOMAIN, FCConfig.getBotUserAgentKeywords());
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
 		aResponse.setBots(bots);
 
@@ -551,6 +553,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 	/**
+	 * Dynamic-URL patterns, keyed by domain for the console - see {@link #getBots}. One entry.
 	 *
 	 * @param req
 	 * @return
@@ -558,7 +561,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse getDynamicURLs(HttpServletRequest req)
 	{
 		Map<String, Set<String>> dynamicURLs = new HashMap<String, Set<String>>();
-		dynamicURLs.putAll(FCConfig.getDynamicURLs());
+		dynamicURLs.put(FCConfig.DEFAULT_DOMAIN, FCConfig.getDynamicURLs());
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
 		aResponse.setDynamicURLs(dynamicURLs);
 

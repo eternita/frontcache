@@ -349,11 +349,11 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		status.put(CacheProcessor.CACHED_ENTRIES + "-L1", "" + ehCache.getKeys().size());
 		status.put(CacheProcessor.CACHED_ENTRIES + "-L2", "" + luceneIndexManager.getIndexSize());
 
-		for (String domain : FCConfig.getDomains())
-		{
-			long domainCount = luceneIndexManager.getDocumentsCount(domain);
-			status.put(CacheProcessor.CACHED_ENTRIES + "-L2." + domain, "" + domainCount);
-		}
+		// Entries are stamped with this node's own domain, so there is exactly one counter. It is
+		// still reported per domain because the console aggregates several edges and each may serve
+		// a different site.
+		String domain = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
+		status.put(CacheProcessor.CACHED_ENTRIES + "-L2." + domain, "" + luceneIndexManager.getDocumentsCount(domain));
 
 		return status;
 	}

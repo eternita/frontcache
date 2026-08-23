@@ -11,6 +11,9 @@ package org.frontcache;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.List;
 
 import org.junit.After;
@@ -87,6 +90,41 @@ public class FrontCacheEngineRetiredDomainConfigTest {
 		// overrides sorted, so the message is stable across runs
 		assertEquals(ORIGIN_HOST_KEY, keys.get(1));
 		assertEquals(SITE_KEY_KEY, keys.get(2));
+	}
+
+	@Test
+	public void noLeftoverPerDomainConfigDirsInTheFixtureHome() {
+		// the fixture home has conf/{bots,dynamic-urls,fallbacks}.conf at the top level and no
+		// subdirectories - which is the shape every node now has
+		assertEquals(0, FrontCacheEngine.findRetiredDomainConfigDirs().size());
+	}
+
+	@Test
+	public void leftoverPerDomainConfigDirIsReported() throws Exception {
+		File confDir = new File(System.getProperty("frontcache.home"), "conf");
+		File domainDir = new File(confDir, "www.example.com");
+		File botsConf = new File(domainDir, "bots.conf");
+		File strayDir = new File(confDir, "notes");
+
+		try {
+			// a bare subdirectory is nobody's business
+			assertTrue(strayDir.mkdirs() || strayDir.isDirectory());
+			assertEquals("a subdirectory with no per-domain config must be ignored",
+					0, FrontCacheEngine.findRetiredDomainConfigDirs().size());
+
+			// one holding a file that USED to be layered per domain would now be read by nothing
+			assertTrue(domainDir.mkdirs() || domainDir.isDirectory());
+			Files.write(botsConf.toPath(), "Googlebot\n".getBytes(StandardCharsets.UTF_8));
+
+			List<String> retired = FrontCacheEngine.findRetiredDomainConfigDirs();
+
+			assertEquals(retired.toString(), 1, retired.size());
+			assertEquals("conf/www.example.com/bots.conf", retired.get(0));
+		} finally {
+			botsConf.delete();
+			domainDir.delete();
+			strayDir.delete();
+		}
 	}
 
 	@Test
