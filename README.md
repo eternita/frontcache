@@ -1,7 +1,7 @@
 ## Frontcache = [includes + fragment cache] x edge side
 
 
-- Licensing: https://www.eternita.co/frontcache-license.html
+- Licensing: https://www.eternita.co/frontcache.html
 
 #### Get started
 

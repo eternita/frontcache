@@ -188,4 +188,4 @@ all four into Elasticsearch + Kibana with ready-made dashboards.
 
 Topologies: [deployment-usecases.md](deployment-usecases.md) ·
 Install: [install-guide.md](install-guide.md) ·
-Licensing: <https://www.eternita.co/frontcache-license.html>
+Licensing: <https://www.eternita.co/frontcache.html>
