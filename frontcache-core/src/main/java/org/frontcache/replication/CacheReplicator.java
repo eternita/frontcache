@@ -221,14 +221,7 @@ public class CacheReplicator {
 				return false;
 			}
 
-			// Use the domain from the source entry; fall back to a default if null
-			String domain = entry.getDomain();
-			if (domain == null || domain.isEmpty()) {
-				// Extract domain from the source URL as a fallback
-				domain = extractDomain(source.getFrontCacheURL());
-			}
-
-			boolean ok = target.putToCache(domain, key, entry);
+			boolean ok = target.putToCache(key, entry);
 			if (!ok) {
 				logger.warn("putToCache returned failure for key={} on target {}", key, result.getTargetUrl());
 			}
@@ -238,25 +231,6 @@ public class CacheReplicator {
 			logger.error("Failed to transfer entry: key={}", key, e);
 			return false;
 		}
-	}
-
-	/**
-	 * Extracts the hostname from a URL string (e.g. "http://fc-ap.example-site.com:9080/" → "fc-ap.example-site.com").
-	 */
-	private static String extractDomain(String url) {
-		if (url == null)
-			return "unknown";
-		String host = url;
-		int schemeEnd = host.indexOf("://");
-		if (schemeEnd >= 0)
-			host = host.substring(schemeEnd + 3);
-		int slashIdx = host.indexOf('/');
-		if (slashIdx >= 0)
-			host = host.substring(0, slashIdx);
-		int colonIdx = host.indexOf(':');
-		if (colonIdx >= 0)
-			host = host.substring(0, colonIdx);
-		return host;
 	}
 
 	private static long elapsedMillis(long startNanos) {

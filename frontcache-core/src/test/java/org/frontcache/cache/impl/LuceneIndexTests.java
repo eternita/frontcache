@@ -52,7 +52,7 @@ public class LuceneIndexTests {
 		for (int i = 0; i < size; i++) {
 			String url = UUID.randomUUID().toString();
 			String content = UUID.randomUUID().toString();
-			luceneIndexManager.delete(DOMAIN, url);
+			luceneIndexManager.delete(url);
 
 			WebResponse response = new WebResponse(url, content.getBytes());
 			List<String> list = new ArrayList<>();
@@ -60,7 +60,6 @@ public class LuceneIndexTests {
 			response.getHeaders().put("Accept", list);
 			Set<String> tagSet = new HashSet<>();
 			tagSet.add(tags[i]);
-			response.setDomain(DOMAIN);
 			response.setTags(tagSet);
 			response.setStatusCode(55);
 			luceneIndexManager.indexDoc(response);
@@ -76,7 +75,7 @@ public class LuceneIndexTests {
 		}
 
 		assertEquals(size, luceneIndexManager.getIndexSize());
-		luceneIndexManager.delete(DOMAIN, "apple");
+		luceneIndexManager.delete("apple");
 		assertEquals(size - 1, luceneIndexManager.getIndexSize());
 
 	}
@@ -98,7 +97,6 @@ public class LuceneIndexTests {
 			set.add(tags[i]);
 			response.setTags(set);
 			response.setStatusCode(55);
-			response.setDomain(DOMAIN);
 			luceneIndexManager.indexDoc(response);
 
 			WebResponse fromFile = luceneIndexManager.getResponse(url);
@@ -111,7 +109,7 @@ public class LuceneIndexTests {
 		}
 
 		assertEquals(size, luceneIndexManager.getIndexSize());
-		luceneIndexManager.delete(DOMAIN, "apple");
+		luceneIndexManager.delete("apple");
 		assertEquals(size - 1, luceneIndexManager.getIndexSize());
 
 	}
@@ -138,7 +136,6 @@ public class LuceneIndexTests {
 			set.add(tags[i]);
 			response.setTags(set);
 			response.setStatusCode(55);
-			response.setDomain(DOMAIN);
 			luceneIndexManager.indexDoc(response);
 
 			WebResponse fromFile = luceneIndexManager.getResponse(url);
@@ -154,7 +151,7 @@ public class LuceneIndexTests {
 			WebResponse fromFile = luceneIndexManager.getResponse(url);
 			assertNotNull(fromFile);
 			assertEquals(urls.get(url), new String(fromFile.getContent()));
-			luceneIndexManager.delete(DOMAIN, url);
+			luceneIndexManager.delete(url);
 			fromFile = luceneIndexManager.getResponse(url);
 			assertNull(fromFile);
 		}
@@ -166,18 +163,17 @@ public class LuceneIndexTests {
 
 		String url = "https://www.example.com/en/coin_definition-1_Escudo-Gold-Centralist_Republic_of_Mexico_(1835_1846)-E9AKbzbiOBIAAAFG0vnZjkvL.htm";
 
-		luceneIndexManager.delete(DOMAIN, url);
+		luceneIndexManager.delete(url);
 
 		WebResponse response = new WebResponse(url, "data".getBytes());
 		response.addTags(Arrays.asList(new String[]{"E9AKbzbiOBIAAAFG0vnZjkvL"}));
-		response.setDomain(COINSHOME_DOMAIN);
 		luceneIndexManager.indexDoc(response);
 
 		WebResponse fromFile = luceneIndexManager.getResponse(url);
 		assertEquals(url, fromFile.getUrl());
 		assertEquals(new String("data".getBytes()), new String(fromFile.getContent()));
 
-		luceneIndexManager.delete(DOMAIN, "E9AKbzbiOBIAAAFG0vnZjkvL");
+		luceneIndexManager.delete("E9AKbzbiOBIAAAFG0vnZjkvL");
 
 		fromFile = luceneIndexManager.getResponse(url);
 		assertNull(fromFile);
@@ -188,7 +184,7 @@ public class LuceneIndexTests {
 	public void fileEmptyByteTest() throws Exception {
 
 			String url = UUID.randomUUID().toString();
-			luceneIndexManager.delete(DOMAIN, url);
+			luceneIndexManager.delete(url);
 
 			WebResponse response = new WebResponse(url, null);
 			List<String> list = new ArrayList<>();
@@ -198,7 +194,6 @@ public class LuceneIndexTests {
 			set.add("banana");
 			response.setTags(set);
 			response.setStatusCode(55);
-			response.setDomain(DOMAIN);
 			luceneIndexManager.indexDoc(response);
 
 			WebResponse fromFile = luceneIndexManager.getResponse(url);
@@ -229,10 +224,9 @@ public class LuceneIndexTests {
 
 //		System.out.println("hello");
 		String url = UUID.randomUUID().toString();
-		luceneIndexManager1.delete(DOMAIN, url);
+		luceneIndexManager1.delete(url);
 
 		WebResponse response = new WebResponse(url, null);
-		response.setDomain(DOMAIN);
 		List<String> list = new ArrayList<>();
 		list.add(UUID.randomUUID().toString());
 		response.getHeaders().put("Accept", list);
@@ -268,10 +262,9 @@ public class LuceneIndexTests {
 
 
 		String url = UUID.randomUUID().toString();
-		luceneIndexManager1.delete(DOMAIN, url);
+		luceneIndexManager1.delete(url);
 
 		WebResponse response = new WebResponse(url, null);
-		response.setDomain(DOMAIN);
 		List<String> list = new ArrayList<>();
 		list.add(UUID.randomUUID().toString());
 		response.getHeaders().put("Accept", list);
@@ -303,10 +296,9 @@ public class LuceneIndexTests {
 		String fullUrl = "https://www.example-site.com:443/en/welcome.htm";
 		String expectedPath = "/en/welcome.htm";
 
-		luceneIndexManager.delete(DOMAIN, fullUrl);
+		luceneIndexManager.delete(fullUrl);
 
 		WebResponse response = new WebResponse(fullUrl, "data".getBytes());
-		response.setDomain(DOMAIN);
 		luceneIndexManager.indexDoc(response);
 
 		// getKeys() returns the normalised path, not the full URL
@@ -330,7 +322,7 @@ public class LuceneIndexTests {
 		assertEquals(fullUrl, fromPath.getUrl());
 
 		// delete works with the full URL
-		luceneIndexManager.delete(DOMAIN, fullUrl);
+		luceneIndexManager.delete(fullUrl);
 		assertNull(luceneIndexManager.getResponse(fullUrl));
 	}
 
@@ -340,10 +332,9 @@ public class LuceneIndexTests {
 		String url1 = "http://fc1-test.org/common/page.html";
 		String url2 = "http://fc2.test.org/common/page.html";
 
-		luceneIndexManager.delete(DOMAIN, url1);
+		luceneIndexManager.delete(url1);
 
 		WebResponse r1 = new WebResponse(url1, "from-fc1".getBytes());
-		r1.setDomain(DOMAIN);
 		luceneIndexManager.indexDoc(r1);
 
 		// looking up via a different host returns the same entry
@@ -354,7 +345,7 @@ public class LuceneIndexTests {
 		// only one entry in the index (same path = same key)
 		assertEquals(1, luceneIndexManager.getIndexSize());
 
-		luceneIndexManager.delete(DOMAIN, url1);
+		luceneIndexManager.delete(url1);
 	}
 
 	@Test
@@ -362,10 +353,9 @@ public class LuceneIndexTests {
 		String fullUrl = "http://example.com:8080/search?q=coin&page=2";
 		String expectedPath = "/search?q=coin&page=2";
 
-		luceneIndexManager.delete(DOMAIN, fullUrl);
+		luceneIndexManager.delete(fullUrl);
 
 		WebResponse response = new WebResponse(fullUrl, "results".getBytes());
-		response.setDomain(DOMAIN);
 		luceneIndexManager.indexDoc(response);
 
 		List<String> keys = luceneIndexManager.getKeys();
@@ -375,7 +365,7 @@ public class LuceneIndexTests {
 		WebResponse same = luceneIndexManager.getResponse("http://other.host:9999/search?q=coin&page=2");
 		assertNotNull(same);
 
-		luceneIndexManager.delete(DOMAIN, fullUrl);
+		luceneIndexManager.delete(fullUrl);
 	}
 
 	@Test
@@ -405,7 +395,6 @@ public class LuceneIndexTests {
 
 			String url = "https://www.example.com/en/country_coins-Ottoman_Empire_(1299_1923)-x.htm";
 			WebResponse wr = new WebResponse(url, "hello".getBytes());
-			wr.setDomain(COINSHOME_DOMAIN);
 			m2.indexDoc(wr);
 
 			WebResponse back = m2.getResponse(url);
@@ -423,7 +412,6 @@ public class LuceneIndexTests {
 		for (int i = 0; i < size; i++) {
 			String url = UUID.randomUUID().toString();
 			WebResponse response = new WebResponse(url, UUID.randomUUID().toString().getBytes());
-			response.setDomain(DOMAIN);
 			luceneIndexManager.indexDoc(response);
 		}
 		assertEquals(size, luceneIndexManager.getIndexSize());
@@ -479,7 +467,6 @@ public class LuceneIndexTests {
 		// baseline: the writer works
 		String url1 = UUID.randomUUID().toString();
 		WebResponse r1 = new WebResponse(url1, UUID.randomUUID().toString().getBytes());
-		r1.setDomain(DOMAIN);
 		luceneIndexManager.indexDoc(r1);
 		assertNotNull(luceneIndexManager.getResponse(url1));
 
@@ -504,7 +491,6 @@ public class LuceneIndexTests {
 		// --- next cache write must self-heal (delete the stale lock + reopen) rather than wedge ---
 		String url2 = UUID.randomUUID().toString();
 		WebResponse r2 = new WebResponse(url2, UUID.randomUUID().toString().getBytes());
-		r2.setDomain(DOMAIN);
 		luceneIndexManager.indexDoc(r2);
 
 		WebResponse restored = luceneIndexManager.getResponse(url2);
@@ -527,7 +513,6 @@ public class LuceneIndexTests {
 		// a first manager creates the index, then (simulating a hard crash) leaves write.lock behind
 		LuceneIndexManager crashed = new LuceneIndexManager(dir);
 		WebResponse r1 = new WebResponse(UUID.randomUUID().toString(), UUID.randomUUID().toString().getBytes());
-		r1.setDomain(DOMAIN);
 		crashed.indexDoc(r1);
 
 		leaveStaleWriteLockBehind(crashed, dir);
@@ -540,7 +525,6 @@ public class LuceneIndexTests {
 		LuceneIndexManager restarted = new LuceneIndexManager(dir);
 		String url2 = UUID.randomUUID().toString();
 		WebResponse r2 = new WebResponse(url2, UUID.randomUUID().toString().getBytes());
-		r2.setDomain(DOMAIN);
 		restarted.indexDoc(r2);
 		assertNotNull("fresh manager should have recovered from the leftover lock", restarted.getResponse(url2));
 		restarted.close();

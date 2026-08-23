@@ -19,7 +19,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -202,28 +201,6 @@ public class FrontCacheEngine {
 	public boolean isNodeSiteKey(String siteKey)
 	{
 		return null != siteKey && 0 < siteKey.length() && siteKey.equals(this.siteKey);
-	}
-
-	/**
-	 * The single domain this node serves. Kept set-shaped for the management API, which still
-	 * distinguishes a domain this node owns from one that only appears on entries pushed in by
-	 * index replication.
-	 */
-	public Set<String> getConfiguredDomains()
-	{
-		Set<String> domains = new HashSet<String>();
-		if (null != domain)
-			domains.add(domain);
-
-		return domains;
-	}
-
-	/**
-	 * @return true when {@code domain} is the one this node serves itself
-	 */
-	public boolean isConfiguredDomain(String domain)
-	{
-		return null != domain && domain.equals(this.domain);
 	}
 
 	// synchronized on the same monitor as getFrontCache() so a shutdown/reload can't interleave with

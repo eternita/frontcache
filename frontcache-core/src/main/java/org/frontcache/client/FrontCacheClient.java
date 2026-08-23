@@ -553,17 +553,15 @@ public class FrontCacheClient {
 	 * Pushes a WebResponse entry into the remote node's cache.
 	 * Used by the replication engine to write entries from a source edge to a target edge.
 	 *
-	 * @param domain      the domain to store under
 	 * @param key         the cache key (normalised path)
 	 * @param webResponse the entry to store
 	 * @return true if the entry was stored successfully
 	 */
-	public boolean putToCache(String domain, String key, WebResponse webResponse)
+	public boolean putToCache(String key, WebResponse webResponse)
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.PUT_TO_CACHE));
 		urlParameters.add(new BasicNameValuePair("key", key));
-		urlParameters.add(new BasicNameValuePair("domain", domain));
 
 		try {
 			String json = jsonMapper.writeValueAsString(webResponse);
@@ -574,7 +572,7 @@ public class FrontCacheClient {
 					jsonMapper.readValue(responseStr.getBytes(), PutToCacheActionResponse.class);
 			return ActionResponse.RESPONSE_STATUS_OK.equals(actionResponse.getResponseStatus());
 		} catch (Exception e) {
-			logger.error("putToCache failed: domain={}, key={}", domain, key, e);
+			logger.error("putToCache failed: key={}", key, e);
 			return false;
 		}
 	}

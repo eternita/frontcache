@@ -231,32 +231,17 @@ public class FrontCacheIOServlet extends HttpServlet {
 			return aResponse;
 		}
 
-		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
-		String domain = fcEngine.getDomain(); // the request already passed site-key validation
-
 		if ("*".equals(filter))
 		{
-			// A domain-scoped delete only drops entries stamped with this node's domain. Entries
-			// pushed in by index replication carry the SOURCE edge's domain, so they survive every
-			// "*" and keep being served (reads are by URL only, domain is not consulted). On a
-			// single-domain node "*" can only mean "empty this node", so do exactly that; a
-			// multi-domain node keeps the per-domain behaviour unless all-domains=true is passed.
-			boolean allDomains = "true".equalsIgnoreCase(req.getParameter("all-domains"))
-					|| fcEngine.getConfiguredDomains().size() < 2;
-
-			if (allDomains)
-			{
-				CacheManager.getInstance().removeFromCacheAll();
-				logger.info("Invalidation for filter: {} (all domains)", filter);
-			} else {
-				CacheManager.getInstance().removeFromCacheAll(domain);
-				logger.info("Invalidation for filter: {} (domain: {})", filter, domain);
-			}
+			// "*" empties this node - including entries pushed in by index replication, which used to
+			// survive it because they carry the SOURCE edge's domain and the delete was domain-scoped.
+			CacheManager.getInstance().removeFromCacheAll();
+			logger.info("Invalidation for filter: {} (whole node)", filter);
 
 			return aResponse;
 		}
 
-		CacheManager.getInstance().removeFromCache(domain, filter);
+		CacheManager.getInstance().removeFromCache(filter);
 
 		logger.info("Invalidation for filter: " + filter);
 		return aResponse;
@@ -332,29 +317,29 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse putToCache(HttpServletRequest req)
 	{
 		String key = req.getParameter("key");
-		String requestedDomain = req.getParameter("domain");
 		String webResponseJson = req.getParameter("webResponse");
 
-		if (key == null || requestedDomain == null || webResponseJson == null)
+		if (key == null || webResponseJson == null)
 		{
-			PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key, requestedDomain);
+			PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			aResponse.setErrorDescription("Required parameters: key, domain, webResponse");
+			aResponse.setErrorDescription("Required parameters: key, webResponse");
 			return aResponse;
 		}
 
-		String domain = resolveLocalDomain(req, requestedDomain);
-		PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key, domain);
+		// A `domain` parameter from an older client is accepted and ignored - entries are not
+		// domain-scoped any more, so there is nothing to map it onto.
+		PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key);
 
 		try
 		{
 			WebResponse webResponse = jsonMapper.readValue(webResponseJson, WebResponse.class);
-			CacheManager.getInstance().putToCache(domain, key, webResponse);
-			logger.info("put-to-cache: domain={}, key={}", domain, key);
+			CacheManager.getInstance().putToCache(key, webResponse);
+			logger.info("put-to-cache: key={}", key);
 		}
 		catch (Exception e)
 		{
-			logger.error("put-to-cache failed: domain={}, key={}", domain, key, e);
+			logger.error("put-to-cache failed: key={}", key, e);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 			aResponse.setErrorDescription(e.getMessage());
 		}
@@ -362,32 +347,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 		return aResponse;
 	}
 
-	/**
-	 * Maps the domain a caller asked for onto a domain THIS node serves.
-	 *
-	 * Replication sends the source entry's domain, so an entry copied from another edge would be
-	 * stored under a domain this node knows nothing about - invisible to "invalidate all" and to the
-	 * per-domain counters, though still served (lookups are by URL).
-	 *
-	 * @param requestedDomain domain from the request (never null here)
-	 * @return the domain to store the entry under
-	 */
-	private String resolveLocalDomain(HttpServletRequest req, String requestedDomain)
-	{
-		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
-
-		if (fcEngine.isConfiguredDomain(requestedDomain))
-			return requestedDomain;
-
-		String localDomain = fcEngine.getDomain();
-		if (null == localDomain)
-			return requestedDomain; // nothing better to map onto - keep the caller's value
-
-		logger.debug("put-to-cache: domain {} is not served here - storing under {}",
-				requestedDomain, localDomain);
-
-		return localDomain;
-	}
 
 	/**
 	 * Dumps cached keys to a file under ./warmer asynchronously.

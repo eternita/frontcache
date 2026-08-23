@@ -244,7 +244,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 					softRefresh = true;
 				} else {
 					// regular expiration
-					cacheProcessor.removeFromCache(context.getDomain(), urlStr);
+					cacheProcessor.removeFromCache(urlStr);
 					webResponse = null; // refresh from origin
 				}
 			}

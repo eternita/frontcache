@@ -42,27 +42,41 @@ public class PutToCacheActionResponseTest {
 
 	@Test
 	public void responseSerializesToJson() throws Exception {
-		PutToCacheActionResponse resp = new PutToCacheActionResponse("/en/welcome.htm", "www.example.com");
+		PutToCacheActionResponse resp = new PutToCacheActionResponse("/en/welcome.htm");
 
 		String json = jsonMapper.writeValueAsString(resp);
 
 		assertTrue(json.contains("\"action\":\"put to cache\""));
 		assertTrue(json.contains("\"responseStatus\":\"OK\""));
 		assertTrue(json.contains("\"key\":\"/en/welcome.htm\""));
-		assertTrue(json.contains("\"domain\":\"www.example.com\""));
 	}
 
 	@Test
 	public void responseDeserializesFromJson() throws Exception {
 		String json = "{\"action\":\"put to cache\",\"responseStatus\":\"OK\","
-				+ "\"key\":\"/en/welcome.htm\",\"domain\":\"www.example.com\"}";
+				+ "\"key\":\"/en/welcome.htm\"}";
 
 		PutToCacheActionResponse resp = jsonMapper.readValue(json.getBytes(), PutToCacheActionResponse.class);
 
 		assertEquals("put to cache", resp.getAction());
 		assertEquals(ActionResponse.RESPONSE_STATUS_OK, resp.getResponseStatus());
 		assertEquals("/en/welcome.htm", resp.getKey());
-		assertEquals("www.example.com", resp.getDomain());
+	}
+
+	/**
+	 * An older node still sends the retired `domain` field. Index replication has a new node reading
+	 * an older node's response mid-upgrade, and Jackson fails on unknown properties by default - so
+	 * without ActionResponse's @JsonIgnoreProperties every replicated entry would report failure.
+	 */
+	@Test
+	public void unknownFieldFromAnOlderNodeIsIgnored() throws Exception {
+		String json = "{\"action\":\"put to cache\",\"responseStatus\":\"OK\","
+				+ "\"key\":\"/en/welcome.htm\",\"domain\":\"www.example.com\"}";
+
+		PutToCacheActionResponse resp = jsonMapper.readValue(json.getBytes(), PutToCacheActionResponse.class);
+
+		assertEquals(ActionResponse.RESPONSE_STATUS_OK, resp.getResponseStatus());
+		assertEquals("/en/welcome.htm", resp.getKey());
 	}
 
 	@Test
@@ -74,12 +88,11 @@ public class PutToCacheActionResponseTest {
 
 		assertNotNull(resp);
 		assertNull(resp.getKey());
-		assertNull(resp.getDomain());
 	}
 
 	@Test
 	public void errorResponseRoundTrip() throws Exception {
-		PutToCacheActionResponse resp = new PutToCacheActionResponse("/missing.htm", "www.example.com");
+		PutToCacheActionResponse resp = new PutToCacheActionResponse("/missing.htm");
 		resp.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 		resp.setErrorDescription("Entry not found");
 

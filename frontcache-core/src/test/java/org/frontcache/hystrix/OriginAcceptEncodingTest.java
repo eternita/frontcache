@@ -48,7 +48,7 @@ public class OriginAcceptEncodingTest {
 
 	private RequestContext newContext() {
 		RequestContext ctx = new RequestContext();
-		ctx.setDomain("test.org");
+		ctx.setDomain("test.org"); // the Hystrix command group key
 		return ctx;
 	}
 

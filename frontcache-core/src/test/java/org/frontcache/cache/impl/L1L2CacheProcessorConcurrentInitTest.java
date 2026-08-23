@@ -45,7 +45,6 @@ import org.junit.Test;
  */
 public class L1L2CacheProcessorConcurrentInitTest {
 
-	private static final String DOMAIN = "test-domain";
 
 	private final List<CacheProcessor> processors = new ArrayList<CacheProcessor>();
 
@@ -93,9 +92,9 @@ public class L1L2CacheProcessorConcurrentInitTest {
 		String urlA = "http://test.example.com/dup/a-" + UUID.randomUUID() + ".html";
 		String urlB = "http://test.example.com/dup/b-" + UUID.randomUUID() + ".html";
 
-		first.putToCache(DOMAIN, urlA, cacheableResponse(urlA));
+		first.putToCache(urlA, cacheableResponse(urlA));
 		// before the fix this write hit "Lock held elsewhere" and was silently dropped
-		second.putToCache(DOMAIN, urlB, cacheableResponse(urlB));
+		second.putToCache(urlB, cacheableResponse(urlB));
 
 		assertNotNull("first processor should read back its own L2 entry", first.getFromCache(urlA, null));
 		assertNotNull("second processor must be able to write to L2 (was lock-starved)",
@@ -147,7 +146,6 @@ public class L1L2CacheProcessorConcurrentInitTest {
 		// and the single manager actually works - i.e. it holds the write lock
 		String url = "http://test.example.com/concurrent/" + UUID.randomUUID() + ".html";
 		WebResponse r = new WebResponse(url, "payload".getBytes());
-		r.setDomain(DOMAIN);
 		manager.indexDoc(r);
 		assertNotNull("the shared manager must be able to write", manager.getResponse(url));
 
@@ -169,7 +167,6 @@ public class L1L2CacheProcessorConcurrentInitTest {
 		// an index with a genuinely stale write.lock, as left behind by a hard-killed JVM
 		LuceneIndexManager seed = new LuceneIndexManager(dir);
 		WebResponse seedResponse = new WebResponse(UUID.randomUUID().toString(), "seed".getBytes());
-		seedResponse.setDomain(DOMAIN);
 		seed.indexDoc(seedResponse);
 		LuceneIndexTests.leaveStaleWriteLockBehind(seed, dir);
 
@@ -191,7 +188,6 @@ public class L1L2CacheProcessorConcurrentInitTest {
 						managers[idx] = m;
 						String url = "http://test.example.com/heal/" + idx + "-" + UUID.randomUUID() + ".html";
 						WebResponse r = new WebResponse(url, ("payload " + idx).getBytes());
-						r.setDomain(DOMAIN);
 						m.indexDoc(r);
 						if (m.getResponse(url) != null)
 							written.add(url);
@@ -230,7 +226,6 @@ public class L1L2CacheProcessorConcurrentInitTest {
 
 		String before = "http://test.example.com/stolen/before-" + UUID.randomUUID() + ".html";
 		WebResponse r1 = new WebResponse(before, "before".getBytes());
-		r1.setDomain(DOMAIN);
 		manager.indexDoc(r1);
 		assertNotNull("baseline write should work", manager.getResponse(before));
 
@@ -260,12 +255,11 @@ public class L1L2CacheProcessorConcurrentInitTest {
 		// so the writer is left reporting isOpen()==true with a dead lock. That asymmetry is exactly why
 		// production wedged on the soft-invalidation path (delete + commit) while page writes kept
 		// working, and why isOpen() cannot be the liveness check.
-		manager.delete(DOMAIN, before);
+		manager.delete(before);
 
 		// ...and the NEXT one must succeed against a freshly opened writer
 		String after = "http://test.example.com/stolen/after-" + UUID.randomUUID() + ".html";
 		WebResponse r3 = new WebResponse(after, "after".getBytes());
-		r3.setDomain(DOMAIN);
 		manager.indexDoc(r3);
 
 		// Checked against a fresh on-disk reader, NOT manager.getResponse(): readers are opened from the

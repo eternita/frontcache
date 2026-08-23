@@ -31,7 +31,6 @@ import org.junit.Test;
  */
 public class L1L2CacheProcessorPurgeTest {
 
-	private static final String DOMAIN = "test-domain";
 
 	private CacheProcessor cacheProcessor;
 
@@ -66,7 +65,7 @@ public class L1L2CacheProcessorPurgeTest {
 	}
 
 	private void put(String url, long expireMillis, String cacheLevel) {
-		cacheProcessor.putToCache(DOMAIN, url, response(url, expireMillis, cacheLevel));
+		cacheProcessor.putToCache(url, response(url, expireMillis, cacheLevel));
 	}
 
 	@Test

@@ -30,7 +30,6 @@ import org.junit.Test;
  */
 public class L1L2CacheProcessorGetCachedKeysTest {
 
-	private static final String DOMAIN = "test-domain";
 
 	private CacheProcessor cacheProcessor;
 
@@ -59,13 +58,13 @@ public class L1L2CacheProcessorGetCachedKeysTest {
 	}
 
 	private void putL2(String url) { // default cache level -> Lucene
-		cacheProcessor.putToCache(DOMAIN, url, cacheable(url));
+		cacheProcessor.putToCache(url, cacheable(url));
 	}
 
 	private void putL1(String url) { // explicit L1 -> Ehcache
 		WebResponse response = cacheable(url);
 		response.setCacheLevel(FCHeaders.CACHE_LEVEL_L1);
-		cacheProcessor.putToCache(DOMAIN, url, response);
+		cacheProcessor.putToCache(url, response);
 	}
 
 	@Test
@@ -125,7 +124,7 @@ public class L1L2CacheProcessorGetCachedKeysTest {
 		assertEquals(2, cacheProcessor.getCachedKeys().size());
 
 		// removeFromCache scans both tiers by substring filter
-		cacheProcessor.removeFromCache(DOMAIN, l2Url);
+		cacheProcessor.removeFromCache(l2Url);
 		List<String> keys = cacheProcessor.getCachedKeys();
 		assertEquals(1, keys.size());
 		// L2 key was stored as path, so the path form must be gone

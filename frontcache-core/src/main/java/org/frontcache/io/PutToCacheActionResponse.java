@@ -19,17 +19,15 @@ package org.frontcache.io;
 public class PutToCacheActionResponse extends ActionResponse {
 
 	private String key;
-	private String domain;
 
 	/** No-arg constructor for Jackson deserialization. */
 	public PutToCacheActionResponse() {
 	}
 
-	public PutToCacheActionResponse(String key, String domain) {
+	public PutToCacheActionResponse(String key) {
 		setAction("put to cache");
 		setResponseStatus(RESPONSE_STATUS_OK);
 		this.key = key;
-		this.domain = domain;
 	}
 
 	public String getKey() {
@@ -38,14 +36,6 @@ public class PutToCacheActionResponse extends ActionResponse {
 
 	public void setKey(String key) {
 		this.key = key;
-	}
-
-	public String getDomain() {
-		return domain;
-	}
-
-	public void setDomain(String domain) {
-		this.domain = domain;
 	}
 
 }

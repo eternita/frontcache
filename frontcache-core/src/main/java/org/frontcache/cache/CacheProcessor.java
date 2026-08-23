@@ -29,20 +29,19 @@ public interface CacheProcessor {
 
 	public void destroy();
 
-	public void putToCache(String domain, String url, WebResponse component);
+	public void putToCache(String url, WebResponse component);
 
 	public WebResponse getFromCache(String url, RequestContext context);
 
-	public void removeFromCache(String domain, String filter);
-
-	public void removeFromCacheAll(String domain);
+	public void removeFromCache(String filter);
 
 	/**
-	 * Removes every entry from this node, whatever domain it was cached under.
+	 * Removes every entry from this node.
 	 *
-	 * {@link #removeFromCacheAll(String)} only drops entries stamped with the given domain, and
-	 * replicated entries carry the domain of the edge they came from - so a domain-scoped
-	 * "invalidate all" leaves them behind. Callers that mean "empty this node" must use this method.
+	 * There used to be a domain-scoped flavour alongside this one. It only dropped entries stamped
+	 * with the caller's domain, and replicated entries carry the domain of the edge they came from -
+	 * so an "invalidate all" at the target edge walked straight past them and they stayed served.
+	 * With one site per node there is one flavour, and it means what it says.
 	 */
 	public void removeFromCacheAll();
 

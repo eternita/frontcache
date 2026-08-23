@@ -41,7 +41,6 @@ public class WebResponse implements Serializable {
 
 	private String url;
 
-	private String domain;
 
 	private byte[] content;
 
@@ -316,7 +315,6 @@ public class WebResponse implements Serializable {
     	copy.statusCode = this.statusCode;
     	copy.refreshType = this.refreshType;
     	copy.cacheLevel = this.cacheLevel;
-    	copy.domain = this.domain;
     	copy.tags.addAll(this.tags);
 
     	if (null != headers)
@@ -376,12 +374,6 @@ public class WebResponse implements Serializable {
 	}
 	public void setCacheLevel(String cacheLevel) {
 		this.cacheLevel = cacheLevel;
-	}
-	public String getDomain() {
-		return domain;
-	}
-	public void setDomain(String domain) {
-		this.domain = domain;
 	}
 
 }

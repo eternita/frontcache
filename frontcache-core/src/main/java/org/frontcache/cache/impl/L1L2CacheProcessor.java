@@ -185,12 +185,12 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	 * Saves web response to cache-file
 	 */
 	@Override
-	public void putToCacheImpl(String domain, String url, WebResponse component) {
+	public void putToCacheImpl(String url, WebResponse component) {
 
 		// don't cache pure dynamic components
 		if (!FCUtils.isWebComponentSubjectToCache(component.getExpireTimeMap()))
 		{
-			logWithStackTrace("Dynamic response caching " + domain + " - " + url + "expireTimeMap shouldn't be like that " + component.getExpireTimeMap());
+			logWithStackTrace("Dynamic response caching " + url + "expireTimeMap shouldn't be like that " + component.getExpireTimeMap());
 			return;
 		}
 
@@ -207,7 +207,6 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 			return;
 		}
 
-		component.setDomain(domain);
 
 		if (FCHeaders.CACHE_LEVEL_L1.equalsIgnoreCase(component.getCacheLevel()))
 		{
@@ -259,28 +258,6 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 
 	@Override
-	public void removeFromCache(String domain, String filter) {
-		logger.debug("Removing from cache {}", filter);
-
-		{ // remove from ehCache
-			List<Object> removeList = new ArrayList<Object>();
-
-			for(Object key : ehCache.getKeys())
-			{
-				String str = key.toString();
-				if (-1 < str.indexOf(filter))
-					removeList.add(key);
-			}
-
-			for(Object key : removeList)
-				ehCache.remove(key);
-		}
-
-		// remove from Lucene
-		luceneIndexManager.delete(domain, filter);
-	}
-
-
 	public void removeFromCache(String filter) {
 		logger.debug("Removing from cache {}", filter);
 
@@ -303,36 +280,8 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	}
 
 	@Override
-	public void removeFromCacheAll(String domain) {
-		logger.debug("truncate cache");
-
-		{ // remove from ehCache
-			List<Object> removeList = new ArrayList<Object>();
-
-			for(Object key : ehCache.getKeys())
-			{
-				// the element can be evicted/expired between getKeys() and get() - skipping a vanished
-				// element is right, and it keeps an NPE here from aborting the method before the L2
-				// deletion below ever runs (which would leave an "invalidate all" silently half-done).
-				Element el = ehCache.get(key);
-				if (null == el || null == el.getObjectValue())
-					continue;
-
-				String objDomain = ((WebResponse) el.getObjectValue()).getDomain();
-				if (null != domain && domain.equals(objDomain))
-					removeList.add(key);
-			}
-
-			for(Object key : removeList)
-				ehCache.remove(key);
-		}
-
-		luceneIndexManager.deleteAll(domain);
-	}
-
-	@Override
 	public void removeFromCacheAll() {
-		logger.debug("truncate cache - all domains");
+		logger.debug("truncate cache");
 
 		ehCache.removeAll();
 		luceneIndexManager.deleteAll();
@@ -349,11 +298,6 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		status.put(CacheProcessor.CACHED_ENTRIES + "-L1", "" + ehCache.getKeys().size());
 		status.put(CacheProcessor.CACHED_ENTRIES + "-L2", "" + luceneIndexManager.getIndexSize());
 
-		// Entries are stamped with this node's own domain, so there is exactly one counter. It is
-		// still reported per domain because the console aggregates several edges and each may serve
-		// a different site.
-		String domain = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
-		status.put(CacheProcessor.CACHED_ENTRIES + "-L2." + domain, "" + luceneIndexManager.getDocumentsCount(domain));
 
 		return status;
 	}

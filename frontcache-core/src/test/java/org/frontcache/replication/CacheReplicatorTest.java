@@ -78,7 +78,6 @@ public class CacheReplicatorTest {
 
 	private void stubGetFromCache(FrontCacheClient client, String key, String content) {
 		WebResponse wr = new WebResponse("http://source.example.com" + key, content.getBytes());
-		wr.setDomain("source.example.com");
 		when(client.getFromCache(eq(key))).thenReturn(wr);
 	}
 
@@ -91,7 +90,7 @@ public class CacheReplicatorTest {
 		stubGetFromCache(source, "/page1.html", "content1");
 		stubGetFromCache(source, "/page2.html", "content2");
 		stubGetFromCache(source, "/page3.html", "content3");
-		when(target.putToCache(anyString(), anyString(), any(WebResponse.class))).thenReturn(true);
+		when(target.putToCache(anyString(), any(WebResponse.class))).thenReturn(true);
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		ReplicationResult result = replicator.run(null);
@@ -102,7 +101,7 @@ public class CacheReplicatorTest {
 		assertEquals(0, result.getErrors());
 		assertEquals(3, result.getTotalSourceKeys());
 
-		verify(target, org.mockito.Mockito.times(3)).putToCache(anyString(), anyString(), any(WebResponse.class));
+		verify(target, org.mockito.Mockito.times(3)).putToCache(anyString(), any(WebResponse.class));
 	}
 
 	@Test
@@ -112,7 +111,7 @@ public class CacheReplicatorTest {
 		stubCachedKeys(source, "/page1.html", "/page2.html", "/page3.html");
 		stubGetFromCache(source, "/page1.html", "content1");
 		stubGetFromCache(source, "/page3.html", "content3");
-		when(target.putToCache(anyString(), anyString(), any(WebResponse.class))).thenReturn(true);
+		when(target.putToCache(anyString(), any(WebResponse.class))).thenReturn(true);
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		ReplicationResult result = replicator.run(null);
@@ -123,8 +122,8 @@ public class CacheReplicatorTest {
 		assertEquals(0, result.getErrors());
 
 		// putToCache should NOT be called for /page2.html
-		verify(target, never()).putToCache(anyString(), eq("/page2.html"), any(WebResponse.class));
-		verify(target, org.mockito.Mockito.times(2)).putToCache(anyString(), anyString(), any(WebResponse.class));
+		verify(target, never()).putToCache(eq("/page2.html"), any(WebResponse.class));
+		verify(target, org.mockito.Mockito.times(2)).putToCache(anyString(), any(WebResponse.class));
 	}
 
 	@Test
@@ -140,7 +139,7 @@ public class CacheReplicatorTest {
 		assertEquals(2, result.getSkipped());
 		assertEquals(0, result.getErrors());
 
-		verify(target, never()).putToCache(anyString(), anyString(), any(WebResponse.class));
+		verify(target, never()).putToCache(anyString(), any(WebResponse.class));
 	}
 
 	@Test
@@ -150,7 +149,7 @@ public class CacheReplicatorTest {
 		stubGetFromCache(source, "/page1.html", "content1");
 		// /page2.html returns null (entry vanished)
 		when(source.getFromCache(eq("/page2.html"))).thenReturn(null);
-		when(target.putToCache(anyString(), anyString(), any(WebResponse.class))).thenReturn(true);
+		when(target.putToCache(anyString(), any(WebResponse.class))).thenReturn(true);
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		ReplicationResult result = replicator.run(null);
@@ -166,7 +165,7 @@ public class CacheReplicatorTest {
 		stubCachedKeysSet(target); // empty target
 		stubCachedKeys(source, "/page1.html");
 		stubGetFromCache(source, "/page1.html", "content1");
-		when(target.putToCache(anyString(), anyString(), any(WebResponse.class))).thenReturn(false);
+		when(target.putToCache(anyString(), any(WebResponse.class))).thenReturn(false);
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		ReplicationResult result = replicator.run(null);
@@ -184,7 +183,7 @@ public class CacheReplicatorTest {
 		stubGetFromCache(source, "/a.html", "a");
 		stubGetFromCache(source, "/b.html", "b");
 		stubGetFromCache(source, "/c.html", "c");
-		when(target.putToCache(anyString(), anyString(), any(WebResponse.class))).thenReturn(true);
+		when(target.putToCache(anyString(), any(WebResponse.class))).thenReturn(true);
 
 		final List<long[]> progressSnapshots = new ArrayList<long[]>();
 		final AtomicInteger completeCount = new AtomicInteger(0);
@@ -233,7 +232,7 @@ public class CacheReplicatorTest {
 		stubGetFromCache(source, "/e.html", "e");
 
 		// Cancel after the first entry is transferred
-		when(target.putToCache(anyString(), anyString(), any(WebResponse.class)))
+		when(target.putToCache(anyString(), any(WebResponse.class)))
 				.thenAnswer(new Answer<Boolean>() {
 					private int callCount = 0;
 
@@ -315,7 +314,7 @@ public class CacheReplicatorTest {
 		stubCachedKeysSet(target);
 		stubCachedKeys(source, "/page.html");
 		stubGetFromCache(source, "/page.html", "content");
-		when(target.putToCache(anyString(), anyString(), any(WebResponse.class))).thenReturn(true);
+		when(target.putToCache(anyString(), any(WebResponse.class))).thenReturn(true);
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		assertFalse("should not be running before run()", replicator.isRunning());
@@ -325,21 +324,25 @@ public class CacheReplicatorTest {
 		assertFalse("should not be running after completion", replicator.isRunning());
 	}
 
+	/**
+	 * The entry is written to the target under the key the source listed it under, untouched.
+	 *
+	 * This test used to cover a domain-stamping step: the replicator read the source entry's domain,
+	 * fell back to the source host when it was null, and passed it to putToCache. Entries are not
+	 * domain-scoped any more, so the key is all that crosses.
+	 */
 	@Test
-	public void domainFallbackUsesSourceHostWhenWebResponseDomainIsNull() {
+	public void entryIsWrittenToTargetUnderTheSourceKey() {
 		stubCachedKeysSet(target); // empty target
 		stubCachedKeys(source, "/page.html");
 
-		// Create a WebResponse with null domain
 		WebResponse wr = new WebResponse("http://source.example.com/page.html", "content".getBytes());
-		// domain is null by default
 		when(source.getFromCache(eq("/page.html"))).thenReturn(wr);
-		when(target.putToCache(anyString(), anyString(), any(WebResponse.class))).thenReturn(true);
+		when(target.putToCache(anyString(), any(WebResponse.class))).thenReturn(true);
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		replicator.run(null);
 
-		// Should have called putToCache with domain extracted from source URL
-		verify(target).putToCache(eq("source.example.com"), eq("/page.html"), any(WebResponse.class));
+		verify(target).putToCache(eq("/page.html"), eq(wr));
 	}
 }

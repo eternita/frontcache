@@ -64,7 +64,7 @@ public class BypassCacheFallbackWriteTest {
 
 	private RequestContext newContext(HttpServletResponse servletResponse) {
 		RequestContext ctx = new RequestContext();
-		ctx.setDomain("example.com");
+		ctx.setDomain("example.com"); // the Hystrix command group key
 		ctx.setResponse(servletResponse);
 
 		HttpServletRequest request = mock(HttpServletRequest.class);
