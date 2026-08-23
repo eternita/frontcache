@@ -20,14 +20,14 @@ import org.htmlunit.html.HtmlPage;
 
 public abstract class IncludeTests extends TestsBase {
 
-	public abstract String getFrontCacheBaseURLDomainFC1();
+	public abstract String getFrontCacheBaseURLLocalhost();
 
 	protected FrontCacheClient frontcacheClient = null;
 
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLDomainFC1(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
 		frontcacheClient.removeFromCacheAll(); // clean up
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
@@ -42,7 +42,7 @@ public abstract class IncludeTests extends TestsBase {
 	@Test
 	public void includeAsync1() throws Exception {
 
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/a1.jsp");
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/deep-include-async/a1.jsp");
 		assertEquals("a", page.getPage().asNormalizedText()); // no 'b' in response because 'b' included in async mode
 	}
 
@@ -50,7 +50,7 @@ public abstract class IncludeTests extends TestsBase {
 	@Test
 	public void includeAsync2() throws Exception {
 
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/a.jsp");
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/deep-include-async/a.jsp");
 		assertEquals("abcd", page.getPage().asNormalizedText()); // no 'ef' in response because 'e' included in async mode
 
 	}
@@ -59,7 +59,7 @@ public abstract class IncludeTests extends TestsBase {
 	@Test
 	public void includeAsync3() throws Exception {
 
-		final String baseURL = getFrontCacheBaseURLDomainFC1() + "common/deep-include-async/";
+		final String baseURL = getFrontCacheBaseURLLocalhost() + "common/deep-include-async/";
 
 		// The 'e' fragment is pulled in via an async include: it is resolved fire-and-forget on a
 		// background thread (see ConcurrentIncludeProcessor - the Future is not awaited). In the Jetty
@@ -118,12 +118,12 @@ public abstract class IncludeTests extends TestsBase {
 		HtmlPage page = null;
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 
 		// request as browser
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 	}
 
@@ -132,12 +132,12 @@ public abstract class IncludeTests extends TestsBase {
 		HtmlPage page = null;
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a1.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a1.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 
 		// request as browser
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a1.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a1.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
 	}
 
@@ -146,12 +146,12 @@ public abstract class IncludeTests extends TestsBase {
 		HtmlPage page = null;
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a2.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a2.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
 
 		// request as browser
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a2.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a2.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 	}
 
@@ -160,12 +160,12 @@ public abstract class IncludeTests extends TestsBase {
 		HtmlPage page = null;
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a3.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a3.jsp");
 		assertEquals(page.getPage().asNormalizedText(), "a");
 
 		// request as browser
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/include-bot-browser/a3.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a3.jsp");
 		assertEquals(page.getPage().asNormalizedText(), "a");
 	}
 

@@ -48,13 +48,13 @@ public abstract class StaticReadTests extends TestsBase {
 		super.tearDown();
 	}
 
-	public abstract String getFrontCacheBaseURLDomainFC1();
+	public abstract String getFrontCacheBaseURLLocalhost();
 
 	@Test
 	public void text1() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
 
-		TextPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/a.txt");
+		TextPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/static-read/a.txt");
 		String pageAsText = page.getContent();
 		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
@@ -65,7 +65,7 @@ public abstract class StaticReadTests extends TestsBase {
 	public void text2() throws Exception {
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "*/*");
 
-		TextPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/a.txt");
+		TextPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/static-read/a.txt");
 		String pageAsText = page.getContent();
 		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
@@ -79,7 +79,7 @@ public abstract class StaticReadTests extends TestsBase {
 		// htmlunit 4.x dropped JavaScriptPage; which concrete Page a .js response maps to now
 		// depends on the mime type the container sends (text/javascript -> TextPage,
 		// application/javascript -> UnexpectedPage), so read the body off the response instead.
-		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/static-read/jquery.js");
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/static-read/jquery.js");
 		WebResponse webResponse = page.getWebResponse();
 		String pageAsText = webResponse.getContentAsString();
 		printHeaders(webResponse);
@@ -91,7 +91,7 @@ public abstract class StaticReadTests extends TestsBase {
 	@Test
 	public void img() throws Exception {
 
-		String urlStr = getFrontCacheBaseURLDomainFC1() + "common/static-read/image.jpg";
+		String urlStr = getFrontCacheBaseURLLocalhost() + "common/static-read/image.jpg";
 		CloseableHttpClient httpclient = HttpClients.createDefault();
 
 		HttpResponse response = null;

@@ -51,7 +51,7 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	private static final String CACHEABLE_FIXTURE = "common/fc-headers/a.jsp";
 	private static final String CACHEABLE_EXPECTED = "a";
 
-	public abstract String getFrontCacheBaseURLDomainFC1();
+	public abstract String getFrontCacheBaseURLLocalhost();
 
 	@Before
 	public void setUp() throws Exception {
@@ -90,7 +90,7 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	public void acceptEncodingIdentity() throws Exception {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
-			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLDomainFC1() + STATIC_FIXTURE, "identity");
+			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, "identity");
 			try {
 				assertEquals(200, response.getStatusLine().getStatusCode());
 				assertNotBrotli(response);
@@ -111,7 +111,7 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	public void acceptEncodingAbsent() throws Exception {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
-			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLDomainFC1() + STATIC_FIXTURE, null);
+			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, null);
 			try {
 				assertEquals(200, response.getStatusLine().getStatusCode());
 				assertNotBrotli(response);
@@ -134,7 +134,7 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	public void acceptEncodingZstdOnly() throws Exception {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
-			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLDomainFC1() + STATIC_FIXTURE, "zstd");
+			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, "zstd");
 			try {
 				assertEquals(200, response.getStatusLine().getStatusCode());
 				assertNotBrotli(response);
@@ -158,7 +158,7 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	 */
 	@Test
 	public void cachedEntryServedDecodableToIdentityClient() throws Exception {
-		String url = getFrontCacheBaseURLDomainFC1() + CACHEABLE_FIXTURE;
+		String url = getFrontCacheBaseURLLocalhost() + CACHEABLE_FIXTURE;
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
 			// 1st request - populate the cache; identity client
@@ -198,7 +198,7 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	private String assertServedDecodable(String path, String acceptEncoding) throws Exception {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
-			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLDomainFC1() + path, acceptEncoding);
+			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + path, acceptEncoding);
 			try {
 				assertEquals(200, response.getStatusLine().getStatusCode());
 				assertNotBrotli(response);

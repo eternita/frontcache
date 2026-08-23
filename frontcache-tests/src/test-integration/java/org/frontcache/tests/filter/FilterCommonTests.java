@@ -14,7 +14,7 @@ public class FilterCommonTests extends CommonTests {
 
 	@Test
 	public void frontcacheIdTest() throws Exception {
-		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/fc-headers/a.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/fc-headers/a.jsp");
 		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
 		String frontcacheId = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_ID);
@@ -23,8 +23,8 @@ public class FilterCommonTests extends CommonTests {
 	}
 
 	@Override
-	public String getFrontCacheBaseURLDomainFC1() {
-		return getFilterBaseURLDomainFC1();
+	public String getFrontCacheBaseURLLocalhost() {
+		return getFilterBaseURLLocalhost();
 	}
 
 }

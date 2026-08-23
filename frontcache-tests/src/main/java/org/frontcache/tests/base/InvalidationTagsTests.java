@@ -39,14 +39,14 @@ public abstract class InvalidationTagsTests extends TestsBase {
 		super.tearDown();
 	}
 
-	public abstract String getFrontCacheBaseURLDomainFC1();
+	public abstract String getFrontCacheBaseURLLocalhost();
 
 
 
 	@Test
 	public void staticInvalidationTags() throws Exception {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/invalidation-tags/a.jsp");
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/invalidation-tags/a.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();
@@ -62,7 +62,7 @@ public abstract class InvalidationTagsTests extends TestsBase {
 	@Test
 	public void dynamicInvalidationTags() throws Exception {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
-		HtmlPage page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/invalidation-tags/b.jsp");
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/invalidation-tags/b.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
 
 		WebResponse webResponse = page.getWebResponse();

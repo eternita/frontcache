@@ -6,12 +6,12 @@ public class FilterClientTests extends ClientTests {
 
 
 	@Override
-	public String getFrontCacheBaseURLDomainFC1() {
-		return getFilterBaseURLDomainFC1();
+	public String getFrontCacheBaseURLLocalhost() {
+		return getFilterBaseURLLocalhost();
 	}
 
 	@Override
-	public String getFrontCacheBaseURLDomainFC2() {
-		return getFilterBaseURLDomainFC2();
+	public String getFrontCacheBaseURLLoopback() {
+		return getFilterBaseURLLoopback();
 	}
 }
