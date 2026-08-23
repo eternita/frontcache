@@ -66,4 +66,4 @@ Add the dependency and the repository from `pom.xml`, copy the `FilterRegistrati
 and take a `FRONTCACHE_HOME` skeleton from
 `org.frontcache:frontcache-core:2.6.0:home@zip` (it ships a filter-mode
 `frontcache.properties` and a `README-FILTER.md`). See the
-[install guide](../../docs/HOWTO-install.md).
+[install guide](../../docs/install-guide.md).

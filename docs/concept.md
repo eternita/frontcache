@@ -120,7 +120,7 @@ Not in the application's own config. The directory is located via `-Dfrontcache.
 | `bots.conf` | UA keywords treated as bots (per domain) → `client="bot"` / `bot:` TTL splits |
 | `dynamic-urls.conf` | regex of never-cache URLs (carts, login, admin) → routed via `FC_BypassCache` |
 | `fallbacks.conf` | `URI_PATTERN \| fallback_file \| optional_origin_request`; served when the origin 5XXs or the circuit is open. Files seed at startup |
-| `guard-rules.conf` | request-rejection rules — see [frontcache-guard-getting-started.md](frontcache-guard-getting-started.md) |
+| `guard-rules.conf` | request-rejection rules — see [guard-getting-started.md](guard-getting-started.md) |
 | `fc-l1-ehcache-config.xml` | L1 sizing |
 | `hystrix.properties` | circuit-breaker thresholds and pool sizes |
 | `fc-logback.xml` | logging |
@@ -180,21 +180,12 @@ all four into Elasticsearch + Kibana with ready-made dashboards.
 - Pick a topology — filter, standalone proxy, or GSLB multi-region:
   [deployment-usecases.md](deployment-usecases.md)
 - Install it: [install-guide.md](install-guide.md)
-- Reject bad traffic at the edge: [frontcache-guard-getting-started.md](frontcache-guard-getting-started.md)
+- Reject bad traffic at the edge: [guard-getting-started.md](guard-getting-started.md)
 - Circuit breakers in detail: [hystrix-command-flow.md](hystrix-command-flow.md)
 - Run something: [JSP](../examples/frontcache-jsp) · [Spring Boot](../examples/frontcache-spring) · [PHP](../examples/frontcache-php)
-
-In the Frontcache product source repository — named for orientation, since this repository ships
-documentation and examples only:
-
-- Filter / Servlet entry: `frontcache-core/.../org/frontcache/{FrontCacheFilter,FrontCacheServlet}.java`
-- Headers: `frontcache-core/.../core/FCHeaders.java`
-- Taglib: `frontcache-core/src/main/resources/META-INF/fc.tld`
-- Sample props: `frontcache-core/src/main/resources/front-cache.template.properties`
-- Agent: `frontcache-agent/.../agent/{FrontCacheAgent,FrontCacheAgentCluster}.java`
 
 ---
 
 Topologies: [deployment-usecases.md](deployment-usecases.md) ·
 Install: [install-guide.md](install-guide.md) ·
-Licensing: <https://www.eternita.co/frontcache-license.html>
+Licensing: <https://www.eternita.co/frontcache.html>
