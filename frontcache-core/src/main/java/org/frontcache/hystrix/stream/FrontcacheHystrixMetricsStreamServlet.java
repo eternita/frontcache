@@ -10,11 +10,7 @@ package org.frontcache.hystrix.stream;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.netflix.config.DynamicIntProperty;
-import com.netflix.config.DynamicPropertyFactory;
-import com.netflix.hystrix.metric.consumer.HystrixDashboardStream;
-
-import rx.Observable;
+import org.frontcache.hystrix.FcResilienceConfig;
 
 public class FrontcacheHystrixMetricsStreamServlet extends FrontcacheHystrixSampleSseServlet {
 
@@ -22,20 +18,21 @@ public class FrontcacheHystrixMetricsStreamServlet extends FrontcacheHystrixSamp
 
     /* used to track number of connections and throttle */
     private static AtomicInteger concurrentConnections = new AtomicInteger(0);
-    private static DynamicIntProperty maxConcurrentConnections =
-            DynamicPropertyFactory.getInstance().getIntProperty("hystrix.config.stream.maxConcurrentConnections", 5);
 
     public FrontcacheHystrixMetricsStreamServlet() {
-        this(HystrixDashboardStream.getInstance().observe());
+        super(DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS);
     }
 
-    public FrontcacheHystrixMetricsStreamServlet(Observable<HystrixDashboardStream.DashboardData> sampleStream) {
-        super(sampleStream, DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS);
-    }
-
+    /**
+     * Same key, same file, no Archaius. This used to be an Archaius {@code DynamicIntProperty}, which is
+     * exactly the coupling that made {@code FrontcacheConfigBootstrapListener} necessary: touching this
+     * servlet's static initializer before any page request installed Archaius first and silently dropped
+     * every per-command override in hystrix.properties. Read from a plain Properties instead, per
+     * request, so nothing depends on class-initialization order.
+     */
     @Override
     protected int getMaxNumberConcurrentConnectionsAllowed() {
-        return maxConcurrentConnections.get();
+        return FcResilienceConfig.getInstance().streamMaxConcurrentConnections();
     }
 
     @Override

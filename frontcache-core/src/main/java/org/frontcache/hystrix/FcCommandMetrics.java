@@ -76,6 +76,8 @@ public class FcCommandMetrics {
 	private volatile int currentBucket = 0;
 
 	private final AtomicInteger concurrentExecutions = new AtomicInteger(0);
+	/** Per-bucket high-water mark of concurrentExecutions, for rollingMaxConcurrentExecutionCount. */
+	private final int[] maxConcurrentPerBucket;
 	private final ConcurrentMap<Long, InFlight> inFlight = new ConcurrentHashMap<Long, InFlight>();
 
 	private FcCommandMetrics(String commandKey, String group, int rollingStatsMs) {
@@ -92,6 +94,7 @@ public class FcCommandMetrics {
 				this.buckets[i][e] = new LongAdder();
 			this.latencyBuckets[i] = new ConcurrentHistogram(MAX_TRACKED_LATENCY_MS, 3);
 		}
+		this.maxConcurrentPerBucket = new int[bucketCount];
 	}
 
 	public static FcCommandMetrics getInstance(String commandKey, String group, int rollingStatsMs)
@@ -161,7 +164,14 @@ public class FcCommandMetrics {
 	public long markStart(long budgetMs, String description)
 	{
 		long id = EXECUTION_IDS.incrementAndGet();
-		concurrentExecutions.incrementAndGet();
+		int concurrent = concurrentExecutions.incrementAndGet();
+
+		// Racy by construction - two threads can read the same bucket and both write. The value is a
+		// dashboard high-water mark, not an accounting figure, and a lock on the request path to make it
+		// exact would cost more than the number is worth.
+		int bucket = currentBucket;
+		if (concurrent > maxConcurrentPerBucket[bucket])
+			maxConcurrentPerBucket[bucket] = concurrent;
 		if (budgetMs > 0)
 			inFlight.put(Long.valueOf(id), new InFlight(System.nanoTime(), budgetMs, description));
 		return id;
@@ -176,6 +186,15 @@ public class FcCommandMetrics {
 	public int getCurrentConcurrentExecutionCount()
 	{
 		return concurrentExecutions.get();
+	}
+
+	public int getRollingMaxConcurrentExecutionCount()
+	{
+		int max = 0;
+		for (int i = 0; i < bucketCount; i++)
+			if (maxConcurrentPerBucket[i] > max)
+				max = maxConcurrentPerBucket[i];
+		return max;
 	}
 
 	// ---- reading ------------------------------------------------------------
@@ -259,6 +278,7 @@ public class FcCommandMetrics {
 		for (LongAdder adder : buckets[next])
 			adder.reset();
 		latencyBuckets[next].reset();
+		maxConcurrentPerBucket[next] = 0;
 		currentBucket = next;
 	}
 

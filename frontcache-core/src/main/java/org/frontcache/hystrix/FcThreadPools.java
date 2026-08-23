@@ -41,6 +41,14 @@ public class FcThreadPools {
 
 	private static final ConcurrentMap<String, ThreadPoolExecutor> POOLS = new ConcurrentHashMap<String, ThreadPoolExecutor>();
 
+	/**
+	 * Rejections per pool. Hystrix reported rollingCountCommandRejections on its thread-pool frames and
+	 * a ThreadPoolExecutor keeps no such count, so the rejection handler keeps one - otherwise the most
+	 * operationally interesting number on that panel would always read zero.
+	 */
+	private static final ConcurrentMap<String, java.util.concurrent.atomic.LongAdder> REJECTIONS =
+			new ConcurrentHashMap<String, java.util.concurrent.atomic.LongAdder>();
+
 	private FcThreadPools() { }
 
 	public static ThreadPoolExecutor pool(String poolKey)
@@ -76,9 +84,9 @@ public class FcThreadPools {
 
 		ThreadPoolExecutor pool = new ThreadPoolExecutor(coreSize, maximumSize,
 				keepAliveMinutes, TimeUnit.MINUTES, queue, new FcThreadFactory(poolKey),
-				// AbortPolicy throws RejectedExecutionException, which FcCommand maps to
-				// THREAD_POOL_REJECTED - the same outcome Hystrix reports.
-				new ThreadPoolExecutor.AbortPolicy());
+				// Counts, then behaves exactly like AbortPolicy: throws RejectedExecutionException,
+				// which FcCommand maps to THREAD_POOL_REJECTED - the same outcome Hystrix reports.
+				new CountingAbortPolicy(poolKey));
 
 		logger.info("Thread pool '" + poolKey + "' coreSize=" + coreSize + " maximumSize=" + maximumSize
 				+ " maxQueueSize=" + maxQueueSize + " queue=" + queue.getClass().getSimpleName());
@@ -102,6 +110,12 @@ public class FcThreadPools {
 		return POOLS.get(poolKey);
 	}
 
+	public static long rejectionCount(String poolKey)
+	{
+		java.util.concurrent.atomic.LongAdder rejections = REJECTIONS.get(poolKey);
+		return (null == rejections) ? 0 : rejections.sum();
+	}
+
 	/** Test seam - shuts every pool down and forgets it. */
 	static void shutdownAll()
 	{
@@ -109,6 +123,27 @@ public class FcThreadPools {
 			for (ThreadPoolExecutor pool : POOLS.values())
 				pool.shutdownNow();
 			POOLS.clear();
+			REJECTIONS.clear();
+		}
+	}
+
+	private static class CountingAbortPolicy extends ThreadPoolExecutor.AbortPolicy {
+
+		private final String poolKey;
+
+		CountingAbortPolicy(String poolKey) {
+			this.poolKey = poolKey;
+			REJECTIONS.putIfAbsent(poolKey, new java.util.concurrent.atomic.LongAdder());
+		}
+
+		@Override
+		public void rejectedExecution(Runnable r, ThreadPoolExecutor executor)
+		{
+			java.util.concurrent.atomic.LongAdder rejections = REJECTIONS.get(poolKey);
+			if (null != rejections)
+				rejections.increment();
+
+			super.rejectedExecution(r, executor);
 		}
 	}
 

@@ -31,5 +31,19 @@
         <servlet-name>FrontCacheIOServlet</servlet-name>
         <url-pattern>/frontcache-io</url-pattern>
     </servlet-mapping>
+
+    <!-- The metrics stream the console reads. Mapped here so the e2e suite actually covers it: it was
+         previously only mapped in the real server webapp, so nothing in the test suite ever hit the
+         endpoint and the empty thread-pool panel went unnoticed for as long as it did. An exact
+         url-pattern wins over FrontCacheServlet's /*. -->
+    <servlet>
+        <servlet-name>HystrixMetricsStreamServlet</servlet-name>
+        <servlet-class>org.frontcache.hystrix.HystrixStreamSecurityWrapperServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>HystrixMetricsStreamServlet</servlet-name>
+        <url-pattern>/hystrix.stream</url-pattern>
+    </servlet-mapping>
     
 </web-app>

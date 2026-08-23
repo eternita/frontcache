@@ -8,88 +8,92 @@
  */
 package org.frontcache.hystrix;
 
-import com.netflix.hystrix.metric.consumer.HystrixDashboardStream;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+
+import org.frontcache.core.FCHeaders;
 import org.frontcache.hystrix.stream.FrontcacheHystrixMetricsStreamServlet;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import rx.Observable;
-import rx.functions.Func1;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.concurrent.TimeUnit;
-
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
+/**
+ * The metrics stream's refusal paths.
+ *
+ * {@code testOnGetNoSiteKeyHeader} was {@code @Ignore}d because there was nothing to assert: the old
+ * servlet's 503 branch was unreachable - {@code getDomainFromSiteKeyHeader()} returned the literal
+ * "default-domain" for an unauthorized caller rather than nothing, so the request got a 200 and a stream
+ * of empty frames. It now asserts the 401 from proposal section 14.6, and the two refusal reasons are
+ * distinguishable: 401 for authorization, 503 for shutdown and the connection cap.
+ */
 public class HystrixMetricsStreamServletUnitTest {
-	    @Mock HttpServletRequest mockReq;
-	    @Mock HttpServletResponse mockResp;
-	    @Mock HystrixDashboardStream.DashboardData mockDashboard;
-	    @Mock PrintWriter mockPrintWriter;
 
-	    FrontcacheHystrixMetricsStreamServlet servlet;
+	@Mock HttpServletRequest mockReq;
+	@Mock HttpServletResponse mockResp;
 
-	    private final Observable<HystrixDashboardStream.DashboardData> streamOfOnNexts =
-	            Observable.interval(100, TimeUnit.MILLISECONDS).map(new Func1<Long, HystrixDashboardStream.DashboardData>() {
-	                @Override
-	                public HystrixDashboardStream.DashboardData call(Long timestamp) {
-	                    return mockDashboard;
-	                }
-	            });
+	FrontcacheHystrixMetricsStreamServlet servlet;
 
-
-	    @Before
-	    public void init() {
-	        MockitoAnnotations.initMocks(this);
-	        when(mockReq.getMethod()).thenReturn("GET");
-	    }
-
-	    @After
-	    public void tearDown() {
-	        servlet.destroy();
-	        servlet.shutdown();
-	    }
-
-	    @Test
-	    public void shutdownServletShouldRejectRequests() throws ServletException, IOException {
-	        servlet = new FrontcacheHystrixMetricsStreamServlet(streamOfOnNexts);
-	        try {
-	            servlet.init();
-	        } catch (ServletException ex) {
-
-	        }
-
-	        servlet.shutdown();
-
-	        servlet.service(mockReq, mockResp);
-
-	        verify(mockResp).sendError(503, "Service has been shut down.");
-	    }
-
-	    @Test
-	    @Ignore
-	    public void testOnGetNoSiteKeyHeader() throws ServletException, IOException {
-	        servlet = new FrontcacheHystrixMetricsStreamServlet(streamOfOnNexts);
-	        try {
-	            servlet.init();
-	        } catch (ServletException ex) {
-
-	        }
-
-
-	        servlet.service(mockReq, mockResp);
-
-	        verify(mockResp).sendError(503, "Can't resolve domain from siteKey");
-	    }
-
+	@Before
+	public void init() {
+		MockitoAnnotations.initMocks(this);
+		when(mockReq.getMethod()).thenReturn("GET");
 	}
+
+	@After
+	public void tearDown() {
+		servlet.destroy();
+		FrontcacheHystrixMetricsStreamServlet.shutdown();
+	}
+
+	@Test
+	public void shutdownServletShouldRejectRequests() throws ServletException, IOException {
+		servlet = new FrontcacheHystrixMetricsStreamServlet();
+		try {
+			servlet.init();
+		} catch (ServletException ex) {
+		}
+
+		FrontcacheHystrixMetricsStreamServlet.shutdown();
+
+		servlet.service(mockReq, mockResp);
+
+		verify(mockResp).sendError(503, "Service has been shut down.");
+	}
+
+	@Test
+	public void testOnGetNoSiteKeyHeader() throws ServletException, IOException {
+		servlet = new FrontcacheHystrixMetricsStreamServlet();
+		try {
+			servlet.init();
+		} catch (ServletException ex) {
+		}
+
+		// no x-frontcache-site-key on the request at all
+		servlet.service(mockReq, mockResp);
+
+		verify(mockResp).sendError(401, "Missing or invalid " + FCHeaders.X_FRONTCACHE_SITE_KEY);
+	}
+
+	@Test
+	public void testOnGetWrongSiteKeyHeader() throws ServletException, IOException {
+		servlet = new FrontcacheHystrixMetricsStreamServlet();
+		try {
+			servlet.init();
+		} catch (ServletException ex) {
+		}
+
+		when(mockReq.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn("not-the-node-key");
+
+		servlet.service(mockReq, mockResp);
+
+		verify(mockResp).sendError(401, "Missing or invalid " + FCHeaders.X_FRONTCACHE_SITE_KEY);
+	}
+}

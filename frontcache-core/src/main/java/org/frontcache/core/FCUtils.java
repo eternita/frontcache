@@ -757,16 +757,20 @@ public class FCUtils {
 	 * A matching site key resolves to this node's domain; anything else resolves to DEFAULT_DOMAIN,
 	 * which matches no command group - so an unauthenticated subscriber sees an empty stream.
 	 */
-	public static String getDomainFromSiteKeyHeader(HttpServletRequest request) {
+	/**
+	 * True when the request carries this node's management site key.
+	 *
+	 * Replaces {@code getDomainFromSiteKeyHeader()}, which answered a different question than its one
+	 * caller asked. It returned the literal {@code "default-domain"} for an unauthorized request, and
+	 * since that string matches no command group the metrics stream answered with 200 plus an endless
+	 * run of empty frames - an authorization failure dressed up as an empty success. The stream now
+	 * refuses with 401 (proposal section 14.6), and it no longer needs a domain at all: the {@code group}
+	 * field of each frame comes from the metrics object that owns it.
+	 */
+	public static boolean isAuthorizedSiteKeyHeader(HttpServletRequest request) {
 		String siteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
 
-		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
-		if (!fcEngine.isNodeSiteKey(siteKey))
-			return FCConfig.DEFAULT_DOMAIN;
-
-		String domain = fcEngine.getDomain();
-
-		return (null == domain) ? FCConfig.DEFAULT_DOMAIN : domain;
+		return FrontCacheEngine.getFrontCache().isNodeSiteKey(siteKey);
 	}
 
 	/**

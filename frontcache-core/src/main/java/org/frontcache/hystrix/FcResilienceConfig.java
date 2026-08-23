@@ -52,7 +52,7 @@ public class FcResilienceConfig {
 	static final int DEFAULT_ERROR_THRESHOLD_PERCENTAGE = 50;
 	static final int DEFAULT_REQUEST_VOLUME_THRESHOLD = 20;
 	static final int DEFAULT_SLEEP_WINDOW_MS = 5000;
-	static final int DEFAULT_ROLLING_STATS_MS = 10000;
+	public static final int DEFAULT_ROLLING_STATS_MS = 10000;
 	static final int DEFAULT_CORE_SIZE = 10;
 	static final int DEFAULT_MAX_QUEUE_SIZE = -1;
 	static final int DEFAULT_KEEP_ALIVE_MINUTES = 1;
