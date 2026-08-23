@@ -191,21 +191,34 @@ public class FcResilienceConfigTest {
 	}
 
 	/**
-	 * FallbackLogger's return values land in the failed-requests log and in RequestLogger's positional
-	 * output, which log tooling parses - so the event names PR 2 will switch it to have to line up with
-	 * the Hystrix ones exactly.
+	 * FallbackLogger's return values land in the failed-requests log and in {@code RequestLogger}'s
+	 * positional output, which log tooling parses - so they are pinned as literals here.
+	 *
+	 * This started life as a test that every {@code HystrixEventType} FallbackLogger referenced had a
+	 * same-named {@link FcEventType}, which guarded the switch-over in PR 2. With Hystrix gone there is
+	 * nothing left to compare against, so it now asserts the strings themselves - which is the thing
+	 * that actually must not change, and outlives the migration.
 	 */
 	@Test
-	public void everyHystrixEventFallbackLoggerUsesHasAnFcEquivalent()
+	public void failureTypeStringsAreUnchanged()
 	{
-		for (com.netflix.hystrix.HystrixEventType hystrixEvent : new com.netflix.hystrix.HystrixEventType[] {
-				com.netflix.hystrix.HystrixEventType.SHORT_CIRCUITED,
-				com.netflix.hystrix.HystrixEventType.TIMEOUT,
-				com.netflix.hystrix.HystrixEventType.THREAD_POOL_REJECTED,
-				com.netflix.hystrix.HystrixEventType.SEMAPHORE_REJECTED,
-				com.netflix.hystrix.HystrixEventType.BAD_REQUEST,
-				com.netflix.hystrix.HystrixEventType.FAILURE })
-			assertEquals("FcEventType must carry the same name so failureType()'s strings do not change",
-					hystrixEvent.name(), FcEventType.valueOf(hystrixEvent.name()).name());
+		assertEquals("short-circuited", FallbackLogger.failureType(java.util.Arrays.asList(FcEventType.SHORT_CIRCUITED)));
+		assertEquals("timeout", FallbackLogger.failureType(java.util.Arrays.asList(FcEventType.TIMEOUT)));
+		assertEquals("rejected", FallbackLogger.failureType(java.util.Arrays.asList(FcEventType.THREAD_POOL_REJECTED)));
+		assertEquals("rejected", FallbackLogger.failureType(java.util.Arrays.asList(FcEventType.SEMAPHORE_REJECTED)));
+		assertEquals("bad-request", FallbackLogger.failureType(java.util.Arrays.asList(FcEventType.BAD_REQUEST)));
+		assertEquals("failure", FallbackLogger.failureType(java.util.Arrays.asList(FcEventType.FAILURE)));
+
+		assertEquals("no known event -> error", "error",
+				FallbackLogger.failureType(java.util.Arrays.asList(FcEventType.SUCCESS)));
+		assertEquals("null -> error", "error", FallbackLogger.failureType(null));
+
+		// Precedence matters: a short-circuited call that also timed out is reported as short-circuited.
+		assertEquals("short-circuited", FallbackLogger.failureType(
+				java.util.Arrays.asList(FcEventType.TIMEOUT, FcEventType.SHORT_CIRCUITED)));
+
+		// The watchdog's overrun is not a failure of any kind - the call succeeded, just late.
+		assertEquals("error", FallbackLogger.failureType(
+				java.util.Arrays.asList(FcEventType.BUDGET_OVERRUN_OBSERVED)));
 	}
 }

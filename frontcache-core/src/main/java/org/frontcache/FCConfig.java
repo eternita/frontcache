@@ -15,23 +15,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import org.apache.commons.configuration.AbstractConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.netflix.config.ConcurrentMapConfiguration;
-import com.netflix.config.ConfigurationManager;
-
 
 public class FCConfig {
 
@@ -65,20 +58,6 @@ public class FCConfig {
 		init();
 	}
 
-	/**
-	 * Force FCConfig initialization. Referencing this class already runs the static {@code init()}
-	 * block (which installs hystrix.properties into Archaius), so this method body is intentionally
-	 * empty — it exists to make that side effect explicit and callable from a startup hook.
-	 *
-	 * Call this at webapp startup (see FrontcacheConfigBootstrapListener) so the hystrix.properties
-	 * overrides are installed BEFORE the Hystrix metrics-stream servlet's static initializer touches
-	 * Archaius. Archaius accepts an install only once; whoever runs first wins.
-	 */
-	public static void ensureInitialized()
-	{
-		// no-op: class reference above triggered static init()
-	}
-
     private static void init()
     {
 
@@ -96,42 +75,13 @@ public class FCConfig {
 
     	config = loadProperties();
 
-
-    	Properties hystrixProperties = new Properties();
-    	try {
-    		hystrixProperties.load(FCConfig.getConfigInputStream("hystrix.properties"));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-    	Map<String, Object> hystrixConfigMap = new HashMap<String, Object>();
-
-		logger.info("Hystrix.properties : ");
-		for (Object key : hystrixProperties.keySet())
-		{
-			logger.info("-- " + key + " - " + hystrixProperties.getProperty(key.toString()));
-			hystrixConfigMap.put(key.toString(), hystrixProperties.getProperty(key.toString()));
-		}
-
-		// enable configuration from "hystrix.properties"
-		ConcurrentMapConfiguration systemProps = new ConcurrentMapConfiguration(hystrixConfigMap);
-
-		// Archaius (ConfigurationManager) accepts an install only once. If something touched
-		// Archaius/Hystrix before us (e.g. the /hystrix.stream servlet initialized at webapp
-		// startup, or a HystrixCommand was constructed), install() would be skipped and the whole
-		// hystrix.properties silently ignored -> every command falls back to Hystrix defaults
-		// (1000ms timeout, etc.).
-		if (!ConfigurationManager.isConfigurationInstalled())
-		{
-			ConfigurationManager.install(systemProps);
-		} else {
-			AbstractConfiguration installedConfig = ConfigurationManager.getConfigInstance();
-			for (Map.Entry<String, Object> entry : hystrixConfigMap.entrySet())
-				installedConfig.setProperty(entry.getKey(), entry.getValue());
-		}
-
-
-//    	System.getProperties().putAll(hystrixProperties);
+		// hystrix.properties used to be installed into Archaius from here, guarded by an
+		// isConfigurationInstalled() check because Archaius accepts an install only once per JVM: if
+		// anything touched it first (the metrics-stream servlet's static initializer, say) every
+		// per-command override in the file was silently dropped. FrontcacheConfigBootstrapListener
+		// existed solely to win that race. Resilience4j reads the same file through
+		// FcResilienceConfig, as an ordinary Properties object at first use, so both workarounds are
+		// gone and the startup-ordering bug they guarded against is no longer possible.
 
 		loadBotConfigs();
 		loadCacheIgnoreURIPatterns();

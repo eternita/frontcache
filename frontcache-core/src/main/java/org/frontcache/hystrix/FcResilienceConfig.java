@@ -26,12 +26,12 @@ import org.slf4j.LoggerFactory;
  * Reads conf/hystrix.properties into plain {@link Properties} and resolves per-command settings from
  * it, replacing the Archaius {@code ConfigurationManager.install()} path.
  *
- * That replacement is most of the point. Archaius accepts an install once per JVM, globally, which is
- * why {@code FCConfig} carries an {@code isConfigurationInstalled()} branch and why
- * {@code FrontcacheConfigBootstrapListener} exists at all: whoever touches Archaius first wins, so if
- * /hystrix.stream is hit before any page request, every per-command override in the file is silently
- * dropped. Here the file is just a Properties object read at first use, and that entire class of
- * startup-ordering bug stops being possible. See proposal section 6.5.
+ * That replacement is most of the point. Archaius accepted an install once per JVM, globally, which is
+ * why {@code FCConfig} used to carry an {@code isConfigurationInstalled()} branch and why
+ * {@code FrontcacheConfigBootstrapListener} existed at all: whoever touched Archaius first won, so if
+ * /hystrix.stream was hit before any page request, every per-command override in the file was silently
+ * dropped. Here the file is just a Properties object read at first use. Both workarounds are deleted and
+ * that entire class of startup-ordering bug is no longer possible. See proposal section 6.5.
  *
  * Key resolution matches Hystrix: {@code hystrix.command.<key>.<prop>}, then
  * {@code hystrix.command.default.<prop>}, then the Hystrix built-in default.
