@@ -8,12 +8,12 @@
  */
 package org.frontcache.console.model;
 
-public class HystrixConfig {
+public class ResilienceConfig {
 
 	private String name;
 	private String config;
 
-	public HystrixConfig(String name, String config) {
+	public ResilienceConfig(String name, String config) {
 		super();
 		this.name = name;
 		this.config = config;

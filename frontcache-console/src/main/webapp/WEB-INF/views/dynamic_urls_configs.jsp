@@ -15,37 +15,26 @@
     </ul>
 
     <div class="tab-content">
-      <!-- start loop over edges -->
+      <!-- one panel per edge - Map <edge, Set <urlPattern>> -->
       <c:forEach var="edge" items="${dynamicURLsConfigs}" varStatus="status">
 
         <div role="tabpanel" class="tab-pane ${status.first ? 'active' : ''}" id="edge-tab-${status.index}">
 
           <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>
+                <b>URL pattern (never cached)</b>
+              </th>
+            </tr>
+          </thead>
           <tbody>
-
-          <!-- start loop over domain
-                first loop over default domain
-          -->
-
-          <!--  the same loop for other domains (domain specific dynamic URLs)  -->
-          <c:forEach var="dynamicURLDomain" items="${edge.value}">
-            <c:if test="${'default-domain' != dynamicURLDomain.key}">
-                <tr>
-                  <td align="center"><b>
-                      ${dynamicURLDomain.key}
-                  </b></td>
-                </tr>
-            </c:if>
-
-            <c:forEach var="dynamicURL" items="${dynamicURLDomain.value}">
-                <tr>
-                  <td>${dynamicURL}  &nbsp;</td>
-                </tr>
-            </c:forEach>
+          <c:forEach var="dynamicURL" items="${edge.value}">
+            <tr>
+              <td>${dynamicURL}  &nbsp;</td>
+            </tr>
           </c:forEach>
-
           </tbody>
-          <!-- end loop over domains -->
         </table>
 
         </div>

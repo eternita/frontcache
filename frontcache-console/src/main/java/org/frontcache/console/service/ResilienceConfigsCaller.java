@@ -11,20 +11,20 @@ package org.frontcache.console.service;
 import java.util.concurrent.Callable;
 
 import org.frontcache.client.FrontCacheClient;
-import org.frontcache.console.model.HystrixConfig;
+import org.frontcache.console.model.ResilienceConfig;
 
-public class HystrixConfigsCaller implements Callable<HystrixConfig> {
+public class ResilienceConfigsCaller implements Callable<ResilienceConfig> {
 
 	private FrontCacheClient fcClient;
 
-	public HystrixConfigsCaller(FrontCacheClient fcClient) {
+	public ResilienceConfigsCaller(FrontCacheClient fcClient) {
 		super();
 		this.fcClient = fcClient;
 	}
 
     @Override
-    public HystrixConfig call() throws Exception {
+    public ResilienceConfig call() throws Exception {
 
-		 return new HystrixConfig(fcClient.getName(), fcClient.getHystrixConfig());
+		 return new ResilienceConfig(fcClient.getName(), fcClient.getResilienceConfig());
 	}
 }

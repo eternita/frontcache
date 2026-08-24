@@ -29,7 +29,7 @@ import org.frontcache.console.model.FallbackConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.GuardConfig;
 import org.frontcache.console.model.GuardRulesConfig;
-import org.frontcache.console.model.HystrixConfig;
+import org.frontcache.console.model.ResilienceConfig;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
@@ -185,13 +185,13 @@ public class FrontcacheService {
 	 * @param domain
 	 * @return
 	 */
-	public Map<String, Map<String, Set<FallbackConfigEntry>>> getFallbackConfigs() {
+	public Map<String, Set<FallbackConfigEntry>> getFallbackConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<FallbackConfigEntry>>>();
+		Map<String, Set<FallbackConfigEntry>> clusterStatus = new LinkedHashMap<String, Set<FallbackConfigEntry>>();
 
         List<Future<FallbackConfig>> futureList = new ArrayList<Future<FallbackConfig>>();
 
@@ -222,14 +222,14 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String,  Map<String, Set<String>>> getBotConfigs() {
+	public Map<String, Set<String>> getBotConfigs() {
 
         List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Map<String, Set<String>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<String>>>();
+		Map<String, Set<String>> clusterStatus = new LinkedHashMap<String, Set<String>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
@@ -298,14 +298,14 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, Map<String, Set<String>>> getDynamicURLsConfigs() {
+	public Map<String, Set<String>> getDynamicURLsConfigs() {
 
         List<Future<DynamicURLsConfig>> futureList = new ArrayList<Future<DynamicURLsConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Map<String, Set<String>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<String>>>();
+		Map<String, Set<String>> clusterStatus = new LinkedHashMap<String, Set<String>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new DynamicURLsConfigsCaller(fcClient)));
@@ -370,9 +370,9 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, String> getHystrixConfigs() {
+	public Map<String, String> getResilienceConfigs() {
 
-        List<Future<HystrixConfig>> futureList = new ArrayList<Future<HystrixConfig>>();
+        List<Future<ResilienceConfig>> futureList = new ArrayList<Future<ResilienceConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
@@ -380,14 +380,14 @@ public class FrontcacheService {
 		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
-            futureList.add(executor.submit(new HystrixConfigsCaller(fcClient)));
+            futureList.add(executor.submit(new ResilienceConfigsCaller(fcClient)));
 
 		// processing timeouts
         boolean timeoutReached = false;
-        for (Future<HystrixConfig> f : futureList)
+        for (Future<ResilienceConfig> f : futureList)
         {
             try {
-            	HystrixConfig result = null;
+            	ResilienceConfig result = null;
             	if (timeoutReached)
             		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
             	else

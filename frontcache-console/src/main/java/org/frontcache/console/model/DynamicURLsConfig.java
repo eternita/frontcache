@@ -8,15 +8,17 @@
  */
 package org.frontcache.console.model;
 
-import java.util.Map;
 import java.util.Set;
 
+/**
+ * One edge's never-cached URL patterns. A flat set as of 2.7 - see {@link BotConfig}.
+ */
 public class DynamicURLsConfig {
 
 	private String name;
-	private Map<String, Set<String>> config;
+	private Set<String> config;
 
-	public DynamicURLsConfig(String name, Map<String, Set<String>> config) {
+	public DynamicURLsConfig(String name, Set<String> config) {
 		super();
 		this.name = name;
 		this.config = config;
@@ -26,7 +28,7 @@ public class DynamicURLsConfig {
 		return name;
 	}
 
-	public Map<String, Set<String>> getConfig() {
+	public Set<String> getConfig() {
 		return config;
 	}
 

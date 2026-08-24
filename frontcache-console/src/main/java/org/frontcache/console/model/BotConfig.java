@@ -8,15 +8,20 @@
  */
 package org.frontcache.console.model;
 
-import java.util.Map;
 import java.util.Set;
 
+/**
+ * One edge's bot user-agent keywords.
+ *
+ * A flat set as of 2.7: the management API used to return these keyed by domain, which always held a
+ * single entry once one node served one site. See docs/multi-domain-retirement-proposal.md section 8.
+ */
 public class BotConfig {
 
 	private String name;
-	private Map<String, Set<String>> config;
+	private Set<String> config;
 
-	public BotConfig(String name, Map<String, Set<String>> config) {
+	public BotConfig(String name, Set<String> config) {
 		super();
 		this.name = name;
 		this.config = config;
@@ -26,7 +31,7 @@ public class BotConfig {
 		return name;
 	}
 
-	public Map<String, Set<String>> getConfig() {
+	public Set<String> getConfig() {
 		return config;
 	}
 

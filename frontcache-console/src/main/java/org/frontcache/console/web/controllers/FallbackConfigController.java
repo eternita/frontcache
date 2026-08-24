@@ -33,7 +33,7 @@ public class FallbackConfigController {
     @RequestMapping(value = "/fallbacks", method = RequestMethod.GET)
     public String fallbacks(ModelMap model) {
 
-    	Map<String, Map<String, Set<FallbackConfigEntry>>> fallbackConfigs = frontcacheService.getFallbackConfigs();
+    	Map<String, Set<FallbackConfigEntry>> fallbackConfigs = frontcacheService.getFallbackConfigs();
 		model.put("fallbackConfigs", fallbackConfigs);
 
 

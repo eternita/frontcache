@@ -1,14 +1,14 @@
 <%@taglib uri="http://www.springframework.org/tags/form" prefix="form"%>
 <%@ include file="/WEB-INF/views/inc/header.jsp"%>
 
-<c:set var="activeConfig" value="hystrix"/>
+<c:set var="activeConfig" value="resilience"/>
 <%@ include file="/WEB-INF/views/inc/config_menu.jsp"%>
 
     <hr>
 
     <!-- one tab per edge; tab order follows the edge order from the console config -->
     <ul class="nav nav-tabs" role="tablist">
-      <c:forEach var="edge" items="${hystrixConfigs}" varStatus="status">
+      <c:forEach var="edge" items="${resilienceConfigs}" varStatus="status">
         <li role="presentation" class="${status.first ? 'active' : ''}">
           <a href="#edge-tab-${status.index}" role="tab" data-toggle="tab">${edge.key}</a>
         </li>
@@ -16,8 +16,8 @@
     </ul>
 
     <div class="tab-content">
-      <!-- start loop over edges - raw ./conf/hystrix.properties (read-only) -->
-      <c:forEach var="edge" items="${hystrixConfigs}" varStatus="status">
+      <!-- start loop over edges - raw ./conf/resilience.properties (read-only) -->
+      <c:forEach var="edge" items="${resilienceConfigs}" varStatus="status">
 
         <div role="tabpanel" class="tab-pane ${status.first ? 'active' : ''}" id="edge-tab-${status.index}">
           <p/>

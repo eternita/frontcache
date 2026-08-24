@@ -8,17 +8,19 @@
  */
 package org.frontcache.console.model;
 
-import java.util.Map;
 import java.util.Set;
 
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 
+/**
+ * One edge's fallback entries. A flat set as of 2.7 - see {@link BotConfig}.
+ */
 public class FallbackConfig {
 
 	private String name;
-	private Map <String, Set<FallbackConfigEntry>> config;
+	private Set<FallbackConfigEntry> config;
 
-	public FallbackConfig(String name, Map <String, Set<FallbackConfigEntry>> config) {
+	public FallbackConfig(String name, Set<FallbackConfigEntry> config) {
 		super();
 		this.name = name;
 		this.config = config;
@@ -28,7 +30,7 @@ public class FallbackConfig {
 		return name;
 	}
 
-	public Map <String, Set<FallbackConfigEntry>> getConfig() {
+	public Set<FallbackConfigEntry> getConfig() {
 		return config;
 	}
 

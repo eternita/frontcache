@@ -19,18 +19,22 @@ import org.springframework.web.bind.annotation.RequestMethod;
 
 
 @Controller
-public class HystrixConfigController {
+public class ResilienceConfigController {
 
 	@Autowired
 	private FrontcacheService frontcacheService;
 
-    @RequestMapping(value = "/hystrix-configs", method = RequestMethod.GET)
-    public String getHystrixConfigs(ModelMap model) {
+    /**
+     * Both paths are mapped: /hystrix-configs is what this page was called before 2.7, and it is a URL
+     * a person can have bookmarked or linked to, so it keeps resolving rather than 404ing.
+     */
+    @RequestMapping(value = { "/resilience-configs", "/hystrix-configs" }, method = RequestMethod.GET)
+    public String getResilienceConfigs(ModelMap model) {
 
-    	Map<String, String> hystrixConfigs = frontcacheService.getHystrixConfigs();
-		model.put("hystrixConfigs", hystrixConfigs);
+    	Map<String, String> resilienceConfigs = frontcacheService.getResilienceConfigs();
+		model.put("resilienceConfigs", resilienceConfigs);
 
-        return "hystrix_configs";
+        return "resilience_configs";
     }
 
 
