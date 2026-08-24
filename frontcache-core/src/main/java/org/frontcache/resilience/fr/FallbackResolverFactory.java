@@ -51,24 +51,49 @@ public class FallbackResolverFactory {
 			return new FileBasedFallbackResolver();
 		}
 
-		implStr = remapLegacyPackage(implStr);
+		return resolverFor(implStr);
+	}
+
+	/**
+	 * Loads the named resolver, or the built-in one if it cannot be used.
+	 *
+	 * Split out from the config lookup above so this - the part with the reflection, the legacy package
+	 * remap and the interface check - can be tested without a FRONTCACHE_HOME. {@code FCConfig} reads
+	 * its properties once in a static initializer and offers no reload, so a test that had to go through
+	 * the config to reach this code could not vary the class name at all.
+	 *
+	 * Package-private for that reason.
+	 */
+	static FallbackResolver resolverFor(String configuredClassName)
+	{
+		String implStr = remapLegacyPackage(configuredClassName);
 
 		try
 		{
+			Class<?> clazz = Class.forName(implStr);
 
-			@SuppressWarnings("rawtypes")
-			Class clazz = Class.forName(implStr);
-			Object obj = clazz.newInstance();
-			if (null != obj && obj instanceof FallbackResolver)
+			if (!implementsGetFallbackEntries(clazz))
+			{
+				logger.error("front-cache.fallback-resolver.impl=" + implStr + " does not implement"
+						+ " getFallbackEntries(). It was almost certainly compiled against Frontcache 2.6, where"
+						+ " FallbackResolver declared getFallbackConfigs() returning Map<domain, Set<...>> instead;"
+						+ " the domain key went away with multi-domain support. Recompile it against this release."
+						+ " Falling back to " + FileBasedFallbackResolver.class.getCanonicalName() + ".");
+				return new FileBasedFallbackResolver();
+			}
+
+			Object obj = clazz.getDeclaredConstructor().newInstance();
+			if (obj instanceof FallbackResolver)
 			{
 				logger.info("FallbackResolver implementation loaded: " + implStr);
-				FallbackResolver fallbackResolver = (FallbackResolver) obj;
-
-				return fallbackResolver;
+				return (FallbackResolver) obj;
 			}
+
+			logger.error(implStr + " is not a " + FallbackResolver.class.getCanonicalName()
+					+ ". Default implementation is loaded: " + FileBasedFallbackResolver.class.getCanonicalName());
+
 		} catch (Exception ex) {
-			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + FileBasedFallbackResolver.class.getCanonicalName());
-			return new FileBasedFallbackResolver();
+			logger.error("Cant instantiate " + implStr + ". Default implementation is loaded: " + FileBasedFallbackResolver.class.getCanonicalName(), ex);
 		}
 
 		return new FileBasedFallbackResolver();
@@ -94,6 +119,30 @@ public class FallbackResolverFactory {
 		logger.warn("front-cache.fallback-resolver.impl=" + implStr + " names a package that was renamed in 2.7"
 				+ " - loading " + remapped + " instead. Update frontcache.properties; this remapping is not permanent.");
 		return remapped;
+	}
+
+	/**
+	 * Whether the loaded class actually supplies {@code getFallbackEntries()}, or merely inherits the
+	 * interface's abstract declaration.
+	 *
+	 * This check exists because the JVM does not re-verify a class against an interface that changed
+	 * after it was compiled. A resolver built against 2.6 still passes {@code instanceof
+	 * FallbackResolver} here and loads cleanly; the failure - an {@code AbstractMethodError} - would
+	 * arrive later, on the first call. For a fallback resolver that call happens while the origin is
+	 * already down, which is the worst moment to discover a packaging mistake. Better to refuse it at
+	 * startup and say exactly what to do.
+	 *
+	 * {@code getMethod} searches superclasses and superinterfaces, so a class that does not supply the
+	 * method resolves to the interface's own abstract declaration - which is what the interface check
+	 * detects.
+	 */
+	static boolean implementsGetFallbackEntries(Class<?> clazz)
+	{
+		try {
+			return !clazz.getMethod("getFallbackEntries").getDeclaringClass().isInterface();
+		} catch (NoSuchMethodException e) {
+			return false;
+		}
 	}
 
 	public static void destroy()

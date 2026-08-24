@@ -8,9 +8,8 @@
  */
 package org.frontcache.resilience.fr;
 
+import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.http.client.HttpClient;
@@ -45,9 +44,10 @@ public class DefaultFallbackResolver implements FallbackResolver {
 	public void init(HttpClient client) {
 	}
 
+	/** No configuration to show: this resolver serves one generic body for every URL. */
 	@Override
-	public Map <String, Set<FallbackConfigEntry>> getFallbackConfigs() {
-		return new HashMap<String, Set<FallbackConfigEntry>>();
+	public Set<FallbackConfigEntry> getFallbackEntries() {
+		return Collections.emptySet();
 	}
 
 }

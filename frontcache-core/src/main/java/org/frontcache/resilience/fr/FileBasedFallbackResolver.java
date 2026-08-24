@@ -20,9 +20,7 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -80,11 +78,15 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	}
 
 	/**
-	 * Keyed by domain for the console, which aggregates several edges - each possibly serving a
-	 * different site. One node serves one site, so the map holds exactly one entry.
+	 * A copy, not the live entries: these go out over the management API, and the returned objects are
+	 * plain {@link FallbackConfigEntry} rather than the {@link FallbackConfigEntryImpl} used internally
+	 * so the compiled {@code Pattern} does not have to serialize.
+	 *
+	 * LinkedHashSet because the order is the matching order - first match wins - which is what makes
+	 * the console's list readable as the rule sequence it actually is.
 	 */
 	@Override
-	public Map <String, Set<FallbackConfigEntry>> getFallbackConfigs() {
+	public Set<FallbackConfigEntry> getFallbackEntries() {
 
 		Set<FallbackConfigEntry> configs = new LinkedHashSet<FallbackConfigEntry>();
 		for (FallbackConfigEntryImpl fallbackConfigOriginal : fallbackConfigs)
@@ -96,9 +98,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 			configs.add(fallbackConfig);
 		}
 
-		Map <String, Set<FallbackConfigEntry>> configMap = new LinkedHashMap<String, Set<FallbackConfigEntry>>();
-		configMap.put(FCConfig.DEFAULT_DOMAIN, configs);
-		return configMap;
+		return configs;
 	}
 
 	@Override
