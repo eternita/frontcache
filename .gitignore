@@ -14,3 +14,5 @@
 /frontcache-tests/FRONTCACHE_HOME_FILTER/logs/
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/cache/
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/
+# the unit suite starts a real FrontCacheEngine against this home and leaves a Lucene index behind
+/frontcache-core/src/test/resources/fallback-home/cache/

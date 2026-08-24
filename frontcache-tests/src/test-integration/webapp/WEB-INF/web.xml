@@ -35,6 +35,9 @@
     <servlet>
         <servlet-name>FcDashboardStreamServlet</servlet-name>
         <servlet-class>org.frontcache.resilience.FcDashboardStreamSecurityServlet</servlet-class>
+        <!-- Required: the stream runs on Servlet 3.1 async so a dashboard viewer does not hold a
+             container thread. Without this the container refuses startAsync() outright. -->
+        <async-supported>true</async-supported>
     </servlet>
 
     <servlet-mapping>

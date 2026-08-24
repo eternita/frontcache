@@ -9,21 +9,27 @@
 package org.frontcache.resilience.stream;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,23 +38,55 @@ import jakarta.servlet.http.HttpServletResponse;
  * Serves the SSE dashboard stream at {@code /fc-dashboard.stream} and at the pre-2.7
  * {@code /hystrix.stream}, from Frontcache's own metrics instead of Hystrix's.
  *
- * The SSE framing, the 500 ms cadence, the {@code maxConcurrentConnections} throttle and the parked
- * request thread are all preserved - moving to Servlet 3.1 async is a real improvement (one container
- * thread per dashboard viewer is not free) but it is an independent change and is left as follow-on
- * work. What goes away is RxJava: {@code Observable.concatMap(...).observeOn(Schedulers.io())} becomes a
- * single scheduled publisher plus one queue per subscriber.
+ * The SSE framing, the 500 ms cadence and the {@code maxConcurrentConnections} throttle are exactly
+ * what they were. What changed, in two steps:
  *
- * The threading is slightly better than what it replaces, and deliberately so:
+ * <h2>PR 3 removed RxJava</h2>
  *
- * - Frames are built ONCE per tick on the publisher thread, not once per subscriber, so fifteen
- *   dashboards cost one serialization rather than fifteen.
- * - Each connection drains its own bounded queue and does its own blocking write, on the request thread
- *   that was previously just sleeping. A stalled client can therefore only stall itself; with a single
- *   shared writer thread, one client behind TCP backpressure would stall the stream for everyone.
- * - The queue is bounded and drops its OLDEST frame when full. A dashboard only ever wants the latest
- *   numbers, and an unbounded queue behind a stalled reader is a memory leak with a 500 ms fuse.
+ * {@code Observable.concatMap(...).observeOn(Schedulers.io())} became one scheduled publisher plus one
+ * queue per subscriber. Frames are built ONCE per tick rather than once per subscriber, so fifteen
+ * dashboards cost one serialization rather than fifteen.
  *
- * Two behavior changes, both from proposal section 14.6:
+ * <h2>2.7 removed the parked thread</h2>
+ *
+ * Until now each connection held a container thread for its entire life - originally asleep, then
+ * blocked on its own queue. At the default cap that is five threads, at a tuned fifteen it is fifteen,
+ * doing nothing but waiting 500 ms at a time. On a node whose thread pool also serves traffic, leaving
+ * a dashboard tab open all afternoon costs a request-serving thread all afternoon.
+ *
+ * This is now Servlet 3.1 async with <b>non-blocking</b> output: {@code doGet} validates, calls
+ * {@code startAsync()}, registers a {@link WriteListener} and <b>returns</b>, handing the container
+ * thread straight back. No thread is dedicated to a viewer at all - writes happen either on the
+ * publisher thread (when the connection is ready to take a frame) or on a container thread the
+ * container hands us via {@code onWritePossible()} (when it was not, and now is).
+ *
+ * <h3>Why the writes are non-blocking rather than "publisher writes and blocks"</h3>
+ *
+ * Because that is the whole difficulty of the change. A single publisher thread doing blocking writes
+ * would be simple and would reintroduce precisely what PR 3 fixed: one reader behind TCP backpressure
+ * stalls every other dashboard. {@code isReady()} is what avoids it - a write is attempted only when
+ * the container promises it will not block, so a stalled reader just stops being written to. Its own
+ * queue fills, its oldest frames are dropped, and no other connection notices.
+ *
+ * <h3>The idle handoff</h3>
+ *
+ * {@code onWritePossible()} is only called on a not-ready -> ready transition, so a subscriber that
+ * drains its queue while still ready will never be called again on its own. That is why
+ * {@link Subscriber#offer} also drains: whichever of the two threads finds work to do does it, under
+ * one lock per subscriber so that only one of them is inside {@code isReady()}/{@code write()} at a
+ * time. The lock is held only across non-blocking writes, so a container thread can never be parked
+ * on it for longer than it takes to fill a socket buffer.
+ *
+ * <h3>The connection count</h3>
+ *
+ * The cap is now released from {@link Subscriber#close}, not from a {@code finally} around the request,
+ * because the request ends immediately and the connection does not. {@code close()} is
+ * compare-and-set guarded so the decrement happens exactly once however the connection ends - client
+ * disconnect, write error, container timeout, or shutdown. Getting this wrong would not fail visibly
+ * at once: the endpoint would simply start answering 503 forever after N lifetime connections, which
+ * is why {@code StandaloneDashboardStreamTests} asserts a closed connection frees its slot.
+ *
+ * <h2>Two behavior changes, both from proposal section 14.6</h2>
  *
  * - A wrong or absent {@code x-frontcache-site-key} gets {@code 401}, where it used to get {@code 200}
  *   and an endless stream of empty frames. The header is this endpoint's only authentication, so an
@@ -62,14 +100,14 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 
 	private static final Logger logger = LoggerFactory.getLogger(FcSampleSseServlet.class);
 
-	/** Publish cadence, and how often a parked connection wakes to check it is still wanted. */
+	/** Publish cadence in ms. Named for the field it replaced, which was a poll timeout. */
 	protected static final int DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS = 500;
 
 	/**
 	 * Frames a slow subscriber may fall behind by before the oldest are dropped. Two seconds of ticks
 	 * for a handful of commands - enough to ride out a hiccup, small enough to bound the memory.
 	 */
-	private static final int SUBSCRIBER_QUEUE_CAPACITY = 64;
+	static final int SUBSCRIBER_QUEUE_CAPACITY = 64;
 
 	private static final CopyOnWriteArrayList<Subscriber> SUBSCRIBERS = new CopyOnWriteArrayList<Subscriber>();
 
@@ -78,10 +116,10 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 	/* Set to true upon shutdown, so it's OK to be shared among all SampleSseServlets */
 	private static volatile boolean isDestroyed = false;
 
-	private final int pausePollerThreadDelayInMs;
+	private final int publishDelayInMs;
 
 	protected FcSampleSseServlet(int pausePollerThreadDelayInMs) {
-		this.pausePollerThreadDelayInMs = pausePollerThreadDelayInMs;
+		this.publishDelayInMs = pausePollerThreadDelayInMs;
 	}
 
 	protected abstract int getMaxNumberConcurrentConnectionsAllowed();
@@ -126,24 +164,23 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 	}
 
 	/**
-	 * - maintain an open connection with the client
-	 * - on initial connection send latest data of each requested event type
-	 * - subsequently send all changes for each requested event type
+	 * Accepts the connection and returns. Everything after this happens on the publisher thread or on a
+	 * container thread delivering {@code onWritePossible()} - never on this one.
 	 */
-	private void handleRequest(HttpServletRequest request, final HttpServletResponse response)
+	private void handleRequest(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 
 		if (!FCUtils.isAuthorizedSiteKeyHeader(request)) {
 			// Refused, not answered with an empty stream - see the class javadoc. Logged at info because
 			// on a management port this is either a misconfigured console or someone probing.
 			logger.info("Rejecting " + request.getRequestURI() + ": missing or wrong site key from " + FCUtils.getClientIP(request));
-			response.sendError(401, "Missing or invalid " + org.frontcache.core.FCHeaders.X_FRONTCACHE_SITE_KEY);
+			response.sendError(401, "Missing or invalid " + FCHeaders.X_FRONTCACHE_SITE_KEY);
 			return;
 		}
 
 		/* ensure we aren't allowing more connections than we want */
 		int numberConnections = incrementAndGetCurrentConcurrentConnections();
-		Subscriber subscriber = null;
+		boolean accepted = false;
 		try {
 			int maxNumberConnectionsAllowed = getMaxNumberConcurrentConnectionsAllowed();
 			if (numberConnections > maxNumberConnectionsAllowed) {
@@ -155,39 +192,37 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 			response.setHeader("Content-Type", "text/event-stream;charset=UTF-8");
 			response.setHeader("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate");
 			response.setHeader("Pragma", "no-cache");
+			// the response is a stream of frames, and a proxy buffering it would defeat the point
+			response.setHeader("X-Accel-Buffering", "no");
 
-			PrintWriter writer = response.getWriter();
+			AsyncContext async = request.startAsync();
+			// A metrics stream has no natural end, so it must not be given one. The container's default
+			// async timeout would otherwise complete a perfectly healthy connection after 30 s.
+			async.setTimeout(0);
 
-			subscriber = new Subscriber();
+			Subscriber subscriber = new Subscriber(this, async, response.getOutputStream());
+			async.addListener(subscriber);
+
+			// setWriteListener BEFORE the subscriber is published to the publisher thread. The other
+			// order looks more natural and is a race: isReady() before a write listener is registered is
+			// an IllegalStateException, so a tick landing in that window would kill the connection at
+			// birth - intermittently, and only under load, which is the worst way to find out.
+			subscriber.start();
+
 			SUBSCRIBERS.add(subscriber);
 			startPublisher();
 
-			// This thread is the writer for its own connection: it blocks on its queue and writes what
-			// arrives, rather than sleeping while another thread writes into its response.
-			while (subscriber.open && !isDestroyed) {
-				String frame = subscriber.queue.poll(pausePollerThreadDelayInMs, TimeUnit.MILLISECONDS);
-				if (null == frame)
-					continue;
+			accepted = true;
 
-				writer.print("data: " + frame + "\n\n");
-				// explicitly check for client disconnect - PrintWriter does not throw exceptions
-				if (writer.checkError())
-					break;
-
-				writer.flush();
-			}
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
 		} finally {
-			if (null != subscriber) {
-				subscriber.open = false;
-				SUBSCRIBERS.remove(subscriber);
-			}
-			decrementCurrentConcurrentConnections();
+			// Only for the paths that never became a subscriber. A live connection releases its slot in
+			// Subscriber.close(), which is the only place that can know when the connection actually ends.
+			if (!accepted)
+				decrementCurrentConcurrentConnections();
 		}
 	}
 
-	private static void startPublisher()
+	private void startPublisher()
 	{
 		if (null != publisher)
 			return;
@@ -218,7 +253,7 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 						logger.error("Metrics stream tick failed", t);
 					}
 				}
-			}, 0, DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS, TimeUnit.MILLISECONDS);
+			}, 0, publishDelayInMs, TimeUnit.MILLISECONDS);
 
 			publisher = local;
 		}
@@ -231,20 +266,28 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 				publisher.shutdownNow();
 				publisher = null;
 			}
-			for (Subscriber subscriber : SUBSCRIBERS)
-				subscriber.open = false;
 		}
+
+		// Outside the lock: close() completes an AsyncContext, and completing one while holding a lock
+		// the container's own callback threads may want is a deadlock waiting to be reported as a hang.
+		for (Subscriber subscriber : SUBSCRIBERS)
+			subscriber.close();
 	}
 
-	/** Serialize once, fan out to every subscriber. */
+	/** Serialize once, encode once, fan out to every subscriber. */
 	static void publishTick()
 	{
 		if (SUBSCRIBERS.isEmpty())
 			return;
 
 		List<String> frames = FcDashboardJson.frames();
+
+		byte[][] encoded = new byte[frames.size()][];
+		for (int i = 0; i < frames.size(); i++)
+			encoded[i] = ("data: " + frames.get(i) + "\n\n").getBytes(StandardCharsets.UTF_8);
+
 		for (Subscriber subscriber : SUBSCRIBERS)
-			for (String frame : frames)
+			for (byte[] frame : encoded)
 				subscriber.offer(frame);
 	}
 
@@ -254,18 +297,179 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 		return SUBSCRIBERS.size();
 	}
 
-	private static class Subscriber {
+	/**
+	 * One connection: a bounded queue of encoded frames, and the two entry points that drain it.
+	 *
+	 * Package-private so {@code FcStreamSubscriberTest} can drive the backpressure and drop-oldest
+	 * behaviour directly - both are only observable through a stalled connection, which is awkward to
+	 * arrange over a socket and trivial to arrange against a fake {@code ServletOutputStream}.
+	 */
+	static final class Subscriber implements WriteListener, AsyncListener {
 
-		private final BlockingQueue<String> queue = new ArrayBlockingQueue<String>(SUBSCRIBER_QUEUE_CAPACITY);
-		private volatile boolean open = true;
+		private final FcSampleSseServlet servlet;
 
-		void offer(String frame)
+		private final AsyncContext async;
+
+		private final ServletOutputStream out;
+
+		/** Guarded by itself. An ArrayDeque, not a BlockingQueue: nothing blocks on it any more. */
+		private final ArrayDeque<byte[]> queue = new ArrayDeque<byte[]>(SUBSCRIBER_QUEUE_CAPACITY);
+
+		private final AtomicBoolean closed = new AtomicBoolean(false);
+
+		/** Serializes isReady()/write() between the publisher thread and the container's callbacks. */
+		private final Object writeLock = new Object();
+
+		Subscriber(FcSampleSseServlet servlet, AsyncContext async, ServletOutputStream out) {
+			this.servlet = servlet;
+			this.async = async;
+			this.out = out;
+		}
+
+		void start()
 		{
-			// Drop the oldest rather than the newest: a dashboard wants current numbers, and a stale
-			// frame is worth less than the one behind it.
-			while (!queue.offer(frame))
-				if (null == queue.poll())
-					return;
+			out.setWriteListener(this);
+		}
+
+		/**
+		 * Queue a frame and write it if this connection is idle and ready.
+		 *
+		 * Called on the publisher thread. It may end up performing the write itself, which is safe
+		 * precisely because {@code isReady()} gates it: the container has promised the write will not
+		 * block, so the publisher cannot be held up by a slow reader.
+		 */
+		void offer(byte[] frame)
+		{
+			if (closed.get())
+				return;
+
+			synchronized (queue) {
+				// Drop the oldest rather than the newest: a dashboard wants current numbers, and a stale
+				// frame is worth less than the one behind it.
+				while (queue.size() >= SUBSCRIBER_QUEUE_CAPACITY)
+					queue.poll();
+
+				queue.add(frame);
+			}
+
+			drain();
+		}
+
+		/** The container telling us this connection went from not-ready to ready. */
+		@Override
+		public void onWritePossible()
+		{
+			drain();
+		}
+
+		private void drain()
+		{
+			if (closed.get())
+				return;
+
+			synchronized (writeLock) {
+				boolean wrote = false;
+				try {
+					while (out.isReady()) {
+						byte[] frame;
+						synchronized (queue) {
+							frame = queue.poll();
+						}
+
+						// Nothing left to send while still ready: the container will NOT call
+						// onWritePossible() again, so the next offer() is what wakes this connection.
+						if (null == frame) {
+							// And flush before going idle. Without this the container aggregates frames
+							// into its output buffer and releases them when it fills - measured at ~3 s
+							// of silence and then eight frames at once, which is a dashboard that jumps
+							// rather than ticks. isReady() was true this iteration, so this does not
+							// block. Only when we wrote: an empty flush on every publish tick would be
+							// a syscall per idle connection per 500 ms.
+							if (wrote)
+								out.flush();
+
+							return;
+						}
+
+						out.write(frame);
+						wrote = true;
+					}
+					// Not ready - stop writing and wait for onWritePossible(). No flush here: the
+					// container is already draining what it took, which is why it went not-ready.
+				} catch (IOException e) {
+					// the usual reason is the operator closing the dashboard tab
+					logger.debug("Dashboard stream connection ended", e);
+					close();
+				} catch (IllegalStateException e) {
+					// isReady()/write() after the container has finished with this request
+					logger.debug("Dashboard stream connection already completed", e);
+					close();
+				}
+			}
+		}
+
+		/**
+		 * Ends the connection and releases its slot in the concurrency cap, exactly once however the
+		 * connection ended.
+		 */
+		void close()
+		{
+			if (!closed.compareAndSet(false, true))
+				return;
+
+			SUBSCRIBERS.remove(this);
+			servlet.decrementCurrentConcurrentConnections();
+
+			try {
+				async.complete();
+			} catch (Exception e) {
+				// already completed by the container (timeout, error, client gone) - nothing to do
+				logger.debug("AsyncContext was already complete", e);
+			}
+		}
+
+		// ---- AsyncListener: every way the container can end this connection ----
+
+		@Override
+		public void onComplete(AsyncEvent event) {
+			close();
+		}
+
+		@Override
+		public void onTimeout(AsyncEvent event) {
+			close();
+		}
+
+		@Override
+		public void onError(AsyncEvent event) {
+			close();
+		}
+
+		@Override
+		public void onStartAsync(AsyncEvent event) {
+			// this stream is never dispatched and re-started; nothing to re-register
+		}
+
+		// ---- WriteListener ----
+
+		@Override
+		public void onError(Throwable t) {
+			logger.debug("Dashboard stream write failed", t);
+			close();
+		}
+
+		/** Package-private for tests. */
+		int queueSize()
+		{
+			synchronized (queue) {
+				return queue.size();
+			}
+		}
+
+		/** Package-private for tests. */
+		boolean isClosed()
+		{
+			return closed.get();
 		}
 	}
 }
