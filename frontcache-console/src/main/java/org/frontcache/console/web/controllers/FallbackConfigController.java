@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.frontcache.console.service.FrontcacheService;
-import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;

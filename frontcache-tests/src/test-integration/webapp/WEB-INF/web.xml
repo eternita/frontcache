@@ -27,17 +27,19 @@
         <url-pattern>/frontcache-io</url-pattern>
     </servlet-mapping>
 
-    <!-- The metrics stream the console reads. Mapped here so the e2e suite actually covers it: it was
+    <!-- The dashboard stream the console reads. Mapped here so the e2e suite actually covers it: it was
          previously only mapped in the real server webapp, so nothing in the test suite ever hit the
          endpoint and the empty thread-pool panel went unnoticed for as long as it did. An exact
-         url-pattern wins over FrontCacheServlet's /*. -->
+         url-pattern wins over FrontCacheServlet's /*. Both the new path and the pre-2.7 /hystrix.stream
+         are mapped, and the suite asserts both. -->
     <servlet>
-        <servlet-name>HystrixMetricsStreamServlet</servlet-name>
-        <servlet-class>org.frontcache.hystrix.HystrixStreamSecurityWrapperServlet</servlet-class>
+        <servlet-name>FcDashboardStreamServlet</servlet-name>
+        <servlet-class>org.frontcache.resilience.FcDashboardStreamSecurityServlet</servlet-class>
     </servlet>
 
     <servlet-mapping>
-        <servlet-name>HystrixMetricsStreamServlet</servlet-name>
+        <servlet-name>FcDashboardStreamServlet</servlet-name>
+        <url-pattern>/fc-dashboard.stream</url-pattern>
         <url-pattern>/hystrix.stream</url-pattern>
     </servlet-mapping>
 

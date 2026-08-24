@@ -45,7 +45,7 @@ import org.apache.http.protocol.HttpContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
-import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;

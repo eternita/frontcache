@@ -29,11 +29,11 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
-import org.frontcache.hystrix.fr.FallbackResolverFactory;
+import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
-import org.frontcache.hystrix.FcCommandException;
+import org.frontcache.resilience.FcCommandException;
 
 /**
  *
@@ -320,7 +320,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			} catch (FcCommandException e) {
 				// Reached only when the command failed AND its fallback failed or was absent: FcCommand
 				// resolves the fallback from its own catch block, on this thread, so the "in multi
-				// threaded environment hystrix does not resolve fallback ??" case this used to work
+				// threaded environment hystrix does not resolve fallback ??" case this comment used to work
 				// around cannot happen any more. The manual resolution in the finally block below is
 				// kept as the answer for the remaining case, where the fallback itself failed.
 				logger.error("FcCommandException: unexpected error processing include " + includeURL, e);

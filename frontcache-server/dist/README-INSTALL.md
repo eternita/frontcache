@@ -2,7 +2,7 @@
 
 This bundle is the reverse-proxy mode of Frontcache: it sits in front of an origin web app
 written in any language, serves cached page fragments, stitches `<fc:include url="..."/>`
-fragments, and circuit-breaks origin calls with Hystrix fallbacks.
+fragments, and circuit-breaks origin calls with Resilience4j fallbacks.
 
 ```
 bin/frontcache                          convenience wrapper
@@ -52,7 +52,9 @@ Then, as needed:
 - `fallbacks.conf` — what to serve when the origin 5XXs or a circuit opens.
 - `guard-rules.conf` — checks applied before cache and origin (reject / redirect / dry-run).
 - `fc-l1-ehcache-config.xml` — L1 in-memory cache sizing.
-- `hystrix.properties` — circuit-breaker thresholds and thread pools.
+- `resilience.properties` — circuit-breaker thresholds and thread pools. (Pre-2.7 installs called
+  this `hystrix.properties`; that name is still read for one release, with a warning, and the
+  `hystrix.*` keys inside it are accepted indefinitely.)
 
 ## 3. Run
 
@@ -75,7 +77,8 @@ report the fragments as coming from cache. Logs are under `FRONTCACHE_HOME/logs/
 1. Terminate TLS upstream (nginx, ALB) on 80/443 and proxy to `http://127.0.0.1:9080`.
    Forward `X-Forwarded-*` — the launcher honours them, which is what keeps the
    management-port check and absolute-URL rewriting correct behind a proxy.
-   Do **not** buffer `/hystrix.stream`; it is a Server-Sent-Events stream.
+   Do **not** buffer `/fc-dashboard.stream` (or its pre-2.7 alias `/hystrix.stream`); they are
+   Server-Sent-Events streams.
    Set `front-cache.http-port` / `front-cache.https-port` to the ports **clients** see
    (80/443), not this one, or redirects will send users to `:9080`.
    A worked nginx front door — two containers, or a script for this exact layout — is at

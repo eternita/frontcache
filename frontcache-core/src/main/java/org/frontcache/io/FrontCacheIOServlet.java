@@ -37,8 +37,8 @@ import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
-import org.frontcache.hystrix.fr.FallbackConfigEntry;
-import org.frontcache.hystrix.fr.FallbackResolverFactory;
+import org.frontcache.resilience.fr.FallbackConfigEntry;
+import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +50,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
 	private ObjectMapper jsonMapper = new ObjectMapper();
+
+	private static final String RESILIENCE_CONFIG_FILE = "resilience.properties";
+	private static final String LEGACY_RESILIENCE_CONFIG_FILE = "hystrix.properties";
 
 	FrontCacheEngine fcEngine = null;
 
@@ -75,14 +78,14 @@ public class FrontCacheIOServlet extends HttpServlet {
 		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
 		siteKey = FCConfig.getProperty("front-cache.site-key", "");
 		if (null == managementPortStr || managementPortStr.trim().length() == 0)
-			logger.warn("Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
+			logger.warn("Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
 		else {
 			try
 			{
 				managementPort = Integer.parseInt(managementPortStr);
 			} catch (Exception ex) {
 				ex.printStackTrace();
-				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
+				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
 			}
 		}
 
@@ -520,8 +523,15 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 	/**
-	 * Reads the raw ./conf/hystrix.properties file (comments and empty lines
-	 * preserved) so it can be displayed as-is in the console.
+	 * Reads the raw ./conf/resilience.properties file (comments and empty lines preserved) so it can be
+	 * displayed as-is in the console, falling back to the pre-2.7 ./conf/hystrix.properties.
+	 *
+	 * The fallback has to be here as well as in {@code FcResilienceConfig}: this action shows the operator
+	 * the file the node is actually using, so reading a different one than the engine reads would make the
+	 * console lie in exactly the situation - a half-finished upgrade - where it is being consulted.
+	 *
+	 * The action name and the response field keep their pre-2.7 spelling; they are the console wire format,
+	 * which is a separate change (proposal section 11).
 	 *
 	 * @param req
 	 * @return
@@ -530,17 +540,29 @@ public class FrontCacheIOServlet extends HttpServlet {
 	{
 		GetHystrixConfigActionResponse aResponse = new GetHystrixConfigActionResponse();
 
-		try (InputStream is = FCConfig.getConfigInputStream("hystrix.properties"))
+		String fileName = RESILIENCE_CONFIG_FILE;
+		try
 		{
+			InputStream is = FCConfig.getConfigInputStream(fileName);
+			if (null == is)
+			{
+				fileName = LEGACY_RESILIENCE_CONFIG_FILE;
+				is = FCConfig.getConfigInputStream(fileName);
+			}
+
 			if (null == is)
 			{
 				aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-				aResponse.setErrorDescription("hystrix.properties not found");
+				aResponse.setErrorDescription(RESILIENCE_CONFIG_FILE + " not found");
 			} else {
-				aResponse.setHystrixConfig(new String(is.readAllBytes(), StandardCharsets.UTF_8));
+				try {
+					aResponse.setHystrixConfig(new String(is.readAllBytes(), StandardCharsets.UTF_8));
+				} finally {
+					is.close();
+				}
 			}
 		} catch (IOException e) {
-			logger.error("Can't read hystrix.properties", e);
+			logger.error("Can't read " + fileName, e);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 			aResponse.setErrorDescription(e.getMessage());
 		}

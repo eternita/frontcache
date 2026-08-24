@@ -20,7 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * The Prometheus scrape endpoint, {@code /fc-metrics}.
  *
- * Behind the same {@code front-cache.management.port} gate as {@code /hystrix.stream}, and for the same
+ * Behind the same {@code front-cache.management.port} gate as the dashboard stream, and for the same
  * reason: this exposes traffic volumes, error rates, circuit state and command names. A scrape endpoint
  * is unauthenticated by convention, so the connector it answers on IS the access control.
  *

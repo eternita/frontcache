@@ -34,6 +34,9 @@ public abstract class FrontcacheAction {
 
 	public static final String GET_DYNAMIC_URLS = "get-dynamic-urls";
 
+	// Pre-2.7 spelling, kept: the console is deployed separately and switches on this literal, so the
+	// action name is wire format rather than an internal identifier. Renaming it belongs with the console
+	// work - see docs/hystrix-to-resilience4j-proposal.md section 11.
 	public static final String GET_HYSTRIX_CONFIGS = "get-hystrix-configs";
 
 	public static final String GET_GUARD_RULES = "get-guard-rules";
@@ -65,7 +68,7 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.PUT_TO_CACHE, "store a WebResponse entry into the local cache (used for replication); accepts 'key', 'domain', and 'webResponse' (JSON) parameters");
 		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get substring to determine bots based on User-Agent HTTP header from ./conf/bots.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
-		actionsDescriptionMap.put(FrontcacheAction.GET_HYSTRIX_CONFIGS, "get raw hystrix configuration from ./conf/hystrix.properties");
+		actionsDescriptionMap.put(FrontcacheAction.GET_HYSTRIX_CONFIGS, "get raw resilience configuration from ./conf/resilience.properties");
 		actionsDescriptionMap.put(FrontcacheAction.GET_GUARD_RULES, "get guard rules (checks running before cache & origin) in evaluation order, with hit counts - built-ins plus ./conf/guard-rules.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_GUARD_CONFIG, "get raw guard rules configuration from ./conf/guard-rules.conf");
 		actionsDescriptionMap.put(FrontcacheAction.RELOAD_GUARD_RULES, "reload guard rules from ./conf/guard-rules.conf (resets hit counters)");

@@ -14,9 +14,9 @@ import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import org.frontcache.FCConfig;
-import org.frontcache.hystrix.FcCommandMetrics;
-import org.frontcache.hystrix.FcEventType;
-import org.frontcache.hystrix.FcThreadPools;
+import org.frontcache.resilience.FcCommandMetrics;
+import org.frontcache.resilience.FcEventType;
+import org.frontcache.resilience.FcThreadPools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,13 +175,13 @@ public class FcMetricsExport {
 	{
 		// Resilience4j's own binders: circuit state, failure rate, bulkhead occupancy, timeout counts.
 		io.github.resilience4j.micrometer.tagged.TaggedCircuitBreakerMetrics
-				.ofCircuitBreakerRegistry(org.frontcache.hystrix.FcResilienceRegistry.circuitBreakerRegistry())
+				.ofCircuitBreakerRegistry(org.frontcache.resilience.FcResilienceRegistry.circuitBreakerRegistry())
 				.bindTo(registry);
 		io.github.resilience4j.micrometer.tagged.TaggedBulkheadMetrics
-				.ofBulkheadRegistry(org.frontcache.hystrix.FcResilienceRegistry.bulkheadRegistry())
+				.ofBulkheadRegistry(org.frontcache.resilience.FcResilienceRegistry.bulkheadRegistry())
 				.bindTo(registry);
 		io.github.resilience4j.micrometer.tagged.TaggedTimeLimiterMetrics
-				.ofTimeLimiterRegistry(org.frontcache.hystrix.FcResilienceRegistry.timeLimiterRegistry())
+				.ofTimeLimiterRegistry(org.frontcache.resilience.FcResilienceRegistry.timeLimiterRegistry())
 				.bindTo(registry);
 
 		// Those binders alone would make Prometheus strictly poorer than the SSE stream: no per-event

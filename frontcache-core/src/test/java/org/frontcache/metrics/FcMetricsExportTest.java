@@ -20,9 +20,9 @@ import java.util.Properties;
 import java.util.TreeSet;
 
 import org.frontcache.FCConfig;
-import org.frontcache.hystrix.FcCommand;
-import org.frontcache.hystrix.FcCommandMetrics;
-import org.frontcache.hystrix.FcTestSupport;
+import org.frontcache.resilience.FcCommand;
+import org.frontcache.resilience.FcCommandMetrics;
+import org.frontcache.resilience.FcTestSupport;
 import org.junit.After;
 import org.junit.Test;
 
@@ -205,7 +205,7 @@ public class FcMetricsExportTest {
 		FcMetricsExport.refresh();
 
 		FcCommandMetrics metrics = FcCommandMetrics.existing("Cache-Origin-http");
-		assertEquals(1, metrics.getTotalCount(org.frontcache.hystrix.FcEventType.SUCCESS));
+		assertEquals(1, metrics.getTotalCount(org.frontcache.resilience.FcEventType.SUCCESS));
 
 		// Rotate the whole rolling window out: the dashboard's number goes to zero, the exported one
 		// must not - otherwise every rate() query over it is wrong.
@@ -213,9 +213,9 @@ public class FcMetricsExportTest {
 			FcTestSupport.rotate(metrics);
 
 		assertEquals("rolling window has moved on", 0,
-				metrics.getRollingCount(org.frontcache.hystrix.FcEventType.SUCCESS));
+				metrics.getRollingCount(org.frontcache.resilience.FcEventType.SUCCESS));
 		assertEquals("but the exported counter is monotonic", 1,
-				metrics.getTotalCount(org.frontcache.hystrix.FcEventType.SUCCESS));
+				metrics.getTotalCount(org.frontcache.resilience.FcEventType.SUCCESS));
 	}
 
 	@Test

@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  *  cacheable_flag - true/1 if request is run through FrontCache engine (e.g. GET method, text data). false/0 - otherwise (request forwarded to origin)
  *  dynamic_flag{1|0} - true if origin has been requested. false/0 - otherwise (it's cacheable & cached).
  *
- *	log-timestamp request-id    domain   http-method   is-hystrix-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache|dynamic-soft}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|browser}    user-agent
+ *	log-timestamp request-id    domain   http-method   is-fallback-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache|dynamic-soft}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|browser}    user-agent
  *
  *  EXAMPLE
  *  2016-06-03T15:06:35,092-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 example.com GET success toplevel cacheable from-cache 0 50874 "http://myfc.example.com:8080/en/coin_definition-1_Thaler-Silver-Kingdom_of_Prussia_(1701_1918)-c_sK.GJAIx4AAAEvnTTi7NnT.htm" 0:0:0:0:0:0:0:1 front-cache-local-1 browser
@@ -52,7 +52,7 @@ public class RequestLogger {
 	private static Logger logger = LoggerFactory.getLogger(RequestLogger.class);
 
 	// dedicated logger for non-successful requests: guard-rule actions (reject / redirect / dry-run)
-	// and hystrix fallbacks (short-circuited / timeout / rejected / failure). Routed to its own file
+	// and fallbacks (short-circuited / timeout / rejected / failure). Routed to its own file
 	// via logback (frontcache-failed-requests.log).
 	private static Logger failedRequestLogger = LoggerFactory.getLogger("frontcache.failed-requests");
 
@@ -66,7 +66,7 @@ public class RequestLogger {
 	 * name as the reason and the sent HTTP status as the last two columns - NOT to error.log, so a
 	 * high-volume bad-crawler flood stays filterable without drowning real errors.
 	 *
-	 * The trailing status column is written for guard actions only; the hystrix-fallback lines that
+	 * The trailing status column is written for guard actions only; the fallback lines that
 	 * {@link #logRequest} adds to the same file end at the reason (the response there is a normal
 	 * - usually 200 - fallback response, whose status this logger does not read: includes are
 	 * logged off the request thread, where HttpServletResponse is not safe to touch).
@@ -117,7 +117,7 @@ public class RequestLogger {
 
 		StringBuilder sb4file = new StringBuilder();
         HttpServletRequest request = context.getRequest();
-        boolean isHystrixError = context.isHystrixFallback();
+        boolean isFallbackError = context.isFallbackUsed();
         String userAgent = request.getHeader("User-Agent");
 
         String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
@@ -128,7 +128,7 @@ public class RequestLogger {
 		.append(SEPARATOR).append(context.getRequestId())
 		.append(SEPARATOR).append(context.getDomain())
 		.append(SEPARATOR).append(request.getMethod())
-		.append(SEPARATOR).append((isHystrixError) ? "error" : "success")
+		.append(SEPARATOR).append((isFallbackError) ? "error" : "success")
 		.append(SEPARATOR).append(context.getRequestType()) // toplevel | include | include-async
 		.append(SEPARATOR).append((isCacheable) ? "cacheable" : "direct")
 		.append(SEPARATOR).append(requestTypeDynamicCachedSoft)
@@ -145,9 +145,9 @@ public class RequestLogger {
 		// also write non-successful requests to the dedicated failed-requests log, with the
 		// failure category appended as the last column for easy filtering. No HTTP-status column
 		// here - see logGuardedRequest(), which writes one for guard actions only.
-		if (isHystrixError)
+		if (isFallbackError)
 		{
-			sb4file.append(SEPARATOR).append("\"").append(context.getHystrixReason()).append("\"");
+			sb4file.append(SEPARATOR).append("\"").append(context.getFallbackReason()).append("\"");
 			failedRequestLogger.trace(sb4file.toString());
 		}
 
@@ -167,7 +167,7 @@ public class RequestLogger {
 	 * @param dummy
 	 */
 	public static void logRequestToHeader(String url, String requestType, boolean isCached, boolean softRefresh, long runtimeMillis, long lengthBytes, RequestContext context, String includeLevel) {
-        boolean isHystrixError = context.isHystrixFallback();
+        boolean isFallbackError = context.isFallbackUsed();
         String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
         if (!isCached && softRefresh)
         	requestTypeDynamicCachedSoft = "dynamic-soft";
@@ -175,7 +175,7 @@ public class RequestLogger {
         if (context.getLogToHTTPHeaders())
         {
     		StringBuilder sb4header = new StringBuilder();
-    		sb4header.append((isHystrixError) ? "error" : "success")
+    		sb4header.append((isFallbackError) ? "error" : "success")
     		.append(SEPARATOR).append(requestType) // toplevel | include | include-async
     		.append(SEPARATOR).append(requestTypeDynamicCachedSoft)
     		.append(SEPARATOR).append(runtimeMillis)

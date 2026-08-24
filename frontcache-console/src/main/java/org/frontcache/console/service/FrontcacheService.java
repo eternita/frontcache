@@ -33,7 +33,7 @@ import org.frontcache.console.model.HystrixConfig;
 import org.frontcache.console.model.HystrixConnection;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
-import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.replication.CacheReplicator;
@@ -424,6 +424,10 @@ public class FrontcacheService {
 			String fcURL = fcClient.getFrontCacheURL();
 			if (!fcURL.endsWith("/"))
 				fcURL += "/";
+			// Deliberately still the pre-2.7 path, not /fc-dashboard.stream: the console is deployed
+			// separately from the nodes it monitors, so it has to work against a mixed fleet, and only
+			// the old path exists on a 2.6 node. 2.7+ serves both. Switch this when the oldest supported
+			// node is 2.7 - see docs/hystrix-to-resilience4j-proposal.md section 8.2.
 			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcURL + "hystrix.stream"));
 		}
 

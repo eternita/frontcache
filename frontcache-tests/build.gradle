@@ -179,7 +179,7 @@ integrationTest.configure {
 
 // The two Jetty servers run in their own JVMs, so they need the jacoco agent attached
 // individually — without this every engine-side class (FrontCacheEngine, the cache
-// processors, includes, hystrix) reports 0% no matter what the suite exercises, since
+// processors, includes, resilience) reports 0% no matter what the suite exercises, since
 // the integrationTest JVM only ever runs the HtmlUnit client and the FC client/agent.
 // Each writes its own .exec, which jacocoIntegrationTestReport picks up by glob.
 // The agent flushes on JVM shutdown, so tests.sh must stop these servers with SIGTERM

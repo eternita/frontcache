@@ -27,15 +27,19 @@
         <url-pattern>/frontcache-io</url-pattern>
     </servlet-mapping>
 
+    <!-- The dashboard SSE stream. Two url-patterns, one servlet: /hystrix.stream is the pre-2.7 path
+         and is kept indefinitely, because reverse-proxy no-buffering rules, guard rules and any
+         external Turbine name it and we cannot edit those from here. -->
     <servlet>
         <description></description>
-        <display-name>HystrixMetricsStreamServlet</display-name>
-        <servlet-name>HystrixMetricsStreamServlet</servlet-name>
-        <servlet-class>org.frontcache.hystrix.HystrixStreamSecurityWrapperServlet</servlet-class>
+        <display-name>FcDashboardStreamServlet</display-name>
+        <servlet-name>FcDashboardStreamServlet</servlet-name>
+        <servlet-class>org.frontcache.resilience.FcDashboardStreamSecurityServlet</servlet-class>
     </servlet>
 
     <servlet-mapping>
-        <servlet-name>HystrixMetricsStreamServlet</servlet-name>
+        <servlet-name>FcDashboardStreamServlet</servlet-name>
+        <url-pattern>/fc-dashboard.stream</url-pattern>
         <url-pattern>/hystrix.stream</url-pattern>
     </servlet-mapping>
 

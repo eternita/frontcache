@@ -215,7 +215,7 @@ project(':frontcache-core') {
 	//     org.frontcache:frontcache-core:<v>:home@zip
 	//
 	// Everything except frontcache.properties is taken from the server's conf/ so there is one
-	// copy of bots.conf, guard-rules.conf, hystrix.properties and friends. frontcache.properties
+	// copy of bots.conf, guard-rules.conf, resilience.properties and friends. frontcache.properties
 	// is the one file that genuinely differs: in filter mode the app IS the origin, so the
 	// standalone template's origin-host/origin-port section would be actively misleading.
 	def frontcacheHomeZip = tasks.register('frontcacheHomeZip', Zip) {
@@ -272,7 +272,7 @@ project(':frontcache-core') {
 		api         	'org.hdrhistogram:HdrHistogram:2.2.2'
 
 		// Prometheus / OTLP export (docs/hystrix-to-resilience4j-proposal.md section 7.5). Additive:
-		// the /hystrix.stream SSE contract is unaffected, and export defaults to none, so an upgrade
+		// the dashboard SSE contract is unaffected, and export defaults to none, so an upgrade
 		// starts no listener and no push loop until front-cache.metrics.export says so.
 		// 1.17.1 is the current STABLE micrometer; 1.18.0-M1 exists and is deliberately not used - a
 		// milestone build on the request path is the opposite of what blocker 1 is about.

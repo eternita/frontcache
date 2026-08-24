@@ -21,7 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
  *
  * Management endpoints - the metrics stream and the Prometheus scrape - expose traffic volumes, error
  * rates and URL-shaped command names, so they belong on an internal connector rather than the public
- * one. This used to be inlined in {@code HystrixStreamSecurityWrapperServlet}; it was extracted when a
+ * one. This used to be inlined in {@code FcDashboardStreamSecurityServlet}; it was extracted when a
  * second endpoint needed the same rule, because two implementations of one security check is one too
  * many and the copy is always the one that goes stale.
  *

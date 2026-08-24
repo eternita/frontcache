@@ -11,7 +11,7 @@ package org.frontcache.io;
 import java.util.Map;
 import java.util.Set;
 
-import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.resilience.fr.FallbackConfigEntry;
 
 public class GetFallbackConfigActionResponse extends ActionResponse {
 

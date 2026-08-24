@@ -200,7 +200,7 @@ public class GuardRuleEngineTest {
 
 	@Test
 	public void startupProbesDoNotInflateHitCounters() {
-		// load() self-checks the health-check / management / hystrix-stream paths against an IP host;
+		// load() self-checks the health-check / management / dashboard-stream paths against an IP host;
 		// those synthetic probes must not look like traffic in the management API's hit counts
 		GuardRuleEngine fresh = new GuardRuleEngine(MAX_URI_LENGTH);
 

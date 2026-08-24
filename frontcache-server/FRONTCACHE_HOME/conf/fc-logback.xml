@@ -148,7 +148,7 @@ front-cache.request-logs-config=fc-logback.xml
     <!-- Fallback logger. Same reasoning as the request logger above: additivity="false" keeps
          these TRACE lines in logs/fallback.log and off stdout. Also TRACE-only - every call on
          it (FileBasedFallbackResolver, DefaultFallbackResolver) is fallbackLogger.trace. -->
-    <logger name="org.frontcache.hystrix.FallbackLogger" additivity="false">
+    <logger name="org.frontcache.resilience.FallbackLogger" additivity="false">
         <level value="TRACE" />
         <appender-ref ref="FallbackLoggerFile" />
     </logger>
