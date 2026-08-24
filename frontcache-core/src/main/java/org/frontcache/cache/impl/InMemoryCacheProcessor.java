@@ -16,6 +16,8 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheStats;
+import org.frontcache.cache.FcCacheMetrics;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.WebResponse;
 
@@ -83,6 +85,11 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	public WebResponse getFromCacheImpl(String url) {
 
 		WebResponse comp = cache.get(url);
+
+		// This processor has one tier, and it is in memory - so its hits are L1 hits, and the exported
+		// series stay comparable across cache-processor implementations.
+		FcCacheMetrics.recordHitOrMiss(comp, FcCacheMetrics.Outcome.HIT_L1);
+
 		if (null == comp)
 			return null;
 
@@ -117,6 +124,16 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	@Override
 	public void removeFromCacheAll() {
 		cache.clear();
+	}
+
+	/**
+	 * One tier, in memory, so only the L1 entry count is real. Evictions are not tracked by this
+	 * processor and there is no on-disk tier - both stay UNKNOWN rather than being reported as zero,
+	 * so nobody alerts on a flat line that means "not measured".
+	 */
+	@Override
+	public CacheStats getCacheStats() {
+		return new CacheStats(cache.size(), CacheStats.UNKNOWN, CacheStats.UNKNOWN, CacheStats.UNKNOWN);
 	}
 
 	@Override

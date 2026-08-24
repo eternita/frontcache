@@ -14,6 +14,10 @@ import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import org.frontcache.FCConfig;
+import org.frontcache.cache.CacheManager;
+import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheStats;
+import org.frontcache.cache.FcCacheMetrics;
 import org.frontcache.resilience.FcCommandMetrics;
 import org.frontcache.resilience.FcEventType;
 import org.frontcache.resilience.FcThreadPools;
@@ -188,6 +192,91 @@ public class FcMetricsExport {
 		// taxonomy and no latency percentiles. We already maintain both for the dashboard, so bridge them.
 		bindCommandMetrics();
 		bindThreadPools();
+		bindCacheMetrics();
+	}
+
+	private boolean cacheBound = false;
+
+	/**
+	 * L1/L2 hit ratio, eviction rate and index size - the numbers an operator actually alerts on, and
+	 * the ones the resilience meters say nothing about. A page cache that has quietly stopped hitting
+	 * looks perfectly healthy through circuit-breaker metrics: every origin call succeeds.
+	 *
+	 * Two different sources, deliberately:
+	 * <ul>
+	 * <li>the READ COUNTERS come from {@link FcCacheMetrics}, which counts them on the request path, so
+	 *     they are exact and monotonic;</li>
+	 * <li>the SIZES come from {@link CacheStats}, sampled at scrape time, because a size is a level and
+	 *     counting every insert and eviction to track one would cost more than reading it.</li>
+	 * </ul>
+	 *
+	 * Sizes are bound once the cache processor exists, and only for the tiers it actually tracks: a
+	 * processor with no disk tier gets no index series rather than a gauge reading a flat zero, which
+	 * is a line somebody would eventually alert on.
+	 */
+	private synchronized void bindCacheMetrics()
+	{
+		// The read counters do not depend on a cache processor existing, so they are always registered -
+		// a zero here means "no reads yet", which is true.
+		if (!cacheReadsBound)
+		{
+			cacheReadsBound = true;
+			for (final FcCacheMetrics.Outcome outcome : FcCacheMetrics.Outcome.values())
+				FunctionCounter.builder("cache.reads", outcome, o -> FcCacheMetrics.count(o))
+						.description("Cache reads by outcome, since JVM start")
+						.tags(Tags.of("result", outcome.getResult(), "tier", outcome.getTier()))
+						.register(registry);
+		}
+
+		if (cacheBound)
+			return;
+
+		// existingInstance(), not getInstance(): a scrape must not be what starts the cache. See
+		// CacheManager.existingInstance().
+		CacheProcessor processor = CacheManager.existingInstance();
+		if (null == processor)
+			return;
+
+		CacheStats stats = processor.getCacheStats();
+		cacheBound = true;
+
+		if (CacheStats.UNKNOWN != stats.getL1Entries())
+			cacheGauge("cache.entries", "Entries currently cached", Tags.of("tier", "L1"),
+					s -> s.getL1Entries());
+
+		if (CacheStats.UNKNOWN != stats.getL1Evictions())
+			FunctionCounter.builder("cache.evictions", processor, p -> p.getCacheStats().getL1Evictions())
+					.description("Entries evicted from the in-memory tier, since JVM start")
+					.tags(Tags.of("tier", "L1"))
+					.register(registry);
+
+		if (CacheStats.UNKNOWN != stats.getL2Entries())
+			cacheGauge("cache.entries", "Entries currently cached", Tags.of("tier", "L2"),
+					s -> s.getL2Entries());
+
+		if (CacheStats.UNKNOWN != stats.getL2DiskBytes())
+			cacheGauge("cache.disk.bytes", "Bytes the on-disk tier occupies", Tags.of("tier", "L2"),
+					s -> s.getL2DiskBytes());
+	}
+
+	private boolean cacheReadsBound = false;
+
+	/**
+	 * Each gauge re-reads through {@link CacheManager#existingInstance()} rather than closing over the
+	 * processor, so a cache reload that swaps the instance does not leave the series reporting the old
+	 * one forever.
+	 */
+	private void cacheGauge(String name, String description, Tags tags,
+			final java.util.function.ToLongFunction<CacheStats> read)
+	{
+		Gauge.builder(name, () -> {
+					CacheProcessor current = CacheManager.existingInstance();
+					return (null == current) ? Double.valueOf(Double.NaN)
+							: Double.valueOf(read.applyAsLong(current.getCacheStats()));
+				})
+				.description(description)
+				.tags(tags)
+				.register(registry);
 	}
 
 	/**
@@ -279,6 +368,7 @@ public class FcMetricsExport {
 
 		local.bindCommandMetrics();
 		local.bindThreadPools();
+		local.bindCacheMetrics();
 	}
 
 	// ---- config -------------------------------------------------------------

@@ -75,6 +75,57 @@ public class StandaloneMetricsExportTests extends TestsBase {
 		}
 	}
 
+	/**
+	 * The cache series, against a real L1/L2 cache with real traffic through it.
+	 *
+	 * Worth doing end to end rather than only in a unit test: the sizes are read from a live Ehcache and
+	 * a live Lucene IndexWriter, and the whole reason those accessors exist is that the obvious ones
+	 * (open a DirectoryReader per call) are too expensive to put behind a scrape. A unit test with a
+	 * hand-built processor would not exercise the same wiring the server actually runs.
+	 */
+	@Test
+	public void scrapeExposesCacheSeriesFromRealTraffic() throws Exception
+	{
+		String url = TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST + "common/jsp-read/a.jsp";
+
+		// first request populates the cache (a miss), the rest are hits
+		for (int i = 0; i < 3; i++)
+			webClient.getPage(url);
+
+		CloseableHttpClient client = HttpClients.createDefault();
+		try {
+			CloseableHttpResponse response = client.execute(new HttpGet(METRICS_URL));
+			try {
+				assertEquals(200, response.getStatusLine().getStatusCode());
+				String body = EntityUtils.toString(response.getEntity());
+
+				// Hit ratio is the number an operator alerts on, and it needs both labels on the wire.
+				assertTrue("no cache read series:\n" + head(body),
+						body.contains("frontcache_cache_reads_total"));
+				assertTrue("hits not exported", body.contains("result=\"hit\""));
+				assertTrue("misses not exported - a ratio needs a denominator",
+						body.contains("result=\"miss\""));
+
+				// Tier attribution: "90% hit ratio, all of it off disk" is a different situation from
+				// "90% hit ratio, all of it in memory", and only the tier label distinguishes them.
+				assertTrue("L1 tier not exported", body.contains("tier=\"L1\""));
+				assertTrue("L2 tier not exported", body.contains("tier=\"L2\""));
+
+				// Sizes, read from the live cache rather than by reopening the index.
+				assertTrue("cache entry gauge missing", body.contains("frontcache_cache_entries"));
+				assertTrue("on-disk size gauge missing", body.contains("frontcache_cache_disk_bytes"));
+				assertTrue("eviction counter missing", body.contains("frontcache_cache_evictions"));
+
+				assertFalse("a cache series is labelled with a URL - unbounded cardinality",
+						body.contains("=\"/common/") || body.contains("jsp-read/a.jsp"));
+			} finally {
+				response.close();
+			}
+		} finally {
+			client.close();
+		}
+	}
+
 	private static String head(String body)
 	{
 		return body.length() > 2000 ? body.substring(0, 2000) : body;

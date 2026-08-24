@@ -153,8 +153,12 @@ public class FcMetricsExportTest {
 		executeSomeTraffic();
 		FcMetricsExport.refresh();
 
+		// Reviewed: every one of these has a small fixed value set fixed at compile time.
+		//   result -> hit|miss          tier -> L1|L2|none        (FcCacheMetrics.Outcome, 3 combinations)
+		//   command -> the five FC_* keys   event -> FcEventType   quantile -> a fixed list
+		//   pool -> the named thread pools  name/kind/state -> resilience4j's own, one per breaker
 		TreeSet<String> allowed = new TreeSet<String>(java.util.Arrays.asList(
-				"command", "event", "quantile", "pool", "name", "kind", "state"));
+				"command", "event", "quantile", "pool", "name", "kind", "state", "result", "tier"));
 
 		TreeSet<String> seen = new TreeSet<String>();
 		for (Meter meter : FcMetricsExport.registry().getMeters())

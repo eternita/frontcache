@@ -31,6 +31,18 @@ public class CacheManager {
 	// L2 stayed dead (reads included) until the next restart, which re-rolled the same dice.
 	private static volatile CacheProcessor instance;
 
+	/**
+	 * @return the cache processor if one has been created, or null - never creating one.
+	 *
+	 * {@link #getInstance()} initialises on first call, which includes opening the Lucene index and
+	 * taking its write lock. That is the right behaviour for the request path and the wrong behaviour
+	 * for a metrics scrape: a node whose cache has not started yet must not have it started BY being
+	 * scraped. Reporting no cache series for a few seconds is the correct answer.
+	 */
+	public static CacheProcessor existingInstance(){
+		return instance;
+	}
+
 	public static CacheProcessor getInstance(){
 		CacheProcessor localInstance = instance;
 		if (null == localInstance) {

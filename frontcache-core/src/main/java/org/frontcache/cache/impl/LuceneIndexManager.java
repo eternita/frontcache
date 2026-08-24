@@ -992,6 +992,65 @@ public class LuceneIndexManager {
 	 * Returns index size
 	 * @return
 	 */
+	/**
+	 * Document count, read from the live writer instead of by opening a reader.
+	 *
+	 * {@link #getIndexSize()} opens a fresh {@code FSDirectory} and {@code DirectoryReader} on every
+	 * call, which is fine for the occasional management-API request it was written for and wrong for a
+	 * Prometheus scrape arriving every few seconds forever. {@code IndexWriter.getDocStats()} is an
+	 * in-memory read of state the writer already maintains.
+	 *
+	 * The two can differ by the documents buffered since the last commit; for a cache-size gauge that
+	 * is noise, and the cheapness is worth more than the precision.
+	 *
+	 * @return the document count, or -1 when the writer is unavailable - never an exception, because
+	 *         the caller is a metrics gauge and a wedged index must not break a scrape
+	 */
+	public int getIndexSizeFast() {
+		try {
+			IndexWriter writer = getIndexWriter();
+			return (null == writer) ? -1 : writer.getDocStats().numDocs;
+
+		} catch (Exception e) {
+			logger.debug("Can't read doc count from the index writer", e);
+			return -1;
+		}
+	}
+
+	/**
+	 * On-disk size of the index, summed over the files Lucene currently lists.
+	 *
+	 * This is the number that answers "will the cache volume fill up", which document count does not:
+	 * entry sizes vary by orders of magnitude on a page cache. Deleted-but-not-merged documents are
+	 * included, deliberately - they occupy the disk this is measuring.
+	 *
+	 * @return total bytes, or -1 when the directory cannot be read
+	 */
+	public long getIndexDiskBytes() {
+		try {
+			Directory dir = directory;
+			if (null == dir)
+				return -1;
+
+			long total = 0;
+			for (String name : dir.listAll())
+			{
+				try {
+					total += dir.fileLength(name);
+				} catch (IOException merged) {
+					// a segment file merged away between listAll() and fileLength() - skip it rather
+					// than fail the whole reading; the next scrape sees the new file set
+				}
+			}
+
+			return total;
+
+		} catch (Exception e) {
+			logger.debug("Can't measure index size on disk", e);
+			return -1;
+		}
+	}
+
 	public int getIndexSize(){
 		int n = -1;
 		IndexReader reader = null;
