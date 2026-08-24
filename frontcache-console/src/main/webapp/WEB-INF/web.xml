@@ -4,16 +4,15 @@
          metadata-complete="false" version="6.0">
   <display-name>Frontcache Console</display-name>
 
-   <!-- hystrix streams -->
+	<!-- Relays an edge's dashboard SSE stream to the browser (the console is a different origin
+	     than the node). Replaced the vendored Netflix ProxyStreamServlet in 2.7. -->
 	<servlet>
-		<description />
-		<display-name>ProxyStreamServlet</display-name>
-		<servlet-name>ProxyStreamServlet</servlet-name>
-		<servlet-class>com.netflix.hystrix.dashboard.stream.ProxyStreamServlet</servlet-class>
+		<servlet-name>DashboardStreamProxyServlet</servlet-name>
+		<servlet-class>org.frontcache.console.web.DashboardStreamProxyServlet</servlet-class>
 	</servlet>
 	<servlet-mapping>
-		<servlet-name>ProxyStreamServlet</servlet-name>
-		<url-pattern>/resources/hystrix/proxy.stream</url-pattern>
+		<servlet-name>DashboardStreamProxyServlet</servlet-name>
+		<url-pattern>/fc-dashboard-proxy.stream</url-pattern>
 	</servlet-mapping>
   
 	<!-- For web context -->

@@ -1,0 +1,198 @@
+/*
+ * Realtime monitor styling.
+ *
+ * Replaces the vendored Netflix dashboard's global.css + resets.css + monitor.css +
+ * hystrixCommand.css, and the page-level <style> block that used to override them. Scoped under
+ * .fc-dashboard so nothing here can reach the rest of the console (the vendored resets.css was
+ * page-global and had to be kept away from bootstrap by hand).
+ */
+
+.fc-dashboard .fc-legend {
+	font-size: 80%;
+	padding: 4px 0 5px 0;
+	border-bottom: 1px solid #000;
+	text-align: right;
+}
+
+.fc-dashboard .fc-legend .fc-legend-title {
+	float: left;
+	font-size: 130%;
+	font-weight: 700;
+}
+
+.fc-dashboard .fc-stream-name {
+	font-size: 85%;
+	color: grey;
+	padding: 6px 0 0 0;
+}
+
+.fc-dashboard .fc-status {
+	display: block;
+	padding: 12px 0;
+	color: grey;
+	text-align: center;
+}
+
+.fc-dashboard .fc-status.failed {
+	color: red;
+}
+
+/* the circuit boxes: a wrapping row of fixed-size cards */
+.fc-dashboard .fc-circuits {
+	display: flex;
+	flex-wrap: wrap;
+	align-content: flex-start;
+	padding-top: 5px;
+}
+
+.fc-dashboard .fc-circuit {
+	position: relative;
+	width: 245px;
+	height: 250px;
+	margin: 0 5px 15px 0;
+	font-size: 10pt;
+}
+
+/* custom left-to-right order of the circuit cards (lower number = further left).
+   Commands not listed keep the default order (0) and so appear before order:1. */
+.fc-dashboard .fc-circuit[data-command="Input-Requests"]      { order: 1; }
+.fc-dashboard .fc-circuit[data-command="Cache-Hits"]          { order: 2; }
+.fc-dashboard .fc-circuit[data-command="Cache-Origin-filter"] { order: 3; }
+.fc-dashboard .fc-circuit[data-command="Cache-Origin-http"]   { order: 4; }
+.fc-dashboard .fc-circuit[data-command="Origin-Hits"]         { order: 5; }
+
+/* the bubble + sparkline sit behind the numbers */
+.fc-dashboard .fc-circuit-chart {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.fc-dashboard .fc-circuit-body {
+	position: relative;
+	pointer-events: none;
+}
+
+.fc-dashboard .fc-circuit-body a,
+.fc-dashboard .fc-circuit-body span.value {
+	pointer-events: auto;
+}
+
+.fc-dashboard .fc-name {
+	font-weight: 700;
+	text-align: right;
+	background: rgba(255, 255, 255, 0.8);
+	padding-bottom: 5px;
+}
+
+.fc-dashboard .fc-counters {
+	text-align: right;
+	padding-bottom: 10px;
+	background: rgba(255, 255, 255, 0.8);
+}
+
+.fc-dashboard .fc-counters .fc-cell {
+	display: inline-block;
+	vertical-align: top;
+}
+
+.fc-dashboard .fc-counters .fc-border-right {
+	border-right: 1px solid grey;
+	padding-right: 6px;
+	padding-left: 8px;
+}
+
+.fc-dashboard .fc-counters .fc-cell span {
+	display: block;
+	font-weight: 700;
+	cursor: default;
+}
+
+.fc-dashboard .fc-error-percentage {
+	font-size: 12pt;
+	font-weight: 700;
+	padding-left: 5px;
+	color: grey;
+}
+
+.fc-dashboard .fc-rate {
+	text-align: right;
+	font-size: 11pt;
+	background: rgba(255, 255, 255, 0.8);
+	cursor: default;
+}
+
+.fc-dashboard .fc-rate .fc-smaller {
+	font-size: 8pt;
+	color: grey;
+}
+
+.fc-dashboard .fc-rate .fc-value {
+	font-weight: 700;
+}
+
+.fc-dashboard .fc-circuit-status {
+	font-size: 9pt;
+	text-align: right;
+	padding-top: 4px;
+	background: rgba(255, 255, 255, 0.8);
+}
+
+/* the latency table */
+.fc-dashboard .fc-latency {
+	width: 100%;
+	font-size: 8pt;
+	border-collapse: collapse;
+	margin-top: 6px;
+	background: rgba(255, 255, 255, 0.8);
+}
+
+.fc-dashboard .fc-latency th {
+	width: 18%;
+	text-align: right;
+	padding-right: 4px;
+	font-weight: 400;
+}
+
+.fc-dashboard .fc-latency td {
+	width: 17%;
+	text-align: right;
+	font-weight: 700;
+	padding-right: 6px;
+}
+
+/* the shared event colours - also used by the legend */
+.fc-dashboard .fc-success         { color: green; }
+.fc-dashboard .fc-short-circuited { color: blue; }
+.fc-dashboard .fc-timeout         { color: #F90; }
+.fc-dashboard .fc-failure         { color: red; }
+.fc-dashboard .fc-rejected        { color: purple; }
+.fc-dashboard .fc-bad-request     { color: #20b2aa; }
+
+.fc-dashboard .fc-sparkline {
+	stroke: #4682b4;
+	stroke-width: 1;
+	fill: none;
+}
+
+/* "Edges status" and the monitor side by side on wide screens, stacked below */
+.fc-layout {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 20px 40px;
+}
+
+.fc-layout .fc-edges {
+	flex: 0 0 auto;
+	padding-left: 20px;
+}
+
+/* min-width:0 lets the monitor column shrink below its widest card instead of
+   forcing the page to scroll horizontally */
+.fc-layout .fc-monitor {
+	flex: 1 1 600px;
+	min-width: 0;
+}

@@ -30,7 +30,7 @@ import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.GuardConfig;
 import org.frontcache.console.model.GuardRulesConfig;
 import org.frontcache.console.model.ResilienceConfig;
-import org.frontcache.console.model.HystrixConnection;
+import org.frontcache.console.model.DashboardStream;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
@@ -407,39 +407,32 @@ public class FrontcacheService {
 	}
 
 	/**
+	 * The edges the realtime page subscribes to, as JSON.
 	 *
-	 * @param domain
-	 * @return
+	 * Only names and edge URLs - the page hands an edge URL back to
+	 * {@code DashboardStreamProxyServlet}, which is where the stream path and the site key live.
 	 */
-	public String getHystrixMonitorURLList()
+	public String getDashboardStreams()
 	{
-		// [{"name":"My Super App","stream":"http://sg.example.com/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.example.com/hystrix.stream","auth":"","delay":"2000"}]
+		// [{"name":"My Super App","url":"http://sg.example.com/"},{"name":"My Super App","url":"http://or.example.com/"}]
 
-		List<FrontCacheClient> fcClients = getFrontCacheAgents();
+		List<DashboardStream> streams = new ArrayList<DashboardStream>();
 
-		List<HystrixConnection> hystrixConnections = new ArrayList<HystrixConnection>();
-
-		for (FrontCacheClient fcClient : fcClients)
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
 		{
 			String fcURL = fcClient.getFrontCacheURL();
 			if (!fcURL.endsWith("/"))
 				fcURL += "/";
-			// Deliberately still the pre-2.7 path, not /fc-dashboard.stream: the console is deployed
-			// separately from the nodes it monitors, so it has to work against a mixed fleet, and only
-			// the old path exists on a 2.6 node. 2.7+ serves both. Switch this when the oldest supported
-			// node is 2.7 - see docs/hystrix-to-resilience4j-proposal.md section 8.2.
-			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcURL + "hystrix.stream"));
+
+			streams.add(new DashboardStream(fcClient.getName(), fcURL));
 		}
 
-		String urlListStr = "";
 		try {
-			urlListStr = jsonMapper.writeValueAsString(hystrixConnections);
-		} catch (JsonProcessingException e1) {
-			logger.error("Can't serialize array of Hystrix connections", e1);
-			urlListStr = e1.getMessage();
-			e1.printStackTrace();
+			return jsonMapper.writeValueAsString(streams);
+		} catch (JsonProcessingException e) {
+			logger.error("Can't serialize the dashboard stream list", e);
+			return "[]";
 		}
-		return urlListStr;
 	}
 
 	public Set<String> getFrontCacheAgentURLs()

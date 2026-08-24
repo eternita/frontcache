@@ -12,7 +12,8 @@
  
 	<context:component-scan base-package="org.frontcache.console.config" />
 	<context:component-scan base-package="org.frontcache.console.web.controllers" />
-	
-	<mvc:resources mapping="/resources/**" location="/resources/" />
-	 
+
+	<!-- /resources/** used to serve the vendored Netflix dashboard assets, deleted in 2.7.
+	     Everything the console serves now lives under /static/** (WebMVCConfig). -->
+
 </beans>
