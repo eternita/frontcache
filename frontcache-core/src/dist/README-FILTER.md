@@ -5,7 +5,7 @@ your own Java web app, with no separate proxy tier. The app is its own origin.
 
 ```
 conf/frontcache.properties     the file to edit first
-conf/bots.conf                 user-agent keywords treated as bots, per domain
+conf/bots.conf                 user-agent keywords treated as bots
 conf/dynamic-urls.conf         URL patterns that must NEVER be cached (cart, login, admin)
 conf/fallbacks.conf            what to serve when a component fails or a circuit opens
 conf/guard-rules.conf          checks applied before cache and origin

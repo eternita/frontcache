@@ -20,7 +20,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import com.netflix.hystrix.HystrixThreadPoolKey;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -39,11 +38,7 @@ import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.netflix.hystrix.HystrixCommand;
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixCommandKey;
-
-public class FC_BypassCache extends HystrixCommand<Object> {
+public class FC_BypassCache extends FcCommand<Object> {
 
 	private final HttpClient client;
 	private final RequestContext context;
@@ -52,9 +47,9 @@ public class FC_BypassCache extends HystrixCommand<Object> {
     public FC_BypassCache(HttpClient client, RequestContext context) {
 
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Origin-Hits"))
-				.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey("OriginHitsPool"))
+                .withGroupKey(context.getDomain())
+                .andCommandKey("Origin-Hits")
+				.andThreadPoolKey("OriginHitsPool")
         		);
 
         this.client = client;
@@ -94,7 +89,7 @@ public class FC_BypassCache extends HystrixCommand<Object> {
 
 			logger.error("FC - ORIGIN ERROR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents(), getFailedExecutionException());
 
-			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
+			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
 
 			// Park the fallback for the request thread to write - don't write it here. This runs on a
 			// Hystrix thread while the request thread is about to write the response itself, and two

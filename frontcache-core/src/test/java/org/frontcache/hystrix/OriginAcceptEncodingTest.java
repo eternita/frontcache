@@ -28,7 +28,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.message.BasicStatusLine;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
 import org.junit.Test;
@@ -49,7 +48,7 @@ public class OriginAcceptEncodingTest {
 
 	private RequestContext newContext() {
 		RequestContext ctx = new RequestContext();
-		ctx.setDomainContext(new DomainContext("test.org", "test-key", "origin.test.org", "80", "443"));
+		ctx.setDomain("test.org"); // the Hystrix command group key
 		return ctx;
 	}
 

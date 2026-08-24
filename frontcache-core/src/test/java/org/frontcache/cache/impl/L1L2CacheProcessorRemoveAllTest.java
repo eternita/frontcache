@@ -9,10 +9,8 @@
 package org.frontcache.cache.impl;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -24,16 +22,16 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Covers the two "invalidate all" flavours on L1L2CacheProcessor.
+ * "Invalidate all" must empty BOTH tiers of L1L2CacheProcessor, leaving nothing behind.
  *
- * The domain-scoped one only drops entries stamped with the given domain - entries pushed in by
- * index replication carry the SOURCE edge's domain, which is how a production edge kept serving
- * ~336k replicated pages after a "*" invalidation. The unscoped one empties the node.
+ * There used to be a second, domain-scoped flavour that only dropped entries stamped with the
+ * caller's domain. Entries pushed in by index replication carry the SOURCE edge's domain, so it
+ * walked straight past them - which is how a production edge kept serving ~336k replicated pages
+ * after a "*" invalidation. Retiring multi-domain support removed the scoped flavour along with the
+ * domain stamp, so that failure mode no longer has a way to happen; this test pins the behaviour
+ * that replaced it.
  */
 public class L1L2CacheProcessorRemoveAllTest {
-
-	private static final String LOCAL_DOMAIN = "fc-edge.test.com";
-	private static final String REPLICATED_DOMAIN = "fc-eu.test.com"; // as stamped by the source edge
 
 	private CacheProcessor cacheProcessor;
 
@@ -51,7 +49,7 @@ public class L1L2CacheProcessorRemoveAllTest {
 		cacheProcessor.destroy();
 	}
 
-	private void put(String domain, String url, String cacheLevel) {
+	private void put(String url, String cacheLevel) {
 		WebResponse r = new WebResponse(url, ("content of " + url).getBytes());
 		Map<String, Long> expireTimeMap = new HashMap<String, Long>();
 		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, CacheProcessor.CACHE_FOREVER);
@@ -59,37 +57,39 @@ public class L1L2CacheProcessorRemoveAllTest {
 		r.setExpireTimeMap(expireTimeMap);
 		r.setStatusCode(200);
 		r.setCacheLevel(cacheLevel); // null -> L2 (Lucene), "L1" -> Ehcache
-		cacheProcessor.putToCache(domain, url, r);
+		cacheProcessor.putToCache(url, r);
 	}
 
 	@Test
-	public void domainScopedRemoveAllKeepsEntriesOfOtherDomains() {
-		put(LOCAL_DOMAIN, "http://test.com/local.html", null);
-		put(REPLICATED_DOMAIN, "http://test.com/replicated.html", null);
-		put(LOCAL_DOMAIN, "http://test.com/local-l1.html", FCHeaders.CACHE_LEVEL_L1);
-		put(REPLICATED_DOMAIN, "http://test.com/replicated-l1.html", FCHeaders.CACHE_LEVEL_L1);
-
-		assertEquals(4, cacheProcessor.getCachedKeys().size());
-
-		cacheProcessor.removeFromCacheAll(LOCAL_DOMAIN);
-
-		List<String> keys = cacheProcessor.getCachedKeys();
-		assertEquals("only the entries of the other domain survive", 2, keys.size());
-		assertTrue(keys.contains("/replicated.html")); // L2 keys are stored as paths
-		assertTrue(keys.contains("http://test.com/replicated-l1.html"));
-	}
-
-	@Test
-	public void unscopedRemoveAllEmptiesBothTiersForEveryDomain() {
-		put(LOCAL_DOMAIN, "http://test.com/local.html", null);
-		put(REPLICATED_DOMAIN, "http://test.com/replicated.html", null);
-		put(LOCAL_DOMAIN, "http://test.com/local-l1.html", FCHeaders.CACHE_LEVEL_L1);
-		put(REPLICATED_DOMAIN, "http://test.com/replicated-l1.html", FCHeaders.CACHE_LEVEL_L1);
+	public void removeAllEmptiesBothTiers() {
+		put("http://test.com/l2-a.html", null);
+		put("http://test.com/l2-b.html", null);
+		put("http://test.com/l1-a.html", FCHeaders.CACHE_LEVEL_L1);
+		put("http://test.com/l1-b.html", FCHeaders.CACHE_LEVEL_L1);
 
 		assertEquals(4, cacheProcessor.getCachedKeys().size());
 
 		cacheProcessor.removeFromCacheAll();
 
 		assertEquals("nothing may survive", 0, cacheProcessor.getCachedKeys().size());
+	}
+
+	/**
+	 * An entry that arrived by replication is indistinguishable from a locally-cached one, so
+	 * "invalidate all" must take it too. Before the domain stamp went away, this was the case that
+	 * silently survived.
+	 */
+	@Test
+	public void removeAllTakesReplicatedEntriesToo() {
+		// as written by FrontCacheIOServlet's put-to-cache on behalf of a source edge
+		put("/replicated-from-another-edge.html", null);
+		put("http://test.com/local.html", null);
+
+		assertEquals(2, cacheProcessor.getCachedKeys().size());
+
+		cacheProcessor.removeFromCacheAll();
+
+		assertEquals("replicated entries must not survive an invalidate-all",
+				0, cacheProcessor.getCachedKeys().size());
 	}
 }

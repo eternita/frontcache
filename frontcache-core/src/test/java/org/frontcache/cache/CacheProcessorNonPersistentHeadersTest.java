@@ -32,7 +32,6 @@ import org.junit.Test;
  */
 public class CacheProcessorNonPersistentHeadersTest {
 
-	private static final String DOMAIN = "test-domain";
 	private static final String URL = "http://test.example.com/cookie/page.html";
 
 	private CacheProcessor cacheProcessor;
@@ -84,7 +83,7 @@ public class CacheProcessorNonPersistentHeadersTest {
 		WebResponse response = responseWithCookie("Set-Cookie");
 		response.setCacheLevel(FCHeaders.CACHE_LEVEL_L1); // Ehcache tier
 
-		cache.putToCache(DOMAIN, URL, response);
+		cache.putToCache(URL, response);
 
 		WebResponse cached = ((L1L2CacheProcessor) cache).getFromCacheImpl(URL);
 		assertNotNull("entry should be cached - a cookie does not make a response uncacheable", cached);
@@ -96,7 +95,7 @@ public class CacheProcessorNonPersistentHeadersTest {
 	public void setCookieIsStrippedByL2() {
 		CacheProcessor cache = l1l2();
 
-		cache.putToCache(DOMAIN, URL, responseWithCookie("Set-Cookie")); // default level -> Lucene
+		cache.putToCache(URL, responseWithCookie("Set-Cookie")); // default level -> Lucene
 
 		WebResponse cached = ((L1L2CacheProcessor) cache).getFromCacheImpl(URL);
 		assertNotNull("entry should be cached - a cookie does not make a response uncacheable", cached);
@@ -107,7 +106,7 @@ public class CacheProcessorNonPersistentHeadersTest {
 	public void setCookieIsStrippedByInMemoryCache() {
 		CacheProcessor cache = inMemory();
 
-		cache.putToCache(DOMAIN, URL, responseWithCookie("Set-Cookie"));
+		cache.putToCache(URL, responseWithCookie("Set-Cookie"));
 
 		WebResponse cached = ((InMemoryCacheProcessor) cache).getFromCacheImpl(URL);
 		assertNotNull(cached);
@@ -122,7 +121,7 @@ public class CacheProcessorNonPersistentHeadersTest {
 	public void reCasedSetCookieIsStripped() {
 		CacheProcessor cache = inMemory();
 
-		cache.putToCache(DOMAIN, URL, responseWithCookie("set-cookie"));
+		cache.putToCache(URL, responseWithCookie("set-cookie"));
 
 		WebResponse cached = ((InMemoryCacheProcessor) cache).getFromCacheImpl(URL);
 		assertNotNull(cached);

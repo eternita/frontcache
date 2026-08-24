@@ -13,20 +13,17 @@ public class TestConfig {
 	// is used to cleanup generaged fallbacks in FRONTCACHE_HOME_XXX folders
 	public static final String FRONTCACHE_TEST_PROJECT_DIR_KEY = "frontcache-tests.home";
 
-	public static final String TEST_DOMAIN_FC1 = "fc1-test.org";
-
-	public static final String TEST_DOMAIN_FC2 = "fc2-test.org";
-
+	// Both nodes are reached over loopback - no /etc/hosts entries required.
 	public static final String FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST = "http://localhost:9080/";
 
 	public static final String FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST = "http://localhost:8080/";
 
-	public static final String FRONTCACHE_STANDALONE_TEST_BASE_URI_FC1 = "http://www.fc1-test.org:9080/";
+	// A second spelling of the SAME node. FrontCacheCluster / FrontCacheAgentCluster key their
+	// result maps by member URL, so a cluster fan-out test needs two distinct member URLs; there is
+	// no second node. This used to be a second virtual hostname (www.fc2-test.org) back when a node
+	// could serve several domains - see docs/multi-domain-retirement-proposal.md.
+	public static final String FRONTCACHE_STANDALONE_TEST_BASE_URI_LOOPBACK = "http://127.0.0.1:9080/";
 
-	public static final String FRONTCACHE_FILTER_TEST_BASE_URI_FC1 = "http://www.fc1-test.org:8080/";
-
-	public static final String FRONTCACHE_STANDALONE_TEST_BASE_URI_FC2 = "http://www.fc2-test.org:9080/";
-
-	public static final String FRONTCACHE_FILTER_TEST_BASE_URI_FC2 = "http://www.fc2-test.org:8080/";
+	public static final String FRONTCACHE_FILTER_TEST_BASE_URI_LOOPBACK = "http://127.0.0.1:8080/";
 
 }

@@ -28,9 +28,9 @@ import org.htmlunit.html.HtmlPage;
 /**
  *
  * Validates the cache-by-cache scenario: a request sent to the standalone node
- * (FC1, :9080) is forwarded to its origin {@code origin.fc1-test.org:8080}, which
- * is the FC2 filter. After the request the same content must be cached in BOTH
- * Frontcache instances - FC1 and FC2.
+ * (FC1, :9080) is forwarded to its origin {@code localhost:8080}, which is the FC2
+ * filter. After the request the same content must be cached in BOTH Frontcache
+ * instances - FC1 and FC2.
  *
  */
 public class StandaloneCacheStorageTests extends TestsBase {
@@ -40,11 +40,12 @@ public class StandaloneCacheStorageTests extends TestsBase {
 	private static final String PATH = "common/debug/a.jsp";
 
 	// FC1 (standalone) caches under the request URL it received.
-	private static final String FC1_KEY = TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_FC1 + PATH;
+	private static final String FC1_KEY = TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST + PATH;
 
-	// FC2 (filter) caches under the URL FC1 used to call its origin
-	// (origin host alias from FRONTCACHE_HOME_STANDALONE/conf/frontcache.properties).
-	private static final String FC2_KEY = "http://origin." + TestConfig.TEST_DOMAIN_FC1 + ":8080/" + PATH;
+	// FC2 (filter) caches under the URL FC1 used to call its origin - front-cache.origin-host /
+	// front-cache.origin-http-port from FRONTCACHE_HOME_STANDALONE/conf/frontcache.properties,
+	// which is this same loopback address on :8080.
+	private static final String FC2_KEY = TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST + PATH;
 
 	@Before
 	public void setUp() throws Exception {
@@ -75,7 +76,7 @@ public class StandaloneCacheStorageTests extends TestsBase {
 
 		// 1st request to the standalone node -> FC1 -> origin (FC2 filter) -> web app.
 		// FC1 cache is empty, so this request must be served dynamically.
-		HtmlPage page = webClient.getPage(getStandaloneBaseURLDomainFC1() + PATH);
+		HtmlPage page = webClient.getPage(getStandaloneBaseURLLocalhost() + PATH);
 		assertEquals("a", page.getPage().asNormalizedText());
 
 		String trace1 = page.getWebResponse().getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
@@ -96,7 +97,7 @@ public class StandaloneCacheStorageTests extends TestsBase {
 		assertEquals("a", new String(fc2Cached.getContent()));
 
 		// 2nd request - FC1 now serves the page from its own cache.
-		page = webClient.getPage(getStandaloneBaseURLDomainFC1() + PATH);
+		page = webClient.getPage(getStandaloneBaseURLLocalhost() + PATH);
 		assertEquals("a", page.getPage().asNormalizedText());
 
 		String trace2 = page.getWebResponse().getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");

@@ -10,30 +10,21 @@ package org.frontcache;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import org.apache.commons.configuration.AbstractConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.netflix.config.ConcurrentMapConfiguration;
-import com.netflix.config.ConfigurationManager;
-
 
 public class FCConfig {
 
@@ -55,30 +46,16 @@ public class FCConfig {
 
 	private static final String BOT_CONIF_FILE = "bots.conf";
 
-	private static Map<String, Set<String>> botUserAgentKeywordsMap = new HashMap<String, Set<String>>(); // <Domain, List with bots>
+	private static Set<String> botUserAgentKeywords = new HashSet<String>();
 
 	private static final String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "dynamic-urls.conf";
 
-	private static Map<String, Set <Pattern>> dynamicURLPatternsMap = new HashMap<String, Set<Pattern>>();
+	private static Set<Pattern> dynamicURLPatterns = new HashSet<Pattern>();
 
 	private static Logger logger = LoggerFactory.getLogger(FCConfig.class);
 
 	static {
 		init();
-	}
-
-	/**
-	 * Force FCConfig initialization. Referencing this class already runs the static {@code init()}
-	 * block (which installs hystrix.properties into Archaius), so this method body is intentionally
-	 * empty — it exists to make that side effect explicit and callable from a startup hook.
-	 *
-	 * Call this at webapp startup (see FrontcacheConfigBootstrapListener) so the hystrix.properties
-	 * overrides are installed BEFORE the Hystrix metrics-stream servlet's static initializer touches
-	 * Archaius. Archaius accepts an install only once; whoever runs first wins.
-	 */
-	public static void ensureInitialized()
-	{
-		// no-op: class reference above triggered static init()
 	}
 
     private static void init()
@@ -98,42 +75,13 @@ public class FCConfig {
 
     	config = loadProperties();
 
-
-    	Properties hystrixProperties = new Properties();
-    	try {
-    		hystrixProperties.load(FCConfig.getConfigInputStream("hystrix.properties"));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-    	Map<String, Object> hystrixConfigMap = new HashMap<String, Object>();
-
-		logger.info("Hystrix.properties : ");
-		for (Object key : hystrixProperties.keySet())
-		{
-			logger.info("-- " + key + " - " + hystrixProperties.getProperty(key.toString()));
-			hystrixConfigMap.put(key.toString(), hystrixProperties.getProperty(key.toString()));
-		}
-
-		// enable configuration from "hystrix.properties"
-		ConcurrentMapConfiguration systemProps = new ConcurrentMapConfiguration(hystrixConfigMap);
-
-		// Archaius (ConfigurationManager) accepts an install only once. If something touched
-		// Archaius/Hystrix before us (e.g. the /hystrix.stream servlet initialized at webapp
-		// startup, or a HystrixCommand was constructed), install() would be skipped and the whole
-		// hystrix.properties silently ignored -> every command falls back to Hystrix defaults
-		// (1000ms timeout, etc.).
-		if (!ConfigurationManager.isConfigurationInstalled())
-		{
-			ConfigurationManager.install(systemProps);
-		} else {
-			AbstractConfiguration installedConfig = ConfigurationManager.getConfigInstance();
-			for (Map.Entry<String, Object> entry : hystrixConfigMap.entrySet())
-				installedConfig.setProperty(entry.getKey(), entry.getValue());
-		}
-
-
-//    	System.getProperties().putAll(hystrixProperties);
+		// hystrix.properties used to be installed into Archaius from here, guarded by an
+		// isConfigurationInstalled() check because Archaius accepts an install only once per JVM: if
+		// anything touched it first (the metrics-stream servlet's static initializer, say) every
+		// per-command override in the file was silently dropped. FrontcacheConfigBootstrapListener
+		// existed solely to win that race. Resilience4j reads the same file through
+		// FcResilienceConfig, as an ordinary Properties object at first use, so both workarounds are
+		// gone and the startup-ordering bug they guarded against is no longer possible.
 
 		loadBotConfigs();
 		loadCacheIgnoreURIPatterns();
@@ -142,26 +90,19 @@ public class FCConfig {
     		throw new RuntimeException("Can't load " + FRONT_CACHE_CONFIG + " from classpath and " + FRONT_CACHE_HOME_SYSTEM_KEY + "=" + System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY) + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + "=" + System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY) + " (environment variable)");
     }
 
-	public static Set<String> getBotUserAgentKeywords(String domain)
+	/**
+	 * Bot user-agent keywords from conf/bots.conf. One node serves one site, so there is one set.
+	 */
+	public static Set<String> getBotUserAgentKeywords()
 	{
-		Set<String> botUserAgentKeywordsSet = botUserAgentKeywordsMap.get(domain);
-
-		if (null == botUserAgentKeywordsSet)
-			botUserAgentKeywordsSet = botUserAgentKeywordsMap.get(DEFAULT_DOMAIN);
-
-		return botUserAgentKeywordsSet;
-	}
-
-	public static Map<String, Set<String>> getBotUserAgentKeywords()
-	{
-		return botUserAgentKeywordsMap;
+		return botUserAgentKeywords;
 	}
 
     public static void destroy()
     {
     	config = null;
-    	botUserAgentKeywordsMap.clear();
-    	dynamicURLPatternsMap.clear();
+    	botUserAgentKeywords.clear();
+    	dynamicURLPatterns.clear();
     }
 
     public static String getProperty(String key, String defaultValue)
@@ -199,6 +140,37 @@ public class FCConfig {
 
     	return props;
     }
+
+	/**
+	 * The FRONTCACHE_HOME/conf directory, or null when it cannot be resolved.
+	 *
+	 * Package-private: used by FrontCacheEngine to detect leftover per-domain config directories
+	 * (see FrontCacheEngine.findRetiredDomainConfigDirs).
+	 */
+	static File getConfDir()
+	{
+		// 1. frontcache.home java system variable
+		String frontcacheHome = System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY);
+
+		if (null != frontcacheHome)
+		{
+			File fcConfig = new File(new File(frontcacheHome), "conf");
+			if (fcConfig.exists())
+				return fcConfig;
+		}
+
+		// 2. FRONTCACHE_HOME environment variable
+		frontcacheHome = System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY);
+
+		if (null != frontcacheHome)
+		{
+			File fcConfig = new File(new File(frontcacheHome), "conf");
+			if (fcConfig.exists())
+				return fcConfig;
+		}
+
+		return null;
+	}
 
 	private static Properties loadProperties()
 	{
@@ -309,93 +281,20 @@ public class FCConfig {
 		return is;
 	}
 
-	private static File getConfDir()
-	{
-		// 1. get input stream from system variable frontcache.home
-		String frontcacheHome = System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY);
-
-		if (null != frontcacheHome)
-		{
-			File fcConfig = new File(new File(frontcacheHome), "conf");
-			if (fcConfig.exists())
-			{
-				return fcConfig;
-			}
-		}
-
-		// 2. get input stream from environment variable FRONTCACHE_HOME/conf/frontcache.properties
-		frontcacheHome = System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY);
-
-		if (null != frontcacheHome)
-		{
-			File fcConfig = new File(new File(frontcacheHome), "conf");
-			if (fcConfig.exists())
-			{
-				return fcConfig;
-			}
-		}
-
-		logger.error("Can't find config dir for " + FRONT_CACHE_HOME_SYSTEM_KEY + "=" + System.getProperty(FRONT_CACHE_HOME_SYSTEM_KEY) + " (java system variable) or " + FRONT_CACHE_HOME_ENVIRONMENT_KEY + "=" + System.getenv().get(FRONT_CACHE_HOME_ENVIRONMENT_KEY) + " (environment variable)");
-
-		return null;
-	}
-
-
-
-	public static List<String> getDomains()
-	{
-
-		List<String> domains = new ArrayList<String>();
-		File configDir = getConfDir();
-		if (null == configDir)
-			return domains;
-
-		String configDirStr = configDir.getAbsolutePath();
-
-		FileFilter dirFilter = new FileFilter() {
-		    public boolean accept(File file) {
-		        return file.isDirectory();
-		    }
-		};
-
-		for (File domainDir : configDir.listFiles(dirFilter))
-		{
-			String domainDirStr = domainDir.getAbsolutePath();
-			String domain = domainDirStr.substring(configDirStr.length() + 1);
-			domains.add(domain);
-		}
-
-		return domains;
-	}
-
 	/**
 	 *
 	 */
 	private static void loadBotConfigs() {
-		botUserAgentKeywordsMap.clear();
+		botUserAgentKeywords.clear();
 
 		logger.info("Starting bot configs loading ...");
-		for (String domain : getDomains())
-		{
-			Set<String> botConfigs = loadBotConfigs(domain + "/" + BOT_CONIF_FILE);
-
-			if (null != botConfigs)
-			{
-				botUserAgentKeywordsMap.put(domain, botConfigs);
-				logger.info("   " + domain + " -> loaded " + botConfigs.size() + " bots from domain configs");
-			} else {
-				logger.info("   " + domain + " -> no bot configs found - use default configuration");
-			}
-		}
-
-		// default bot configs
 		Set<String> botConfigs = loadBotConfigs(BOT_CONIF_FILE);
 		if (null != botConfigs)
 		{
-			botUserAgentKeywordsMap.put(DEFAULT_DOMAIN, botConfigs);
-			logger.info("   " + DEFAULT_DOMAIN + " -> loaded " + botConfigs.size() + " bots from domain configs");
+			botUserAgentKeywords.addAll(botConfigs);
+			logger.info("   loaded " + botConfigs.size() + " bots from " + BOT_CONIF_FILE);
 		} else {
-			logger.info("   " + DEFAULT_DOMAIN + " -> no bot configs found - use default configuration");
+			logger.info("   no bot configs found in " + BOT_CONIF_FILE + " - no user agent is treated as a bot");
 		}
 		logger.info("Bot configs loading is completed ...");
 		return;
@@ -456,30 +355,16 @@ public class FCConfig {
 
 
 	private static void loadCacheIgnoreURIPatterns() {
-		dynamicURLPatternsMap.clear();
+		dynamicURLPatterns.clear();
 
 		logger.info("Starting dynamic URLs configs loading ...");
-		for (String domain : getDomains())
-		{
-			Set<Pattern> dynamicURLsConfig = loadCacheIgnoreURIPatterns(domain + "/" + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
-
-			if (null != dynamicURLsConfig)
-			{
-				dynamicURLPatternsMap.put(domain, dynamicURLsConfig);
-				logger.info("   " + domain + " -> loaded " + dynamicURLsConfig.size() + " dynamic urls from domain configs");
-			} else {
-				logger.info("   " + domain + " -> no dynamic urls found - use default configuration");
-			}
-		}
-
-		// default dynamic urls configs
 		Set<Pattern> dynamicURLsConfig = loadCacheIgnoreURIPatterns(CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
 		if (null != dynamicURLsConfig)
 		{
-			dynamicURLPatternsMap.put(DEFAULT_DOMAIN, dynamicURLsConfig);
-			logger.info("   " + DEFAULT_DOMAIN + " -> loaded " + dynamicURLsConfig.size() + " dynamic urls from domain configs");
+			dynamicURLPatterns.addAll(dynamicURLsConfig);
+			logger.info("   loaded " + dynamicURLsConfig.size() + " dynamic urls from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
 		} else {
-			logger.info("   " + DEFAULT_DOMAIN + " -> no dynamic urls found - use default configuration");
+			logger.info("   no dynamic urls found in " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE + " - every cacheable URL may be cached");
 		}
 		logger.info("Dynamic URLs configs loading is completed ...");
 		return;
@@ -540,36 +425,22 @@ public class FCConfig {
 	 *
 	 * @return
 	 */
-	public static Map<String, Set<String>> getDynamicURLs()
+	public static Set<String> getDynamicURLs()
 	{
-		Map<String, Set<String>> dynamicURLsMap = new HashMap<String, Set<String>>();
+		Set<String> dynamicURLs = new HashSet<String>();
 
-		for (String domain : dynamicURLPatternsMap.keySet())
-		{
-			Set<String> dynamicURLs = new HashSet<String>();
+		for (Pattern p : dynamicURLPatterns)
+			dynamicURLs.add(p.toString());
 
-			for (Pattern p : dynamicURLPatternsMap.get(domain))
-				dynamicURLs.add(p.toString());
-
-			dynamicURLsMap.put(domain, dynamicURLs);
-		}
-
-		return dynamicURLsMap;
+		return dynamicURLs;
 	}
 
 	/**
-	 *
-	 * @param domain
-	 * @return
+	 * URL patterns that are never cached, from conf/dynamic-urls.conf.
 	 */
-	public static Set<Pattern> getDynamicURLPatterns(String domain)
+	public static Set<Pattern> getDynamicURLPatterns()
 	{
-		Set<Pattern> dynamicURLPatternsList = dynamicURLPatternsMap.get(domain);
-
-		if (null == dynamicURLPatternsList)
-			dynamicURLPatternsList = dynamicURLPatternsMap.get(DEFAULT_DOMAIN);
-
-		return dynamicURLPatternsList;
+		return dynamicURLPatterns;
 	}
 
 

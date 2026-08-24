@@ -8,6 +8,17 @@
  */
 package org.frontcache.io;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * Base of every management-API response.
+ *
+ * Unknown properties are ignored (inherited by every subclass), so a client can talk to a node of a
+ * different version without a field it does not know about aborting the parse. This is not
+ * hypothetical: PutToCacheActionResponse dropped its `domain` field when multi-domain support was
+ * retired, and index replication has a new node reading an older node's response mid-upgrade.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ActionResponse {
 
 	public static final String RESPONSE_STATUS_OK = "OK";

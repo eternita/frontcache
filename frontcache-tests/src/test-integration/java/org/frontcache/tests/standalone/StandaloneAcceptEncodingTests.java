@@ -11,8 +11,8 @@ import org.frontcache.tests.base.AcceptEncodingTests;
 public class StandaloneAcceptEncodingTests extends AcceptEncodingTests {
 
 	@Override
-	public String getFrontCacheBaseURLDomainFC1() {
-		return getStandaloneBaseURLDomainFC1();
+	public String getFrontCacheBaseURLLocalhost() {
+		return getStandaloneBaseURLLocalhost();
 	}
 
 }

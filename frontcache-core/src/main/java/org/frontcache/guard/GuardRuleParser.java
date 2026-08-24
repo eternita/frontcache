@@ -171,7 +171,7 @@ public class GuardRuleParser {
 
 		if (!allowedRedirectHosts.contains(host.toLowerCase()))
 			throw new GuardConfigException("redirect target host '" + host + "' is not allowed in '" + line
-					+ "' - add it to front-cache.guard-rules.allowed-redirect-hosts (or front-cache.domains)");
+					+ "' - add it to front-cache.guard-rules.allowed-redirect-hosts");
 	}
 
 }

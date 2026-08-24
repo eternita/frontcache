@@ -7,11 +7,6 @@
 	<display-name>frontcache-standalone</display-name>
 	<description>frontcache-standalone</description>
 
-    <!-- install Frontcache config (incl. hystrix.properties into Archaius) before any servlet loads -->
-    <listener>
-        <listener-class>org.frontcache.FrontcacheConfigBootstrapListener</listener-class>
-    </listener>
-
     <servlet>
         <servlet-name>FrontCacheServlet</servlet-name>
         <servlet-class>org.frontcache.FrontCacheServlet</servlet-class>
@@ -42,6 +37,18 @@
     <servlet-mapping>
         <servlet-name>HystrixMetricsStreamServlet</servlet-name>
         <url-pattern>/hystrix.stream</url-pattern>
+    </servlet-mapping>
+
+    <!-- Prometheus scrape. Serves nothing unless front-cache.metrics.export enables it, and answers
+         only on front-cache.management.port when that is set. -->
+    <servlet>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <servlet-class>org.frontcache.metrics.FcMetricsServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <url-pattern>/fc-metrics</url-pattern>
     </servlet-mapping>
 
     <!-- session timeout: 1 year (365 * 24 * 60 = 525600 minutes) -->

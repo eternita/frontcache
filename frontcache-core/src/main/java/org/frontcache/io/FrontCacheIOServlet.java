@@ -33,7 +33,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheManager;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
@@ -114,14 +113,13 @@ public class FrontCacheIOServlet extends HttpServlet {
 			return;
 		}
 
-		// site-key validation is active only when a site key is configured.
-		// A request is authorized when its X_FRONTCACHE_SITE_KEY header matches the
-		// global site key or any per-domain site key (the management API is multi-domain aware).
+		// site-key validation is active only when a site key is configured. A request is authorized
+		// when its X_FRONTCACHE_SITE_KEY header matches this node's site key - there is one per node.
 		if (siteKey.length() > 0)
 		{
 			String requestSiteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
 			boolean authorized = null != requestSiteKey && requestSiteKey.length() > 0
-					&& (siteKey.equals(requestSiteKey) || null != fcEngine.getDomainContexBySiteKey(requestSiteKey));
+					&& siteKey.equals(requestSiteKey);
 			if (!authorized)
 			{
 				response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
@@ -233,37 +231,17 @@ public class FrontCacheIOServlet extends HttpServlet {
 			return aResponse;
 		}
 
-		String siteKey = req.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
-		String domain = null;
-
-		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
-		DomainContext domainContext = fcEngine.getDomainContexBySiteKey(siteKey);
-		if (null != domainContext)
-			domain = domainContext.getDomain();
-
 		if ("*".equals(filter))
 		{
-			// A domain-scoped delete only drops entries stamped with this node's domain. Entries
-			// pushed in by index replication carry the SOURCE edge's domain, so they survive every
-			// "*" and keep being served (reads are by URL only, domain is not consulted). On a
-			// single-domain node "*" can only mean "empty this node", so do exactly that; a
-			// multi-domain node keeps the per-domain behaviour unless all-domains=true is passed.
-			boolean allDomains = "true".equalsIgnoreCase(req.getParameter("all-domains"))
-					|| fcEngine.getConfiguredDomains().size() < 2;
-
-			if (allDomains)
-			{
-				CacheManager.getInstance().removeFromCacheAll();
-				logger.info("Invalidation for filter: {} (all domains)", filter);
-			} else {
-				CacheManager.getInstance().removeFromCacheAll(domain);
-				logger.info("Invalidation for filter: {} (domain: {})", filter, domain);
-			}
+			// "*" empties this node - including entries pushed in by index replication, which used to
+			// survive it because they carry the SOURCE edge's domain and the delete was domain-scoped.
+			CacheManager.getInstance().removeFromCacheAll();
+			logger.info("Invalidation for filter: {} (whole node)", filter);
 
 			return aResponse;
 		}
 
-		CacheManager.getInstance().removeFromCache(domain, filter);
+		CacheManager.getInstance().removeFromCache(filter);
 
 		logger.info("Invalidation for filter: " + filter);
 		return aResponse;
@@ -339,29 +317,29 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse putToCache(HttpServletRequest req)
 	{
 		String key = req.getParameter("key");
-		String requestedDomain = req.getParameter("domain");
 		String webResponseJson = req.getParameter("webResponse");
 
-		if (key == null || requestedDomain == null || webResponseJson == null)
+		if (key == null || webResponseJson == null)
 		{
-			PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key, requestedDomain);
+			PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			aResponse.setErrorDescription("Required parameters: key, domain, webResponse");
+			aResponse.setErrorDescription("Required parameters: key, webResponse");
 			return aResponse;
 		}
 
-		String domain = resolveLocalDomain(req, requestedDomain);
-		PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key, domain);
+		// A `domain` parameter from an older client is accepted and ignored - entries are not
+		// domain-scoped any more, so there is nothing to map it onto.
+		PutToCacheActionResponse aResponse = new PutToCacheActionResponse(key);
 
 		try
 		{
 			WebResponse webResponse = jsonMapper.readValue(webResponseJson, WebResponse.class);
-			CacheManager.getInstance().putToCache(domain, key, webResponse);
-			logger.info("put-to-cache: domain={}, key={}", domain, key);
+			CacheManager.getInstance().putToCache(key, webResponse);
+			logger.info("put-to-cache: key={}", key);
 		}
 		catch (Exception e)
 		{
-			logger.error("put-to-cache failed: domain={}, key={}", domain, key, e);
+			logger.error("put-to-cache failed: key={}", key, e);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 			aResponse.setErrorDescription(e.getMessage());
 		}
@@ -369,33 +347,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 		return aResponse;
 	}
 
-	/**
-	 * Maps the domain a caller asked for onto a domain THIS node serves.
-	 *
-	 * Replication sends the source entry's domain, so an entry copied from another edge would be
-	 * stored under a domain this node knows nothing about - invisible to "invalidate all" and to the
-	 * per-domain counters, though still served (lookups are by URL). A requested domain this node
-	 * actually serves is kept as-is, so a multi-domain edge can still replicate per domain.
-	 *
-	 * @param requestedDomain domain from the request (never null here)
-	 * @return the domain to store the entry under
-	 */
-	private String resolveLocalDomain(HttpServletRequest req, String requestedDomain)
-	{
-		FrontCacheEngine fcEngine = FrontCacheEngine.getFrontCache();
-
-		if (fcEngine.isConfiguredDomain(requestedDomain))
-			return requestedDomain;
-
-		DomainContext domainContext = fcEngine.getDomainContexBySiteKey(req.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY));
-		if (null == domainContext || null == domainContext.getDomain())
-			return requestedDomain; // nothing better to map onto - keep the caller's value
-
-		logger.debug("put-to-cache: domain {} is not served here - storing under {}",
-				requestedDomain, domainContext.getDomain());
-
-		return domainContext.getDomain();
-	}
 
 	/**
 	 * Dumps cached keys to a file under ./warmer asynchronously.
@@ -501,6 +452,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 	/**
+	 * Bot keywords, keyed by domain for the console - which aggregates several edges, each possibly
+	 * serving a different site. One node serves one site, so the map holds exactly one entry.
 	 *
 	 * @param req
 	 * @return
@@ -508,7 +461,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse getBots(HttpServletRequest req)
 	{
 		Map<String, Set<String>> bots = new HashMap<String, Set<String>>();
-		bots.putAll(FCConfig.getBotUserAgentKeywords());
+		bots.put(FCConfig.DEFAULT_DOMAIN, FCConfig.getBotUserAgentKeywords());
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
 		aResponse.setBots(bots);
 
@@ -551,6 +504,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 	/**
+	 * Dynamic-URL patterns, keyed by domain for the console - see {@link #getBots}. One entry.
 	 *
 	 * @param req
 	 * @return
@@ -558,7 +512,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse getDynamicURLs(HttpServletRequest req)
 	{
 		Map<String, Set<String>> dynamicURLs = new HashMap<String, Set<String>>();
-		dynamicURLs.putAll(FCConfig.getDynamicURLs());
+		dynamicURLs.put(FCConfig.DEFAULT_DOMAIN, FCConfig.getDynamicURLs());
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
 		aResponse.setDynamicURLs(dynamicURLs);
 

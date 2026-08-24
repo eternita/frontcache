@@ -22,8 +22,6 @@ public abstract class FallbackHystrixTests extends TestsBase {
 
 	public abstract String getFrontCacheBaseURLLocalhost();
 
-	public abstract String getFrontCacheBaseURLDomainFC1();
-
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -40,7 +38,7 @@ public abstract class FallbackHystrixTests extends TestsBase {
 	@Test
 	public void customTimeoutTest() throws Exception {
 		// page timeout 1500ms. Hystrix timeout - 3000ms, what is more than default 1000ms
-		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/a.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/hystrix/a.jsp");
 		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
 		assertEquals("Hi from Hystrix", webResponse.getContentAsString().trim());
@@ -65,21 +63,11 @@ public abstract class FallbackHystrixTests extends TestsBase {
 		assertNotEquals(-1, webResponse.getResponseHeaderValue("Cache-Control").indexOf("no-store"));
 	}
 
-	@Test
-	public void timeoutFailTestCustomDomainFC1() throws Exception {
-		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/b.jsp");
-		WebResponse webResponse = page.getWebResponse();
-		printHeaders(webResponse);
-		String respStr = webResponse.getContentAsString();
-		assertNotEquals(-1, respStr.indexOf("Default Fallback"));
-		assertNotEquals(-1, respStr.indexOf("/common/hystrix/b.jsp"));
-	}
 
 	@Test
 	public void timeoutInsideIncludeTest() throws Exception {
 		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/top1.jsp");
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/hystrix/top1.jsp");
 		WebResponse webResponse = page.getWebResponse();
 		printHeaders(webResponse);
 
@@ -106,15 +94,6 @@ public abstract class FallbackHystrixTests extends TestsBase {
 		assertEquals(503, webResponse.getStatusCode());
 	}
 
-	@Test
-	public void customFallbackTest1FC1() throws Exception {
-		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/fallback1.jsp");
-		WebResponse webResponse = page.getWebResponse();
-		printHeaders(webResponse);
-
-		assertEquals("Hi from custom fallback fc1", webResponse.getContentAsString());
-	}
 
 	@Test
 	public void customFallbackTest2LoadFromURLLocalhost() throws Exception {
@@ -137,26 +116,6 @@ public abstract class FallbackHystrixTests extends TestsBase {
 		assertEquals("Hi from custom fallback (loaded from URL)", webResponse.getContentAsString());
 	}
 
-	@Test
-	public void customFallbackTest2LoadFromURLFC1() throws Exception {
-		// cleanup is in @BeforeClass
-		// wait while server is started and fallbacks are loaded from URLs (they are loaded in separate thread during startup)
-		// so, it's possible state (server is started but fallback configs are not loaded yet)
-
-		// this wait time should be more than
-		// before
-		// FallbackResolverFactory.init(httpClient);
-		// in FrontCacheEngine
-
-		Thread.sleep(5000);
-
-		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/fallback2.jsp");
-		WebResponse webResponse = page.getWebResponse();
-		printHeaders(webResponse);
-
-		assertEquals("Hi from custom fallback (loaded from URL)", webResponse.getContentAsString());
-	}
 
 	@Test
 	public void customFallbackTest3URLPatternLocalhost() throws Exception {
@@ -168,14 +127,5 @@ public abstract class FallbackHystrixTests extends TestsBase {
 		assertEquals("Hi from custom fallback localhost", webResponse.getContentAsString());
 	}
 
-	@Test
-	public void customFallbackTest3URLPatternFC1() throws Exception {
-		// page timeout more than Hystrix timeout
-		Page page = webClient.getPage(getFrontCacheBaseURLDomainFC1() + "common/hystrix/fallback3-pattern.jsp");
-		WebResponse webResponse = page.getWebResponse();
-		printHeaders(webResponse);
-
-		assertEquals("Hi from custom fallback fc1", webResponse.getContentAsString());
-	}
 
 }

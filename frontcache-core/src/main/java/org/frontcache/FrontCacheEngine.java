@@ -9,20 +9,24 @@
 package org.frontcache;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import jakarta.servlet.FilterChain;
@@ -50,7 +54,6 @@ import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.guard.GuardAction;
 import org.frontcache.guard.GuardOutcome;
@@ -65,6 +68,7 @@ import org.frontcache.hystrix.FC_Total;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
+import org.frontcache.metrics.FcMetricsExport;
 import org.frontcache.reqlog.RequestLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +76,12 @@ import org.slf4j.LoggerFactory;
 public class FrontCacheEngine {
 
 
-	private Map<String, DomainContext> domainConfigMap = new ConcurrentHashMap<String, DomainContext>(); // <DomainStr, DomainConfig>
+	// This node's site. One node serves one site - see docs/multi-domain-retirement-proposal.md.
+	private String domain;          // front-cache.default-domain
+	private String siteKey;         // front-cache.site-key
+	private String originHost;      // front-cache.origin-host
+	private String originHttpPort;  // front-cache.origin-http-port
+	private String originHttpsPort; // front-cache.origin-https-port
 
 	private String frontcacheHttpPort = null;
 
@@ -178,40 +187,21 @@ public class FrontCacheEngine {
 		return localInstance;
 	}
 
-	public DomainContext getDomainContexBySiteKey(String siteKey)
+	/**
+	 * The site this node serves (front-cache.default-domain). Stamped on every request context and
+	 * on every cache entry this node writes.
+	 */
+	public String getDomain()
 	{
-		for (DomainContext domainContext : domainConfigMap.values())
-			if (null != domainContext.getSiteKey() && domainContext.getSiteKey().equals(siteKey))
-				return domainContext;
-
-		return null;
-	}
-
-	public DomainContext getDomainContexByOrigin(String origin) {
-		return getDomainContext(origin);
+		return domain;
 	}
 
 	/**
-	 * Domains this node is configured to serve (the default domain plus any listed in
-	 * front-cache.domains). Used by the management API to tell a domain this node owns from a
-	 * domain that only appears on entries pushed in from another edge by replication.
+	 * @return true when {@code siteKey} is this node's configured management site key
 	 */
-	public Set<String> getConfiguredDomains()
+	public boolean isNodeSiteKey(String siteKey)
 	{
-		Set<String> domains = new HashSet<String>();
-		for (DomainContext domainContext : domainConfigMap.values())
-			if (null != domainContext.getDomain())
-				domains.add(domainContext.getDomain());
-
-		return domains;
-	}
-
-	/**
-	 * @return true when {@code domain} is one this node serves itself
-	 */
-	public boolean isConfiguredDomain(String domain)
-	{
-		return null != domain && getConfiguredDomains().contains(domain);
+		return null != siteKey && 0 < siteKey.length() && siteKey.equals(this.siteKey);
 	}
 
 	// synchronized on the same monitor as getFrontCache() so a shutdown/reload can't interleave with
@@ -248,68 +238,161 @@ public class FrontCacheEngine {
 		return httpClient;
 	}
 
-	private void loadDomainConfigs()
+	// Retired multi-domain config. One node serves one site; these keys used to make a node serve
+	// several. See docs/multi-domain-retirement-proposal.md.
+	private static final String RETIRED_DOMAIN_LIST_KEY = "front-cache.domains";
+	private static final String RETIRED_DOMAIN_KEY_PREFIX = "front-cache.domain.";
+
+	// Config that conf/<domain>/ subdirectories used to layer over the top-level files. Those
+	// subdirectories are no longer read at all, so a leftover one must not be ignored in silence.
+	private static final String[] RETIRED_DOMAIN_CONFIG_FILES = { "bots.conf", "dynamic-urls.conf", "fallbacks.conf" };
+
+	// The engine is rebuilt on every getFrontCache() until construction succeeds, so a rejected
+	// config would otherwise re-log this whole message once per request.
+	private static final AtomicBoolean retiredDomainConfigLogged = new AtomicBoolean(false);
+
+	/**
+	 * Retired multi-domain keys that are set to a non-blank value, sorted, {@code front-cache.domains}
+	 * first. A blank value counts as absent, so an operator can neutralize a key by emptying it.
+	 *
+	 * Per-domain overrides are reported even without {@code front-cache.domains}: on their own they
+	 * were silently ignored, so whoever set them never learned they did nothing.
+	 */
+	// package-private for FrontCacheEngineRetiredDomainConfigTest
+	static List<String> findRetiredDomainKeys()
 	{
+		List<String> retiredKeys = new ArrayList<String>();
 
-		String defaultDomain = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
-		String defaultSiteKey = FCConfig.getProperty("front-cache.site-key", "");
-		String defaultOriginHost = FCConfig.getProperty("front-cache.origin-host", "localhost");
-		String defaultOriginHttpPort = FCConfig.getProperty("front-cache.origin-http-port", "80");
-		String defaultOriginHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
+		String domainList = FCConfig.getProperty(RETIRED_DOMAIN_LIST_KEY);
+		if (isSet(domainList))
+			retiredKeys.add(RETIRED_DOMAIN_LIST_KEY + "=" + domainList.trim());
 
-		domainConfigMap.put(FCConfig.DEFAULT_DOMAIN,
-				new DomainContext(defaultDomain, defaultSiteKey, defaultOriginHost, defaultOriginHttpPort, defaultOriginHttpsPort ));
+		List<String> overrideKeys = new ArrayList<String>();
+		Properties props = FCConfig.getProperties();
+		for (String key : props.stringPropertyNames())
+			if (key.startsWith(RETIRED_DOMAIN_KEY_PREFIX) && isSet(props.getProperty(key)))
+				overrideKeys.add(key);
 
-		String domainList = FCConfig.getProperty("front-cache.domains");
-		if (null != domainList)
-		{
-			for(String domain : domainList.split(","))
-			{
-				String siteKey = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".site-key", "");
-				String originHost = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-host", defaultOriginHost);
-				String originHttpPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-http-port", defaultOriginHttpPort);
-				String originHttpsPort = FCConfig.getProperty("front-cache.domain." + domain.replace('.', '_') + ".origin-https-port", defaultOriginHttpsPort);
+		Collections.sort(overrideKeys);
+		retiredKeys.addAll(overrideKeys);
 
-				domainConfigMap.put(domain,
-						new DomainContext(domain, siteKey, originHost, originHttpPort, originHttpsPort));
-			}
-		}
-		logger.info("Loaded following origin configurations: ");
+		return retiredKeys;
+	}
 
-		for (String domain : domainConfigMap.keySet())
-			logger.info(" -- " + domainConfigMap.get(domain));
-
-		return;
+	private static boolean isSet(String value)
+	{
+		return null != value && 0 < value.trim().length();
 	}
 
 	/**
+	 * Leftover per-domain config files, as {@code conf/<domain>/<file>} paths, sorted.
 	 *
-	 * @param requestDomainName
-	 * @return
+	 * conf/ subdirectories used to be scanned as domains, each able to override bots.conf,
+	 * dynamic-urls.conf and fallbacks.conf. They are no longer read. A subdirectory on its own is
+	 * nobody's business - only one holding a file that USED to be layered is reported, since that
+	 * config would now be silently ignored.
 	 */
-	private DomainContext getDomainContext(String requestDomainName)
+	// package-private for FrontCacheEngineRetiredDomainConfigTest
+	static List<String> findRetiredDomainConfigDirs()
 	{
-		for (String domainSuffix : domainConfigMap.keySet())
-		{
-			if (requestDomainName.endsWith(domainSuffix))
-			{
-				if (requestDomainName.equals(domainSuffix))
-					return domainConfigMap.get(domainSuffix);
-				//case for abc.com & bc.com
-				if (requestDomainName.endsWith("." + domainSuffix))
-					return domainConfigMap.get(domainSuffix);
-			}
-		}
+		List<String> retired = new ArrayList<String>();
 
-		// default
-		return domainConfigMap.get(FCConfig.DEFAULT_DOMAIN);
+		File confDir = FCConfig.getConfDir();
+		if (null == confDir)
+			return retired;
+
+		File[] subDirs = confDir.listFiles(new FileFilter() {
+			public boolean accept(File file) {
+				return file.isDirectory();
+			}
+		});
+		if (null == subDirs)
+			return retired;
+
+		for (File subDir : subDirs)
+			for (String configFile : RETIRED_DOMAIN_CONFIG_FILES)
+				if (new File(subDir, configFile).isFile())
+					retired.add("conf/" + subDir.getName() + "/" + configFile);
+
+		Collections.sort(retired);
+
+		return retired;
+	}
+
+	// package-private for FrontCacheEngineRetiredDomainConfigTest
+	static String retiredDomainConfigMessage(List<String> retiredKeys)
+	{
+		StringBuilder sb = new StringBuilder();
+		sb.append("Multi-domain configuration is no longer supported - refusing to start.")
+		  .append("\n\nRetired multi-domain configuration found (keys in conf/frontcache.properties,")
+		  .append("\nand per-domain config directories under conf/):");
+
+		for (String key : retiredKeys)
+			sb.append("\n    ").append(key);
+
+		sb.append("\n\nA node serving several domains shared one cache and one set of circuit breakers")
+		  .append("\nacross all of them: cache entries are keyed by request path only, so a request to one")
+		  .append("\ndomain could be served another domain's cached page, and one domain's failing origin")
+		  .append("\nopened the circuit breaker for every other domain on the node.")
+		  .append("\n\nFix: remove the entries above and run one Frontcache node per site. Set this node's")
+		  .append("\nown domain with front-cache.default-domain and its origin with front-cache.origin-host")
+		  .append("\n(front-cache.origin-http-port / front-cache.origin-https-port). Per-domain config")
+		  .append("\nfiles move to the top-level conf/bots.conf, conf/dynamic-urls.conf, conf/fallbacks.conf.")
+		  .append("\n\nSee docs/multi-domain-retirement-proposal.md");
+
+		return sb.toString();
+	}
+
+	/**
+	 * Refuses to start a node configured for multi-domain.
+	 *
+	 * Serving several domains from one node was never sound: L2 cache entries are keyed by request
+	 * PATH only (see LuceneIndexManager.toPathKey), so a request to one domain can be served another
+	 * domain's cached page, and Hystrix keys circuit breakers by command name only, so one domain's
+	 * failing origin opens the breaker for every other domain on the node.
+	 *
+	 * Failing closed rather than ignoring the keys: they ask for per-domain origin routing, and a node
+	 * that silently sent every domain to one origin would be a worse outcome than one that does not
+	 * start. Removing the keys is a config edit and a restart.
+	 *
+	 * @throws IllegalStateException when any retired key is set
+	 */
+	private void rejectRetiredDomainConfig()
+	{
+		List<String> retiredKeys = findRetiredDomainKeys();
+		retiredKeys.addAll(findRetiredDomainConfigDirs());
+		if (retiredKeys.isEmpty())
+			return;
+
+		String message = retiredDomainConfigMessage(retiredKeys);
+
+		if (retiredDomainConfigLogged.compareAndSet(false, true))
+			logger.error(message);
+
+		throw new IllegalStateException(message);
+	}
+
+	private void loadOriginConfig()
+	{
+		rejectRetiredDomainConfig();
+
+		domain          = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
+		siteKey         = FCConfig.getProperty("front-cache.site-key", "");
+		originHost      = FCConfig.getProperty("front-cache.origin-host", "localhost");
+		originHttpPort  = FCConfig.getProperty("front-cache.origin-http-port", "80");
+		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
+
+		logger.info("Serving domain " + domain + " from origin " + originHost
+				+ " (http " + originHttpPort + " / https " + originHttpsPort + ")");
+
+		return;
 	}
 
 	private void initialize() {
 
 		logger = LoggerFactory.getLogger(FrontCacheEngine.class);
 
-		loadDomainConfigs();
+		loadOriginConfig();
 
 		frontcacheHttpPort = FCConfig.getProperty("front-cache.http-port", "80");
 		frontcacheHttpsPort = FCConfig.getProperty("front-cache.https-port", "443");
@@ -390,6 +473,11 @@ public class FrontCacheEngine {
 		});
 		t.start();
 
+		// Prometheus / OTLP export. A no-op unless front-cache.metrics.export says otherwise, which is
+		// why this is called unconditionally: the node's lifecycle owner is the right place to start a
+		// background push loop, and gating the call here would just duplicate the config read.
+		FcMetricsExport.start();
+
 		return;
 	}
 
@@ -432,16 +520,15 @@ public class FrontCacheEngine {
 
 	private URL getOriginUrl(RequestContext context) {
 		boolean isSecure = context.getRequest().isSecure();
-		DomainContext domainCtx = context.getDomainContext();
 
-		String port = isSecure ? domainCtx.getHttpsPort() : domainCtx.getHttpPort();
+		String port = isSecure ? originHttpsPort : originHttpPort;
 
-		String urlStr = makeURL(isSecure, domainCtx.getHost(), port);
+		String urlStr = makeURL(isSecure, originHost, port);
 		try {
 			URL routeUrl = new URL(urlStr);
 			return  routeUrl;
 		} catch (MalformedURLException e) {
-			throw new RuntimeException("Invalid front-cache.app-origin-base-url (" + domainCtx.getHost() + ")", e);
+			throw new RuntimeException("Invalid front-cache.origin-host (" + originHost + ")", e);
 		}
 
 	}
@@ -604,8 +691,7 @@ public class FrontCacheEngine {
 		context.setFrontCacheHttpPort(frontcacheHttpPort);
 		context.setFrontCacheHttpsPort(frontcacheHttpsPort);
 
-		DomainContext domainContex = getDomainContext(context.getRequest().getServerName());
-		context.setDomainContext(domainContex);
+		context.setDomain(domain);
 
 		String protocol = "https".equalsIgnoreCase(servletRequest.getScheme()) ? "https" : "http";
 		context.setFrontCacheProtocol(protocol);
@@ -652,7 +738,7 @@ public class FrontCacheEngine {
         context.setRequestId(requestId);
         context.setRequestType(requestType);
 
-        context.setClientType(getClientType(servletRequest, domainContex.getDomain())); // client type = bot | browser based on User-Agent Header and bots.conf
+        context.setClientType(getClientType(servletRequest)); // client type = bot | browser based on User-Agent Header and bots.conf
 
         if (null != filterChain)
             context.setFilterChain(filterChain);
@@ -660,13 +746,13 @@ public class FrontCacheEngine {
 		return context;
     }
 
-	private String getClientType(HttpServletRequest request, String domain)
+	private String getClientType(HttpServletRequest request)
 	{
 
 		String userAgent = request.getHeader("User-Agent");
 		if (null != userAgent)
 		{
-			for (String botKeyword : FCConfig.getBotUserAgentKeywords(domain))
+			for (String botKeyword : FCConfig.getBotUserAgentKeywords())
 				if (userAgent.contains(botKeyword))
 					return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
 		} else {
@@ -676,9 +762,9 @@ public class FrontCacheEngine {
 		return FCHeaders.REQUEST_CLIENT_TYPE_BROWSER;
 	}
 
-    private boolean ignoreCache(String uri, String domain)
+    private boolean ignoreCache(String uri)
     {
-    	for (Pattern p : FCConfig.getDynamicURLPatterns(domain))
+    	for (Pattern p : FCConfig.getDynamicURLPatterns())
     		if (p.matcher(uri).find())
     			return true;
 
@@ -805,7 +891,7 @@ public class FrontCacheEngine {
 
 		boolean dynamicRequest = ("true".equals(httpRequest.getHeader(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST))) ? true : false;
 
-		if (!dynamicRequest && context.isCacheableRequest() && !ignoreCache(context.getRequestURI(), context.getDomainContext().getDomain())) // GET method without jsessionid
+		if (!dynamicRequest && context.isCacheableRequest() && !ignoreCache(context.getRequestURI())) // GET method without jsessionid
 		{
 			long start = System.currentTimeMillis();
 

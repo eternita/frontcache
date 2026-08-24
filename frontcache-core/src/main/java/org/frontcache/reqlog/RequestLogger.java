@@ -85,7 +85,7 @@ public class RequestLogger {
 		StringBuilder sb = new StringBuilder();
 		sb.append(logTimeDateFormat.format(new Date()))
 			.append(SEPARATOR).append(context.getRequestId())
-			.append(SEPARATOR).append(context.getDomainContext().getDomain())
+			.append(SEPARATOR).append(context.getDomain())
 			.append(SEPARATOR).append((null != request) ? request.getMethod() : "-")
 			.append(SEPARATOR).append("error")
 			.append(SEPARATOR).append(context.getRequestType())
@@ -126,7 +126,7 @@ public class RequestLogger {
 
 		sb4file.append(logTimeDateFormat.format(new Date()))
 		.append(SEPARATOR).append(context.getRequestId())
-		.append(SEPARATOR).append(context.getDomainContext().getDomain())
+		.append(SEPARATOR).append(context.getDomain())
 		.append(SEPARATOR).append(request.getMethod())
 		.append(SEPARATOR).append((isHystrixError) ? "error" : "success")
 		.append(SEPARATOR).append(context.getRequestType()) // toplevel | include | include-async

@@ -65,7 +65,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}
 
 	@Override
-	public void putToCacheImpl(String domain, String url, WebResponse component) {
+	public void putToCacheImpl(String url, WebResponse component) {
 
 		int newSize = currentSize + component.getContent().length;
 		if (newSize < maxSize)
@@ -98,7 +98,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}
 
 	@Override
-	public void removeFromCache(String domain, String filter) {
+	public void removeFromCache(String filter) {
 
 		List<String> removeList = new ArrayList<String>();
 
@@ -115,13 +115,7 @@ public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheP
 	}
 
 	@Override
-	public void removeFromCacheAll(String domain) {
-		cache.clear();
-	}
-
-	@Override
 	public void removeFromCacheAll() {
-		// single flat map - no domain scoping to begin with
 		cache.clear();
 	}
 

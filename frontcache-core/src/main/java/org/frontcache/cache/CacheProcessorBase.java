@@ -57,14 +57,13 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	public abstract WebResponse getFromCacheImpl(String url);
 
 	/**
-	 * Stores the entry. Called by {@link #putToCache(String, String, WebResponse)} once the headers
+	 * Stores the entry. Called by {@link #putToCache(String, WebResponse)} once the headers
 	 * that must never be persisted (Set-Cookie in particular) have been removed.
 	 *
-	 * @param domain domain the entry belongs to
 	 * @param url cache key
 	 * @param component response to store - the cache takes ownership of it
 	 */
-	public abstract void putToCacheImpl(String domain, String url, WebResponse component);
+	public abstract void putToCacheImpl(String url, WebResponse component);
 
 	/**
 	 * Single entry point for writing to the cache.
@@ -78,13 +77,13 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	 * Set-Cookie on the live response of a cache miss).
 	 */
 	@Override
-	public final void putToCache(String domain, String url, WebResponse component) {
+	public final void putToCache(String url, WebResponse component) {
 
 		if (null == component)
 			return;
 
 		cleanupNonPersistentHeaders(component.getHeaders());
-		putToCacheImpl(domain, url, component);
+		putToCacheImpl(url, component);
 	}
 
 	@Override
@@ -133,7 +132,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					doSoftInvalidation(currentRequestURL, originUrlStr, requestHeaders, client, context);
 				} else {
 					// regular expiration
-					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
+					removeFromCache(currentRequestURL);
 					cachedWebResponse = null; // refresh from origin
 				}
 			}
@@ -163,7 +162,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				{
 					WebResponse copy4cache = cachedWebResponse.copy(); // copy - putToCache strips headers in place
 					copy4cache.setUrl(currentRequestURL);
-					putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
+					putToCache(currentRequestURL, copy4cache); // put to cache copy
 				}
 			} catch (FrontCacheException ex) {
 				throw ex;
@@ -211,7 +210,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				try {
 
 //					logger.info("Soft invalidation: removing form cache: " + currentRequestURL);
-					removeFromCache(context.getDomainContext().getDomain(), currentRequestURL);
+					removeFromCache(currentRequestURL);
 
 					RequestContext ctxCopy = context.copy();
 					ctxCopy.setFilterChain(null); // async calls for ServletFilter doesnt works (some objects already disposed), so use http calls for soft resets
@@ -223,7 +222,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					copy4cache.setUrl(currentRequestURL);
 
 					if (!ctxCopy.isHystrixFallback()) // don't cache hystrix fallbacks
-						putToCache(context.getDomainContext().getDomain(), currentRequestURL, copy4cache); // put to cache copy
+						putToCache(currentRequestURL, copy4cache); // put to cache copy
 
 				} catch (Exception e) {
 

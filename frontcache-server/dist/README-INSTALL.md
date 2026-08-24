@@ -48,7 +48,7 @@ Then, as needed:
 - `frontcache.id` — this node's identity, returned in the `x-frontcache-id` response header.
   Give every node a distinct value so traces are attributable.
 - `dynamic-urls.conf` — URL patterns that must never be cached (cart, login, admin).
-- `bots.conf` — user-agent keywords treated as bots, per domain.
+- `bots.conf` — user-agent keywords treated as bots.
 - `fallbacks.conf` — what to serve when the origin 5XXs or a circuit opens.
 - `guard-rules.conf` — checks applied before cache and origin (reject / redirect / dry-run).
 - `fc-l1-ehcache-config.xml` — L1 in-memory cache sizing.

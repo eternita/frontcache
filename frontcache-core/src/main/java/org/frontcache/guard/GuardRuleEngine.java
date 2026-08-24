@@ -191,16 +191,19 @@ public class GuardRuleEngine {
 	}
 
 	/**
-	 * Hosts an absolute redirect target may point at: the explicitly allowed ones plus every domain
-	 * this node serves (a redirect to your own site is the normal case and should not need extra
-	 * config).
+	 * Hosts an absolute redirect target may point at, from
+	 * front-cache.guard-rules.allowed-redirect-hosts.
+	 *
+	 * This used to also add front-cache.domains. That key is retired (a node configured with it
+	 * refuses to start - see docs/multi-domain-retirement-proposal.md), so the read is gone. Note
+	 * that front-cache.default-domain has never been added here either, despite what this javadoc
+	 * used to claim: a redirect to your own site must be listed explicitly.
 	 */
 	private Set<String> allowedRedirectHosts()
 	{
 		Set<String> hosts = new HashSet<String>();
 
 		addHosts(hosts, FCConfig.getProperty("front-cache.guard-rules.allowed-redirect-hosts", ""));
-		addHosts(hosts, FCConfig.getProperty("front-cache.domains", ""));
 
 		return hosts;
 	}
@@ -254,7 +257,8 @@ public class GuardRuleEngine {
 	{
 		checkReachable("http://127.0.0.1/fc-ping.jsp", "GSLB health check (/fc-ping.jsp)");
 		checkReachable("http://127.0.0.1/frontcache-io?action=ping", "management API (/frontcache-io) used by frontcache-agent, the console and replication");
-		checkReachable("http://127.0.0.1/hystrix.stream", "Hystrix metrics stream (/hystrix.stream) read by the console");
+		checkReachable("http://127.0.0.1/hystrix.stream", "metrics stream (/hystrix.stream) read by the console");
+		checkReachable("http://127.0.0.1/fc-metrics", "Prometheus scrape endpoint (/fc-metrics)");
 	}
 
 	private void checkReachable(String url, String what)

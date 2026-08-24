@@ -7,11 +7,6 @@
 	<display-name>front-cache in standalone mode</display-name>
 	<description>front-cache in standalone mode (is running inside embedded Jetty)</description>
 
-    <!-- install Frontcache config (incl. hystrix.properties into Archaius) before any servlet loads -->
-    <listener>
-        <listener-class>org.frontcache.FrontcacheConfigBootstrapListener</listener-class>
-    </listener>
-
     <servlet>
         <servlet-name>FrontCacheServlet</servlet-name>
         <servlet-class>org.frontcache.FrontCacheServlet</servlet-class>
@@ -30,6 +25,31 @@
     <servlet-mapping>
         <servlet-name>FrontCacheIOServlet</servlet-name>
         <url-pattern>/frontcache-io</url-pattern>
+    </servlet-mapping>
+
+    <!-- The metrics stream the console reads. Mapped here so the e2e suite actually covers it: it was
+         previously only mapped in the real server webapp, so nothing in the test suite ever hit the
+         endpoint and the empty thread-pool panel went unnoticed for as long as it did. An exact
+         url-pattern wins over FrontCacheServlet's /*. -->
+    <servlet>
+        <servlet-name>HystrixMetricsStreamServlet</servlet-name>
+        <servlet-class>org.frontcache.hystrix.HystrixStreamSecurityWrapperServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>HystrixMetricsStreamServlet</servlet-name>
+        <url-pattern>/hystrix.stream</url-pattern>
+    </servlet-mapping>
+
+    <!-- Prometheus scrape, so the e2e suite covers the gating and the exposition format. -->
+    <servlet>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <servlet-class>org.frontcache.metrics.FcMetricsServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <url-pattern>/fc-metrics</url-pattern>
     </servlet-mapping>
     
 </web-app>

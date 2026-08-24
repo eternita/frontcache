@@ -28,7 +28,6 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.http.client.HttpClient;
 import org.frontcache.FCConfig;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.fr.FallbackResolverFactory;
@@ -49,9 +48,6 @@ import org.junit.Test;
  */
 public class BypassCacheFallbackWriteTest {
 
-	private static final DomainContext DOMAIN =
-			new DomainContext("example.com", "test-site-key-fallback", "origin.example.com", "80", "443");
-
 	@BeforeClass
 	public static void setUpClass() throws Exception {
 		// same fixture FRONTCACHE_HOME as FileBasedFallbackResolverTest - must be set before FCConfig
@@ -68,7 +64,7 @@ public class BypassCacheFallbackWriteTest {
 
 	private RequestContext newContext(HttpServletResponse servletResponse) {
 		RequestContext ctx = new RequestContext();
-		ctx.setDomainContext(DOMAIN);
+		ctx.setDomain("example.com"); // the Hystrix command group key
 		ctx.setResponse(servletResponse);
 
 		HttpServletRequest request = mock(HttpServletRequest.class);

@@ -29,7 +29,6 @@ import org.junit.Test;
  */
 public class InMemoryCacheProcessorGetCachedKeysTest {
 
-	private static final String DOMAIN = "test-domain";
 
 	private CacheProcessor cacheProcessor;
 
@@ -48,7 +47,7 @@ public class InMemoryCacheProcessorGetCachedKeysTest {
 	}
 
 	private void put(String url) {
-		cacheProcessor.putToCache(DOMAIN, url, new WebResponse(url, ("content of " + url).getBytes()));
+		cacheProcessor.putToCache(url, new WebResponse(url, ("content of " + url).getBytes()));
 	}
 
 	@Test
@@ -97,14 +96,14 @@ public class InMemoryCacheProcessorGetCachedKeysTest {
 		put(url2);
 		assertEquals(2, cacheProcessor.getCachedKeys().size());
 
-		cacheProcessor.removeFromCache(DOMAIN, url1);
+		cacheProcessor.removeFromCache(url1);
 
 		List<String> keys = cacheProcessor.getCachedKeys();
 		assertEquals(1, keys.size());
 		assertFalse(keys.contains(url1));
 		assertTrue(keys.contains(url2));
 
-		cacheProcessor.removeFromCacheAll(DOMAIN);
+		cacheProcessor.removeFromCacheAll();
 		assertTrue(cacheProcessor.getCachedKeys().isEmpty());
 	}
 }

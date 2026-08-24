@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.http.client.HttpClient;
-import org.frontcache.core.DomainContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.hystrix.FallbackLogger;
@@ -28,7 +27,7 @@ public class DefaultFallbackResolver implements FallbackResolver {
 	public DefaultFallbackResolver() {
 	}
 
-	public WebResponse getFallback(DomainContext domain, String fallbackSource, String urlStr)
+	public WebResponse getFallback(String fallbackSource, String urlStr)
 	{
 		fallbackLogger.trace(FallbackLogger.logTimeDateFormat.format(new Date()) + " | " + fallbackSource + " default | turn on another FallbackResolver implementation to get better fallbacks | " + urlStr);
 

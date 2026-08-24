@@ -95,7 +95,6 @@ public class LuceneIndexManager {
 	// searchable fields
 	public static final String TAGS_FIELD = "tags"; // for invalidation
 	public static final String URL_FIELD = "url";
-	public static final String DOMAIN_FIELD = "domain"; // for shared / multidomain mode
 	public static final String EXPIRE_DATE_FIELD = "expire_date";
 
 	private IndexWriter indexWriter = null;
@@ -249,11 +248,9 @@ public class LuceneIndexManager {
 				// create dummy index
 				{
 					String url = UUID.randomUUID().toString();
-					String domain = UUID.randomUUID().toString();
 					WebResponse dummy =  new WebResponse(url);
-					dummy.setDomain(domain);
 					indexDoc(dummy);
-					delete(domain, url);
+					delete(url);
 				}
 			} catch (IOException e) {
 				logger.error("Error during creating cache-file", e);
@@ -655,8 +652,6 @@ public class LuceneIndexManager {
 		String urlKey = toPathKey(url);
 		doc.add(new StringField(URL_FIELD, urlKey, Field.Store.YES));
 
-		doc.add(new StringField(DOMAIN_FIELD, response.getDomain(), Field.Store.YES));
-
 		if (null != response.getContent())
 			doc.add(new StoredField(BIN_FIELD, response.getContent()));
 
@@ -766,86 +761,11 @@ public class LuceneIndexManager {
 	}
 
 
-	public long getDocumentsCount(String domain) {
-
-		long count = -1;
-
-		IndexWriter iWriter = null;
-		try {
-			iWriter = getIndexWriter();
-			if (iWriter == null){
-				return count;
-			}
-		} catch (Exception e1) {
-			logger.debug("Error during getting indexWriter. " + e1.getMessage());
-			return count;
-		}
-
-		IndexReader reader = null;
-		try {
-			reader = DirectoryReader.open(iWriter);
-			Term domainTerm = new Term(DOMAIN_FIELD, domain);
-			// number of documents containing this domain term (Lucene 10 dropped the
-			// searcher.termStatistics(Term, TermStates) overload; docFreq gives the same value directly)
-			count = reader.docFreq(domainTerm);
-		} catch (Exception e1) {
-			if (!discardWriterIfLockLost(e1, "getDocumentsCount"))
-				logger.debug("Error during reader.totalTermFreq(domainTerm). " + e1.getMessage());
-		} finally {
-			if (reader != null) {
-				try {
-					reader.close();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			}
-		}
-
-		return count;
-	}
-
 	/**
-	 * Removes documents by url or tags
-	 * @param urlOrTag
+	 * Removes documents by url or tag.
+	 *
+	 * @param urlOrTag a full URL (normalised to its path), a bare path, or an invalidation tag
 	 */
-	public void delete(String domain, String urlOrTag) {
-
-		IndexWriter iWriter = null;
-		try {
-			iWriter = getIndexWriter();
-			if (iWriter == null){
-				return ;
-			}
-		} catch (Exception e1) {
-			logger.debug("Error during getting indexWriter. " + e1.getMessage());
-			return;
-		}
-
-
-		try {
-//			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
-			Query urlQuery = new TermQuery(new Term(URL_FIELD, toPathKey(urlOrTag)));
-			Query tagsQuery = new TermQuery(new Term(TAGS_FIELD, urlOrTag));
-
-			BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
-
-//			booleanQuery.add(domainQuery, Occur.MUST);
-			booleanQuery.add(urlQuery, Occur.SHOULD);
-			booleanQuery.add(tagsQuery, Occur.SHOULD);
-
-			long count = iWriter.deleteDocuments(booleanQuery.build());
-			logger.debug("Removed  {} documents for {}.", count, urlOrTag);
-		} catch (IOException e) {
-			if (!discardWriterIfLockLost(e, "delete"))
-				logger.error(e.getMessage(), e);
-		} catch (AlreadyClosedException ace) {
-			discardWriterIfLockLost(ace, "delete");
-		} finally {
-			commitQuietly(iWriter, "delete/commit");
-		}
-	}
-
 	public void delete(String urlOrTag) {
 
 		IndexWriter iWriter = null;
@@ -881,53 +801,11 @@ public class LuceneIndexManager {
 	}
 
 	/**
-	 * Removes documents by url or tags
-	 * @param domain
-	 */
-	public void deleteAll(String domain) {
-
-		if (null == domain)
-		{
-			logger.error("Cant delete all with null domain");
-			return;
-		}
-
-		IndexWriter iWriter = null;
-		try {
-			iWriter = getIndexWriter();
-			if (iWriter == null){
-				return ;
-			}
-		} catch (Exception e1) {
-			logger.debug("Error during getting indexWriter. " + e1.getMessage());
-			return;
-		}
-
-
-		try {
-			logger.debug("Removing all documents for {}.", domain);
-
-			Query domainQuery = new TermQuery(new Term(DOMAIN_FIELD, domain));
-
-			long count = iWriter.deleteDocuments(domainQuery);
-			logger.debug("Removed  {} documents for {}.", count, domain);
-		} catch (IOException e) {
-			if (!discardWriterIfLockLost(e, "deleteAll"))
-				logger.error(e.getMessage(), e);
-		} catch (AlreadyClosedException ace) {
-			discardWriterIfLockLost(ace, "deleteAll");
-		} finally {
-			commitQuietly(iWriter, "delete/commit");
-		}
-	}
-
-	/**
-	 * Removes every document from the index, whatever domain it was indexed under.
+	 * Removes every document from the index.
 	 *
-	 * Needed because {@link #deleteAll(String)} only matches the DOMAIN_FIELD term: entries pushed in
-	 * by index replication carry the SOURCE edge's domain, so a domain-scoped "invalidate all" issued
-	 * at the target edge silently walks past them and they stay served forever. Callers that mean
-	 * "empty this node" must use this method.
+	 * There used to be a domain-scoped flavour that matched a DOMAIN_FIELD term. Entries pushed in by
+	 * index replication carry the SOURCE edge's domain, so it silently walked past them and they
+	 * stayed served forever. With one site per node there is one flavour, and no DOMAIN_FIELD.
 	 */
 	public void deleteAll() {
 
@@ -944,7 +822,7 @@ public class LuceneIndexManager {
 
 		try {
 			long count = iWriter.deleteAll();
-			logger.info("Removed all {} documents (all domains).", count);
+			logger.info("Removed all {} documents.", count);
 		} catch (IOException e) {
 			if (!discardWriterIfLockLost(e, "deleteAll"))
 				logger.error(e.getMessage(), e);

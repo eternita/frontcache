@@ -21,17 +21,12 @@ public class NoopCacheProcessor extends CacheProcessorBase implements CacheProce
 	}
 
 	@Override
-	public void putToCacheImpl(String domain, String url, WebResponse component) {
+	public void putToCacheImpl(String url, WebResponse component) {
 
 	}
 
 	@Override
-	public void removeFromCache(String domain, String filter) {
-
-	}
-
-	@Override
-	public void removeFromCacheAll(String domain) {
+	public void removeFromCache(String filter) {
 
 	}
 

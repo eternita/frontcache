@@ -10,56 +10,38 @@ package org.frontcache.hystrix;
 
 import java.io.IOException;
 
-import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.frontcache.FCConfig;
+import org.frontcache.core.ManagementPort;
 import org.frontcache.hystrix.stream.FrontcacheHystrixMetricsStreamServlet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+/**
+ * Restricts the metrics stream to {@code front-cache.management.port}.
+ *
+ * The gate itself lives in {@link ManagementPort}, shared with the Prometheus scrape endpoint - see that
+ * class for why it is not inlined here any more.
+ */
 @SuppressWarnings("serial")
 public class HystrixStreamSecurityWrapperServlet extends FrontcacheHystrixMetricsStreamServlet {
 
-	private int managementPort = -1; // management port for security
-
-	private Logger logger = LoggerFactory.getLogger(getClass());
+	private static final String WHAT = "/hystrix.stream";
 
 	public HystrixStreamSecurityWrapperServlet() {
 		super();
 	}
 
 	@Override
-	public void init(ServletConfig config) throws ServletException {
-		super.init(config);
-
-		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
-		if (null == managementPortStr || managementPortStr.trim().length() == 0)
-			logger.warn("Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
-		else {
-			try
-			{
-				managementPort = Integer.parseInt(managementPortStr);
-			} catch (Exception ex) {
-				ex.printStackTrace();
-				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
-			}
-		}
-
-		return;
-	}
-
-	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 
-		if (-1 < managementPort && managementPort != request.getServerPort())
+		if (!ManagementPort.isAllowed(request, WHAT))
 		{
-			String msg = "Accessing Management URL with wrong port " + request.getServerPort();
-			logger.info(msg);
-			response.getOutputStream().write(msg.getBytes());
+			// Historical behaviour: the message is written as the response body with a 200. Kept as-is -
+			// it is a management endpoint on the wrong connector, and changing the shape of this reply is
+			// not what this migration is for.
+			response.getOutputStream().write(("Accessing Management URL with wrong port " + request.getServerPort()).getBytes());
 			return;
 		}
 

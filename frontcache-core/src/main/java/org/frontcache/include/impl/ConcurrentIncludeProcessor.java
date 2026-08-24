@@ -33,7 +33,7 @@ import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
-import com.netflix.hystrix.exception.HystrixRuntimeException;
+import org.frontcache.hystrix.FcCommandException;
 
 /**
  *
@@ -250,7 +250,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				if (!INCLUDE_TYPE_ASYNC.equals(inc.includeType))
 				{
 		        	logger.debug("include detais "  + inc.includeURL + " content is not resolved due to timeout (" + timeout + ")  getting defaults");
-		        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(inc.context.getDomainContext(), this.getClass().getName(), inc.includeURL);
+		        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), inc.includeURL);
 				}
 	        }
 
@@ -317,10 +317,13 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 			} catch (FrontCacheException e) {
 				logger.error("FrontCacheException: unexpected error processing include " + includeURL, e);
-			} catch (HystrixRuntimeException e) {
-				logger.error("HystrixRuntimeException: unexpected error processing include " + includeURL, e);
-				// in multi threaded environment hystrix does not resolve fallback ??
-				// so, get fallback manually
+			} catch (FcCommandException e) {
+				// Reached only when the command failed AND its fallback failed or was absent: FcCommand
+				// resolves the fallback from its own catch block, on this thread, so the "in multi
+				// threaded environment hystrix does not resolve fallback ??" case this used to work
+				// around cannot happen any more. The manual resolution in the finally block below is
+				// kept as the answer for the remaining case, where the fallback itself failed.
+				logger.error("FcCommandException: unexpected error processing include " + includeURL, e);
 			} catch (Throwable e) {
 				logger.error("Throwable: unexpected error processing include " + includeURL, e);
 			} finally {
@@ -330,7 +333,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					// when async call -> webResponse is null because we don't wait for response
 					// get fallback for SYNC includes only
 					if (!INCLUDE_TYPE_ASYNC.equals(includeType))
-						this.webResponse = FallbackResolverFactory.getInstance().getFallback(this.context.getDomainContext(), this.getClass().getName(), includeURL);
+						this.webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), includeURL);
 				}
 			}
 

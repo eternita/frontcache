@@ -259,9 +259,27 @@ project(':frontcache-core') {
         api         	'org.apache.httpcomponents:httpclient:4.5.14' // final 4.5.x; 5.x is a package/API migration
         api         	'commons-io:commons-io:2.22.0'
         api         	'ch.qos.logback:logback-classic:1.5.38'
-		api         	'com.netflix.hystrix:hystrix-core:1.5.18'
-		api         	'com.netflix.hystrix:hystrix-metrics-event-stream:1.5.18'
-		api         	'com.netflix.hystrix:hystrix-serialization:1.5.18' // provides com.netflix.hystrix.serial.SerialHystrixDashboardData (not pulled transitively)
+		// Resilience4j replaced Hystrix (see docs/hystrix-to-resilience4j-proposal.md). Removing
+		// hystrix-core took five unmaintained artifacts off the runtime classpath of every origin call
+		// with it: archaius-core (2014), commons-configuration (2012), commons-lang (2011) and
+		// rxjava 1.x (EOL 2018). Each of these declares only resilience4j-core + slf4j-api.
+		api         	'io.github.resilience4j:resilience4j-circuitbreaker:2.4.0'
+		api         	'io.github.resilience4j:resilience4j-timelimiter:2.4.0'
+		api         	'io.github.resilience4j:resilience4j-bulkhead:2.4.0'
+		// Latency percentiles for the dashboard JSON. Already on the runtime classpath transitively
+		// via hystrix-core (2.1.9); declared explicitly at a current version so it survives the
+		// removal of Hystrix and stops being an accident of someone else's dependency tree.
+		api         	'org.hdrhistogram:HdrHistogram:2.2.2'
+
+		// Prometheus / OTLP export (docs/hystrix-to-resilience4j-proposal.md section 7.5). Additive:
+		// the /hystrix.stream SSE contract is unaffected, and export defaults to none, so an upgrade
+		// starts no listener and no push loop until front-cache.metrics.export says so.
+		// 1.17.1 is the current STABLE micrometer; 1.18.0-M1 exists and is deliberately not used - a
+		// milestone build on the request path is the opposite of what blocker 1 is about.
+		api         	'io.github.resilience4j:resilience4j-micrometer:2.4.0'
+		api         	'io.micrometer:micrometer-core:1.17.1'
+		api         	'io.micrometer:micrometer-registry-prometheus:1.17.1'
+		api         	'io.micrometer:micrometer-registry-otlp:1.17.1'
         api         	'net.sf.ehcache:ehcache:2.10.9.2'
         api         	'com.google.code.gson:gson:2.14.0'
         api         	'org.apache.lucene:lucene-core:10.5.1'
@@ -278,6 +296,11 @@ project(':frontcache-core') {
         // (NoClassDefFoundError), making the failure depend on test-execution order. Pin a minimal
         // fixture home so init always succeeds regardless of which test runs first.
         systemProperty 'frontcache.home', "${projectDir}/src/test/resources/fallback-home"
+
+        // Opt-in switch for DashboardJsonKeysTest to rewrite its own golden file. Forwarded explicitly
+        // because Gradle does not pass -D through to the test JVM; default false so the normal build
+        // can only compare, never regenerate.
+        systemProperty 'fc.dashboard.keys.regenerate', System.getProperty('fc.dashboard.keys.regenerate', 'false')
     }
 }
 

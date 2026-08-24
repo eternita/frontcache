@@ -20,17 +20,13 @@ import org.frontcache.hystrix.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.netflix.hystrix.HystrixCommand;
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixCommandKey;
-
 /**
  *
  * All requests through Frontcache engine
  * Must use SEMAPHORE to access the same thread
  *
  */
-public class FC_Total extends HystrixCommand<Object> {
+public class FC_Total extends FcCommand<Object> {
 
 	private final FrontCacheEngine frontCacheEngine;
 	private final RequestContext context;
@@ -39,8 +35,8 @@ public class FC_Total extends HystrixCommand<Object> {
     public FC_Total(FrontCacheEngine frontCacheEngine, RequestContext context) {
 
         super(Setter
-                .withGroupKey(HystrixCommandGroupKey.Factory.asKey(context.getDomainContext().getDomain()))
-                .andCommandKey(HystrixCommandKey.Factory.asKey("Input-Requests"))
+                .withGroupKey(context.getDomain())
+                .andCommandKey("Input-Requests")
                 );
         this.frontCacheEngine = frontCacheEngine;
         this.context = context;
@@ -61,7 +57,7 @@ public class FC_Total extends HystrixCommand<Object> {
 
 		try {
 			context.setHystrixFallback(FallbackLogger.failureType(getExecutionEvents()));
-			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(context.getDomainContext(), this.getClass().getName(), url);
+			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
 			if (null != webResponse)
 			{
 				FCUtils.applyFallbackHeaders(httpResponse, webResponse);

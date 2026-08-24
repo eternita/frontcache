@@ -165,6 +165,14 @@ public class ProxyStreamServlet extends HttpServlet {
                         }
                     }
                 }
+            } else {
+                // Propagate the refusal instead of swallowing it. Without this the `if (statusCode ==
+                // SC_OK)` above has no else, so an upstream 401/503 reaches the browser as an empty 200
+                // with nothing in the log - which is exactly where an operator looks first when the
+                // dashboard is blank. The node now answers 401 for a missing or wrong site key
+                // (docs/hystrix-to-resilience4j-proposal.md section 14.6), and that has to be visible.
+                logger.warn("Upstream {} returned {} - propagating to the client", proxyUrl, statusCode);
+                response.sendError(statusCode, "Metrics stream returned " + statusCode);
             }
         } catch (Exception e) {
             logger.error("Error proxying request: " + url, e);
