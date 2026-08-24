@@ -9,6 +9,9 @@
 	<servlet>
 		<servlet-name>DashboardStreamProxyServlet</servlet-name>
 		<servlet-class>org.frontcache.console.web.DashboardStreamProxyServlet</servlet-class>
+		<!-- Required: the relay is non-blocking at both ends, so a dashboard viewer holds no thread
+		     here either. Without this the container refuses startAsync() outright. -->
+		<async-supported>true</async-supported>
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>DashboardStreamProxyServlet</servlet-name>

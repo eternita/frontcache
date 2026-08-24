@@ -9,17 +9,23 @@
 package org.frontcache.console.web;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Flow;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.core.FCHeaders;
 import org.slf4j.Logger;
@@ -29,8 +35,12 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
-import jakarta.servlet.ServletConfig;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -54,6 +64,39 @@ import jakarta.servlet.http.HttpServletResponse;
  * anything added at runtime through the Edges page). Nothing else is contacted, and no other query
  * parameter is passed on. This costs nothing operationally - the page only ever asks for edges the
  * console itself listed.
+ *
+ * <h2>Nothing blocks, at either end</h2>
+ *
+ * A relay has two sides and both used to be blocking: a container thread sat in a
+ * {@code while (is.read())} loop for the life of every dashboard tab. Making only the servlet side
+ * async would have moved that thread from the container's pool to one of ours, which is not a saving.
+ *
+ * So both sides are non-blocking:
+ *
+ * <ul>
+ * <li><b>Upstream</b> is the JDK's own {@code java.net.http.HttpClient} with
+ *     {@code BodyHandlers.ofPublisher()}, which hands back a {@link Flow.Publisher} of chunks over the
+ *     JDK's shared selector threads. Deliberately not an async Apache client: that would be a new
+ *     dependency and a second HTTP stack inside one war, and the node's own migration was fought over
+ *     exactly this kind of accretion. The blocking Apache client stays for the console's other calls,
+ *     which are short request/response exchanges where it is the right tool.</li>
+ * <li><b>Downstream</b> is Servlet 3.1 async with a {@link WriteListener}, the same shape as the node's
+ *     {@code FcSampleSseServlet}.</li>
+ * </ul>
+ *
+ * <h3>The backpressure is now end to end, which is the real gain</h3>
+ *
+ * The two sides are joined by demand: a chunk is requested from the upstream publisher only once
+ * everything already received has been written to the browser. So a viewer on a stalled connection
+ * stops us reading from the node, which applies TCP backpressure to the node, which its own stream
+ * handles by dropping that subscriber's oldest frames. Every link in the chain degrades where it should,
+ * instead of the middle one buffering an unbounded amount of an endless stream in the console's heap.
+ *
+ * This is also why <b>nothing is dropped here</b>, unlike in the node's stream. The node drops oldest
+ * because it knows what a frame is and that a stale one is worthless. A relay does not: dropping bytes
+ * mid-stream would cut an SSE frame in half and corrupt everything after it. Demand is what bounds the
+ * memory instead: one delivery is requested at a time, so what is held is one delivery's worth of
+ * buffers - not one buffer, since a delivery may carry several, but never an unbounded backlog.
  */
 public class DashboardStreamProxyServlet extends HttpServlet {
 
@@ -72,16 +115,50 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 	 */
 	static final String STREAM_PATH = "hystrix.stream";
 
+	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+
+	/**
+	 * How long a relay may go without receiving a byte before it is ended.
+	 *
+	 * Replaces the blocking client's 10 s socket timeout, and is worth replacing rather than dropping:
+	 * the node emits every 500 ms, so ten seconds of silence means the stream is wedged, and an
+	 * {@code EventSource} whose connection is merely quiet never reconnects - the dashboard would sit on
+	 * stale numbers indefinitely. Ending the relay is what makes the browser retry.
+	 */
+	private static final long IDLE_LIMIT_MS = 10000;
+
+	private static final long REAPER_PERIOD_MS = 2000;
+
+	private static final HttpClient HTTP = HttpClient.newBuilder()
+			.connectTimeout(CONNECT_TIMEOUT)
+			// Pinned to 1.1: the JDK client would otherwise try an h2c upgrade on every connection to a
+			// node that does not offer one. SSE gains nothing from HTTP/2 here and the fallback is a
+			// wasted round trip per dashboard.
+			.version(HttpClient.Version.HTTP_1_1)
+			.followRedirects(HttpClient.Redirect.NEVER)
+			.build();
+
+	private static final CopyOnWriteArrayList<Relay> RELAYS = new CopyOnWriteArrayList<Relay>();
+
+	private static volatile ScheduledExecutorService reaper;
+
 	@Autowired
 	private FrontcacheService frontcacheService;
 
 	@Override
-	public void init(ServletConfig config) throws ServletException {
-		super.init(config);
-
+	public void init() throws ServletException {
 		WebApplicationContext context = WebApplicationContextUtils.getWebApplicationContext(getServletContext());
 		AutowireCapableBeanFactory beanFactory = context.getAutowireCapableBeanFactory();
 		beanFactory.autowireBean(this);
+	}
+
+	@Override
+	public void destroy() {
+		stopReaper();
+		for (Relay relay : RELAYS)
+			relay.close();
+
+		super.destroy();
 	}
 
 	@Override
@@ -100,7 +177,87 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 			return;
 		}
 
-		proxy(streamUrl, frontcacheService.getSiteKey(), response);
+		// Everything past here happens on a JDK HttpClient thread or a container callback. This one
+		// goes back to the pool now.
+		AsyncContext async = request.startAsync();
+		async.setTimeout(0);
+
+		open(streamUrl, frontcacheService.getSiteKey(), async, response);
+	}
+
+	private void open(String streamUrl, String siteKey, AsyncContext async, HttpServletResponse response) {
+
+		HttpRequest.Builder upstream = HttpRequest.newBuilder(URI.create(streamUrl)).GET();
+		if (null != siteKey)
+			upstream.header(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
+
+		HTTP.sendAsync(upstream.build(), HttpResponse.BodyHandlers.ofPublisher())
+				.whenComplete((upstreamResponse, failure) -> {
+					if (null != failure) {
+						// The edge is down, refused, or unresolvable. Without this the browser would be
+						// handed an empty 200 and show a blank panel with nothing anywhere to say why.
+						logger.error("Could not open " + streamUrl, failure);
+						refuse(async, response, HttpServletResponse.SC_BAD_GATEWAY,
+								"Could not read the metrics stream");
+						return;
+					}
+
+					if (200 != upstreamResponse.statusCode()) {
+						// Propagate the refusal rather than swallowing it. The node answers 401 for a
+						// missing or wrong site key (docs/hystrix-to-resilience4j-proposal.md section
+						// 14.6), and an operator looking at a blank dashboard needs to see that.
+						logger.warn("Upstream {} returned {} - propagating to the client", streamUrl,
+								upstreamResponse.statusCode());
+						refuse(async, response, upstreamResponse.statusCode(),
+								"Metrics stream returned " + upstreamResponse.statusCode());
+						return;
+					}
+
+					start(streamUrl, async, response, upstreamResponse.body());
+				});
+	}
+
+	/** Nothing has been written yet, so the response is uncommitted and can still carry a status. */
+	private static void refuse(AsyncContext async, HttpServletResponse response, int status, String message) {
+
+		try {
+			response.sendError(status, message);
+		} catch (Exception e) {
+			logger.debug("Could not send " + status + " to the dashboard", e);
+		} finally {
+			try {
+				async.complete();
+			} catch (Exception e) {
+				logger.debug("AsyncContext was already complete", e);
+			}
+		}
+	}
+
+	private void start(String streamUrl, AsyncContext async, HttpServletResponse response,
+			Flow.Publisher<List<ByteBuffer>> body) {
+
+		try {
+			response.setContentType("text/event-stream");
+			response.setCharacterEncoding("UTF-8");
+			response.setHeader("Cache-Control", "no-cache, no-store");
+			// the stream is a relay of SSE frames, and a proxy buffering it would defeat the point
+			response.setHeader("X-Accel-Buffering", "no");
+
+			Relay relay = new Relay(streamUrl, async, response.getOutputStream());
+			async.addListener(relay);
+
+			RELAYS.add(relay);
+			startReaper();
+
+			// Write listener first, then subscribe: a chunk arriving before the listener is registered
+			// would find isReady() throwing IllegalStateException.
+			relay.start();
+			body.subscribe(relay);
+
+		} catch (Exception e) {
+			logger.error("Could not start the dashboard relay", e);
+			refuse(async, response, HttpServletResponse.SC_BAD_GATEWAY, "Could not start the metrics stream");
+		}
 	}
 
 	/**
@@ -133,98 +290,279 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 		return normalized + "/";
 	}
 
-	private void proxy(String streamUrl, String siteKey, HttpServletResponse response) throws IOException {
+	// ---- the idle reaper ------------------------------------------------------------------------
 
-		HttpGet httpGet = new HttpGet(streamUrl);
-		InputStream is = null;
+	private static void startReaper()
+	{
+		if (null != reaper)
+			return;
 
-		if (null != siteKey)
-			httpGet.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
-
-		try {
-			HttpResponse upstream = Connections.httpClient.execute(httpGet);
-			int statusCode = upstream.getStatusLine().getStatusCode();
-
-			if (HttpStatus.SC_OK != statusCode) {
-				// Propagate the refusal instead of swallowing it: an upstream 401/503 reaching the browser
-				// as an empty 200 with nothing in the log is exactly where an operator looks first when the
-				// dashboard is blank. The node answers 401 for a missing or wrong site key
-				// (docs/hystrix-to-resilience4j-proposal.md section 14.6), and that has to be visible.
-				logger.warn("Upstream {} returned {} - propagating to the client", streamUrl, statusCode);
-				response.sendError(statusCode, "Metrics stream returned " + statusCode);
+		synchronized (DashboardStreamProxyServlet.class) {
+			if (null != reaper)
 				return;
-			}
 
-			response.setContentType("text/event-stream");
-			response.setCharacterEncoding("UTF-8");
-			response.setHeader("Cache-Control", "no-cache, no-store");
-			// the stream is a relay of SSE frames, and a proxy buffering it would defeat the point
-			response.setHeader("X-Accel-Buffering", "no");
+			ScheduledExecutorService local = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+				@Override
+				public Thread newThread(Runnable r)
+				{
+					Thread t = new Thread(r, "fc-console-stream-reaper");
+					t.setDaemon(true);
+					return t;
+				}
+			});
 
-			is = upstream.getEntity().getContent();
-			relay(is, response.getOutputStream());
+			local.scheduleAtFixedRate(new Runnable() {
+				@Override
+				public void run()
+				{
+					try {
+						long cutoff = System.currentTimeMillis() - IDLE_LIMIT_MS;
+						for (Relay relay : RELAYS)
+							if (relay.lastActivityMs() < cutoff) {
+								// WARN, not INFO: an edge that accepted the connection and then went
+								// quiet is an operational condition, and it is the only notice anyone
+								// gets - the browser just reconnects.
+								logger.warn("Ending a dashboard relay to {} - no data for over {} ms",
+										relay.streamUrl(), IDLE_LIMIT_MS);
+								relay.close();
+							}
+					} catch (Throwable t) {
+						// a throw here would kill the task for the life of the JVM
+						logger.error("Dashboard relay reaper failed", t);
+					}
+				}
+			}, REAPER_PERIOD_MS, REAPER_PERIOD_MS, TimeUnit.MILLISECONDS);
 
-		} catch (Exception e) {
-			logger.error("Error proxying " + streamUrl, e);
-
-			// If we never got as far as writing a frame - the edge is down, DNS fails, the connection is
-			// refused - the browser would otherwise be handed an empty 200 and show a blank panel with
-			// nothing anywhere to say why. Same reasoning as the non-200 branch above.
-			if (!response.isCommitted())
-				response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Could not read the metrics stream");
-		} finally {
-			// abort() MUST come before close(): the entity is an endless stream, so closing it first blocks
-			try { httpGet.abort(); } catch (Exception e) { logger.debug("failed aborting proxy connection", e); }
-			if (null != is)
-				try { is.close(); } catch (Exception e) { /* already closed by abort() */ }
+			reaper = local;
 		}
 	}
 
-	/** Copies SSE frames through, flushing on each line feed so the browser sees them as they arrive. */
-	private void relay(InputStream is, OutputStream os) throws IOException {
+	private static void stopReaper()
+	{
+		synchronized (DashboardStreamProxyServlet.class) {
+			if (null != reaper) {
+				reaper.shutdownNow();
+				reaper = null;
+			}
+		}
+	}
 
-		int b;
-		while (-1 != (b = is.read())) {
-			try {
-				os.write(b);
-				if ('\n' == b)
-					os.flush();
-			} catch (Exception e) {
-				String exName = e.getClass().getSimpleName();
-				if (exName.equalsIgnoreCase("ClientAbortException") || exName.equals("EofException")) {
-					// the operator closed the dashboard tab - the expected way one of these ends
-					logger.debug("Connection closed by client ({}). Will stop proxying ...", exName);
+	/** Package-private for tests. */
+	static int relayCount()
+	{
+		return RELAYS.size();
+	}
+
+	/**
+	 * One dashboard connection: subscriber to the upstream chunks, write listener for the browser.
+	 *
+	 * Package-private so {@code DashboardRelayTest} can drive both sides directly - the interesting
+	 * behaviour is what happens when one of them misbehaves, which is awkward to arrange over sockets.
+	 */
+	static final class Relay implements Flow.Subscriber<List<ByteBuffer>>, WriteListener, AsyncListener {
+
+		private final String streamUrl;
+
+		private final AsyncContext async;
+
+		private final ServletOutputStream out;
+
+		/** Guarded by itself. Holds one delivery's buffers at most, because demand is one at a time. */
+		private final ArrayDeque<byte[]> queue = new ArrayDeque<byte[]>();
+
+		private final AtomicBoolean closed = new AtomicBoolean(false);
+
+		/** True while a request(1) is outstanding, so we never ask for a second chunk in flight. */
+		private final AtomicBoolean demanded = new AtomicBoolean(false);
+
+		/** Serializes isReady()/write() between the HttpClient thread and the container's callbacks. */
+		private final Object writeLock = new Object();
+
+		private volatile Flow.Subscription subscription;
+
+		private volatile long lastActivity = System.currentTimeMillis();
+
+		Relay(String streamUrl, AsyncContext async, ServletOutputStream out) {
+			this.streamUrl = streamUrl;
+			this.async = async;
+			this.out = out;
+		}
+
+		String streamUrl()
+		{
+			return streamUrl;
+		}
+
+		void start()
+		{
+			out.setWriteListener(this);
+		}
+
+		long lastActivityMs()
+		{
+			return lastActivity;
+		}
+
+		// ---- upstream ----
+
+		@Override
+		public void onSubscribe(Flow.Subscription subscription)
+		{
+			this.subscription = subscription;
+
+			// Nothing is requested yet: the browser side has not reported ready, and asking for chunks we
+			// cannot write is how a relay ends up buffering an endless stream.
+			requestIfDrained();
+		}
+
+		@Override
+		public void onNext(List<ByteBuffer> chunks)
+		{
+			demanded.set(false);
+			lastActivity = System.currentTimeMillis();
+
+			synchronized (queue) {
+				for (ByteBuffer chunk : chunks) {
+					byte[] bytes = new byte[chunk.remaining()];
+					chunk.get(bytes);
+					if (bytes.length > 0)
+						queue.add(bytes);
+				}
+			}
+
+			drain();
+		}
+
+		/**
+		 * Serves BOTH {@link Flow.Subscriber#onError} and {@link WriteListener#onError} - the two
+		 * interfaces declare the same signature, and the response to either is the same: this connection
+		 * is over. Whichever end broke, the other is released by {@link #close()}.
+		 */
+		@Override
+		public void onError(Throwable throwable)
+		{
+			logger.debug("Dashboard relay failed", throwable);
+			close();
+		}
+
+		@Override
+		public void onComplete()
+		{
+			// the node's stream has no natural end, so this means the edge went away
+			logger.debug("Dashboard relay upstream ended");
+			close();
+		}
+
+		// ---- browser ----
+
+		@Override
+		public void onWritePossible()
+		{
+			drain();
+		}
+
+		private void drain()
+		{
+			if (closed.get())
+				return;
+
+			synchronized (writeLock) {
+				boolean wrote = false;
+				try {
+					while (out.isReady()) {
+						byte[] chunk;
+						synchronized (queue) {
+							chunk = queue.poll();
+						}
+
+						if (null == chunk) {
+							// Flush before going idle. Without this the container aggregates frames and
+							// releases them when its buffer fills, which turns a stream that ticks twice
+							// a second into one that jumps every few seconds.
+							if (wrote)
+								out.flush();
+
+							break;
+						}
+
+						out.write(chunk);
+						wrote = true;
+						lastActivity = System.currentTimeMillis();
+					}
+				} catch (IOException e) {
+					// the usual reason is the operator closing the dashboard tab
+					logger.debug("Dashboard relay connection ended", e);
+					close();
+					return;
+				} catch (IllegalStateException e) {
+					logger.debug("Dashboard relay already completed", e);
+					close();
 					return;
 				}
-				throw new RuntimeException(e);
+			}
+
+			requestIfDrained();
+		}
+
+		/** Ask the node for more only once the browser has taken everything we already have. */
+		private void requestIfDrained()
+		{
+			Flow.Subscription current = subscription;
+			if (null == current || closed.get())
+				return;
+
+			synchronized (queue) {
+				if (!queue.isEmpty())
+					return;
+			}
+
+			if (demanded.compareAndSet(false, true))
+				current.request(1);
+		}
+
+		void close()
+		{
+			if (!closed.compareAndSet(false, true))
+				return;
+
+			RELAYS.remove(this);
+
+			Flow.Subscription current = subscription;
+			if (null != current)
+				try { current.cancel(); } catch (Exception e) { logger.debug("Could not cancel upstream", e); }
+
+			try {
+				async.complete();
+			} catch (Exception e) {
+				logger.debug("AsyncContext was already complete", e);
 			}
 		}
-	}
 
-	private static class Connections {
+		// ---- AsyncListener: every way the container can end this connection ----
 
-		private static final PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+		@Override public void onComplete(AsyncEvent event) { close(); }
+		@Override public void onTimeout(AsyncEvent event) { close(); }
+		@Override public void onError(AsyncEvent event) { close(); }
+		@Override public void onStartAsync(AsyncEvent event) { /* never re-dispatched */ }
 
-		private static final HttpClient httpClient;
+		/** Package-private for tests. */
+		int queueSize()
+		{
+			synchronized (queue) {
+				return queue.size();
+			}
+		}
 
-		static {
-			// one long-lived connection per dashboard viewer per edge, so the pool is sized by viewers
-			connectionManager.setDefaultMaxPerRoute(400);
-			connectionManager.setMaxTotal(400);
+		/** Package-private for tests. */
+		boolean isClosed()
+		{
+			return closed.get();
+		}
 
-			// The node emits a frame every 500 ms, so 10 s of silence means the stream is wedged, not idle.
-			// Letting the read time out ends the relay and the browser's EventSource reconnects; an
-			// infinite socket timeout would instead park this container thread for the life of the process.
-			RequestConfig requestConfig = RequestConfig.custom()
-					.setConnectTimeout(5000)
-					.setConnectionRequestTimeout(5000)
-					.setSocketTimeout(10000)
-					.build();
-
-			httpClient = HttpClients.custom()
-					.setConnectionManager(connectionManager)
-					.setDefaultRequestConfig(requestConfig)
-					.build();
+		/** Package-private for tests. */
+		boolean hasOutstandingDemand()
+		{
+			return demanded.get();
 		}
 	}
 
