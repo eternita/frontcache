@@ -1,0 +1,118 @@
+/*
+ * The "Edges status" block: the dot, the edge name and the node's live numbers.
+ *
+ * Its own file rather than part of fc-dashboard.css because the block is not the realtime page's -
+ * it renders on the cache and config pages too, through inc/edges_status.jsp, and those pages have
+ * no reason to load a monitor stylesheet. The realtime page's own layout (the column the block sits
+ * in, the circuit cards beside it) stays in fc-dashboard.css.
+ *
+ * Filled by fc-edges-status.js.
+ */
+
+/* ---- the status dot ----
+   Three states, so a CSS circle rather than the green.png/red.png pair: until the first poll answers
+   there is no third image to show, and "we have not asked yet" must not render as "this node is
+   down". */
+.fc-dot {
+	display: inline-block;
+	width: 13px;
+	height: 13px;
+	border-radius: 50%;
+	vertical-align: middle;
+	background: #ccc;
+}
+
+.fc-dot.fc-dot-online  { background: #2eaa2e; }
+.fc-dot.fc-dot-offline { background: #d33; }
+
+/* not yet asked: visibly neither of the above, and quietly animated so it reads as "in progress" */
+.fc-dot.fc-dot-pending {
+	background: #ccc;
+	animation: fc-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes fc-dot-pulse {
+	0%, 100% { opacity: 1; }
+	50%      { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.fc-dot.fc-dot-pending { animation: none; }
+}
+
+/* ---- the rows ---- */
+
+.fc-edges-status {
+	font-size: 18px;
+}
+
+.fc-edges-status td {
+	padding: 5px 5px 15px 5px;
+	vertical-align: top;
+}
+
+.fc-edges-status .fc-edge-name {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 190px;
+}
+
+.fc-edges-status .fc-edge-uptime {
+	font-size: 12px;
+	color: #999;
+	font-weight: 400;
+}
+
+/* Label left, value right, one row each. A two-column grid rather than floated dt/dd: a float lets
+   the value text flow AROUND the label and wrap mid-value ("18.4" / "KB") as soon as the pair is
+   wider than the column, which at 240px is most of them. The grid gives the label exactly the width
+   it needs and the value the rest, and nowrap makes an over-long value clip the label column instead
+   of folding onto a second line. */
+.fc-edges-status .fc-edge-stats {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	column-gap: 8px;
+	row-gap: 1px;
+	margin: 4px 0 0 0;
+	font-size: 12px;
+	color: #777;
+	line-height: 1.45;
+}
+
+.fc-edges-status .fc-edge-stats dt {
+	font-weight: 400;
+	color: #999;
+	white-space: nowrap;
+}
+
+.fc-edges-status .fc-edge-stats dd {
+	margin: 0;
+	text-align: right;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;   /* so a changing number does not jitter its neighbours */
+}
+
+.fc-edges-status .fc-edge-note {
+	display: block;
+	font-size: 11px;
+	color: #aaa;
+}
+
+.fc-edges-status .fc-edge-offline {
+	font-size: 12px;
+	color: #c00;
+}
+
+/* ---- the wide variant (inc/edges_status.jsp, edges.jsp) ----
+   The same block on the pages where it is context rather than the subject: one row per edge, so the
+   stacked variant's cell padding and its block-level offline note would both be wrong here. */
+.fc-edges-status-wide td {
+	padding: 5px;
+	vertical-align: middle;
+}
+
+.fc-edges-status-wide .fc-edge-offline {
+	display: inline;
+	margin-left: 6px;
+}

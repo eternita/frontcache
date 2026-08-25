@@ -135,14 +135,15 @@ var FcEdgesStatus = (function () {
 		if (offline)
 			offline.style.display = edge.available ? "none" : "";
 
-		// The dot is server-rendered on page load and would otherwise stay at whatever the edge was
-		// when the page opened - a node that died an hour ago would still be green next to a column of
-		// em dashes, which is a worse signal than no dot at all.
+		// The dot starts PENDING: the page is rendered from the console's own edge list without
+		// contacting anything, so until this first poll answers there is genuinely no online status to
+		// show. Rendering that as red would report every healthy node as down for a moment on every
+		// page load; rendering it as green would hide a node that is actually gone.
 		var dot = row.querySelector("[data-field='dot']");
 		if (dot) {
-			var src = edge.available ? "static/images/status/green.png" : "static/images/status/red.png";
-			if (dot.getAttribute("src") !== src)
-				dot.setAttribute("src", src);
+			var state = edge.available ? "fc-dot-online" : "fc-dot-offline";
+			dot.className = "fc-dot " + state;
+			dot.title = edge.available ? "online" : "not reachable";
 		}
 	}
 

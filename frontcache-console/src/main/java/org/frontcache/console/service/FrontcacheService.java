@@ -179,6 +179,36 @@ public class FrontcacheService {
 		return new ArrayList<FrontCacheStatus>(getClusterStatus().values());
 	}
 
+	/**
+	 * The configured edges, with no numbers and NO NETWORK CALLS - just what the console already knows
+	 * from its own config: each edge's name and URL.
+	 *
+	 * This is what a page renders its "Edges status" rows from. Filling those rows used to mean a
+	 * fan-out over the whole fleet before the first byte of HTML, so one unreachable edge held the
+	 * page for {@link #FRONTCACHE_CLIENT_TIMEOUT} - on the realtime page, that is a monitoring
+	 * dashboard that will not paint because something it monitors is down. The numbers now arrive from
+	 * /edges-status.json a moment later, which is the one place that talks to the fleet.
+	 *
+	 * {@code available} is deliberately left false here and is not rendered as "offline": until the
+	 * first poll answers, this console does not know, and a red dot on a healthy node is a worse
+	 * answer than an honest "checking".
+	 */
+	public List<FrontCacheStatus> getEdgeList() {
+
+		List<FrontCacheStatus> edges = new ArrayList<FrontCacheStatus>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		{
+			FrontCacheStatus edge = new FrontCacheStatus();
+			edge.setName(fcClient.getName());
+			edge.setUrl(fcClient.getFrontCacheURL());
+			edge.setCachedAmount(-1);
+			edges.add(edge);
+		}
+
+		return edges;
+	}
+
 	// ---- the polled view ---------------------------------------------------------------------
 
 	/**

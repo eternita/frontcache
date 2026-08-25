@@ -54,7 +54,9 @@ public class IndexController {
 	@RequestMapping(value = "/realtime", method = RequestMethod.GET)
 	public String domainRealtimeMonitor(ModelMap model) {
 
-		model.put("edges", frontcacheService.getClusterStatusList());
+		// names and URLs only - no fan-out. The numbers, and the online dot itself, arrive from
+		// /edges-status.json a moment after the page paints; see inc/edges_status_stacked.jsp.
+		model.put("edges", frontcacheService.getEdgeList());
 
 		model.put("dashboardStreams", frontcacheService.getDashboardStreams());
 

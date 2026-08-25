@@ -34,7 +34,7 @@ public class CacheInvalidationController {
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getClusterStatusList());
+		model.addAttribute("edges", frontcacheService.getEdgeList());
 
 		return "cache_invalidation";
 	}
@@ -49,7 +49,7 @@ public class CacheInvalidationController {
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getClusterStatusList());
+		model.addAttribute("edges", frontcacheService.getEdgeList());
 
 		return "cache_invalidation";
 	}
@@ -65,7 +65,7 @@ public class CacheInvalidationController {
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getClusterStatusList());
+		model.addAttribute("edges", frontcacheService.getEdgeList());
 
 		return "cache_invalidation";
 	}
