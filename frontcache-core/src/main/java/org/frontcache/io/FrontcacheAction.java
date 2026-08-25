@@ -24,6 +24,13 @@ public abstract class FrontcacheAction {
 
 	public static final String GET_CACHE_STATE = "get-cache-state";
 
+	/**
+	 * The cheap, pollable companion of {@link #GET_CACHE_STATE}: typed cache sizes plus the JVM's heap,
+	 * CPU and uptime, all read from state the process already holds. {@code get-cache-state} opens a
+	 * Lucene reader per call, which is fine for a console page and wrong for a poll loop.
+	 */
+	public static final String GET_NODE_STATS = "get-node-stats";
+
 	public static final String GET_CACHED_KEYS = "get-cached-keys";
 
 	public static final String GET_FROM_CACHE = "get-from-cache";
@@ -67,6 +74,7 @@ public abstract class FrontcacheAction {
 
 	static {
 		actionsDescriptionMap.put(FrontcacheAction.GET_CACHE_STATE, "get cache state: cache processor, amount cached items");
+		actionsDescriptionMap.put(FrontcacheAction.GET_NODE_STATS, "get node stats: cache sizes per tier plus JVM heap, process CPU and uptime - cheap enough to poll");
 		actionsDescriptionMap.put(FrontcacheAction.GET_FALLBACK_CONFIGS, "get fallback configs from ./conf/fallbacks.conf");
 		actionsDescriptionMap.put(FrontcacheAction.RELOAD_FALLBACKS, "reload fallback configs from ./conf/fallbacks.conf");
 		actionsDescriptionMap.put(FrontcacheAction.INVALIDATE, "Invalidate chache, accept 'filter' param with url/tag for invalidation ('*' - everything). '*' empties the whole node, replicated entries included");

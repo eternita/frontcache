@@ -250,6 +250,11 @@ public class FcMetricsExport {
 					.tags(Tags.of("tier", "L1"))
 					.register(registry);
 
+		// Content bytes, NOT the tier's retained heap - the meter name says "content" for that reason.
+		if (CacheStats.UNKNOWN != stats.getL1ContentBytes())
+			cacheGauge("cache.content.bytes", "Bytes of response content held in the in-memory tier",
+					Tags.of("tier", "L1"), s -> s.getL1ContentBytes());
+
 		if (CacheStats.UNKNOWN != stats.getL2Entries())
 			cacheGauge("cache.entries", "Entries currently cached", Tags.of("tier", "L2"),
 					s -> s.getL2Entries());

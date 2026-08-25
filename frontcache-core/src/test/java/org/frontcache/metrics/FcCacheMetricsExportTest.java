@@ -172,6 +172,7 @@ public class FcCacheMetricsExportTest {
 	{
 		assertEquals(CacheStats.UNKNOWN, CacheStats.NOT_TRACKED.getL1Entries());
 		assertEquals(CacheStats.UNKNOWN, CacheStats.NOT_TRACKED.getL1Evictions());
+		assertEquals(CacheStats.UNKNOWN, CacheStats.NOT_TRACKED.getL1ContentBytes());
 		assertEquals(CacheStats.UNKNOWN, CacheStats.NOT_TRACKED.getL2Entries());
 		assertEquals(CacheStats.UNKNOWN, CacheStats.NOT_TRACKED.getL2DiskBytes());
 
@@ -188,6 +189,9 @@ public class FcCacheMetricsExportTest {
 				stats.isTracked(stats.getL2DiskBytes()), hasSeries("frontcache.cache.disk.bytes", "tier", "L2"));
 		assertEquals("an eviction counter exists exactly when evictions are tracked",
 				stats.isTracked(stats.getL1Evictions()), hasSeries("frontcache.cache.evictions", "tier", "L1"));
+		assertEquals("an L1 content-size gauge exists exactly when L1 content bytes are tracked",
+				stats.isTracked(stats.getL1ContentBytes()),
+				hasSeries("frontcache.cache.content.bytes", "tier", "L1"));
 	}
 
 	private static boolean hasSeries(String name, String tagKey, String tagValue)

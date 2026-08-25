@@ -34,7 +34,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheManager;
+import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheStats;
 import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FcNodeStats;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
@@ -145,6 +148,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.GET_CACHE_STATE:
 			aResponse = getCacheStatus(request);
+			break;
+
+		case FrontcacheAction.GET_NODE_STATS:
+			aResponse = getNodeStats(request);
 			break;
 
 		case FrontcacheAction.GET_CACHED_KEYS:
@@ -264,6 +271,26 @@ public class FrontCacheIOServlet extends HttpServlet {
 		ActionResponse aResponse = new CacheStatusActionResponse(state);
 
 		return aResponse;
+	}
+
+	/**
+	 * The pollable view - see {@link NodeStatsActionResponse}.
+	 *
+	 * Reads through {@link CacheManager#existingInstance()}, not {@code getInstance()}: this action is
+	 * on a console's poll loop, and a node whose cache has not started yet must not have it started BY
+	 * being polled - that would open the Lucene index and take its write lock. The same rule the
+	 * metrics exporter follows. With no cache yet, the cache numbers report as unknown and the JVM
+	 * numbers still answer.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getNodeStats(HttpServletRequest req)
+	{
+		CacheProcessor processor = CacheManager.existingInstance();
+		CacheStats cacheStats = (null == processor) ? CacheStats.NOT_TRACKED : processor.getCacheStats();
+
+		return new NodeStatsActionResponse(cacheStats, FcNodeStats.current());
 	}
 
 	/**

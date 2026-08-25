@@ -16,6 +16,7 @@ import java.util.Properties;
 
 import org.frontcache.cache.CacheStats;
 import org.frontcache.cache.FcCacheMetrics;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.junit.After;
 import org.junit.Before;
@@ -52,6 +53,14 @@ public class L1L2CacheStatsTest {
 	private WebResponse cacheable(String url) {
 		WebResponse response = new WebResponse(url, ("content of " + url).getBytes(), "30d", null);
 		response.setStatusCode(200);
+		return response;
+	}
+
+	/** A response tagged for the in-memory tier, with a body of a known size. */
+	private WebResponse cacheableInL1(String url, int contentBytes) {
+		WebResponse response = new WebResponse(url, new byte[contentBytes], "30d", null);
+		response.setStatusCode(200);
+		response.setCacheLevel(FCHeaders.CACHE_LEVEL_L1);
 		return response;
 	}
 
@@ -120,6 +129,40 @@ public class L1L2CacheStatsTest {
 		assertEquals("the cheap doc count and the reader-opening one must agree",
 				index.getIndexSize(), index.getIndexSizeFast());
 		assertEquals(5, index.getIndexSizeFast());
+	}
+
+	/**
+	 * The L1 byte counter, end to end: through the processor's own put path and out through
+	 * {@link CacheStats}, which is how the metrics exporter and the console will read it.
+	 * {@code L1ByteCounterTest} and {@code L1ByteCounterEvictionTest} cover the counter's arithmetic;
+	 * this covers that it is wired to the cache the processor actually uses.
+	 */
+	@Test
+	public void l1ContentBytesFollowsWhatTheMemoryTierHolds()
+	{
+		CacheStats empty = cacheProcessor.getCacheStats();
+		assertTrue("L1 content bytes must be tracked", empty.isTracked(empty.getL1ContentBytes()));
+		assertEquals("nothing in L1 yet", 0, empty.getL1ContentBytes());
+
+		cacheProcessor.putToCache("http://example.com/l1-a.htm", cacheableInL1("http://example.com/l1-a.htm", 1024));
+		cacheProcessor.putToCache("http://example.com/l1-b.htm", cacheableInL1("http://example.com/l1-b.htm", 2048));
+
+		CacheStats after = cacheProcessor.getCacheStats();
+		assertEquals("both went to the memory tier", 2, after.getL1Entries());
+		assertEquals("and their bodies are what the byte figure counts", 3072, after.getL1ContentBytes());
+	}
+
+	/** L2 is the default tier, and it is on disk - it must not show up in L1's memory figure. */
+	@Test
+	public void l2EntriesDoNotCountTowardsL1ContentBytes()
+	{
+		cacheProcessor.putToCache("http://example.com/a.htm", cacheable("http://example.com/a.htm"));
+
+		CacheStats stats = cacheProcessor.getCacheStats();
+
+		assertEquals("the entry went to L2", 1, stats.getL2Entries());
+		assertEquals("so L1 holds no bytes", 0, stats.getL1ContentBytes());
+		assertTrue("while the on-disk tier does", stats.getL2DiskBytes() > 0);
 	}
 
 	/** A gauge must never throw, whatever state the index is in - a scrape is not a request path. */

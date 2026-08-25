@@ -52,7 +52,7 @@
 
 			<hr>
 			<footer>
-				<p><a href="https://github.com/eternita/frontcache/wiki" target="_blank">Frontcache Docs</a></p>
+				<p><a href="https://github.com/eternita/frontcache/blob/main/docs/doc-index.md" target="_blank">Frontcache Docs</a></p>
 			</footer>
 		</div>
 	</div>
