@@ -154,7 +154,8 @@ configure([project(':frontcache-core'), project(':frontcache-agent')]) {
 	apply plugin: 'maven-publish'
 
 	java {
-		withSourcesJar()   // replaces maven-source-plugin
+		// No sources jar: the published artifacts are binary-only. (The javadoc jar
+		// stays - it documents the API without shipping the implementation.)
 		withJavadocJar()   // replaces maven-javadoc-plugin
 	}
 
