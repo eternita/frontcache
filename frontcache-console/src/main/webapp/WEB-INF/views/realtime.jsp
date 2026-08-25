@@ -22,7 +22,8 @@
 	<div id="mainWrapper">
 		<%@ include file="/WEB-INF/views/inc/menu.jsp"%>
 
-		<div class="container">
+		<%-- fc-wide: the monitor needs the window's width, not bootstrap's 1170px --%>
+		<div class="container fc-wide">
 			<div class="fc-layout">
 				<div class="fc-edges">
 					<p style="height: 10px">&nbsp;</p>

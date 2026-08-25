@@ -18,7 +18,9 @@
 </style>
 
 <nav class="navbar navbar-default navbar-static-top" id="top">
-	<div class="container">
+	<%-- the realtime monitor runs full-width (see .container.fc-wide in fc-dashboard.css);
+	     the navbar follows so the logo stays aligned with the content below it --%>
+	<div class="container ${topActive == 'realtime' ? 'fc-wide' : ''}">
 		<div class="navbar-header">
 			<button aria-controls="bs-navbar" aria-expanded="false"
 				class="collapsed navbar-toggle" data-target="#bs-navbar"

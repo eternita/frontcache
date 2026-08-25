@@ -447,6 +447,15 @@ var FcDashboard = (function () {
 		circuit.update(frame);
 	};
 
+	/**
+	 * How many cards this circuit row holds. The row is a responsive grid that fits as many
+	 * cards per row as the column width allows (see .fc-circuits in fc-dashboard.css); this
+	 * is what stops it from reserving room for cards that do not exist.
+	 */
+	StreamPanel.prototype.syncCardCount = function () {
+		this.circuitsNode.style.setProperty("--fc-cards", this.circuitsNode.children.length);
+	};
+
 	/** Alphabetical, which was the vendored panel's default sort. CSS `order` then pins the known commands. */
 	StreamPanel.prototype.insertSorted = function (circuit) {
 
@@ -456,10 +465,12 @@ var FcDashboard = (function () {
 		for (var i = 0; i < existing.length; i++)
 			if (existing[i].getAttribute("data-command") > circuit.name) {
 				self.circuitsNode.insertBefore(circuit.root, existing[i]);
+				self.syncCardCount();
 				return;
 			}
 
 		self.circuitsNode.appendChild(circuit.root);
+		self.syncCardCount();
 	};
 
 	StreamPanel.prototype.remove = function (commandName) {
@@ -470,6 +481,7 @@ var FcDashboard = (function () {
 
 		this.circuitsNode.removeChild(circuit.root);
 		delete this.circuits[commandName];
+		this.syncCardCount();
 	};
 
 	// ---- entry point ---------------------------------------------------------------------------
