@@ -9,6 +9,8 @@
 package org.frontcache.resilience;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Map;
@@ -124,8 +126,11 @@ public class FcCommandMetricsTest {
 	{
 		FcCommandMetrics metrics = metrics("Concurrency", 10000);
 
-		long first = metrics.markStart(0, "first");
-		long second = metrics.markStart(0, "second");
+		// budgetMs 0 -> not watched, so the token is null - and markEnd must still keep the gauge right
+		FcCommandMetrics.InFlight first = metrics.markStart(0, "first");
+		FcCommandMetrics.InFlight second = metrics.markStart(0, "second");
+		assertNull("an unwatched execution needs no token", first);
+		assertNull("an unwatched execution needs no token", second);
 		assertEquals(2, metrics.getCurrentConcurrentExecutionCount());
 
 		metrics.markEnd(first);
@@ -143,7 +148,8 @@ public class FcCommandMetricsTest {
 	{
 		FcCommandMetrics metrics = metrics("Sweep-Once", 10000);
 
-		long execution = metrics.markStart(50, "GET /slow.jsp");
+		FcCommandMetrics.InFlight execution = metrics.markStart(50, "GET /slow.jsp");
+		assertNotNull("an execution with a budget is watched, so it gets a token", execution);
 		Thread.sleep(120);
 
 		metrics.sweepOverruns();
@@ -164,7 +170,7 @@ public class FcCommandMetricsTest {
 
 		// budgetMs 0 = the thread path, which has a real TimeLimiter; watching it too would report the
 		// same overrun twice.
-		metrics.markStart(0, "thread-isolated");
+		assertNull("no budget - nothing registered with the watchdog", metrics.markStart(0, "thread-isolated"));
 		Thread.sleep(50);
 		metrics.sweepOverruns();
 

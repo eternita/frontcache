@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
@@ -19,7 +20,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 
 import org.HdrHistogram.ConcurrentHistogram;
@@ -63,8 +63,6 @@ public class FcCommandMetrics {
 
 	private static final ConcurrentMap<String, FcCommandMetrics> INSTANCES = new ConcurrentHashMap<String, FcCommandMetrics>();
 
-	private static final AtomicLong EXECUTION_IDS = new AtomicLong(0);
-
 	private static volatile ScheduledExecutorService scheduler;
 
 	private final String commandKey;
@@ -87,7 +85,16 @@ public class FcCommandMetrics {
 	private final AtomicInteger concurrentExecutions = new AtomicInteger(0);
 	/** Per-bucket high-water mark of concurrentExecutions, for rollingMaxConcurrentExecutionCount. */
 	private final int[] maxConcurrentPerBucket;
-	private final ConcurrentMap<Long, InFlight> inFlight = new ConcurrentHashMap<Long, InFlight>();
+	/**
+	 * Executions currently being watched by the semaphore-path watchdog.
+	 *
+	 * An identity Set of the records themselves, not a {@code Map<Long, InFlight>} keyed by a
+	 * monotonic id. The id was past the {@link Long} cache within the first few hundred requests, so
+	 * every watched execution boxed a Long to register and boxed another to deregister, plus the map
+	 * node for each. The record is its own handle; {@link #markStart} hands it back and
+	 * {@link #markEnd} removes it.
+	 */
+	private final Set<InFlight> inFlight = ConcurrentHashMap.newKeySet();
 
 	private FcCommandMetrics(String commandKey, String group, int rollingStatsMs) {
 		this.commandKey = commandKey;
@@ -168,15 +175,16 @@ public class FcCommandMetrics {
 	}
 
 	/**
-	 * Registers an execution and returns its token.
+	 * Registers an execution and returns its token, which must be handed back to {@link #markEnd}.
 	 *
 	 * @param budgetMs the configured timeout for the command, or 0 for "not watched". Only the
 	 *        semaphore path passes a budget: the thread path is bounded by a real TimeLimiter, so
 	 *        watching it too would double-report the same overrun.
+	 * @return the token to pass to {@link #markEnd}, or {@code null} when the execution is not watched
+	 *         - markEnd accepts null and still maintains the concurrency gauge
 	 */
-	public long markStart(long budgetMs, String description)
+	public InFlight markStart(long budgetMs, String description)
 	{
-		long id = EXECUTION_IDS.incrementAndGet();
 		int concurrent = concurrentExecutions.incrementAndGet();
 
 		// Racy by construction - two threads can read the same bucket and both write. The value is a
@@ -185,15 +193,21 @@ public class FcCommandMetrics {
 		int bucket = currentBucket;
 		if (concurrent > maxConcurrentPerBucket[bucket])
 			maxConcurrentPerBucket[bucket] = concurrent;
-		if (budgetMs > 0)
-			inFlight.put(Long.valueOf(id), new InFlight(System.nanoTime(), budgetMs, description));
-		return id;
+
+		if (0 >= budgetMs)
+			return null; // not watched - nothing to register, and nothing to allocate
+
+		InFlight execution = new InFlight(System.nanoTime(), budgetMs, description);
+		inFlight.add(execution);
+		return execution;
 	}
 
-	public void markEnd(long id)
+	/** @param execution the token from {@link #markStart}; null for an execution that was not watched */
+	public void markEnd(InFlight execution)
 	{
 		concurrentExecutions.decrementAndGet();
-		inFlight.remove(Long.valueOf(id));
+		if (null != execution)
+			inFlight.remove(execution);
 	}
 
 	public int getCurrentConcurrentExecutionCount()
@@ -252,34 +266,78 @@ public class FcCommandMetrics {
 		return (int) ((getRollingErrorCount() * 100) / total);
 	}
 
-	private Histogram latencySnapshot()
+	/**
+	 * The mean and the nine percentiles, read from ONE merge of the bucket ring.
+	 *
+	 * The merge is the expensive part - it allocates a {@link Histogram} sized for
+	 * {@link #MAX_TRACKED_LATENCY_MS} at three significant digits (on the order of ten thousand
+	 * counters) and folds every bucket into it. Both numbers come from the same merge here because
+	 * every consumer wants both, and taking them through {@link #getLatencyMean()} and
+	 * {@link #getLatencyPercentiles()} separately paid for the merge twice.
+	 *
+	 * Immutable, so a caller can hold one for the duration of a frame or a scrape.
+	 */
+	public static final class LatencySnapshot {
+
+		private final long mean;
+		private final Map<String, Long> percentiles;
+
+		private LatencySnapshot(long mean, Map<String, Long> percentiles) {
+			this.mean = mean;
+			this.percentiles = percentiles;
+		}
+
+		public long getMean() {
+			return mean;
+		}
+
+		/** The percentile map the dashboard expects, with its exact key set and order. */
+		public Map<String, Long> getPercentiles() {
+			return percentiles;
+		}
+	}
+
+	/**
+	 * One merge of the rolling ring.
+	 *
+	 * This is deliberately NOT cached here. A cache would need a TTL, and a TTL inside the accessor
+	 * would make "record a latency, then read it back" quietly wrong for anything that does the two in
+	 * quick succession - the tests among them. Callers that read repeatedly within one logical
+	 * operation (a dashboard frame, a Prometheus scrape) hold the returned snapshot instead.
+	 */
+	public LatencySnapshot latencySnapshot()
 	{
 		Histogram merged = new Histogram(MAX_TRACKED_LATENCY_MS, 3);
 		for (int i = 0; i < bucketCount; i++)
 			merged.add(latencyBuckets[i]);
-		return merged;
+
+		boolean empty = (0 == merged.getTotalCount());
+
+		Map<String, Long> percentiles = new LinkedHashMap<String, Long>();
+		for (double p : PERCENTILES)
+		{
+			String key = (p == Math.floor(p)) ? String.valueOf((int) p) : String.valueOf(p);
+			percentiles.put(key, Long.valueOf(empty ? 0 : merged.getValueAtPercentile(p)));
+		}
+
+		return new LatencySnapshot(empty ? 0 : (long) merged.getMean(), percentiles);
 	}
 
+	/** Convenience for a caller that wants only the mean. Costs a full merge - see {@link #latencySnapshot()}. */
 	public long getLatencyMean()
 	{
-		Histogram snapshot = latencySnapshot();
-		return (0 == snapshot.getTotalCount()) ? 0 : (long) snapshot.getMean();
+		return latencySnapshot().getMean();
 	}
 
 	/**
 	 * The percentile map the dashboard expects, with its exact key set - it divides and plots these
 	 * directly, so the shape matters as much as the numbers.
+	 *
+	 * Costs a full merge - see {@link #latencySnapshot()}.
 	 */
 	public Map<String, Long> getLatencyPercentiles()
 	{
-		Histogram snapshot = latencySnapshot();
-		Map<String, Long> percentiles = new LinkedHashMap<String, Long>();
-		for (double p : PERCENTILES)
-		{
-			String key = (p == Math.floor(p)) ? String.valueOf((int) p) : String.valueOf(p);
-			percentiles.put(key, Long.valueOf(0 == snapshot.getTotalCount() ? 0 : snapshot.getValueAtPercentile(p)));
-		}
-		return percentiles;
+		return latencySnapshot().getPercentiles();
 	}
 
 	// ---- rotation and the watchdog -----------------------------------------
@@ -318,9 +376,8 @@ public class FcCommandMetrics {
 	void sweepOverruns()
 	{
 		long now = System.nanoTime();
-		for (Map.Entry<Long, InFlight> entry : inFlight.entrySet())
+		for (InFlight execution : inFlight)
 		{
-			InFlight execution = entry.getValue();
 			if (execution.reported || !execution.isOverrun(now))
 				continue;
 
@@ -378,7 +435,11 @@ public class FcCommandMetrics {
 		scheduler = local;
 	}
 
-	private static class InFlight {
+	/**
+	 * One watched execution. Package-visible because it IS the token {@link #markStart} returns - see
+	 * the {@link #inFlight} field.
+	 */
+	static class InFlight {
 
 		private final long startNanos;
 		private final long budgetMs;

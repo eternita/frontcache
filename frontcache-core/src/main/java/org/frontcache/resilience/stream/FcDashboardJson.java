@@ -114,12 +114,18 @@ public class FcDashboardJson {
 		field(json, "currentConcurrentExecutionCount", metrics.getCurrentConcurrentExecutionCount());
 		field(json, "rollingMaxConcurrentExecutionCount", metrics.getRollingMaxConcurrentExecutionCount());
 
-		field(json, "latencyExecute_mean", metrics.getLatencyMean());
-		percentiles(json, "latencyExecute", metrics.getLatencyPercentiles());
+		// ONE merge of the rolling histogram ring for all four fields below. Read through
+		// getLatencyMean()/getLatencyPercentiles() they were four separate merges, each allocating a
+		// ~10k-counter Histogram and folding every bucket into it - per command, per 500ms publish
+		// tick, for as long as one browser had the dashboard open.
+		FcCommandMetrics.LatencySnapshot latency = metrics.latencySnapshot();
+
+		field(json, "latencyExecute_mean", latency.getMean());
+		percentiles(json, "latencyExecute", latency.getPercentiles());
 		// Frontcache has no separate "total" measurement - execute() IS the whole command - so these
 		// mirror the execute values rather than reporting a fabricated second number.
-		field(json, "latencyTotal_mean", metrics.getLatencyMean());
-		percentiles(json, "latencyTotal", metrics.getLatencyPercentiles());
+		field(json, "latencyTotal_mean", latency.getMean());
+		percentiles(json, "latencyTotal", latency.getPercentiles());
 
 		field(json, "propertyValue_circuitBreakerRequestVolumeThreshold", config.getRequestVolumeThreshold());
 		field(json, "propertyValue_circuitBreakerSleepWindowInMilliseconds", config.getSleepWindowMs());

@@ -132,7 +132,7 @@ public abstract class FcCommand<T> {
 		// Only the semaphore path is watched. The thread path has a real TimeLimiter, so watching it too
 		// would report the same overrun twice. See proposal section 6.2.
 		long budgetMs = (Isolation.SEMAPHORE == config.getIsolation()) ? config.getTimeoutMs() : 0;
-		long executionId = metrics.markStart(budgetMs, getExecutionDescription());
+		FcCommandMetrics.InFlight execution = metrics.markStart(budgetMs, getExecutionDescription());
 		long startNanos = System.nanoTime();
 
 		try {
@@ -155,7 +155,7 @@ public abstract class FcCommand<T> {
 			return resolveFallback(failure, cause);
 		} finally {
 			metrics.recordLatency(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
-			metrics.markEnd(executionId);
+			metrics.markEnd(execution);
 		}
 	}
 
