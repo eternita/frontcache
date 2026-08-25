@@ -788,7 +788,7 @@ public class FrontCacheClient {
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 
-		StringBuffer result = new StringBuffer();
+		StringBuilder result = new StringBuilder();
 		CloseableHttpResponse response = (CloseableHttpResponse) client.execute(post);
 		try {
 			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));

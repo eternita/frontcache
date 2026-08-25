@@ -8,6 +8,7 @@
  */
 package org.frontcache.include.impl;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -89,7 +90,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 */
 	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context, int recursionLevel)
 	{
-		String contentStr = new String(parentWebResponse.getContent());
+		// The ONE decode of the parent page per recursion level. hasIncludes() used to decode it too,
+		// immediately before this, purely to test for the marker - it now scans the bytes instead
+		// (IncludeProcessorBase.hasIncludes), so this is no longer the second copy of the same page.
+		String contentStr = new String(parentWebResponse.getContent(), StandardCharsets.UTF_8);
 		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, requestHeaders, client, context);
 
 		if (null == includes)
@@ -233,7 +237,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		// paste content from includes to output doc
 		WebResponse webResponse = new WebResponse("aggregation in " + this.getClass().getName());
 
-		StringBuffer outSb = new StringBuffer();
+		// StringBuilder, not StringBuffer: this is thread-confined, and StringBuffer synchronized every
+		// single append. Pre-sized from the page plus its resolved includes, so assembling a large page
+		// does not walk the array-doubling ladder, copying everything written so far at each step.
+		StringBuilder outSb = new StringBuilder(estimateAggregatedLength(content, includes));
 		for (int i = 0; i < includes.size(); i++)
 		{
 			IncludeResolutionPlaceholder inc = includes.get(i);
@@ -255,7 +262,9 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	        }
 
 
-			outSb.append(content.substring(scanIdx, inc.startIdx));
+			// append(CharSequence, start, end) copies the chars straight into the builder;
+			// append(substring(...)) allocated an intermediate String per segment.
+			outSb.append(content, scanIdx, inc.startIdx);
 
 			if (INCLUDE_TYPE_SYNC.equals(inc.includeType))
 			{
@@ -263,7 +272,8 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					outSb.append("<!-- start fc:include ").append(inc.includeURL).append(" -->");
 
 				if (null != inc.webResponse)
-					outSb.append(new String(inc.webResponse.getContent()));
+					// explicit UTF-8: this was the platform default, which is only incidentally the same
+					outSb.append(new String(inc.webResponse.getContent(), StandardCharsets.UTF_8));
 
 				if (FrontCacheEngine.debugComments)
 					outSb.append("<!-- end fc:include ").append(inc.includeURL).append(" -->");
@@ -274,9 +284,26 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 			scanIdx = inc.endIdx;
 		}
-		outSb.append(content.substring(scanIdx)); // data after the last include
-		webResponse.setContent(outSb.toString().getBytes());
+		outSb.append(content, scanIdx, content.length()); // data after the last include
+		webResponse.setContent(outSb.toString().getBytes(StandardCharsets.UTF_8));
 		return webResponse;
+	}
+
+	/**
+	 * Capacity hint for the aggregated page: the parent's own characters, plus each resolved include's
+	 * body, minus nothing for the tags they replace. Deliberately a slight over-estimate - one
+	 * allocation that is a few percent too large beats the copy-everything-so-far doubling it avoids.
+	 * Include bodies are measured in bytes and appended as chars, which for HTML is close enough for a
+	 * capacity hint.
+	 */
+	private static int estimateAggregatedLength(String content, List<IncludeResolutionPlaceholder> includes)
+	{
+		long estimate = content.length();
+		for (IncludeResolutionPlaceholder inc : includes)
+			if (null != inc.webResponse && null != inc.webResponse.getContent())
+				estimate += inc.webResponse.getContent().length;
+
+		return (int) Math.min(estimate, Integer.MAX_VALUE - 8);
 	}
 
 	/**

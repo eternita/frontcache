@@ -8,7 +8,6 @@
  */
 package org.frontcache;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -16,6 +15,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -535,7 +536,7 @@ public class FrontCacheEngine {
 
 	private String makeURL(boolean isSecure, String host, String port)
 	{
-		StringBuffer str = new StringBuffer();
+		StringBuilder str = new StringBuilder(32);
 		if (isSecure)
 			str.append("https");
 		else
@@ -997,6 +998,22 @@ public class FrontCacheEngine {
 	}
 
 
+	/**
+	 * The charset the response declares, falling back to UTF-8. Only used for the String-bodied
+	 * branch of {@link #writeResponse(RequestContext)}.
+	 */
+	private static Charset responseCharset(RequestContext context) {
+		try {
+			HttpServletResponse servletResponse = context.getResponse();
+			String encoding = (null == servletResponse) ? null : servletResponse.getCharacterEncoding();
+			if (null != encoding && 0 < encoding.length())
+				return Charset.forName(encoding);
+		} catch (Exception e) {
+			// unknown / unsupported charset name - fall through to UTF-8
+		}
+		return StandardCharsets.UTF_8;
+	}
+
 	private void writeResponse(RequestContext context) throws Exception {
 		// there is no body to send
 		if (context.getResponseBody() == null && context.getResponseDataStream() == null) {
@@ -1007,8 +1024,12 @@ public class FrontCacheEngine {
 		InputStream is = null;
 		try {
 			if (context.getResponseBody() != null) {
-				String body = context.getResponseBody();
-				FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes()), outStream);
+				// Nothing in the codebase calls setResponseBody() today, so this branch is currently
+				// unreachable - but it is public API on RequestContext. Written directly rather than
+				// streamed through a ByteArrayInputStream, and with an explicit charset: getBytes()
+				// used the platform default, which is not necessarily the encoding the response
+				// declares.
+				outStream.write(context.getResponseBody().getBytes(responseCharset(context)));
 				return;
 			}
 
@@ -1052,7 +1073,9 @@ public class FrontCacheEngine {
 
 		OutputStream outStream = servletResponse.getOutputStream();
 		try {
-			FCUtils.writeResponse(new ByteArrayInputStream(content), outStream);
+			// The body is already a byte[] - write it. Streaming it through a ByteArrayInputStream
+			// only to have it copied back out 16 KB at a time is a second pass over the whole page.
+			outStream.write(content);
 		}
 		finally {
 			try {
@@ -1076,8 +1099,10 @@ public class FrontCacheEngine {
 		servletResponse.setCharacterEncoding("UTF-8");
 		OutputStream outStream = servletResponse.getOutputStream();
 		try {
-			byte[] body = webResponse.getContent();
-			FCUtils.writeResponse(new ByteArrayInputStream(body), outStream);
+			// This is the cache-hit path: the body is a fully materialised byte[], so write it in one
+			// call. It used to be wrapped in a ByteArrayInputStream and copied back out through
+			// FCUtils.writeResponse's buffer - a whole extra pass over every page served from cache.
+			outStream.write(webResponse.getContent());
 		}
 		finally {
 			try {
