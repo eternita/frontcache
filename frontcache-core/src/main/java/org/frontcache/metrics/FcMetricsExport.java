@@ -193,6 +193,46 @@ public class FcMetricsExport {
 		bindCommandMetrics();
 		bindThreadPools();
 		bindCacheMetrics();
+		bindJvmMetrics();
+	}
+
+	/**
+	 * Heap, process CPU and uptime - the JVM numbers {@code get-node-stats} already reports to the
+	 * console, exported here so the same three are available to Grafana and to alerting.
+	 *
+	 * <h3>Why bind them here rather than bridge FcNodeStats</h3>
+	 *
+	 * {@code FcNodeStats} reads the same beans and deliberately owes nothing to Micrometer, because the
+	 * management API has to answer whether or not export is enabled. Bridging it into gauges would put
+	 * a second implementation of "what is heap" in the tree; Micrometer's binders are the standard one,
+	 * are already on the classpath, and produce the per-pool breakdown a flat heap-used gauge cannot.
+	 *
+	 * <h3>Bound once, not on refresh</h3>
+	 *
+	 * Unlike commands, pools and the cache, these exist from JVM start - there is no later moment at
+	 * which a heap appears. So this is called from {@link #bindMeters()} only, and {@link #refresh()}
+	 * leaves it alone.
+	 *
+	 * <h3>What is deliberately NOT bound</h3>
+	 *
+	 * {@code JvmGcMetrics} is the obvious next one and is left out on purpose: it is {@code Closeable}
+	 * and registers a GC notification listener, so binding it adds a lifecycle obligation to
+	 * {@link #stop()} that nothing else here has, and a leak if that is ever missed. Same for
+	 * {@code JvmHeapPressureMetrics}. Threads, class loading and file descriptors are simply out of
+	 * this change's scope - each is a line to add once someone wants the series.
+	 */
+	private void bindJvmMetrics()
+	{
+		// heap and non-heap, per memory pool. Tags: area (heap|nonheap) and id (pool name) - both
+		// bounded by the JVM's own fixed pool set, which is what the cardinality guard cares about.
+		new io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics().bindTo(registry);
+
+		// process.cpu.usage and system.cpu.usage, plus system.cpu.count and load average. Untagged.
+		new io.micrometer.core.instrument.binder.system.ProcessorMetrics().bindTo(registry);
+
+		// process.uptime and process.start.time - what explains a cache size or a heap that looks wrong
+		// because the node restarted four minutes ago. Untagged.
+		new io.micrometer.core.instrument.binder.system.UptimeMetrics().bindTo(registry);
 	}
 
 	private boolean cacheBound = false;

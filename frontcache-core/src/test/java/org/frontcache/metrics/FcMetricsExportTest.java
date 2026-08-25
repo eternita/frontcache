@@ -127,6 +127,55 @@ public class FcMetricsExportTest {
 		assertTrue("pool label missing", scrape.contains("pool=\"OriginHitsPool\""));
 	}
 
+	/**
+	 * The JVM numbers the console shows per edge - heap, process CPU, uptime - reaching Prometheus, so
+	 * the panel and the dashboards agree about a node rather than each holding half the picture.
+	 *
+	 * These are bound at startup, not on refresh, so this deliberately does NOT refresh first: if they
+	 * only appeared after one, a scrape taken before any traffic would be missing them.
+	 */
+	@Test
+	public void jvmHeapCpuAndUptimeAreExported()
+	{
+		enable("prometheus");
+
+		String scrape = FcMetricsExport.scrape();
+
+		assertTrue("heap not exported:\n" + scrape, scrape.contains("frontcache_jvm_memory_used_bytes"));
+		assertTrue("the heap/non-heap split is what makes the number readable",
+				scrape.contains("area=\"heap\""));
+		assertTrue("process cpu not exported", scrape.contains("frontcache_process_cpu_usage"));
+		assertTrue("uptime not exported", scrape.contains("frontcache_process_uptime_seconds"));
+	}
+
+	/**
+	 * The JVM binders are the one part of the export not driven by traffic, so they are also the part
+	 * that could quietly bind twice - once at startup and again on every scrape.
+	 */
+	@Test
+	public void repeatedRefreshesDoNotDuplicateJvmSeries()
+	{
+		enable("prometheus");
+
+		int before = countMeters("frontcache.jvm.memory.used");
+		FcMetricsExport.refresh();
+		FcMetricsExport.refresh();
+
+		assertTrue("there must be some to begin with", before > 0);
+		assertEquals("a refresh must not add a second copy of a JVM gauge",
+				before, countMeters("frontcache.jvm.memory.used"));
+	}
+
+	private static int countMeters(String name)
+	{
+		int found = 0;
+		for (Meter meter : FcMetricsExport.registry().getMeters())
+			if (name.equals(meter.getId().getName()))
+				found++;
+
+		return found;
+	}
+
 	/** Section 7.5: one prefix for the whole set, so it is findable in a single query. */
 	@Test
 	public void everySeriesIsPrefixed()
@@ -157,8 +206,13 @@ public class FcMetricsExportTest {
 		//   result -> hit|miss          tier -> L1|L2|none        (FcCacheMetrics.Outcome, 3 combinations)
 		//   command -> the five FC_* keys   event -> FcEventType   quantile -> a fixed list
 		//   pool -> the named thread pools  name/kind/state -> resilience4j's own, one per breaker
+		//   area -> heap|nonheap        id -> JVM memory pool names   (JvmMemoryMetrics)
+		// area and id come from the JVM, not from anything request-shaped: the memory pool set is fixed
+		// by the collector at startup and is under a dozen entries, so it cannot grow with traffic -
+		// which is the property this list exists to protect.
 		TreeSet<String> allowed = new TreeSet<String>(java.util.Arrays.asList(
-				"command", "event", "quantile", "pool", "name", "kind", "state", "result", "tier"));
+				"command", "event", "quantile", "pool", "name", "kind", "state", "result", "tier",
+				"area", "id"));
 
 		TreeSet<String> seen = new TreeSet<String>();
 		for (Meter meter : FcMetricsExport.registry().getMeters())
