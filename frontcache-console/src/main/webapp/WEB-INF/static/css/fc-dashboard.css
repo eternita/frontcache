@@ -226,9 +226,77 @@
 	gap: 20px 40px;
 }
 
+/* Pinned, not auto. The block used to take the width of its widest line, which was fine when that
+   was a hostname and an item count. It now carries six rows of numbers, and every pixel it takes
+   comes out of the monitor column - which is sized to fit as many circuit cards per row as it can, so
+   a long hostname or a "1,234.5 MB" would silently drop a card from every circuit. */
 .fc-layout .fc-edges {
-	flex: 0 0 auto;
+	flex: 0 0 240px;
 	padding-left: 20px;
+}
+
+/* ---- the live edge rows (see fc-edges-status.js) ---- */
+
+.fc-edges-status {
+	font-size: 18px;
+}
+
+.fc-edges-status td {
+	padding: 5px 5px 15px 5px;
+	vertical-align: top;
+}
+
+.fc-edges-status .fc-edge-name {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 190px;
+}
+
+.fc-edges-status .fc-edge-uptime {
+	font-size: 12px;
+	color: #999;
+	font-weight: 400;
+}
+
+/* Label left, value right, one row each. A two-column grid rather than floated dt/dd: a float lets
+   the value text flow AROUND the label and wrap mid-value ("18.4" / "KB") as soon as the pair is
+   wider than the column, which at 240px is most of them. The grid gives the label exactly the width
+   it needs and the value the rest, and nowrap makes an over-long value clip the label column instead
+   of folding onto a second line. */
+.fc-edges-status .fc-edge-stats {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	column-gap: 8px;
+	row-gap: 1px;
+	margin: 4px 0 0 0;
+	font-size: 12px;
+	color: #777;
+	line-height: 1.45;
+}
+
+.fc-edges-status .fc-edge-stats dt {
+	font-weight: 400;
+	color: #999;
+	white-space: nowrap;
+}
+
+.fc-edges-status .fc-edge-stats dd {
+	margin: 0;
+	text-align: right;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;   /* so a changing number does not jitter its neighbours */
+}
+
+.fc-edges-status .fc-edge-note {
+	display: block;
+	font-size: 11px;
+	color: #aaa;
+}
+
+.fc-edges-status .fc-edge-offline {
+	font-size: 12px;
+	color: #c00;
 }
 
 /* min-width:0 lets the monitor column shrink below its widest card instead of

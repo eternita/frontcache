@@ -46,6 +46,7 @@ import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
+import org.frontcache.cache.CacheProcessor;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
@@ -58,6 +59,7 @@ import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.GetGuardRulesActionResponse;
 import org.frontcache.io.GetGuardConfigActionResponse;
 import org.frontcache.io.GetResilienceConfigActionResponse;
+import org.frontcache.io.NodeStatsActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -250,6 +252,84 @@ public class FrontCacheClient {
 		}
 
 		return null;
+	}
+
+	/**
+	 * The cheap, pollable view of a node - cache sizes per tier plus JVM heap, CPU and uptime.
+	 *
+	 * <h2>The fallback is the point</h2>
+	 *
+	 * The console upgrades independently of the fleet, in either order, so this has to work against a
+	 * node that has never heard of {@code get-node-stats}. Such a node answers an unrecognized action
+	 * with a PING response rather than an error, which would otherwise render as a panel of dashes with
+	 * nothing in any log. Detecting the ping and retrying with {@code get-cache-state} gets the one
+	 * number an older node does have - the entry count - and leaves the rest {@code UNKNOWN} so the
+	 * console can show it as "not reported" instead of zero.
+	 *
+	 * Same shape as {@link #getResilienceConfigActionResponse()}, which does this for the 2.7 rename.
+	 *
+	 * @return the node's stats, or null when the edge could not be reached at all
+	 */
+	public NodeStatsActionResponse getNodeStatsActionResponse()
+	{
+		NodeStatsActionResponse actionResponse = nodeStatsActionResponse();
+
+		if (null != actionResponse && FrontcacheAction.PING.equals(actionResponse.getAction()))
+		{
+			logger.debug(getFrontCacheURL() + " does not know " + FrontcacheAction.GET_NODE_STATS
+					+ " - it predates 2.8; falling back to " + FrontcacheAction.GET_CACHE_STATE);
+			return fromCacheState(getCacheStateActionResponse());
+		}
+
+		return actionResponse;
+	}
+
+	private NodeStatsActionResponse nodeStatsActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_NODE_STATS));
+		String responseStr = null;
+		try {
+			responseStr = requestFrontCache(urlParameters);
+			return jsonMapper.readValue(responseStr.getBytes(), NodeStatsActionResponse.class);
+
+		} catch (Exception e) {
+			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
+		}
+
+		return null;
+	}
+
+	/**
+	 * What a pre-2.8 node can tell us, in the post-2.8 shape.
+	 *
+	 * {@code get-cache-state} returns a display map whose values are strings; only the total entry
+	 * count is worth lifting out of it. Everything else stays UNKNOWN - deliberately, because the
+	 * per-tier keys in that map ({@code cached-entries-L1}) exist but are the expensive tier counts,
+	 * and reporting some of a node's numbers as though they were all of them is how a half-filled panel
+	 * gets mistaken for a half-empty cache.
+	 */
+	private NodeStatsActionResponse fromCacheState(CacheStatusActionResponse cacheState)
+	{
+		if (null == cacheState || null == cacheState.getCacheStatus())
+			return null;
+
+		NodeStatsActionResponse response = new NodeStatsActionResponse();
+		response.setAction(FrontcacheAction.GET_CACHE_STATE);   // says which action actually answered
+		response.setResponseStatus(ActionResponse.RESPONSE_STATUS_OK);
+
+		String cachedEntries = cacheState.getCacheStatus().get(CacheProcessor.CACHED_ENTRIES);
+		if (null != cachedEntries)
+		{
+			try {
+				response.setCachedEntries(Long.parseLong(cachedEntries.trim()));
+			} catch (NumberFormatException e) {
+				logger.debug("Can't read " + CacheProcessor.CACHED_ENTRIES + "=" + cachedEntries
+						+ " from " + getFrontCacheURL());
+			}
+		}
+
+		return response;
 	}
 
 	/**

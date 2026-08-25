@@ -179,6 +179,55 @@ public class FrontcacheService {
 		return new ArrayList<FrontCacheStatus>(getClusterStatus().values());
 	}
 
+	// ---- the polled view ---------------------------------------------------------------------
+
+	/**
+	 * How long a fan-out is reused for {@code /edges-status.json}.
+	 *
+	 * Deliberately a little under the page's poll interval (10s, see fc-edges-status.js) rather than
+	 * equal to it: the browser cadence and the fleet cadence must not be one knob. Without this, ten
+	 * open dashboards mean ten times the requests to every node, forever - the console would be the
+	 * heaviest client its own fleet has.
+	 */
+	private static final long STATUS_CACHE_MILLIS = 8000;
+
+	private volatile List<FrontCacheStatus> cachedClusterStatus = null;
+	private volatile long cachedClusterStatusStamp = 0;
+	private final Object clusterStatusLock = new Object();
+
+	/**
+	 * The same list {@link #getClusterStatusList()} returns, but reused across callers for a few
+	 * seconds. This is what the realtime page polls.
+	 *
+	 * Page loads deliberately keep using the uncached call: an operator who has just invalidated a
+	 * cache and reloaded expects to see it, and one fan-out per page load was never the problem this
+	 * cache exists to solve.
+	 */
+	public List<FrontCacheStatus> getClusterStatusListPolled() {
+
+		long now = System.currentTimeMillis();
+		List<FrontCacheStatus> current = cachedClusterStatus;
+		if (null != current && now - cachedClusterStatusStamp < STATUS_CACHE_MILLIS)
+			return current;
+
+		// One fan-out at a time. Without the lock, every poll that arrives while one is in flight
+		// starts its own - which is precisely the multiplication the cache is here to prevent, just
+		// moved from "many tabs" to "one slow fleet".
+		synchronized (clusterStatusLock) {
+
+			now = System.currentTimeMillis();
+			current = cachedClusterStatus;
+			if (null != current && now - cachedClusterStatusStamp < STATUS_CACHE_MILLIS)
+				return current;
+
+			List<FrontCacheStatus> fresh = getClusterStatusList();
+			cachedClusterStatus = fresh;
+			cachedClusterStatusStamp = System.currentTimeMillis();
+
+			return fresh;
+		}
+	}
+
 
 	/**
 	 *

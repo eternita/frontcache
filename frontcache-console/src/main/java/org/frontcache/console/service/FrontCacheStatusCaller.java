@@ -8,13 +8,21 @@
  */
 package org.frontcache.console.service;
 
-import java.util.Map;
 import java.util.concurrent.Callable;
 
-import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.FrontCacheStatus;
+import org.frontcache.io.NodeStatsActionResponse;
 
+/**
+ * Reads one edge's numbers for the "Edges status" block.
+ *
+ * Asks {@code get-node-stats} rather than {@code get-cache-state}: the old action returns a display
+ * map and opens a fresh Lucene reader on the node to build it, which was acceptable once per page
+ * load and is not acceptable now the realtime page polls. {@code FrontCacheClient} handles a node too
+ * old to know the action by falling back to {@code get-cache-state}, so a mixed fleet still reports
+ * its entry counts - see {@code NodeStatsActionFallbackTest}.
+ */
 public class FrontCacheStatusCaller implements Callable<FrontCacheStatus> {
 
 	private FrontCacheClient fcClient;
@@ -29,33 +37,24 @@ public class FrontCacheStatusCaller implements Callable<FrontCacheStatus> {
 
     	FrontCacheStatus fcStatus = new FrontCacheStatus();
 		fcStatus.setName(fcClient.getName());
-		long cachedAmount = -1;
+		fcStatus.setUrl(fcClient.getFrontCacheURL());
+		fcStatus.setCachedAmount(-1);
+
 		boolean available = true;
 		try
 		{
-			Map<String, String> cacheState = fcClient.getCacheState();
-			if (null != cacheState)
-			{
-				String cacheAmountStr = cacheState.get(CacheProcessor.CACHED_ENTRIES);
-
-				if (null != cacheAmountStr)
-				{
-					try
-					{
-						cachedAmount = Long.parseLong(cacheAmountStr);
-					} catch (Exception e) {e.printStackTrace();}
-				}
-			} else {
+			NodeStatsActionResponse stats = fcClient.getNodeStatsActionResponse();
+			if (null != stats)
+				fcStatus.readFrom(stats);   // every number the node did not report stays UNKNOWN
+			else
 				available = false;
-			}
+
 		} catch (Throwable ex) {
 			available = false;
 			ex.printStackTrace();
 		}
 
 		fcStatus.setAvailable(available);
-		fcStatus.setCachedAmount(cachedAmount);
-		fcStatus.setUrl(fcClient.getFrontCacheURL());
 
         return fcStatus;
     }

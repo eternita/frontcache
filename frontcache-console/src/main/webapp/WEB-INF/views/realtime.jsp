@@ -16,6 +16,7 @@
 	<!-- The realtime monitor. Uses none of the above - no d3, no underscore, no jQuery. -->
 	<link href="<c:url value='/static/css/fc-dashboard.css' />" rel="stylesheet"></link>
 	<script src="<c:url value='/static/js/fc-dashboard.js' />"></script>
+	<script src="<c:url value='/static/js/fc-edges-status.js' />"></script>
 </head>
 
 <body>
@@ -47,6 +48,9 @@
 						console.error("Could not read the edge list", e);
 					}
 					FcDashboard.attach(document.getElementById("fc-monitor-content"), streams);
+
+					// the live numbers in the "Edges status" column; the JSP rendered placeholders
+					FcEdgesStatus.attach(document.getElementById("fc-edges-status"), "edges-status.json");
 				})();
 			</script>
 

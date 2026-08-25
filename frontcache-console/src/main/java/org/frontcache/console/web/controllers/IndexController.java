@@ -8,14 +8,18 @@
  */
 package org.frontcache.console.web.controllers;
 
+import java.util.List;
+
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 public class IndexController {
@@ -55,6 +59,19 @@ public class IndexController {
 		model.put("dashboardStreams", frontcacheService.getDashboardStreams());
 
 		return "realtime";
+	}
+
+	/**
+	 * The "Edges status" numbers, for the page to poll - see fc-edges-status.js.
+	 *
+	 * Raw numbers, formatted in the browser, with -1 meaning "the node did not report this" rather
+	 * than zero. Served from a short-lived fan-out cache so that the number of open dashboards does
+	 * not multiply the load on the fleet.
+	 */
+	@RequestMapping(value = "/edges-status.json", method = RequestMethod.GET, produces = "application/json")
+	@ResponseBody
+	public List<FrontCacheStatus> edgesStatus() {
+		return frontcacheService.getClusterStatusListPolled();
 	}
 
 }
