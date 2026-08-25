@@ -176,9 +176,11 @@ public class FCUtils {
 
 		// add header with client IP - unless it was already resolved on the request thread (async
 		// includes pre-resolve it there, before the servlet request is recycled; see
-		// ConcurrentIncludeProcessor.parseIncludes). getClientIP is null/recycle-safe either way.
+		// ConcurrentIncludeProcessor.parseIncludes). The context caches the value the engine stamped
+		// in init(), so this is a map read rather than another 13-header scan, and it is still the
+		// right answer on a worker thread whose servlet request has been recycled.
 		if (!requestHeaders.containsKey(FCHeaders.X_FRONTCACHE_CLIENT_IP))
-			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, getClientIP(context.getRequest()));
+			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, context.getClientIP());
 
 		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }

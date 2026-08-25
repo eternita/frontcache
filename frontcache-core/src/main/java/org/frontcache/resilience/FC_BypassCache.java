@@ -117,7 +117,7 @@ public class FC_BypassCache extends FcCommand<Object> {
 			// stand alone mode
 
 			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request);
-			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{FCUtils.getClientIP(context.getRequest())}));
+			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{context.getClientIP()}));
 
 			String verb = request.getMethod();
 			InputStream requestEntity = getRequestBody(request);

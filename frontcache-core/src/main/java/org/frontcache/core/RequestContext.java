@@ -669,6 +669,33 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         set("currentClientType", currentClientType);
 	}
 
+    private static final String CLIENT_IP = "clientIP";
+
+    /**
+     * The client IP of this request, resolved once.
+     *
+     * {@link FCUtils#getClientIP} walks up to thirteen candidate headers, and it used to be called
+     * afresh for every log line - once per request, again per include, again on the origin call.
+     * Resolving it once per exchange makes those free.
+     *
+     * The engine stamps it in init(), on the request thread while the servlet request is still live,
+     * which is also what makes it CORRECT for work that outlives the request: an async include runs
+     * after the container has recycled the request, where a late resolve can only answer
+     * "unresolved". A context built outside the engine (a copy, a test) resolves lazily here instead.
+     */
+    public String getClientIP() {
+        String clientIP = (String) get(CLIENT_IP);
+        if (null == clientIP) {
+            clientIP = FCUtils.getClientIP(getRequest());
+            set(CLIENT_IP, clientIP);
+        }
+        return clientIP;
+    }
+
+    public void setClientIP(String clientIP) {
+        set(CLIENT_IP, clientIP);
+    }
+
 	public RequestContext copy() {
 
 		RequestContext copy = new RequestContext();

@@ -470,6 +470,16 @@ public class LuceneIndexManager {
 	}
 
 	/**
+	 * Test seam: runs one non-blocking refresh, exactly as the scheduled refresher does, so a test can
+	 * contend for the refresh lock the way that thread does.
+	 */
+	void forceRefreshForTest() throws IOException {
+		SearcherManager mgr = searcherManager;
+		if (null != mgr)
+			mgr.maybeRefresh();
+	}
+
+	/**
 	 * The safety-net refresh - see {@link Tuning}. Never throws, for the same reason as
 	 * {@link #commitPending()}.
 	 */
@@ -750,10 +760,20 @@ public class LuceneIndexManager {
 			return; // nothing has read this index yet - the first read builds a current searcher
 
 		try {
-			// Returns false immediately when another thread is already refreshing. That thread's
-			// reopen may have started before this write, which is the race the scheduled refresh
-			// covers - hence it is a safety net, not an optimisation.
-			mgr.maybeRefresh();
+			// BLOCKING, deliberately. maybeRefresh() returns false on the spot when another thread is
+			// already refreshing - and its reopen may have STARTED BEFORE this write, so this entry is
+			// not in it and nothing else will refresh until the scheduled one, up to refreshIntervalMs
+			// away. That is not a rare theoretical window: the scheduled refresher is itself one of
+			// those threads, so it collides with ordinary writes by construction. It cost an e2e
+			// failure - cache the entry, read it 7ms later, miss - which is the origin stampede this
+			// refresh exists to prevent.
+			//
+			// maybeRefreshBlocking() waits for the in-flight reopen, then does its own, which is
+			// guaranteed to include this write. The cost is that concurrent writers serialize here
+			// instead of sharing one reopen. That is affordable where sharing was not correct: writes
+			// are bounded by the MISS rate, each has just paid a full origin round trip, and a reopen
+			// is still far cheaper than the commit() this replaced. Reads pay nothing either way.
+			mgr.maybeRefreshBlocking();
 
 		} catch (AlreadyClosedException ace) {
 			discardWriterIfLockLost(ace, operation + "/refresh");

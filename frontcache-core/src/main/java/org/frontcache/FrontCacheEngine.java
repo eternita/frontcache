@@ -740,6 +740,11 @@ public class FrontCacheEngine {
 
         context.setClientType(getClientType(servletRequest)); // client type = bot | browser based on User-Agent Header and bots.conf
 
+        // Resolved here, on the request thread, for two reasons: it is a 13-header scan that every log
+        // line and the origin call would otherwise repeat, and it is the only point at which the answer
+        // is still knowable - an async include reads it after the container has recycled the request.
+        context.setClientIP(FCUtils.getClientIP(servletRequest));
+
         if (null != filterChain)
             context.setFilterChain(filterChain);
 

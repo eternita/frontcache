@@ -191,12 +191,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 						includeRequestHeaders = new HashMap<String, List<String>>();
 						includeRequestHeaders.putAll(requestHeaders);
 						includeRequestHeaders.put(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE, Arrays.asList(new String[]{"true"}));
-						// Resolve the client IP now, while we are still on the request thread and the
-						// servlet request is live. Async includes run later in a background thread, by
-						// which time the request is recycled and the IP is unrecoverable (see
-						// FCUtils.getClientIP / includeDynamicCallHttpClient).
+						// The client IP was resolved on the request thread while the servlet request was
+						// still live (FrontCacheEngine.init) and cached on the context. Async includes
+						// run later in a background thread, by which time the request is recycled and
+						// the IP would be unrecoverable (see FCUtils.getClientIP).
 						includeRequestHeaders.put(FCHeaders.X_FRONTCACHE_CLIENT_IP,
-								Arrays.asList(new String[]{ FCUtils.getClientIP(context.getRequest()) }));
+								Arrays.asList(new String[]{ context.getClientIP() }));
 					}
 
 					String includeClientType = getIncludeClientType(includeTagStr);

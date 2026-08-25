@@ -87,6 +87,58 @@ public class LuceneDeferredCommitTests {
 	}
 
 	/**
+	 * The same guarantee, while other threads are refreshing - which is the case that actually broke.
+	 *
+	 * {@code SearcherManager.maybeRefresh()} returns false immediately when another thread holds the
+	 * refresh lock, and that other thread's reopen may have started BEFORE this write. The entry is
+	 * then absent from it and stays invisible until the scheduled refresh, up to a second away, so the
+	 * next request for that URL misses and goes to origin. The background refresher collides with
+	 * writes by construction, so this is a routine occurrence, not a corner - it cost an e2e failure
+	 * (cache an entry, read it 7ms later, miss).
+	 *
+	 * A refresher thread here stands in for the scheduled one and runs flat out, so any write whose
+	 * refresh is merely best-effort loses the race almost every time.
+	 */
+	@Test
+	public void anEntryIsReadableImmediatelyEvenWhileOtherThreadsRefresh() throws Exception {
+		String dir = freshDir("visibility-contended");
+		final LuceneIndexManager manager = new LuceneIndexManager(dir);
+		final java.util.concurrent.atomic.AtomicBoolean stop =
+				new java.util.concurrent.atomic.AtomicBoolean(false);
+
+		// stand-in for the scheduled refresher, hammering the refresh lock
+		Thread refresher = new Thread(() -> {
+			while (!stop.get()) {
+				manager.getResponse("http://example.com/does-not-exist.html"); // acquires a searcher
+				try {
+					manager.forceRefreshForTest();
+				} catch (Exception ignored) {
+					// the manager may be closing; the assertions below are what matter
+				}
+			}
+		}, "refresh-contender");
+		refresher.setDaemon(true);
+		refresher.start();
+
+		try {
+			int misses = 0;
+			for (int i = 0; i < 300; i++) {
+				String url = "http://example.com/contended-" + i + ".html";
+				manager.indexDoc(entry(url, "body-" + i));
+				if (null == manager.getResponse(url))
+					misses++;
+			}
+			assertEquals("every write must be visible to the very next read, even when a concurrent "
+					+ "thread is refreshing - a best-effort refresh loses this race and the miss goes "
+					+ "to origin", 0, misses);
+		} finally {
+			stop.set(true);
+			refresher.join(10_000);
+			manager.close();
+		}
+	}
+
+	/**
 	 * Writes do not fsync any more - that is the change. Stated as a test because it is the one thing
 	 * here an operator can be surprised by, and because a future "just add a commit, it's cheap" would
 	 * otherwise silently put the per-request fsync back.

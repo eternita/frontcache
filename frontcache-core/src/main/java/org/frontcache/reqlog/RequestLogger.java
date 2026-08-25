@@ -8,14 +8,13 @@
  */
 package org.frontcache.reqlog;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.frontcache.core.FCHeaders;
-import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +46,27 @@ public class RequestLogger {
 
 	private final static String SEPARATOR = " ";
 
-	private static final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss,SSSZ");
+	/**
+	 * Timestamp of a log line, e.g. {@code 2016-06-03T15:06:35,092-0600}.
+	 *
+	 * This was one shared {@code SimpleDateFormat}, which is <b>not thread safe</b> - and this is the
+	 * most concurrent logger in the product: every Jetty request thread, every include-processor worker
+	 * and every soft-invalidation thread formats through it at once, with no synchronization. The
+	 * documented failure modes are silently wrong timestamps and intermittent
+	 * ArrayIndexOutOfBoundsException / NumberFormatException out of Calendar - in a field an ELK
+	 * pipeline parses.
+	 *
+	 * {@link DateTimeFormatter} is immutable and thread safe, and formats without building a Calendar.
+	 * The pattern is unchanged and the output is byte-identical to what SimpleDateFormat produced -
+	 * {@code RequestLoggerTimestampTest} pins that, because the log format is a consumed contract.
+	 */
+	private static final DateTimeFormatter LOG_TIME_FORMAT =
+			DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss,SSSZ").withZone(ZoneId.systemDefault());
+
+	/** package-private for RequestLoggerTimestampTest */
+	static String formatLogTime(Instant instant) {
+		return LOG_TIME_FORMAT.format(instant);
+	}
 
 	private static Logger logger = LoggerFactory.getLogger(RequestLogger.class);
 
@@ -83,7 +102,7 @@ public class RequestLogger {
 		String userAgent = (null != request) ? request.getHeader("User-Agent") : null;
 
 		StringBuilder sb = new StringBuilder();
-		sb.append(logTimeDateFormat.format(new Date()))
+		sb.append(formatLogTime(Instant.now()))
 			.append(SEPARATOR).append(context.getRequestId())
 			.append(SEPARATOR).append(context.getDomain())
 			.append(SEPARATOR).append((null != request) ? request.getMethod() : "-")
@@ -94,7 +113,7 @@ public class RequestLogger {
 			.append(SEPARATOR).append(0)   // runtimeMillis
 			.append(SEPARATOR).append(-1)  // lengthBytes
 			.append(SEPARATOR).append("\"").append(url).append("\"")
-			.append(SEPARATOR).append("\"").append(FCUtils.getClientIP(request)).append("\"")
+			.append(SEPARATOR).append("\"").append(context.getClientIP()).append("\"")
 			.append(SEPARATOR).append(context.getFrontCacheId())
 			.append(SEPARATOR).append(context.getClientType())
 			.append(SEPARATOR).append("\"").append(userAgent).append("\"")
@@ -124,7 +143,7 @@ public class RequestLogger {
         if (!isCached && "true".equals(request.getHeader(FCHeaders.X_FRONTCACHE_SOFT_REFRESH)))
         	requestTypeDynamicCachedSoft = "dynamic-soft";
 
-		sb4file.append(logTimeDateFormat.format(new Date()))
+		sb4file.append(formatLogTime(Instant.now()))
 		.append(SEPARATOR).append(context.getRequestId())
 		.append(SEPARATOR).append(context.getDomain())
 		.append(SEPARATOR).append(request.getMethod())
@@ -135,7 +154,7 @@ public class RequestLogger {
 		.append(SEPARATOR).append(runtimeMillis)
 		.append(SEPARATOR).append(lengthBytes)
 		.append(SEPARATOR).append("\"").append(url).append("\"")
-		.append(SEPARATOR).append("\"").append(FCUtils.getClientIP(request)).append("\"")
+		.append(SEPARATOR).append("\"").append(context.getClientIP()).append("\"")
 		.append(SEPARATOR).append(context.getFrontCacheId())
 		.append(SEPARATOR).append(context.getClientType())
 		.append(SEPARATOR).append("\"").append(userAgent).append("\"");
