@@ -194,8 +194,15 @@
 .fc-dashboard .fc-rejected        { color: purple; }
 .fc-dashboard .fc-bad-request     { color: #20b2aa; }
 
+/* Navy rather than the vendored dashboard's steelblue. The chart sits BEHIND the card's
+   numbers, and those blocks carry an rgba(255,255,255,.8) background, so everything drawn
+   on the chart is seen through 80% white: an #rrggbb comes out at 204 + 0.2*c. That put
+   steelblue at a slightly HIGHER luminance than the veiled green bubble it crosses (+6),
+   which is why the line disappeared over the circle. Navy lands 17 below it. The green
+   channel is what does the work here - keeping it at 0 is what separates the line from
+   the bubble, so a lighter blue would undo this even if it looked dark on white. */
 .fc-dashboard .fc-sparkline {
-	stroke: #4682b4;
+	stroke: navy;
 	stroke-width: 1;
 	fill: none;
 }
