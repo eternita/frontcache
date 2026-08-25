@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -24,6 +25,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -40,6 +45,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.AlreadyClosedException;
@@ -99,6 +105,31 @@ public class LuceneIndexManager {
 
 	private IndexWriter indexWriter = null;
 
+	/**
+	 * The one near-real-time view every read goes through, shared by all reader threads.
+	 * <p>
+	 * Before this, {@link #getDocByURL} did {@code DirectoryReader.open(indexWriter)} per cache read.
+	 * That is {@code IndexWriter.getReader()}, so a READ took the writer's full-flush lock and forced a
+	 * WRITE, then built {@code SegmentReader}s for the whole segment set, used them for one one-hit
+	 * {@code TermQuery} and threw them away - and two concurrent L2 reads serialized on that lock.
+	 * {@link SearcherManager#acquire()} is a volatile read plus a refcount bump; the reopen happens once
+	 * per refresh for everyone, and is incremental (existing SegmentReaders are reused).
+	 * <p>
+	 * Bound to one {@link IndexWriter}, so it is torn down and rebuilt wherever the writer is - see
+	 * {@link #closeSearcherManagerQuietly()}. Rebuilt lazily by {@link #acquireSearcher()} rather than
+	 * eagerly on writer open, so a failure to build one costs L2 reads until the next attempt instead
+	 * of permanently.
+	 */
+	private volatile SearcherManager searcherManager = null;
+
+	/** Periodic commit and periodic refresh. One daemon thread per manager; stopped by {@link #close()}. */
+	private volatile ScheduledExecutorService maintenance = null;
+
+	// See Tuning.
+	private final long commitIntervalMs;
+	private final boolean refreshOnWrite;
+	private final long refreshIntervalMs;
+
 	// The index directory is opened once and reused for the lifetime of this manager.
 	// Reopening a fresh FSDirectory on every writer reopen (the previous behaviour) leaked
 	// the NativeFSLock held by a broken-but-not-closed writer: the stale lock stayed in the
@@ -133,6 +164,79 @@ public class LuceneIndexManager {
 
 	private final double maxMergedSegmentMB;
 	private final double deletesPctAllowed;
+
+	/**
+	 * Everything about this index that an operator can tune, in one object so adding a knob does not
+	 * add a positional constructor argument.
+	 *
+	 * <h3>Why commits are no longer per write</h3>
+	 *
+	 * {@code indexDoc()} used to end in {@code IndexWriter.commit()} - a flush plus an <b>fsync</b> of
+	 * every file in the commit - so every cache miss paid one fsync, and a regular (non-soft) expiry
+	 * paid two (the {@code removeFromCache} delete commits, then the refreshed entry commits). Commit
+	 * is a checkpoint operation; it belongs on a timer.
+	 *
+	 * <b>The durability trade is deliberate.</b> An ungraceful kill now loses up to
+	 * {@code commitIntervalMs} of cache <i>writes</i> instead of at most the one in flight. For a cache
+	 * that is not a correctness event - the lost entries are simply re-fetched from origin - and
+	 * {@link LuceneIndexManager#close()} commits on ordinary shutdown. Set the interval to 0 to get the
+	 * old commit-per-write behaviour back.
+	 *
+	 * <h3>Why refresh-on-write defaults to true</h3>
+	 *
+	 * A cache entry must be visible to the very next request for that URL, or a popular page stampedes
+	 * the origin for the whole refresh window. So a write refreshes the searcher itself, and the
+	 * background refresh is only the safety net for the race where two writers overlap (the second
+	 * {@code maybeRefresh()} returns immediately while the first is still refreshing, so the second
+	 * write can miss that reopen). Turning it off batches writes into fewer, larger segments - better
+	 * for the merge policy - at the cost of up to {@code refreshIntervalMs} of visibility lag.
+	 *
+	 * <p>Note that refresh is much cheaper than the commit it replaced: an NRT reopen flushes, but does
+	 * not fsync and does not write a new segments file.
+	 */
+	public static final class Tuning {
+
+		/** Commit cadence. {@code <= 0} restores the pre-2.10 commit-after-every-write behaviour. */
+		static final long DEFAULT_COMMIT_INTERVAL_MS = 10_000;
+
+		/** Safety-net refresh cadence. {@code <= 0} disables the background refresher. */
+		static final long DEFAULT_REFRESH_INTERVAL_MS = 1_000;
+
+		final double maxMergedSegmentMB;
+		final double deletesPctAllowed;
+		final long commitIntervalMs;
+		final boolean refreshOnWrite;
+		final long refreshIntervalMs;
+
+		public Tuning(double maxMergedSegmentMB, double deletesPctAllowed,
+				long commitIntervalMs, boolean refreshOnWrite, long refreshIntervalMs) {
+			this.maxMergedSegmentMB = maxMergedSegmentMB;
+			this.deletesPctAllowed = deletesPctAllowed;
+			this.commitIntervalMs = commitIntervalMs;
+			this.refreshOnWrite = refreshOnWrite;
+			this.refreshIntervalMs = refreshIntervalMs;
+		}
+
+		public static Tuning defaults() {
+			return new Tuning(DEFAULT_MAX_MERGED_SEGMENT_MB, DEFAULT_DELETES_PCT_ALLOWED,
+					DEFAULT_COMMIT_INTERVAL_MS, true, DEFAULT_REFRESH_INTERVAL_MS);
+		}
+
+		/** Merge tuning only - everything else default. Keeps the pre-existing 3-arg entry points working. */
+		static Tuning ofMergeTuning(double maxMergedSegmentMB, double deletesPctAllowed) {
+			return new Tuning(maxMergedSegmentMB, deletesPctAllowed,
+					DEFAULT_COMMIT_INTERVAL_MS, true, DEFAULT_REFRESH_INTERVAL_MS);
+		}
+
+		@Override
+		public String toString() {
+			return "maxMergedSegmentMB=" + maxMergedSegmentMB
+					+ ", deletesPctAllowed=" + deletesPctAllowed
+					+ ", commitIntervalMs=" + commitIntervalMs
+					+ ", refreshOnWrite=" + refreshOnWrite
+					+ ", refreshIntervalMs=" + refreshIntervalMs;
+		}
+	}
 
 	public final static FieldType JSON_TYPE;
 	static {
@@ -196,20 +300,39 @@ public class LuceneIndexManager {
 	 * @param deletesPctAllowed % deleted docs tolerated before reclaim; clamped to Lucene's [20,50]
 	 */
 	public static LuceneIndexManager getInstance(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
+		return getInstance(indexPath, Tuning.ofMergeTuning(maxMergedSegmentMB, deletesPctAllowed));
+	}
+
+	/**
+	 * Returns the one manager for {@code indexPath}, creating it with {@code tuning} on first use.
+	 *
+	 * @param indexPath index directory (any form; normalised internally)
+	 * @param tuning merge, commit and refresh settings - see {@link Tuning}
+	 */
+	public static LuceneIndexManager getInstance(String indexPath, Tuning tuning) {
 		String key = normalizePath(indexPath);
 		LuceneIndexManager existing = INSTANCES.get(key);
 		if (null != existing) {
-			if (existing.maxMergedSegmentMB != validateMaxMergedSegmentMB(maxMergedSegmentMB)
-					|| existing.deletesPctAllowed != validateDeletesPctAllowed(deletesPctAllowed))
-				logger.warn("L2 index {} is already open with different merge tuning "
-						+ "(maxMergedSegmentMB={}, deletesPctAllowed={}) - reusing the existing manager; "
-						+ "restart to apply new tuning.", key, existing.maxMergedSegmentMB, existing.deletesPctAllowed);
+			if (existing.maxMergedSegmentMB != validateMaxMergedSegmentMB(tuning.maxMergedSegmentMB)
+					|| existing.deletesPctAllowed != validateDeletesPctAllowed(tuning.deletesPctAllowed)
+					|| existing.commitIntervalMs != tuning.commitIntervalMs
+					|| existing.refreshOnWrite != tuning.refreshOnWrite
+					|| existing.refreshIntervalMs != tuning.refreshIntervalMs)
+				logger.warn("L2 index {} is already open with different tuning ({}) - reusing the existing "
+						+ "manager; restart to apply new tuning.", key, existing.describeTuning());
 			return existing;
 		}
 
 		// computeIfAbsent so two threads racing the first request can't each build a manager
-		return INSTANCES.computeIfAbsent(key,
-				p -> new LuceneIndexManager(p, maxMergedSegmentMB, deletesPctAllowed));
+		return INSTANCES.computeIfAbsent(key, p -> new LuceneIndexManager(p, tuning));
+	}
+
+	private String describeTuning() {
+		return "maxMergedSegmentMB=" + maxMergedSegmentMB
+				+ ", deletesPctAllowed=" + deletesPctAllowed
+				+ ", commitIntervalMs=" + commitIntervalMs
+				+ ", refreshOnWrite=" + refreshOnWrite
+				+ ", refreshIntervalMs=" + refreshIntervalMs;
 	}
 
 	/**
@@ -225,18 +348,30 @@ public class LuceneIndexManager {
 	 * @param indexPath
 	 */
 	LuceneIndexManager(String indexPath) {
-		this(indexPath, DEFAULT_MAX_MERGED_SEGMENT_MB, DEFAULT_DELETES_PCT_ALLOWED);
+		this(indexPath, Tuning.defaults());
 	}
 
 	/**
-	 * Constructor
+	 * Constructor - merge tuning only, everything else default.
 	 * @param indexPath index directory
 	 * @param maxMergedSegmentMB cap on largest merged segment (MB); &lt;=0 -&gt; default
 	 * @param deletesPctAllowed % deleted docs tolerated before reclaim; clamped to Lucene's [20,50]
 	 */
 	LuceneIndexManager(String indexPath, double maxMergedSegmentMB, double deletesPctAllowed) {
-		this.maxMergedSegmentMB = validateMaxMergedSegmentMB(maxMergedSegmentMB);
-		this.deletesPctAllowed = validateDeletesPctAllowed(deletesPctAllowed);
+		this(indexPath, Tuning.ofMergeTuning(maxMergedSegmentMB, deletesPctAllowed));
+	}
+
+	/**
+	 * Constructor
+	 * @param indexPath index directory
+	 * @param tuning merge, commit and refresh settings - see {@link Tuning}
+	 */
+	LuceneIndexManager(String indexPath, Tuning tuning) {
+		this.maxMergedSegmentMB = validateMaxMergedSegmentMB(tuning.maxMergedSegmentMB);
+		this.deletesPctAllowed = validateDeletesPctAllowed(tuning.deletesPctAllowed);
+		this.commitIntervalMs = tuning.commitIntervalMs;
+		this.refreshOnWrite = tuning.refreshOnWrite;
+		this.refreshIntervalMs = tuning.refreshIntervalMs;
 
 		this.indexPath = normalizePath(indexPath);
 		Path path = Paths.get(this.indexPath);
@@ -251,6 +386,9 @@ public class LuceneIndexManager {
 					WebResponse dummy =  new WebResponse(url);
 					indexDoc(dummy);
 					delete(url);
+					// Commit explicitly: writes no longer commit themselves, and this path exists to
+					// leave a valid, readable index on disk for whoever opens the directory next.
+					commitQuietly(indexWriter, "create empty index");
 				}
 			} catch (IOException e) {
 				logger.error("Error during creating cache-file", e);
@@ -262,6 +400,90 @@ public class LuceneIndexManager {
 				// if other instance holds lock on index - lets try to get lock during runtime
 				logger.error("Error during creating indexWriter " + e.getMessage());
 			}
+		}
+
+		startMaintenance();
+	}
+
+	/**
+	 * Starts the periodic commit and the safety-net refresh. One daemon thread does both: they are
+	 * seconds apart and never contend, so a second thread would only add a stack.
+	 */
+	private void startMaintenance() {
+
+		if (0 >= commitIntervalMs && 0 >= refreshIntervalMs)
+			return; // both disabled - commit-per-write and refresh-on-write carry the whole job
+
+		ScheduledExecutorService local = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread t = new Thread(r, "LuceneIndexManager.maintenance");
+				t.setDaemon(true); // must never hold up JVM shutdown
+				return t;
+			}
+		});
+
+		if (0 < commitIntervalMs)
+			local.scheduleWithFixedDelay(this::commitPending, commitIntervalMs, commitIntervalMs, TimeUnit.MILLISECONDS);
+
+		if (0 < refreshIntervalMs)
+			local.scheduleWithFixedDelay(this::refreshSearcher, refreshIntervalMs, refreshIntervalMs, TimeUnit.MILLISECONDS);
+
+		maintenance = local;
+
+		logger.info("L2 index {} - {}", indexPath, describeTuning());
+	}
+
+	/**
+	 * The scheduled commit. Never throws: it runs on a scheduled task, and an escaping exception would
+	 * cancel that task for the life of the JVM - leaving the index uncommitted forever.
+	 */
+	private void commitPending() {
+		try {
+			IndexWriter iWriter = indexWriter; // no getIndexWriter(): a timer must not open an index nobody is using
+			if (null == iWriter || !iWriter.isOpen() || !iWriter.hasUncommittedChanges())
+				return;
+
+			commitQuietly(iWriter, "scheduled commit");
+
+		} catch (Throwable t) {
+			logger.warn("Scheduled L2 commit failed: {}", t.toString());
+		}
+	}
+
+	/**
+	 * Commits pending changes now, instead of waiting for the scheduled commit.
+	 * <p>
+	 * Writes on the request path deliberately do not commit (see {@link Tuning}), which is the right
+	 * trade for a cache: a lost write is re-fetched from origin. It is the wrong trade for an
+	 * operator-initiated invalidation, where an entry re-appearing after a crash is a surprise rather
+	 * than a warm-up - so the management-API paths that empty or purge the cache call this.
+	 * <p>
+	 * Never throws: a wedged writer is discarded here exactly as it is anywhere else, and the caller's
+	 * own operation has already succeeded in memory.
+	 */
+	public void commit() {
+		IndexWriter iWriter = indexWriter;
+		if (null == iWriter || !iWriter.isOpen())
+			return;
+		commitQuietly(iWriter, "explicit commit");
+	}
+
+	/**
+	 * The safety-net refresh - see {@link Tuning}. Never throws, for the same reason as
+	 * {@link #commitPending()}.
+	 */
+	private void refreshSearcher() {
+		try {
+			SearcherManager mgr = searcherManager; // no lazy create: nothing has read this index yet
+			if (null != mgr)
+				mgr.maybeRefresh();
+
+		} catch (AlreadyClosedException ace) {
+			// the writer went away under us; the next read reopens both writer and searcher
+			logger.debug("Scheduled L2 refresh skipped - searcher closed: {}", ace.toString());
+		} catch (Throwable t) {
+			logger.warn("Scheduled L2 refresh failed: {}", t.toString());
 		}
 	}
 
@@ -307,6 +529,9 @@ public class LuceneIndexManager {
 			// path leaves LIVE_WRITER_PATHS so the stale write.lock it may have left behind becomes
 			// eligible for auto-clearing below.
 			if (indexWriter != null) {
+				// Before the writer: the SearcherManager holds an NRT reader ON this writer, and
+				// closing the writer with that reader still open leaks it.
+				closeSearcherManagerQuietly();
 				try {
 					indexWriter.close();
 				} catch (Throwable t) {
@@ -315,6 +540,10 @@ public class LuceneIndexManager {
 				indexWriter = null;
 				LIVE_WRITER_PATHS.remove(indexPath);
 			}
+
+			// Also covers the writer==null case: close() and the tests' reflection-based
+			// "simulate a crashed writer" both leave a manager bound to a writer that is gone.
+			closeSearcherManagerQuietly();
 
 			logger.debug("(re)opening Lucene IndexWriter...");
 
@@ -417,6 +646,124 @@ public class LuceneIndexManager {
 	}
 
 	/**
+	 * A checked-out searcher together with the manager it came from.
+	 * <p>
+	 * The manager travels with the searcher because the two can come apart: a writer reopen between
+	 * acquire and release swaps {@link LuceneIndexManager#searcherManager}, and releasing against
+	 * whatever happens to be in the field at that moment would silently skip the decRef. The reader
+	 * would then stay checked out forever, pinning its segment files against deletion by merges - a
+	 * disk leak that only shows up as an index that never shrinks.
+	 */
+	private static final class Acquired {
+		final SearcherManager manager;
+		final IndexSearcher searcher;
+
+		Acquired(SearcherManager manager, IndexSearcher searcher) {
+			this.manager = manager;
+			this.searcher = searcher;
+		}
+	}
+
+	/**
+	 * The near-real-time searcher for this index, or {@code null} when L2 is unreadable (no writer).
+	 * <p>
+	 * Every caller must {@link #releaseSearcher(Acquired)} in a {@code finally} - see {@link Acquired}.
+	 * <p>
+	 * The manager is built lazily rather than alongside the writer, so a failure here degrades to "L2
+	 * reads unavailable until the next attempt" rather than permanently: the writer's fast path would
+	 * never revisit an eager construction that failed.
+	 */
+	private Acquired acquireSearcher() throws IOException {
+
+		IndexWriter iWriter = getIndexWriter(); // reopens a broken writer, and with it the searcher
+		if (null == iWriter)
+			return null;
+
+		SearcherManager mgr = searcherManager;
+		if (null == mgr) {
+			synchronized (writerMonitorFor(indexPath)) {
+				if (null == searcherManager && null != indexWriter && indexWriter.isOpen())
+					// applyAllDeletes=true: a deleted (invalidated / expired) entry must not be
+					// served. writeAllDeletes=false keeps the deletes in memory rather than pushing
+					// them to disk on every reopen.
+					searcherManager = new SearcherManager(indexWriter, true, false, null);
+				mgr = searcherManager;
+			}
+		}
+
+		if (null == mgr)
+			return null;
+
+		return new Acquired(mgr, mgr.acquire());
+	}
+
+	/** Counterpart of {@link #acquireSearcher()}. Null-safe, so callers can release from a plain finally. */
+	private void releaseSearcher(Acquired acquired) {
+		if (null == acquired)
+			return;
+		try {
+			// Released against the manager that handed it out, not the current one - see Acquired.
+			// ReferenceManager.release() is a decRef and stays valid after that manager was closed.
+			acquired.manager.release(acquired.searcher);
+		} catch (Exception e) {
+			logger.debug("Error releasing L2 searcher: {}", e.toString());
+		}
+	}
+
+	/**
+	 * Closes and forgets the current searcher. Must be called before the writer it is bound to is
+	 * closed. Callers hold {@code writerMonitorFor(indexPath)}, except {@link #close()} which is not
+	 * concurrent with a reopen by contract.
+	 */
+	private void closeSearcherManagerQuietly() {
+		SearcherManager mgr = searcherManager;
+		searcherManager = null;
+		if (null == mgr)
+			return;
+		try {
+			mgr.close();
+		} catch (Throwable t) {
+			logger.debug("Error closing L2 searcher manager: {}", t.toString());
+		}
+	}
+
+	/**
+	 * Runs after a write (index or delete) has been handed to the writer.
+	 * <p>
+	 * This is what replaced the unconditional {@code commit()} that used to end every write - see
+	 * {@link Tuning} for why. A refresh here is what keeps a just-cached entry visible to the very next
+	 * request for that URL; the commit is left to the timer.
+	 */
+	private void afterWrite(IndexWriter iWriter, String operation) {
+
+		if (0 >= commitIntervalMs) {
+			// commit-per-write restored by config; the commit publishes the change, so no refresh needed
+			commitQuietly(iWriter, operation + "/commit");
+			return;
+		}
+
+		if (!refreshOnWrite)
+			return; // the scheduled refresh publishes it, within refreshIntervalMs
+
+		SearcherManager mgr = searcherManager;
+		if (null == mgr)
+			return; // nothing has read this index yet - the first read builds a current searcher
+
+		try {
+			// Returns false immediately when another thread is already refreshing. That thread's
+			// reopen may have started before this write, which is the race the scheduled refresh
+			// covers - hence it is a safety net, not an optimisation.
+			mgr.maybeRefresh();
+
+		} catch (AlreadyClosedException ace) {
+			discardWriterIfLockLost(ace, operation + "/refresh");
+		} catch (Exception e) {
+			logger.warn("Could not refresh the L2 searcher after {} - the entry stays invisible until the "
+					+ "scheduled refresh: {}", operation, e.toString());
+		}
+	}
+
+	/**
 	 * Deletes every file in the index directory and reopens a fresh Directory, discarding an index
 	 * whose on-disk format Lucene can no longer read (e.g. a Lucene 8 index after the upgrade to
 	 * Lucene 10). Safe because L2 is a regenerable cache - the dropped entries are re-fetched from
@@ -514,6 +861,7 @@ public class LuceneIndexManager {
 			return false;
 
 		synchronized (writerMonitorFor(indexPath)) {
+			closeSearcherManagerQuietly(); // bound to this writer - see the field javadoc
 			if (indexWriter != null) {
 				try {
 					indexWriter.close();
@@ -675,23 +1023,33 @@ public class LuceneIndexManager {
 		} catch (AlreadyClosedException ace) {
 			// lock invalidated externally - drop the writer so the next call reopens instead of wedging
 			discardWriterIfLockLost(ace, "indexDoc");
-			return; // nothing to commit on a dead writer
+			return; // nothing to publish on a dead writer
 		} finally {
-			try {
-				if (indexWriter != null)
-					iWriter.commit();
-			} catch (IOException ioEx) {
-				if (!discardWriterIfLockLost(ioEx, "indexDoc commit"))
-					logger.error("Error while commiting changes to Lucene index: {}", ioEx.getMessage(), ioEx);
-			} catch (AlreadyClosedException ace) {
-				discardWriterIfLockLost(ace, "indexDoc commit");
-			}
+			if (indexWriter != null)
+				afterWrite(iWriter, "indexDoc");
 		}
 
 	}
 
 	public void close() {
+
+		// Stop the timers first: a scheduled commit or refresh firing while we tear the writer down
+		// would race with it. shutdownNow() rather than shutdown() - a task that is mid-commit finishes
+		// on its own (the interrupt only matters to a task that is waiting), and the explicit commit
+		// below covers whatever the last scheduled one did not.
+		ScheduledExecutorService local = maintenance;
+		maintenance = null;
+		if (null != local)
+			local.shutdownNow();
+
+		// Before the writer: the searcher holds an NRT reader on it.
+		closeSearcherManagerQuietly();
+
 		if (indexWriter != null && indexWriter.isOpen()) {
+			// Writes no longer commit themselves, so an ordinary shutdown is where the last
+			// commitIntervalMs of cache entries are made durable. IndexWriter.close() commits too;
+			// this is explicit so a commit failure is logged as one rather than as a close failure.
+			commitQuietly(indexWriter, "close");
 			try {
 				indexWriter.close();
 			} catch (Exception e) {
@@ -719,27 +1077,27 @@ public class LuceneIndexManager {
 	}
 
 	/**
-	 * Returns document based on url
+	 * Returns document based on url.
+	 * <p>
+	 * This is the L2 read path - it runs on the request thread for every cache lookup that misses L1,
+	 * so it goes through the shared {@link #searcherManager} rather than opening a reader of its own.
+	 * See that field for what the old {@code DirectoryReader.open(indexWriter)} per read actually cost.
 	 */
 	private Document getDocByURL(String url) throws IOException {
 
-		IndexWriter iWriter = null;
+		Acquired acquired = null;
 		try {
-			iWriter = getIndexWriter();
-			if (iWriter == null){
-				return null;
-			}
+			acquired = acquireSearcher();
 		} catch (Exception e1) {
-			logger.debug("Error during getting indexWriter. " + e1.getMessage());
+			logger.debug("Error during acquiring L2 searcher. " + e1.getMessage());
 			return null;
 		}
 
-		Document doc = null;
-		IndexReader reader = null;
-		try {
-			reader = DirectoryReader.open(iWriter);
+		if (null == acquired)
+			return null;
 
-			IndexSearcher searcher = new IndexSearcher(reader);
+		try {
+			IndexSearcher searcher = acquired.searcher;
 
 			Term term = new Term(URL_FIELD, toPathKey(url));
 			Query query = new TermQuery(term);
@@ -748,16 +1106,14 @@ public class LuceneIndexManager {
 
 			if (results.scoreDocs != null) {
 				if (results.scoreDocs.length == 1) {
-					doc = searcher.storedFields().document(results.scoreDocs[0].doc);
+					return searcher.storedFields().document(results.scoreDocs[0].doc);
 				}
 			}
 		} finally {
-			if (reader != null) {
-				reader.close();
-			}
+			releaseSearcher(acquired);
 		}
 
-		return doc;
+		return null;
 	}
 
 
@@ -796,7 +1152,7 @@ public class LuceneIndexManager {
 		} catch (AlreadyClosedException ace) {
 			discardWriterIfLockLost(ace, "delete");
 		} finally {
-			commitQuietly(iWriter, "delete/commit");
+			afterWrite(iWriter, "delete");
 		}
 	}
 
@@ -829,7 +1185,7 @@ public class LuceneIndexManager {
 		} catch (AlreadyClosedException ace) {
 			discardWriterIfLockLost(ace, "deleteAll");
 		} finally {
-			commitQuietly(iWriter, "delete/commit");
+			afterWrite(iWriter, "deleteAll");
 		}
 	}
 
@@ -857,16 +1213,18 @@ public class LuceneIndexManager {
 		}
 
 		long count = 0;
-		IndexReader reader = null;
+		Acquired acquired = null;
 		try {
 			// expired = expire_date in [MIN_VALUE, now] ; forever entries are Long.MAX_VALUE -> excluded
 			long now = System.currentTimeMillis();
 			Query expiredQuery = LongPoint.newRangeQuery(EXPIRE_DATE_FIELD, Long.MIN_VALUE, now);
 
-			// count matches first so we can report how many were purged
-			reader = DirectoryReader.open(iWriter);
-			IndexSearcher searcher = new IndexSearcher(reader);
-			count = searcher.count(expiredQuery);
+			// Count matches first so we can report how many were purged. The count comes from the
+			// shared searcher, so it can lag the writer by up to one refresh - it is a log line, and
+			// the delete below runs against the writer's own live view either way.
+			acquired = acquireSearcher();
+			if (null != acquired)
+				count = acquired.searcher.count(expiredQuery);
 
 			iWriter.deleteDocuments(expiredQuery);
 			logger.info("deleteExpired() removed {} expired documents", count);
@@ -876,14 +1234,8 @@ public class LuceneIndexManager {
 		} catch (AlreadyClosedException ace) {
 			discardWriterIfLockLost(ace, "deleteExpired");
 		} finally {
-			if (reader != null) {
-				try {
-					reader.close();
-				} catch (IOException e) {
-					logger.error(e.getMessage(), e);
-				}
-			}
-			commitQuietly(iWriter, "delete/commit");
+			releaseSearcher(acquired);
+			afterWrite(iWriter, "deleteExpired");
 		}
 
 		return count;
@@ -900,24 +1252,22 @@ public class LuceneIndexManager {
 	 */
 	public List<String> getKeys()
 	{
-		IndexWriter iWriter = null;
+		Acquired acquired = null;
 		try {
-			iWriter = getIndexWriter();
-			if (iWriter == null){
-				return Collections.emptyList();
-			}
+			acquired = acquireSearcher();
 		} catch (Exception e1) {
-			logger.debug("Error during getting indexWriter. " + e1.getMessage());
+			logger.debug("Error during acquiring L2 searcher. " + e1.getMessage());
 			return Collections.emptyList();
 		}
 
+		if (null == acquired)
+			return Collections.emptyList();
+
 		List<String> keys = new ArrayList<String>();
 
-		IndexReader reader = null;
 		try {
-			reader = DirectoryReader.open(iWriter);
-			IndexSearcher searcher = new IndexSearcher(reader);
-			StoredFields storedFields = reader.storedFields();
+			IndexSearcher searcher = acquired.searcher;
+			StoredFields storedFields = searcher.getIndexReader().storedFields();
 
 			// only load the URL stored field — skip JSON, BIN, etc.
 			Set<String> urlFieldOnly = Collections.singleton(URL_FIELD);
@@ -952,13 +1302,7 @@ public class LuceneIndexManager {
 			if (!discardWriterIfLockLost(e, "getKeys"))
 				logger.error("Error during loading urls/keys from index", e);
 		} finally {
-			if (reader != null) {
-				try {
-					reader.close();
-				} catch (IOException e) {
-					logger.error("Error closing reader", e);
-				}
-			}
+			releaseSearcher(acquired);
 		}
 
 		return keys;
@@ -977,7 +1321,12 @@ public class LuceneIndexManager {
 				response = gson.fromJson(doc.get(JSON_FIELD), WebResponse.class);
 				BytesRef bin1ref = doc.getBinaryValue(BIN_FIELD);
 				if (null != bin1ref)
-					response.setContent(bin1ref.bytes);
+					// BytesRef is (bytes, offset, length) and its backing array may be longer than -
+					// and shared beyond - the value it carries. Handing `bytes` straight to the
+					// WebResponse published trailing bytes as page content and retained an array
+					// larger than the entry for as long as that entry was alive.
+					response.setContent(Arrays.copyOfRange(bin1ref.bytes,
+							bin1ref.offset, bin1ref.offset + bin1ref.length));
 			}
 
 			return response;
@@ -993,15 +1342,15 @@ public class LuceneIndexManager {
 	 * @return
 	 */
 	/**
-	 * Document count, read from the live writer instead of by opening a reader.
+	 * Document count, read from the live writer rather than through a searcher.
 	 *
-	 * {@link #getIndexSize()} opens a fresh {@code FSDirectory} and {@code DirectoryReader} on every
-	 * call, which is fine for the occasional management-API request it was written for and wrong for a
-	 * Prometheus scrape arriving every few seconds forever. {@code IndexWriter.getDocStats()} is an
-	 * in-memory read of state the writer already maintains.
+	 * {@code IndexWriter.getDocStats()} is an in-memory read of state the writer already maintains -
+	 * cheaper still than {@link #getIndexSize()}'s searcher acquire, and, being the writer's own view,
+	 * it does not lag a refresh. That is what a Prometheus scrape arriving every few seconds forever
+	 * wants.
 	 *
-	 * The two can differ by the documents buffered since the last commit; for a cache-size gauge that
-	 * is noise, and the cheapness is worth more than the precision.
+	 * The two can differ by whatever has been written since the last searcher refresh; for a cache-size
+	 * gauge that is noise.
 	 *
 	 * @return the document count, or -1 when the writer is unavailable - never an exception, because
 	 *         the caller is a metrics gauge and a wedged index must not break a scrape
@@ -1051,31 +1400,28 @@ public class LuceneIndexManager {
 		}
 	}
 
+	/**
+	 * Document count as a reader sees it - the number the management API and the console report.
+	 * <p>
+	 * Reads through the shared near-real-time searcher. It used to open its own {@code FSDirectory} and
+	 * {@code DirectoryReader}, which read the last COMMIT - and since commits became periodic
+	 * (see {@link Tuning}) that would report a count up to one commit interval stale, and zero on a
+	 * node that has not committed yet. The NRT view is both correct and far cheaper.
+	 *
+	 * @return the document count, or -1 when L2 is unreadable
+	 */
 	public int getIndexSize(){
-		int n = -1;
-		IndexReader reader = null;
+		Acquired acquired = null;
 		try {
+			acquired = acquireSearcher();
+			return (null == acquired) ? -1 : acquired.searcher.getIndexReader().numDocs();
 
-			Directory dir = FSDirectory.open(Paths.get(indexPath));
-			reader = DirectoryReader.open(dir);
-			n = reader.numDocs();
-
-		} catch (IOException e) {
-
+		} catch (Exception e) {
 			logger.error(e.getMessage(), e);
+			return -1;
 		} finally {
-
-			if (null != reader)
-			{
-				try {
-					reader.close();
-				} catch (IOException e) {
-					logger.error(e.getMessage(), e);
-				}
-			}
+			releaseSearcher(acquired);
 		}
-
-		return n;
 	}
 
 

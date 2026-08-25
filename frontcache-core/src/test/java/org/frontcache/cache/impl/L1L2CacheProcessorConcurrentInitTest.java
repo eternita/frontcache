@@ -249,22 +249,30 @@ public class L1L2CacheProcessorConcurrentInitTest {
 		assertFalse("precondition: the replacement write.lock must be distinguishable from the original",
 				replaced.equals(original));
 
-		// The operation that discovers the invalid lock fails, and must discard the writer.
-		// It has to be a DELETE, not an add: a delete against an already-committed segment writes
-		// liveDocs from IndexWriter.writeReaderPool(), which Lucene does not treat as a tragic event -
-		// so the writer is left reporting isOpen()==true with a dead lock. That asymmetry is exactly why
-		// production wedged on the soft-invalidation path (delete + commit) while page writes kept
-		// working, and why isOpen() cannot be the liveness check.
+		// A DELETE, not an add: a delete against an already-committed segment writes liveDocs from
+		// IndexWriter.writeReaderPool(), which Lucene does not treat as a tragic event - so the writer is
+		// left reporting isOpen()==true with a dead lock. That asymmetry is exactly why production wedged
+		// on the soft-invalidation path while page writes kept working, and why isOpen() cannot be the
+		// liveness check.
 		manager.delete(before);
 
-		// ...and the NEXT one must succeed against a freshly opened writer
+		// Which operation DISCOVERS the invalid lock is Lucene's business, not ours: it surfaces the
+		// next time the writer actually touches the lock, and a buffered delete may not do so until the
+		// following flush. (It used to be the delete's own commit(), back when every write committed.)
+		// So the contract this test pins is the one discardWriterIfLockLost() states - "the NEXT L2
+		// operation will reopen it" - and the way to assert it is to run two writes and require the
+		// index to end up durable. A writer that is never discarded, or never successfully reopened,
+		// fails both and commits neither, which is the wedge.
 		String after = "http://test.example.com/stolen/after-" + UUID.randomUUID() + ".html";
-		WebResponse r3 = new WebResponse(after, "after".getBytes());
-		manager.indexDoc(r3);
+		manager.indexDoc(new WebResponse(after, "after".getBytes())); // may be the discovering operation
+		manager.indexDoc(new WebResponse(after, "after".getBytes())); // must land on the reopened writer
 
-		// Checked against a fresh on-disk reader, NOT manager.getResponse(): readers are opened from the
-		// IndexWriter (near-real-time), so they surface in-memory segments that a dead lock prevented
-		// from ever being committed - which would make a wedged writer look healthy.
+		// Checked against a fresh on-disk reader, NOT manager.getResponse(): reads go through a
+		// near-real-time searcher over the IndexWriter, so they surface in-memory segments that a dead
+		// lock prevented from ever being committed - which would make a wedged writer look healthy.
+		// The commit is explicit because writes no longer commit themselves (LuceneIndexManager.Tuning);
+		// it is still the discriminator, since a writer with an invalidated lock cannot commit at all.
+		manager.commit();
 		assertTrue("L2 must self-heal after its lock was replaced externally and durably commit",
 				committedOnDisk(dir, after));
 
