@@ -55,6 +55,13 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 	private Cache ehCache = null;
 
+	/**
+	 * L1's content-byte counter, fed by Ehcache's own event notifications. Created per init() because it
+	 * is bound to one cache instance - see {@link L1ByteCounter} for why the number cannot simply be
+	 * read from Ehcache or counted at the put site.
+	 */
+	private L1ByteCounter l1Bytes = null;
+
     // L2
 	// Package-private so a test in this package can compare the cheap doc count the metrics gauge uses
 	// against the reader-opening one the management API uses. Nothing outside this package reads it.
@@ -117,6 +124,16 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
         	ehCacheManager.addCache(FRONT_CACHE);
             ehCache = ehCacheManager.getCache(FRONT_CACHE);
         }
+
+        // Registered before anything can be cached, so the counter never starts behind the cache. A
+        // failure here costs one gauge, not the cache - L1 works perfectly well unmeasured.
+        try {
+			L1ByteCounter counter = new L1ByteCounter();
+			ehCache.getCacheEventNotificationService().registerListener(counter);
+			l1Bytes = counter;
+		} catch (Exception e) {
+			logger.warn("Can't register the L1 byte counter - L1 content size will report as unknown", e);
+		}
 
 
 		// L2 - Lucene
@@ -335,7 +352,10 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 			logger.debug("Can't read L1 statistics", e);
 		}
 
-		return new CacheStats(l1Entries, l1Evictions,
+		L1ByteCounter counter = l1Bytes;
+		long l1ContentBytes = (null == counter) ? CacheStats.UNKNOWN : counter.bytes();
+
+		return new CacheStats(l1Entries, l1Evictions, l1ContentBytes,
 				luceneIndexManager.getIndexSizeFast(), luceneIndexManager.getIndexDiskBytes());
 	}
 

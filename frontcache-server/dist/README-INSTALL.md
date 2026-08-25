@@ -39,9 +39,9 @@ Everything lives in `FRONTCACHE_HOME/conf/`. Edit `frontcache.properties` first:
 | `front-cache.origin-host` | the backend Frontcache forwards cache misses to |
 | `front-cache.origin-http-port` / `-https-port` | the backend's ports |
 | `front-cache.default-domain` | your public domain |
-| `front-cache.site-key` | a secret of your own — it guards the management API |
+| `front-cache.site-key` | a secret of your own — **this is what guards the management API**, the dashboard stream and `/fc-metrics`. Send it as `Authorization: Bearer <site-key>` — one form for the agent, the console, node-to-node replication and a Prometheus scrape. The pre-2.9 `x-frontcache-site-key` header still works, deprecated |
 | `front-cache.http-port` / `front-cache.https-port` | the **client-facing** ports (80/443 when a TLS terminator fronts Frontcache), *not* the 9080 the launcher listens on — these two are what redirect rewriting uses |
-| `front-cache.management.port` | the port allowed to reach the management API; firewall it |
+| `front-cache.management.port` | which of this node's connectors answers management traffic. A **routing** check, not a second boundary: it compares the port the caller *addressed* (the Host header), so it is the site key above that keeps anyone out |
 
 Then, as needed:
 
@@ -76,7 +76,9 @@ report the fragments as coming from cache. Logs are under `FRONTCACHE_HOME/logs/
 
 1. Terminate TLS upstream (nginx, ALB) on 80/443 and proxy to `http://127.0.0.1:9080`.
    Forward `X-Forwarded-*` — the launcher honours them, which is what keeps the
-   management-port check and absolute-URL rewriting correct behind a proxy.
+   management-port check and absolute-URL rewriting correct behind a proxy. That check
+   is about routing, not access: set `front-cache.site-key` and require it, or anything
+   that can reach a connector can reach the management API.
    Do **not** buffer `/fc-dashboard.stream` (or its pre-2.7 alias `/hystrix.stream`); they are
    Server-Sent-Events streams.
    Set `front-cache.http-port` / `front-cache.https-port` to the ports **clients** see

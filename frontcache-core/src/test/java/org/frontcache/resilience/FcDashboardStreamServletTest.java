@@ -88,10 +88,10 @@ public class FcDashboardStreamServletTest {
 		} catch (ServletException ex) {
 		}
 
-		// no x-frontcache-site-key on the request at all
+		// no credential on the request at all
 		servlet.service(mockReq, mockResp);
 
-		verify(mockResp).sendError(401, "Missing or invalid " + FCHeaders.X_FRONTCACHE_SITE_KEY);
+		verify(mockResp).sendError(401, "Missing or invalid site key - send 'Authorization: Bearer <site-key>'");
 	}
 
 	@Test
@@ -102,11 +102,33 @@ public class FcDashboardStreamServletTest {
 		} catch (ServletException ex) {
 		}
 
-		when(mockReq.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn("not-the-node-key");
+		when(mockReq.getHeader("Authorization")).thenReturn("Bearer not-the-node-key");
 
 		servlet.service(mockReq, mockResp);
 
-		verify(mockResp).sendError(401, "Missing or invalid " + FCHeaders.X_FRONTCACHE_SITE_KEY);
+		verify(mockResp).sendError(401, "Missing or invalid site key - send 'Authorization: Bearer <site-key>'");
+	}
+
+	/**
+	 * The stream accepts the pre-2.9 header too, through the same {@code SiteKey.presented} the rest of
+	 * the management surface uses - so an older console relaying this stream keeps working.
+	 */
+	@Test
+	@SuppressWarnings("deprecation")
+	public void theDeprecatedHeaderStillAuthenticatesTheStream() throws ServletException, IOException {
+		servlet = new FcDashboardStreamServlet();
+		try {
+			servlet.init();
+		} catch (ServletException ex) {
+		}
+
+		when(mockReq.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn(NODE_SITE_KEY);
+		when(mockReq.startAsync()).thenReturn(mock(AsyncContext.class));
+		when(mockResp.getOutputStream()).thenReturn(mock(ServletOutputStream.class));
+
+		servlet.service(mockReq, mockResp);
+
+		verify(mockResp, never()).sendError(anyInt(), anyString());
 	}
 
 	// ---- 2.7: async, and the concurrency cap that now depends on it -----------------------------
@@ -168,7 +190,7 @@ public class FcDashboardStreamServletTest {
 		AsyncContext async = mock(AsyncContext.class);
 		ServletOutputStream out = mock(ServletOutputStream.class);
 
-		when(mockReq.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn(NODE_SITE_KEY);
+		when(mockReq.getHeader("Authorization")).thenReturn("Bearer " + NODE_SITE_KEY);
 		when(mockReq.startAsync()).thenReturn(async);
 		when(mockResp.getOutputStream()).thenReturn(out);
 
@@ -182,7 +204,7 @@ public class FcDashboardStreamServletTest {
 	private HttpServletRequest freshRequest() {
 		HttpServletRequest request = mock(HttpServletRequest.class);
 		when(request.getMethod()).thenReturn("GET");
-		when(request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn(NODE_SITE_KEY);
+		when(request.getHeader("Authorization")).thenReturn("Bearer " + NODE_SITE_KEY);
 		when(request.startAsync()).thenReturn(mock(AsyncContext.class));
 		return request;
 	}

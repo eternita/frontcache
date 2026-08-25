@@ -39,12 +39,24 @@ public class CacheStats {
 
 	private final long l1Entries;
 	private final long l1Evictions;
+	private final long l1ContentBytes;
 	private final long l2Entries;
 	private final long l2DiskBytes;
 
+	/**
+	 * Kept for cache processors that do not track L1's byte size - {@code CacheProcessor} is a
+	 * reflection-loaded extension point, so an implementation outside this repo still compiles and
+	 * still reports honestly: not tracking a number is what {@link #UNKNOWN} is for, and unlike the
+	 * {@code FallbackResolver} case a default here cannot silently answer a question wrongly.
+	 */
 	public CacheStats(long l1Entries, long l1Evictions, long l2Entries, long l2DiskBytes) {
+		this(l1Entries, l1Evictions, UNKNOWN, l2Entries, l2DiskBytes);
+	}
+
+	public CacheStats(long l1Entries, long l1Evictions, long l1ContentBytes, long l2Entries, long l2DiskBytes) {
 		this.l1Entries = l1Entries;
 		this.l1Evictions = l1Evictions;
+		this.l1ContentBytes = l1ContentBytes;
 		this.l2Entries = l2Entries;
 		this.l2DiskBytes = l2DiskBytes;
 	}
@@ -62,6 +74,17 @@ public class CacheStats {
 	 */
 	public long getL1Evictions() {
 		return l1Evictions;
+	}
+
+	/**
+	 * Bytes of response CONTENT held in the in-memory tier, or {@link #UNKNOWN}.
+	 *
+	 * Not the tier's retained heap: header maps, key strings and per-object overhead are not in it. The
+	 * distinction matters wherever this is shown next to a JVM heap figure. Maintained as the cache
+	 * changes rather than measured on demand - see {@code L1ByteCounter}.
+	 */
+	public long getL1ContentBytes() {
+		return l1ContentBytes;
 	}
 
 	/** Documents in the on-disk tier, or {@link #UNKNOWN}. */
@@ -84,6 +107,7 @@ public class CacheStats {
 	@Override
 	public String toString() {
 		return "CacheStats{l1Entries=" + l1Entries + ", l1Evictions=" + l1Evictions
+				+ ", l1ContentBytes=" + l1ContentBytes
 				+ ", l2Entries=" + l2Entries + ", l2DiskBytes=" + l2DiskBytes + "}";
 	}
 

@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.frontcache.console.service.FrontcacheService;
-import org.frontcache.core.FCHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -189,7 +188,7 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 
 		HttpRequest.Builder upstream = HttpRequest.newBuilder(URI.create(streamUrl)).GET();
 		if (null != siteKey)
-			upstream.header(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
+			upstream.header("Authorization", "Bearer " + siteKey);
 
 		HTTP.sendAsync(upstream.build(), HttpResponse.BodyHandlers.ofPublisher())
 				.whenComplete((upstreamResponse, failure) -> {

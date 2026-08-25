@@ -179,6 +179,85 @@ public class FrontcacheService {
 		return new ArrayList<FrontCacheStatus>(getClusterStatus().values());
 	}
 
+	/**
+	 * The configured edges, with no numbers and NO NETWORK CALLS - just what the console already knows
+	 * from its own config: each edge's name and URL.
+	 *
+	 * This is what a page renders its "Edges status" rows from. Filling those rows used to mean a
+	 * fan-out over the whole fleet before the first byte of HTML, so one unreachable edge held the
+	 * page for {@link #FRONTCACHE_CLIENT_TIMEOUT} - on the realtime page, that is a monitoring
+	 * dashboard that will not paint because something it monitors is down. The numbers now arrive from
+	 * /edges-status.json a moment later, which is the one place that talks to the fleet.
+	 *
+	 * {@code available} is deliberately left false here and is not rendered as "offline": until the
+	 * first poll answers, this console does not know, and a red dot on a healthy node is a worse
+	 * answer than an honest "checking".
+	 */
+	public List<FrontCacheStatus> getEdgeList() {
+
+		List<FrontCacheStatus> edges = new ArrayList<FrontCacheStatus>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		{
+			FrontCacheStatus edge = new FrontCacheStatus();
+			edge.setName(fcClient.getName());
+			edge.setUrl(fcClient.getFrontCacheURL());
+			edge.setCachedAmount(-1);
+			edges.add(edge);
+		}
+
+		return edges;
+	}
+
+	// ---- the polled view ---------------------------------------------------------------------
+
+	/**
+	 * How long a fan-out is reused for {@code /edges-status.json}.
+	 *
+	 * Deliberately a little under the page's poll interval (10s, see fc-edges-status.js) rather than
+	 * equal to it: the browser cadence and the fleet cadence must not be one knob. Without this, ten
+	 * open dashboards mean ten times the requests to every node, forever - the console would be the
+	 * heaviest client its own fleet has.
+	 */
+	private static final long STATUS_CACHE_MILLIS = 8000;
+
+	private volatile List<FrontCacheStatus> cachedClusterStatus = null;
+	private volatile long cachedClusterStatusStamp = 0;
+	private final Object clusterStatusLock = new Object();
+
+	/**
+	 * The same list {@link #getClusterStatusList()} returns, but reused across callers for a few
+	 * seconds. This is what the realtime page polls.
+	 *
+	 * Page loads deliberately keep using the uncached call: an operator who has just invalidated a
+	 * cache and reloaded expects to see it, and one fan-out per page load was never the problem this
+	 * cache exists to solve.
+	 */
+	public List<FrontCacheStatus> getClusterStatusListPolled() {
+
+		long now = System.currentTimeMillis();
+		List<FrontCacheStatus> current = cachedClusterStatus;
+		if (null != current && now - cachedClusterStatusStamp < STATUS_CACHE_MILLIS)
+			return current;
+
+		// One fan-out at a time. Without the lock, every poll that arrives while one is in flight
+		// starts its own - which is precisely the multiplication the cache is here to prevent, just
+		// moved from "many tabs" to "one slow fleet".
+		synchronized (clusterStatusLock) {
+
+			now = System.currentTimeMillis();
+			current = cachedClusterStatus;
+			if (null != current && now - cachedClusterStatusStamp < STATUS_CACHE_MILLIS)
+				return current;
+
+			List<FrontCacheStatus> fresh = getClusterStatusList();
+			cachedClusterStatus = fresh;
+			cachedClusterStatusStamp = System.currentTimeMillis();
+
+			return fresh;
+		}
+	}
+
 
 	/**
 	 *

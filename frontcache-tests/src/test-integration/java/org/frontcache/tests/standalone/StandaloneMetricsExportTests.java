@@ -18,6 +18,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.frontcache.tests.TestConfig;
+import org.frontcache.tests.base.SiteKeys;
 import org.frontcache.tests.base.TestsBase;
 import org.junit.Test;
 
@@ -29,10 +30,22 @@ import org.junit.Test;
  * registries, and that a scraper gets a parseable body from a running node. The standalone test node sets
  * {@code front-cache.metrics.export=prometheus}; the filter node does not, which is what keeps the
  * "off by default" path exercised too.
+ *
+ * A scrape carries the site key as {@code Authorization: Bearer}, the one form every Frontcache caller
+ * uses and the only one Prometheus itself can send. {@code unauthenticatedScrapeIsRefused} is the
+ * reason that matters: this endpoint used to answer anyone who could reach the connector.
  */
 public class StandaloneMetricsExportTests extends TestsBase {
 
 	private static final String METRICS_URL = TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST + "fc-metrics";
+
+	/** What a Prometheus scrape_config sends as authorization.credentials. */
+	private static HttpGet authenticatedScrape()
+	{
+		HttpGet get = new HttpGet(METRICS_URL);
+		get.addHeader("Authorization", "Bearer " + SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		return get;
+	}
 
 	@Test
 	public void scrapeExposesCommandAndPoolSeriesFromRealTraffic() throws Exception
@@ -42,7 +55,7 @@ public class StandaloneMetricsExportTests extends TestsBase {
 
 		CloseableHttpClient client = HttpClients.createDefault();
 		try {
-			CloseableHttpResponse response = client.execute(new HttpGet(METRICS_URL));
+			CloseableHttpResponse response = client.execute(authenticatedScrape());
 			try {
 				assertEquals(200, response.getStatusLine().getStatusCode());
 				assertTrue("Prometheus text format expected, got "
@@ -94,7 +107,7 @@ public class StandaloneMetricsExportTests extends TestsBase {
 
 		CloseableHttpClient client = HttpClients.createDefault();
 		try {
-			CloseableHttpResponse response = client.execute(new HttpGet(METRICS_URL));
+			CloseableHttpResponse response = client.execute(authenticatedScrape());
 			try {
 				assertEquals(200, response.getStatusLine().getStatusCode());
 				String body = EntityUtils.toString(response.getEntity());
@@ -121,6 +134,42 @@ public class StandaloneMetricsExportTests extends TestsBase {
 			} finally {
 				response.close();
 			}
+		} finally {
+			client.close();
+		}
+	}
+
+	/**
+	 * The endpoint's access control, over real HTTP.
+	 *
+	 * It publishes traffic volumes, error rates, circuit state and this node's heap - and before the
+	 * site key was required here, the only thing in front of it was the management-port check, which
+	 * compares a Host header the caller supplies. Anyone who could reach a connector could read all of
+	 * it. The unit tests cover the branch; this covers that the branch is actually in the request path
+	 * of a running node.
+	 */
+	@Test
+	public void unauthenticatedScrapeIsRefused() throws Exception
+	{
+		CloseableHttpClient client = HttpClients.createDefault();
+		try {
+			CloseableHttpResponse response = client.execute(new HttpGet(METRICS_URL));
+			try {
+				assertEquals("a scrape with no credentials must not be served", 401,
+						response.getStatusLine().getStatusCode());
+			} finally {
+				response.close();
+			}
+
+			HttpGet wrongKey = new HttpGet(METRICS_URL);
+			wrongKey.addHeader("Authorization", "Bearer not-this-nodes-key");
+			response = client.execute(wrongKey);
+			try {
+				assertEquals(401, response.getStatusLine().getStatusCode());
+			} finally {
+				response.close();
+			}
+
 		} finally {
 			client.close();
 		}

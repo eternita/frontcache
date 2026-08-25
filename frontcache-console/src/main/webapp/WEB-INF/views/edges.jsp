@@ -13,6 +13,7 @@
 	<script src="<c:url value='/static/js/bootstrap.js' />"></script>
 	<link href="<c:url value='/static/css/app.css' />" rel="stylesheet"></link>
 	<link href="<c:url value='/static/css/bootstrap.css' />" rel="stylesheet"></link>
+	<link href="<c:url value='/static/css/fc-edges-status.css' />" rel="stylesheet"></link>
 </head>
 
 	<body>
@@ -27,33 +28,24 @@
 		        <h2 style="font-size: 22px;">Configure Frontcache Edges</h2>
 		        <br/>
 		        
-        <div style="font-size: 18px;">
+        <%-- the same live block as the rest of the console, plus this page's remove button. The dot
+             and the count are placeholders filled by fc-edges-status.js from /edges-status.json, so
+             this page paints without waiting on the fleet and its numbers do not go stale while it
+             is open. Not inc/edges_status.jsp itself only because of the extra column. --%>
+        <div id="fc-edges-status" class="fc-edges-status fc-edges-status-wide" style="font-size: 18px;">
         
              <table >
                 <c:forEach var="edge" items="${edges}">
-                  <tr>
+                  <tr data-edge-url="<c:out value='${edge.url}'/>">
                      <td align="left" style="padding: 5px; vertical-align: middle;">
-                         <c:choose>
-                          <c:when test="${'ONLINE' == edge.onlineStatus}">
-                            <img alt="status" style="" src="static/images/status/green.png" width="15px">
-                          </c:when>
-                          <c:otherwise>
-                            <img alt="status" style="" src="static/images/status/red.png" width="15px">
-                          </c:otherwise> 
-                         </c:choose>
+                         <span class="fc-dot fc-dot-pending" data-field="dot" title="checking ..."></span>
                      </td>
                      <td align="left" style="padding: 5px;">
                         <c:out value="${edge.name}"/>
                      </td>
                      <td align="left" style="padding-left: 20px;">
-                         <c:choose>
-                          <c:when test="${'ONLINE' == edge.onlineStatus}">
-                            <c:out value="${edge.cachedAmountString}"/> items cached
-                          </c:when>
-                          <c:otherwise>
-                            &nbsp;
-                          </c:otherwise> 
-                         </c:choose>
+                        <span data-field="cachedEntries">&mdash;</span> items cached
+                        <span class="fc-edge-offline" data-field="offline" style="display: none">not reachable</span>
                      </td>
                      <td align="left" style="padding: 5px;">
                       <a class="btn btn-warning" href="remove-edge?edge=${edge.url}">remove</a>
@@ -61,6 +53,11 @@
                  </tr>
                 </c:forEach>
              </table>
+
+             <script src="<c:url value='/static/js/fc-edges-status.js' />"></script>
+             <script>
+                FcEdgesStatus.attach(document.getElementById("fc-edges-status"), "edges-status.json");
+             </script>
 		        
 		        </div>
 

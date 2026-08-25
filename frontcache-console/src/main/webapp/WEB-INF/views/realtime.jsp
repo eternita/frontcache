@@ -15,6 +15,7 @@
 
 	<!-- The realtime monitor. Uses none of the above - no d3, no underscore, no jQuery. -->
 	<link href="<c:url value='/static/css/fc-dashboard.css' />" rel="stylesheet"></link>
+	<link href="<c:url value='/static/css/fc-edges-status.css' />" rel="stylesheet"></link>
 	<script src="<c:url value='/static/js/fc-dashboard.js' />"></script>
 </head>
 
@@ -22,7 +23,8 @@
 	<div id="mainWrapper">
 		<%@ include file="/WEB-INF/views/inc/menu.jsp"%>
 
-		<div class="container">
+		<%-- fc-wide: the monitor needs the window's width, not bootstrap's 1170px --%>
+		<div class="container fc-wide">
 			<div class="fc-layout">
 				<div class="fc-edges">
 					<p style="height: 10px">&nbsp;</p>
@@ -51,7 +53,7 @@
 
 			<hr>
 			<footer>
-				<p><a href="https://github.com/eternita/frontcache/wiki" target="_blank">Frontcache Docs</a></p>
+				<p><a href="https://github.com/eternita/frontcache/blob/main/docs/doc-index.md" target="_blank">Frontcache Docs</a></p>
 			</footer>
 		</div>
 	</div>

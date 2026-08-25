@@ -14,6 +14,9 @@ rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_FILTER/logs/*
 # for standalone test server
 rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/cache/l2-lucene-index/*
 rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/logs/*
+# fallback2.txt is fetched from its init URL at engine startup - but only when it is ABSENT
+rm -f "$TESTS_DIR"/FRONTCACHE_HOME_FILTER/fallbacks/fallback2.txt
+rm -f "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/fallbacks/fallback2.txt
 # end cleanup cache dirs & logs
 
 # stop gradle daemons

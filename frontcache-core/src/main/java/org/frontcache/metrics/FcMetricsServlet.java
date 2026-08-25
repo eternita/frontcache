@@ -11,6 +11,7 @@ package org.frontcache.metrics;
 import java.io.IOException;
 
 import org.frontcache.core.ManagementPort;
+import org.frontcache.core.SiteKey;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -20,9 +21,22 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * The Prometheus scrape endpoint, {@code /fc-metrics}.
  *
- * Behind the same {@code front-cache.management.port} gate as the dashboard stream, and for the same
- * reason: this exposes traffic volumes, error rates, circuit state and command names. A scrape endpoint
- * is unauthenticated by convention, so the connector it answers on IS the access control.
+ * Behind the same {@code front-cache.management.port} check as the dashboard stream, and for the same
+ * reason: this exposes traffic volumes, error rates, circuit state and command names - and, since the
+ * JVM binders were added, this node's heap and CPU.
+ *
+ * <h2>The site key, not the port, is what protects it</h2>
+ *
+ * A scrape endpoint is unauthenticated by convention, and this one used to rely on that convention plus
+ * the port check. That was not a boundary: the port check compares {@code getServerPort()}, which comes
+ * from the Host header, so any caller able to reach any connector could ask for {@code Host: host:443}
+ * and be served. The dashboard stream and the management API both require a site key underneath the
+ * same port check; this endpoint was the one that did not, which made it the way in.
+ *
+ * So when the node has a {@code front-cache.site-key}, a scrape must carry it as
+ * {@code Authorization: Bearer <key>} - which is also the only form Prometheus can send, a
+ * scrape_config having no way to set an arbitrary header. A node with no site key configured is
+ * unchanged, and {@link ManagementPort} warns about that at startup.
  *
  * Deliberately not {@code /fc-metrics.stream} - that name is reserved for the SSE stream's eventual
  * alias, and two endpoints one suffix apart, one a scrape and one an infinite stream, is a support
@@ -44,6 +58,16 @@ public class FcMetricsServlet extends HttpServlet {
 		if (!ManagementPort.isAllowed(request, WHAT))
 		{
 			response.sendError(403, "Metrics are served on the management port only");
+			return;
+		}
+
+		if (!SiteKey.isAuthorized(request))
+		{
+			// The message names the fix, because the symptom - a scrape target that went red on
+			// upgrade - does not. Prometheus sends this as authorization: { credentials: <key> }.
+			response.setHeader("WWW-Authenticate", "Bearer realm=\"frontcache\"");
+			response.sendError(401, "Metrics require this node's front-cache.site-key - send it as "
+					+ "'Authorization: Bearer <site-key>' (in Prometheus: authorization.credentials)");
 			return;
 		}
 

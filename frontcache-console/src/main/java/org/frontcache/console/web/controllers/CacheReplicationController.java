@@ -36,7 +36,7 @@ public class CacheReplicationController {
 		Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
 		model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getClusterStatusList());
+		model.addAttribute("edges", frontcacheService.getEdgeList());
 
 		ReplicationResult status = frontcacheService.getReplicationStatus();
 		model.addAttribute("replicationStatus", status);
@@ -68,7 +68,7 @@ public class CacheReplicationController {
 		Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
 		model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getClusterStatusList());
+		model.addAttribute("edges", frontcacheService.getEdgeList());
 
 		ReplicationResult status = frontcacheService.getReplicationStatus();
 		model.addAttribute("replicationStatus", status);
@@ -87,7 +87,7 @@ public class CacheReplicationController {
 		Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
 		model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getClusterStatusList());
+		model.addAttribute("edges", frontcacheService.getEdgeList());
 
 		ReplicationResult status = frontcacheService.getReplicationStatus();
 		model.addAttribute("replicationStatus", status);

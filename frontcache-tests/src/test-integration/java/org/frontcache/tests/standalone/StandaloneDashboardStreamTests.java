@@ -24,7 +24,6 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.frontcache.core.FCHeaders;
 import org.frontcache.tests.TestConfig;
 import org.frontcache.tests.base.SiteKeys;
 import org.frontcache.tests.base.TestsBase;
@@ -205,7 +204,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 		generateTraffic();
 
 		HttpGet get = new HttpGet(STREAM_URL);
-		get.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		get.addHeader("Authorization", "Bearer " + SiteKeys.TEST_SITE_KEY_LOCALHOST);
 
 		CloseableHttpClient httpClient = client();
 		try {
@@ -310,7 +309,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 	{
 		HttpGet get = new HttpGet(url);
 		if (null != siteKey)
-			get.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
+			get.addHeader("Authorization", "Bearer " + siteKey);
 
 		CloseableHttpClient httpClient = client();
 		try {
@@ -331,7 +330,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 		List<String> frames = new ArrayList<String>();
 
 		HttpGet get = new HttpGet(url);
-		get.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
+		get.addHeader("Authorization", "Bearer " + siteKey);
 
 		CloseableHttpClient httpClient = client();
 		try {
@@ -404,7 +403,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 	private static OpenStream openStream() throws Exception
 	{
 		HttpGet get = new HttpGet(STREAM_URL);
-		get.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		get.addHeader("Authorization", "Bearer " + SiteKeys.TEST_SITE_KEY_LOCALHOST);
 
 		CloseableHttpClient httpClient = client();
 		try {

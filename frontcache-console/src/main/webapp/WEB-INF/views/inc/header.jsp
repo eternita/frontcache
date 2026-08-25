@@ -9,6 +9,8 @@
 		<script src="<c:url value='https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js' />"></script>
 		 <script src="<c:url value='/static/js/bootstrap.js' />"></script>
 		<link href="<c:url value='/static/css/app.css' />" rel="stylesheet"></link>
+		<%-- the "Edges status" block (inc/edges_status.jsp) styles itself from here --%>
+		<link href="<c:url value='/static/css/fc-edges-status.css' />" rel="stylesheet"></link>
 		<link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/4.2.0/css/font-awesome.css" /></head>
 
 	<body>

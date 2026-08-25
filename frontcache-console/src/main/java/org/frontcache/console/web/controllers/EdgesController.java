@@ -8,11 +8,9 @@
  */
 package org.frontcache.console.web.controllers;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -33,8 +31,10 @@ public class EdgesController {
 	@RequestMapping(value = "/edges", method = RequestMethod.GET)
 	public String domainRealtimeMonitor(ModelMap model) {
 
-		Map<String, FrontCacheStatus> clusterStatus = frontcacheService.getClusterStatus();
-		List<FrontCacheStatus> edges = new ArrayList<FrontCacheStatus>(clusterStatus.values());
+		// The edge list, not a fan-out: this page renders the same live block as the others, so the
+		// dot and the item count are filled by the poll rather than by a round trip per edge before
+		// the page can paint. Sorting by name needs no network.
+		List<FrontCacheStatus> edges = frontcacheService.getEdgeList();
 		Collections.sort(edges, new Comparator<FrontCacheStatus>(){
 		    public int compare(FrontCacheStatus t1, FrontCacheStatus t2) {
 	    		return t1.getName().compareTo(t2.getName());

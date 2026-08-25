@@ -37,19 +37,42 @@
 	color: red;
 }
 
-/* the circuit boxes: a wrapping row of fixed-size cards */
+/* The circuit boxes: a wrapping row of cards.
+   Grid rather than flex, because the number of cards per row has to follow the width
+   of the column. A flex row wraps on the cards' base size, so a 4-command circuit
+   (Input-Requests / Cache-Hits / Cache-Origin-* / Origin-Hits) dropped Origin-Hits
+   onto a second row as soon as the column was under 4x250px - flex-shrink does not
+   help, since wrapping is decided before shrinking. auto-fill + minmax lets the tracks
+   give up width so the whole circuit stays on one row; the 200px floor is where the
+   card's own content starts to wrap (measured against the longest command name and the
+   widest latency row), so tracks never get narrower than the card can take.
+   auto-fill, not auto-fit:
+   auto-fit collapses the tracks it has no item for and hands their width to the ones
+   that are left, which would blow four cards up to 400px each on a wide screen. */
 .fc-dashboard .fc-circuits {
-	display: flex;
-	flex-wrap: wrap;
+	--fc-card-min: 200px;
+	--fc-card-gap: 5px;
+
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(var(--fc-card-min), 1fr));
+	justify-content: start;
 	align-content: flex-start;
+	gap: 15px var(--fc-card-gap);
 	padding-top: 5px;
+
+	/* Widen the row only as far as this circuit has cards to put in it. auto-fill spends
+	   spare width on new tracks rather than on the tracks it has, so on a big screen every
+	   card would sit near the 200px floor with the leftover tracks standing empty. This is
+	   the widest the row can be while still holding exactly --fc-cards tracks (one pixel
+	   short of where the next one would appear), which is also where the cards are at their
+	   roomiest. fc-dashboard.js sets --fc-cards as cards come and go; the fallback keeps
+	   the cap out of the way if it ever does not. */
+	max-width: calc((var(--fc-cards, 99) + 1) * (var(--fc-card-min) + var(--fc-card-gap)) - var(--fc-card-gap) - 1px);
 }
 
 .fc-dashboard .fc-circuit {
 	position: relative;
-	width: 245px;
 	height: 250px;
-	margin: 0 5px 15px 0;
 	font-size: 10pt;
 }
 
@@ -171,10 +194,28 @@
 .fc-dashboard .fc-rejected        { color: purple; }
 .fc-dashboard .fc-bad-request     { color: #20b2aa; }
 
+/* Navy rather than the vendored dashboard's steelblue. The chart sits BEHIND the card's
+   numbers, and those blocks carry an rgba(255,255,255,.8) background, so everything drawn
+   on the chart is seen through 80% white: an #rrggbb comes out at 204 + 0.2*c. That put
+   steelblue at a slightly HIGHER luminance than the veiled green bubble it crosses (+6),
+   which is why the line disappeared over the circle. Navy lands 17 below it. The green
+   channel is what does the work here - keeping it at 0 is what separates the line from
+   the bubble, so a lighter blue would undo this even if it looked dark on white. */
 .fc-dashboard .fc-sparkline {
-	stroke: #4682b4;
+	stroke: navy;
 	stroke-width: 1;
 	fill: none;
+}
+
+/* The realtime page is a dashboard, not a page of text: bootstrap's .container caps
+   the content at 1170px, which left the monitor column 897px - room for three 250px
+   cards, so the fourth (Origin-Hits) always wrapped onto a row of its own while ~450px
+   of window went unused. This page gets the window width instead. menu.jsp puts the
+   same class on the navbar's container so the two stay aligned, and the rule only
+   exists here - fc-dashboard.css is linked from realtime.jsp alone. */
+.container.fc-wide {
+	width: auto;
+	max-width: 1800px;
 }
 
 /* "Edges status" and the monitor side by side on wide screens, stacked below */
@@ -185,8 +226,12 @@
 	gap: 20px 40px;
 }
 
+/* Pinned, not auto. The block used to take the width of its widest line, which was fine when that
+   was a hostname and an item count. It now carries six rows of numbers, and every pixel it takes
+   comes out of the monitor column - which is sized to fit as many circuit cards per row as it can, so
+   a long hostname or a "1,234.5 MB" would silently drop a card from every circuit. */
 .fc-layout .fc-edges {
-	flex: 0 0 auto;
+	flex: 0 0 240px;
 	padding-left: 20px;
 }
 

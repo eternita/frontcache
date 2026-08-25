@@ -34,7 +34,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheManager;
-import org.frontcache.core.FCHeaders;
+import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheStats;
+import org.frontcache.core.FcNodeStats;
+import org.frontcache.core.SiteKey;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
@@ -59,7 +62,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 	FrontCacheEngine fcEngine = null;
 
 	private int managementPort = -1; // management port for security
-	private String siteKey = "";
 
 	// guards against concurrent backups - only one index backup may run at a time
 	private final AtomicBoolean backupInProgress = new AtomicBoolean(false);
@@ -78,7 +80,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 		fcEngine = FrontCacheEngine.getFrontCache();
 
 		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
-		siteKey = FCConfig.getProperty("front-cache.site-key", "");
 		if (null == managementPortStr || managementPortStr.trim().length() == 0)
 			logger.warn("Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
 		else {
@@ -118,18 +119,14 @@ public class FrontCacheIOServlet extends HttpServlet {
 			return;
 		}
 
-		// site-key validation is active only when a site key is configured. A request is authorized
-		// when its X_FRONTCACHE_SITE_KEY header matches this node's site key - there is one per node.
-		if (siteKey.length() > 0)
+		// Site-key validation is active only when a site key is configured, and is THE access control
+		// here - the port check above compares the Host header, which the caller supplies. Shared with
+		// /fc-metrics via SiteKey rather than reimplemented, and read per request so that reloading a
+		// node's configuration changes the key actually enforced.
+		if (!SiteKey.isAuthorized(request))
 		{
-			String requestSiteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
-			boolean authorized = null != requestSiteKey && requestSiteKey.length() > 0
-					&& siteKey.equals(requestSiteKey);
-			if (!authorized)
-			{
-				response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
-				return;
-			}
+			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
+			return;
 		}
 
 		String action = request.getParameter("action");
@@ -145,6 +142,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.GET_CACHE_STATE:
 			aResponse = getCacheStatus(request);
+			break;
+
+		case FrontcacheAction.GET_NODE_STATS:
+			aResponse = getNodeStats(request);
 			break;
 
 		case FrontcacheAction.GET_CACHED_KEYS:
@@ -264,6 +265,26 @@ public class FrontCacheIOServlet extends HttpServlet {
 		ActionResponse aResponse = new CacheStatusActionResponse(state);
 
 		return aResponse;
+	}
+
+	/**
+	 * The pollable view - see {@link NodeStatsActionResponse}.
+	 *
+	 * Reads through {@link CacheManager#existingInstance()}, not {@code getInstance()}: this action is
+	 * on a console's poll loop, and a node whose cache has not started yet must not have it started BY
+	 * being polled - that would open the Lucene index and take its write lock. The same rule the
+	 * metrics exporter follows. With no cache yet, the cache numbers report as unknown and the JVM
+	 * numbers still answer.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getNodeStats(HttpServletRequest req)
+	{
+		CacheProcessor processor = CacheManager.existingInstance();
+		CacheStats cacheStats = (null == processor) ? CacheStats.NOT_TRACKED : processor.getCacheStats();
+
+		return new NodeStatsActionResponse(cacheStats, FcNodeStats.current());
 	}
 
 	/**

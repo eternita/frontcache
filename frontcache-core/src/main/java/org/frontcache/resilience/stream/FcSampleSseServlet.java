@@ -19,7 +19,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,7 +87,7 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * <h2>Two behavior changes, both from proposal section 14.6</h2>
  *
- * - A wrong or absent {@code x-frontcache-site-key} gets {@code 401}, where it used to get {@code 200}
+ * - A wrong or absent site key gets {@code 401}, where it used to get {@code 200}
  *   and an endless stream of empty frames. The header is this endpoint's only authentication, so an
  *   unauthenticated read should be refused rather than answered with an empty success.
  * - {@code 503} now means only what it says: the service is shutting down, or the connection cap is
@@ -174,7 +173,8 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 			// Refused, not answered with an empty stream - see the class javadoc. Logged at info because
 			// on a management port this is either a misconfigured console or someone probing.
 			logger.info("Rejecting " + request.getRequestURI() + ": missing or wrong site key from " + FCUtils.getClientIP(request));
-			response.sendError(401, "Missing or invalid " + FCHeaders.X_FRONTCACHE_SITE_KEY);
+			response.setHeader("WWW-Authenticate", "Bearer realm=\"frontcache\"");
+			response.sendError(401, "Missing or invalid site key - send 'Authorization: Bearer <site-key>'");
 			return;
 		}
 

@@ -11,6 +11,7 @@ package org.frontcache.metrics;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import org.frontcache.FCConfig;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.resilience.FcTestSupport;
 import org.junit.After;
 import org.junit.Test;
@@ -30,14 +32,24 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * The gate on {@code /fc-metrics}.
  *
- * A Prometheus scrape endpoint is unauthenticated by convention, so the connector it answers on is the
- * access control. Getting this wrong publishes traffic volumes, error rates and circuit state on the
- * public port - which is why proposal section 7.5 says not to skip it, and why it has its own test rather
- * than being assumed from the fact that the code reads the same property as the metrics stream.
+ * Two checks, and only the second is a boundary. The port check answers "which connector", and reads a
+ * Host header the caller supplies; the site key answers "who", and is what actually keeps traffic
+ * volumes, error rates, circuit state and this node's heap off a public port.
+ *
+ * The endpoint shipped with only the first of those, which is the hole
+ * {@code siteKeyIsRequiredEvenWhenThePortCheckPasses} pins shut.
  */
 public class FcMetricsServletTest {
 
 	private static final String MANAGEMENT_PORT_KEY = "front-cache.management.port";
+	private static final String SITE_KEY_KEY = "front-cache.site-key";
+
+	/**
+	 * Captured, not assumed to be empty. FCConfig is process-wide static state, and other tests in this
+	 * fork read a site key loaded from their own FRONTCACHE_HOME - blanking it here failed two of them
+	 * depending on test order, which is a nastier bug than the one this class is about.
+	 */
+	private final String originalSiteKey = FCConfig.getProperty(SITE_KEY_KEY, "");
 
 	@After
 	public void tearDown()
@@ -45,6 +57,7 @@ public class FcMetricsServletTest {
 		FcMetricsExport.stop();
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "none");
 		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "");
+		FCConfig.setProperty(SITE_KEY_KEY, originalSiteKey);
 		FcTestSupport.resetAll();
 	}
 
@@ -60,6 +73,7 @@ public class FcMetricsServletTest {
 	public void refusedOnANonManagementPort() throws Exception
 	{
 		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "8081");
+		FCConfig.setProperty(SITE_KEY_KEY, "");   // this test is about the port, so pin the other axis
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
 		FcMetricsExport.start();
 
@@ -74,6 +88,7 @@ public class FcMetricsServletTest {
 	public void servedOnTheManagementPort() throws Exception
 	{
 		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "8081");
+		FCConfig.setProperty(SITE_KEY_KEY, "");   // this test is about the port, so pin the other axis
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
 		FcMetricsExport.start();
 
@@ -95,6 +110,7 @@ public class FcMetricsServletTest {
 	public void notFoundWhenExportIsDisabled() throws Exception
 	{
 		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "");
+		FCConfig.setProperty(SITE_KEY_KEY, "");   // this test is about the port, so pin the other axis
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "none");
 		FcMetricsExport.start();
 
@@ -109,12 +125,117 @@ public class FcMetricsServletTest {
 	public void unrestrictedWhenNoManagementPortIsSet() throws Exception
 	{
 		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "");
+		FCConfig.setProperty(SITE_KEY_KEY, "");   // this test is about the port, so pin the other axis
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
 		FcMetricsExport.start();
 
 		StringWriter body = new StringWriter();
 		HttpServletResponse response = mock(HttpServletResponse.class);
 		when(response.getWriter()).thenReturn(new PrintWriter(body));
+
+		new FcMetricsServlet().service(requestOnPort(12345), response);
+
+		verify(response, never()).sendError(anyInt(), anyString());
+	}
+
+	// ---- the site key, which is the actual access control ----------------------------------------
+
+	private static HttpServletRequest requestOnPort(int port, String header, String value)
+	{
+		HttpServletRequest request = requestOnPort(port);
+		when(request.getHeader(header)).thenReturn(value);
+		return request;
+	}
+
+	/**
+	 * The hole this closes. The port check compares {@code getServerPort()}, which the servlet spec
+	 * derives from the Host header - so a caller who could reach ANY connector could ask for the
+	 * management port and be served the whole scrape. Every other management endpoint required a site
+	 * key underneath that check; this one did not.
+	 */
+	@Test
+	public void siteKeyIsRequiredEvenWhenThePortCheckPasses() throws Exception
+	{
+		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "8081");
+		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");
+		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
+		FcMetricsExport.start();
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		new FcMetricsServlet().service(requestOnPort(8081), response);
+
+		verify(response).sendError(eq(401), contains("site-key"));
+		verify(response, never()).getWriter();
+	}
+
+	/** Still accepted for one release - an embedded agent or an older console may send it. */
+	@Test
+	@SuppressWarnings("deprecation")
+	public void theDeprecatedHeaderIsStillAccepted() throws Exception
+	{
+		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "8081");
+		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");
+		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
+		FcMetricsExport.start();
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+
+		new FcMetricsServlet().service(
+				requestOnPort(8081, FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret"), response);
+
+		verify(response, never()).sendError(anyInt(), anyString());
+	}
+
+	/**
+	 * Prometheus cannot send an arbitrary request header - a scrape_config offers basic_auth,
+	 * authorization and oauth2 and nothing else - so the Bearer form is not a nicety. Without it,
+	 * requiring a site key here would make the endpoint unscrapable by the tool it exists for.
+	 */
+	@Test
+	public void authorizationBearerIsAcceptedBecausePrometheusCannotSendAHeader() throws Exception
+	{
+		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "8081");
+		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");
+		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
+		FcMetricsExport.start();
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+
+		new FcMetricsServlet().service(requestOnPort(8081, "Authorization", "Bearer s3cret"), response);
+
+		verify(response, never()).sendError(anyInt(), anyString());
+	}
+
+	@Test
+	public void aWrongKeyIsRefused() throws Exception
+	{
+		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "");
+		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");
+		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
+		FcMetricsExport.start();
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		new FcMetricsServlet().service(requestOnPort(80, "Authorization", "Bearer not-the-key"), response);
+
+		verify(response).sendError(eq(401), anyString());
+	}
+
+	/**
+	 * A node with no site key is unchanged. Refusing on upgrade would take an operator's metrics away
+	 * to protect a node that never asked to be protected; ManagementPort warns about it instead.
+	 */
+	@Test
+	public void aNodeWithNoSiteKeyIsUnchanged() throws Exception
+	{
+		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "");
+		FCConfig.setProperty(SITE_KEY_KEY, "");
+		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
+		FcMetricsExport.start();
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
 
 		new FcMetricsServlet().service(requestOnPort(12345), response);
 
