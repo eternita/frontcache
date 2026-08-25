@@ -8,24 +8,34 @@
  */
 package org.frontcache.core;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
+
 import org.frontcache.FCConfig;
 import org.junit.After;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * {@link SiteKey} - the management API's actual access control, now that {@link ManagementPort} says
  * plainly that it is not one.
  *
- * The rules worth pinning are the two that decide whether a deployment keeps working: an unconfigured
+ * The rules worth pinning are the ones that decide whether a deployment keeps working: an unconfigured
  * node stays open (refusing on upgrade would take away an operator's dashboards to protect a node that
- * never asked), and a configured node accepts the secret by either route.
+ * never asked), {@code Authorization: Bearer} is the form everything sends now, and the pre-2.9 header
+ * is still ACCEPTED - because an embedded agent, a separately deployed console or an older peer node
+ * can be older than the node it calls, and none of them upgrade on our schedule.
  */
 public class SiteKeyTest {
 
@@ -82,17 +92,38 @@ public class SiteKeyTest {
 		assertFalse(SiteKey.isAuthorized(bare()));
 	}
 
+	/**
+	 * The compatibility promise, and the reason this cannot simply be deleted: frontcache-agent is a
+	 * published artifact embedded in customer applications, and a node cannot choose when those
+	 * upgrade. Deleting this test is the deliberate act that ends the grace period.
+	 */
 	@Test
-	public void theFrontcacheHeaderCarriesIt()
+	@SuppressWarnings("deprecation")
+	public void theDeprecatedHeaderIsStillAccepted()
 	{
 		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
 
-		assertTrue(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret")));
+		assertTrue("a pre-2.9 agent must keep working against a 2.9 node",
+				SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret")));
 		assertFalse(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "wrong")));
 		assertFalse(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "")));
 	}
 
-	/** The form Prometheus can actually send: scrape_config has no arbitrary-header option. */
+	/** Bearer wins when a caller mid-migration sends both, so the current form is the one that counts. */
+	@Test
+	@SuppressWarnings("deprecation")
+	public void bearerTakesPrecedenceOverTheDeprecatedHeader()
+	{
+		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+
+		HttpServletRequest both = mock(HttpServletRequest.class);
+		when(both.getHeader("Authorization")).thenReturn("Bearer s3cret");
+		when(both.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn("stale");
+
+		assertTrue(SiteKey.isAuthorized(both));
+	}
+
+	/** The one form everything sends now - and the only one Prometheus can send at all. */
 	@Test
 	public void authorizationBearerCarriesIt()
 	{
@@ -127,8 +158,8 @@ public class SiteKeyTest {
 	{
 		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
 
-		assertFalse(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cr")));
-		assertFalse(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cretIsLonger")));
+		assertFalse(SiteKey.isAuthorized(with("Authorization", "Bearer s3cr")));
+		assertFalse(SiteKey.isAuthorized(with("Authorization", "Bearer s3cretIsLonger")));
 	}
 
 	/** Read per request, so reloading a node's configuration changes the key actually enforced. */
@@ -136,12 +167,12 @@ public class SiteKeyTest {
 	public void theKeyIsReReadRatherThanCached()
 	{
 		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "first");
-		assertTrue(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "first")));
+		assertTrue(SiteKey.isAuthorized(with("Authorization", "Bearer first")));
 
 		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "second");
 
-		assertFalse("the old key must stop working", SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "first")));
-		assertTrue(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "second")));
+		assertFalse("the old key must stop working", SiteKey.isAuthorized(with("Authorization", "Bearer first")));
+		assertTrue(SiteKey.isAuthorized(with("Authorization", "Bearer second")));
 	}
 
 	@Test
@@ -150,6 +181,66 @@ public class SiteKeyTest {
 		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
 
 		assertFalse(SiteKey.isAuthorized(null));
+	}
+
+	// ---- the deprecation warning ---------------------------------------------------------------
+
+	/**
+	 * Once, not per request. A fleet mid-upgrade has every management call arriving on the old header,
+	 * and a warning per call would bury the log it is trying to be visible in.
+	 *
+	 * Worth a test rather than an eyeball because it is invisible when broken - and because the shipped
+	 * fc-logback.xml routes WARN to stdout only (its file appenders use exact-match level filters), so
+	 * it does not show up where someone would go looking.
+	 */
+	@Test
+	@SuppressWarnings("deprecation")
+	public void theLegacyHeaderIsWarnedAboutExactlyOnce()
+	{
+		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		SiteKey.legacyHeaderLogged.set(false);   // another test in this fork may have tripped it
+
+		Logger logger = (Logger) LoggerFactory.getLogger(SiteKey.class);
+		ListAppender<ILoggingEvent> captured = new ListAppender<ILoggingEvent>();
+		captured.start();
+		logger.addAppender(captured);
+
+		try {
+			for (int i = 0; i < 5; i++)
+				assertTrue(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret")));
+
+			List<ILoggingEvent> warnings = captured.list;
+			assertEquals("five legacy calls, one warning", 1, warnings.size());
+			assertEquals(Level.WARN, warnings.get(0).getLevel());
+			assertTrue("the warning must name the header being deprecated: " + warnings.get(0).getFormattedMessage(),
+					warnings.get(0).getFormattedMessage().contains(FCHeaders.X_FRONTCACHE_SITE_KEY));
+			assertTrue("and the form to use instead",
+					warnings.get(0).getFormattedMessage().contains("Bearer"));
+
+		} finally {
+			logger.detachAppender(captured);
+		}
+	}
+
+	/** Bearer is the current form, so it must not warn about anything. */
+	@Test
+	public void theCurrentFormWarnsAboutNothing()
+	{
+		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		SiteKey.legacyHeaderLogged.set(false);
+
+		Logger logger = (Logger) LoggerFactory.getLogger(SiteKey.class);
+		ListAppender<ILoggingEvent> captured = new ListAppender<ILoggingEvent>();
+		captured.start();
+		logger.addAppender(captured);
+
+		try {
+			assertTrue(SiteKey.isAuthorized(with("Authorization", "Bearer s3cret")));
+			assertTrue("Bearer is not deprecated", captured.list.isEmpty());
+
+		} finally {
+			logger.detachAppender(captured);
+		}
 	}
 
 }

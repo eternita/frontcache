@@ -137,8 +137,12 @@ public class FrontCacheAgent {
 
 //    	post.addHeader("Accept-Encoding", "gzip");
 
+		// Standard bearer auth, the one form every Frontcache caller uses. Spelled out rather than
+		// referenced because this module deliberately does not depend on frontcache-core.
+		// A node older than 2.9 will not recognise it - those accept only the pre-2.9
+		// x-frontcache-site-key header, so an agent this new needs a node at least this new.
 		if (null != siteKey)
-			post.addHeader("x-frontcache-site-key", siteKey); // must match FCHeaders.X_FRONTCACHE_SITE_KEY (hyphenated, no dots)
+			post.addHeader("Authorization", "Bearer " + siteKey);
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 

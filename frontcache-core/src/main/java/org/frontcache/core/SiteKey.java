@@ -10,8 +10,11 @@ package org.frontcache.core;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.frontcache.FCConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -26,16 +29,22 @@ import jakarta.servlet.http.HttpServletRequest;
  * {@code FrontCacheIOServlet} and a second endpoint needed the same rule, and two implementations of
  * one security check is one too many - the copy is always the one that goes stale.
  *
- * <h2>Two headers, one secret</h2>
+ * <h2>{@code Authorization: Bearer <site-key>} is the way to send it</h2>
  *
- * {@code X-frontcache-site-key} is the Frontcache convention: the agent, the console and
- * {@code FrontCacheClient} all send it, and it is hardcoded in frontcache-agent.
+ * One form, everywhere: the agent, the console, {@code FrontCacheClient}, node-to-node replication and
+ * a Prometheus scrape all use it. It is a standard scheme with standard tooling, and it is the only
+ * form <b>Prometheus can send at all</b> - a scrape_config offers basic_auth, authorization and
+ * oauth2, and no way to set an arbitrary header - which is what settled the choice between the two.
  *
- * {@code Authorization: Bearer <key>} is accepted for the same secret because <b>Prometheus cannot
- * send an arbitrary request header</b> - a scrape_config offers basic_auth, authorization and oauth2,
- * and nothing else. Without the Bearer form, requiring a site key on {@code /fc-metrics} would make
- * the endpoint unscrapable by the very tool it exists for, which is a worse answer than the hole it
- * closes.
+ * <h2>The legacy {@code x-frontcache-site-key} header, for one release</h2>
+ *
+ * That header was the Frontcache convention through 2.8 and is still accepted, deprecated, with a
+ * warning naming the caller. It cannot simply be dropped: {@code frontcache-agent} is a published
+ * artifact embedded in customer applications, the console is deployed separately from the fleet, and
+ * nodes replicate to each other - so at any moment some caller is older than the node it is calling,
+ * and a node that refused the old header would break all of them on upgrade rather than at a time
+ * anyone chose. Same treatment as {@code get-hystrix-configs} and {@code conf/hystrix.properties} in
+ * 2.7. Remove once no supported caller predates 2.9.
  *
  * <h2>The SSE stream's check is stricter, on purpose</h2>
  *
@@ -56,6 +65,11 @@ public class SiteKey {
 	static final String SITE_KEY_PROPERTY = "front-cache.site-key";
 
 	private static final String BEARER = "Bearer ";
+
+	private static final Logger logger = LoggerFactory.getLogger(SiteKey.class);
+
+	/** Package-private so a test can assert the warning fires, and fires once. */
+	static final AtomicBoolean legacyHeaderLogged = new AtomicBoolean(false);
 
 	private SiteKey() { }
 
@@ -90,15 +104,20 @@ public class SiteKey {
 		return matches(expected, presented(request));
 	}
 
-	/** The key the caller presented, by either accepted route, or null. */
-	private static String presented(HttpServletRequest request)
+	/**
+	 * The credential the caller presented, or null.
+	 *
+	 * Public because the SSE stream reads the same credential and applies a different rule to it (see
+	 * the class javadoc) - so the two share how a caller SENDS the key while keeping their own answers
+	 * about what it means.
+	 *
+	 * @param request the inbound request
+	 * @return the site key the caller sent, by the current or the legacy route, or null
+	 */
+	public static String presented(HttpServletRequest request)
 	{
 		if (null == request)
 			return null;
-
-		String header = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
-		if (null != header && header.trim().length() > 0)
-			return header.trim();
 
 		String authorization = request.getHeader("Authorization");
 		if (null != authorization && authorization.regionMatches(true, 0, BEARER, 0, BEARER.length()))
@@ -108,7 +127,28 @@ public class SiteKey {
 				return credentials;
 		}
 
-		return null;
+		return legacyHeader(request);
+	}
+
+	/**
+	 * The pre-2.9 header. Warned about once rather than per request - a fleet mid-upgrade would
+	 * otherwise fill a log with it - and the message names the caller, because "something still uses
+	 * the old header" is only actionable if you can tell what.
+	 */
+	@SuppressWarnings("deprecation")
+	private static String legacyHeader(HttpServletRequest request)
+	{
+		String header = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
+		if (null == header || 0 == header.trim().length())
+			return null;
+
+		if (legacyHeaderLogged.compareAndSet(false, true))
+			logger.warn("A caller is authenticating with the deprecated " + FCHeaders.X_FRONTCACHE_SITE_KEY
+					+ " header (User-Agent: " + request.getHeader("User-Agent") + ", from "
+					+ request.getRemoteAddr() + "). Send 'Authorization: Bearer <site-key>' instead;"
+					+ " the old header is accepted for one more release.");
+
+		return header.trim();
 	}
 
 	/**

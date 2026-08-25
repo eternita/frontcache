@@ -168,8 +168,10 @@ public class FcMetricsServletTest {
 		verify(response, never()).getWriter();
 	}
 
+	/** Still accepted for one release - an embedded agent or an older console may send it. */
 	@Test
-	public void theFrontcacheHeaderIsAccepted() throws Exception
+	@SuppressWarnings("deprecation")
+	public void theDeprecatedHeaderIsStillAccepted() throws Exception
 	{
 		FCConfig.setProperty(MANAGEMENT_PORT_KEY, "8081");
 		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");

@@ -767,8 +767,17 @@ public class FCUtils {
 	 * refuses with 401 (proposal section 14.6), and it no longer needs a domain at all: the {@code group}
 	 * field of each frame comes from the metrics object that owns it.
 	 */
+	/**
+	 * Reads the credential through {@link SiteKey#presented} - so the stream accepts
+	 * {@code Authorization: Bearer <site-key>} like everything else, and the deprecated
+	 * {@code x-frontcache-site-key} for as long as that is accepted anywhere.
+	 *
+	 * The DECISION stays here and stays stricter than {@link SiteKey#isAuthorized}: a node with no site
+	 * key configured refuses the stream, where it would allow a management call. That difference is
+	 * long-standing and deliberate - see the SiteKey javadoc - so unifying the header did not unify it.
+	 */
 	public static boolean isAuthorizedSiteKeyHeader(HttpServletRequest request) {
-		String siteKey = request.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY);
+		String siteKey = SiteKey.presented(request);
 
 		return FrontCacheEngine.getFrontCache().isNodeSiteKey(siteKey);
 	}

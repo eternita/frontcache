@@ -42,7 +42,6 @@ import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
-import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
@@ -349,7 +348,7 @@ public class FrontCacheClient {
 //    	post.addHeader("Accept-Encoding", "gzip");
 
 		if (null != siteKey)
-			post.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
+			post.addHeader("Authorization", "Bearer " + siteKey);
 
 		InputStream is = null;
 		CloseableHttpResponse response = null;
@@ -785,7 +784,7 @@ public class FrontCacheClient {
 //    	post.addHeader("Accept-Encoding", "gzip");
 
 		if (null != siteKey)
-			post.addHeader(FCHeaders.X_FRONTCACHE_SITE_KEY, siteKey);
+			post.addHeader("Authorization", "Bearer " + siteKey);
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 

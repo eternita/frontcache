@@ -162,7 +162,7 @@ public abstract class ClientTests extends TestsBase {
 		boolean success = frontcacheClient.getCachedKeys(baos);
 		String keys = baos.toString();
 
-		// getCachedKeys must pass the site-key gate (send the X_FRONTCACHE_SITE_KEY header)
+		// getCachedKeys must pass the site-key gate (Authorization: Bearer <site-key>)
 		Assert.assertTrue(success);
 		Assert.assertEquals("getCachedKeys was denied - site key not sent: " + keys, -1, keys.indexOf("Access denied"));
 		Assert.assertNotEquals("cached key not listed: " + keys, -1, keys.indexOf(TEST_URI));

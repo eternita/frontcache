@@ -16,3 +16,7 @@
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/
 # the unit suite starts a real FrontCacheEngine against this home and leaves a Lucene index behind
 /frontcache-core/src/test/resources/fallback-home/cache/
+
+# Written at runtime, not by hand: fallbacks.conf gives fallback2.txt an init URL
+/frontcache-tests/FRONTCACHE_HOME_FILTER/fallbacks/fallback2.txt
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/fallbacks/fallback2.txt

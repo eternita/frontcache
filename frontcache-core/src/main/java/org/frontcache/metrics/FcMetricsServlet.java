@@ -33,10 +33,10 @@ import jakarta.servlet.http.HttpServletResponse;
  * and be served. The dashboard stream and the management API both require a site key underneath the
  * same port check; this endpoint was the one that did not, which made it the way in.
  *
- * So when the node has a {@code front-cache.site-key}, a scrape must carry it - as
- * {@code X-frontcache-site-key}, or as {@code Authorization: Bearer <key>} because Prometheus cannot
- * send an arbitrary header. A node with no site key configured is unchanged, and {@link ManagementPort}
- * warns about that at startup.
+ * So when the node has a {@code front-cache.site-key}, a scrape must carry it as
+ * {@code Authorization: Bearer <key>} - which is also the only form Prometheus can send, a
+ * scrape_config having no way to set an arbitrary header. A node with no site key configured is
+ * unchanged, and {@link ManagementPort} warns about that at startup.
  *
  * Deliberately not {@code /fc-metrics.stream} - that name is reserved for the SSE stream's eventual
  * alias, and two endpoints one suffix apart, one a scrape and one an infinite stream, is a support
@@ -66,8 +66,8 @@ public class FcMetricsServlet extends HttpServlet {
 			// The message names the fix, because the symptom - a scrape target that went red on
 			// upgrade - does not. Prometheus sends this as authorization: { credentials: <key> }.
 			response.setHeader("WWW-Authenticate", "Bearer realm=\"frontcache\"");
-			response.sendError(401, "Metrics require this node's front-cache.site-key: send it as the "
-					+ "X-frontcache-site-key header, or as Authorization: Bearer <site-key>");
+			response.sendError(401, "Metrics require this node's front-cache.site-key - send it as "
+					+ "'Authorization: Bearer <site-key>' (in Prometheus: authorization.credentials)");
 			return;
 		}
 
