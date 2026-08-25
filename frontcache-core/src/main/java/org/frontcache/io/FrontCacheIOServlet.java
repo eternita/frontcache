@@ -19,6 +19,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,8 +38,8 @@ import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
-import org.frontcache.hystrix.fr.FallbackConfigEntry;
-import org.frontcache.hystrix.fr.FallbackResolverFactory;
+import org.frontcache.resilience.fr.FallbackConfigEntry;
+import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	protected Logger logger = LoggerFactory.getLogger(getClass());
 	private ObjectMapper jsonMapper = new ObjectMapper();
+
+	private static final String RESILIENCE_CONFIG_FILE = "resilience.properties";
+	private static final String GUARD_RULES_CONFIG_FILE = "guard-rules.conf";
+	private static final String LEGACY_RESILIENCE_CONFIG_FILE = "hystrix.properties";
 
 	FrontCacheEngine fcEngine = null;
 
@@ -75,14 +80,14 @@ public class FrontCacheIOServlet extends HttpServlet {
 		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
 		siteKey = FCConfig.getProperty("front-cache.site-key", "");
 		if (null == managementPortStr || managementPortStr.trim().length() == 0)
-			logger.warn("Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
+			logger.warn("Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
 		else {
 			try
 			{
 				managementPort = Integer.parseInt(managementPortStr);
 			} catch (Exception ex) {
 				ex.printStackTrace();
-				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache Hystrix Stream is not restricted to specific port. Hystrix Stream is accessible for all connectors");
+				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
 			}
 		}
 
@@ -178,8 +183,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = getDynamicURLs(request);
 			break;
 
-		case FrontcacheAction.GET_HYSTRIX_CONFIGS:
-			aResponse = getHystrixConfigs(request);
+		case FrontcacheAction.GET_RESILIENCE_CONFIGS:
+		case FrontcacheAction.GET_HYSTRIX_CONFIGS: // pre-2.7 alias, see FrontcacheAction
+			aResponse = getResilienceConfigs(request);
 			break;
 
 		case FrontcacheAction.GET_GUARD_RULES:
@@ -443,27 +449,26 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private ActionResponse getFallbackConfigs(HttpServletRequest req)
 	{
 		FallbackResolverFactory.init(FrontCacheEngine.getFrontCache().getHttpClient());
-		Map <String, Set<FallbackConfigEntry>> fallbackConfigs = FallbackResolverFactory.getInstance().getFallbackConfigs();
 
 		GetFallbackConfigActionResponse aResponse = new GetFallbackConfigActionResponse();
-		aResponse.setFallbackConfigs(fallbackConfigs);
+		aResponse.setFallbackEntries(FallbackResolverFactory.getInstance().getFallbackEntries());
 
 		return aResponse;
 	}
 
 	/**
-	 * Bot keywords, keyed by domain for the console - which aggregates several edges, each possibly
-	 * serving a different site. One node serves one site, so the map holds exactly one entry.
+	 * Bot keywords, as a flat set. The console aggregates several edges, so it keys these by EDGE - the
+	 * per-domain keying this used to carry was a leftover of multi-domain support and always held one
+	 * entry. The response still emits the legacy map alongside for an older console; see
+	 * {@link LegacyDomainKeyedField}.
 	 *
 	 * @param req
 	 * @return
 	 */
 	private ActionResponse getBots(HttpServletRequest req)
 	{
-		Map<String, Set<String>> bots = new HashMap<String, Set<String>>();
-		bots.put(FCConfig.DEFAULT_DOMAIN, FCConfig.getBotUserAgentKeywords());
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
-		aResponse.setBots(bots);
+		aResponse.setBotKeywords(FCConfig.getBotUserAgentKeywords());
 
 		return aResponse;
 	}
@@ -511,41 +516,66 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 */
 	private ActionResponse getDynamicURLs(HttpServletRequest req)
 	{
-		Map<String, Set<String>> dynamicURLs = new HashMap<String, Set<String>>();
-		dynamicURLs.put(FCConfig.DEFAULT_DOMAIN, FCConfig.getDynamicURLs());
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
-		aResponse.setDynamicURLs(dynamicURLs);
+		aResponse.setDynamicUrlPatterns(FCConfig.getDynamicURLs());
 
 		return aResponse;
 	}
 
 	/**
-	 * Reads the raw ./conf/hystrix.properties file (comments and empty lines
-	 * preserved) so it can be displayed as-is in the console.
+	 * Reads the raw ./conf/resilience.properties file (comments and empty lines preserved) so it can be
+	 * displayed as-is in the console, falling back to the pre-2.7 ./conf/hystrix.properties.
+	 *
+	 * The fallback has to be here as well as in {@code FcResilienceConfig}: this action shows the operator
+	 * the file the node is actually using, so reading a different one than the engine reads would make the
+	 * console lie in exactly the situation - a half-finished upgrade - where it is being consulted.
+	 *
+	 * Answers both {@code get-resilience-configs} and the pre-2.7 {@code get-hystrix-configs}, and the
+	 * response carries the value under both field names - the console is a separate deployment, so both
+	 * directions of version skew have to work.
 	 *
 	 * @param req
 	 * @return
 	 */
-	private ActionResponse getHystrixConfigs(HttpServletRequest req)
+	private ActionResponse getResilienceConfigs(HttpServletRequest req)
 	{
-		GetHystrixConfigActionResponse aResponse = new GetHystrixConfigActionResponse();
+		GetResilienceConfigActionResponse aResponse = new GetResilienceConfigActionResponse();
 
-		try (InputStream is = FCConfig.getConfigInputStream("hystrix.properties"))
+		String raw = readConfigFile(RESILIENCE_CONFIG_FILE);
+		if (null == raw)
+			raw = readConfigFile(LEGACY_RESILIENCE_CONFIG_FILE);
+
+		if (null == raw)
 		{
-			if (null == is)
-			{
-				aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-				aResponse.setErrorDescription("hystrix.properties not found");
-			} else {
-				aResponse.setHystrixConfig(new String(is.readAllBytes(), StandardCharsets.UTF_8));
-			}
-		} catch (IOException e) {
-			logger.error("Can't read hystrix.properties", e);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			aResponse.setErrorDescription(e.getMessage());
+			aResponse.setErrorDescription(RESILIENCE_CONFIG_FILE + " not found");
+		} else {
+			aResponse.setResilienceConfig(raw);
 		}
 
 		return aResponse;
+	}
+
+	/**
+	 * @return the file's contents, or null when it is not there or cannot be read.
+	 *
+	 * The catch is Exception and not IOException on purpose: {@code FCConfig.getConfigInputStream}
+	 * signals "nowhere on disk or classpath" by THROWING a RuntimeException, not by returning null. With
+	 * a narrower catch, a missing conf/resilience.properties escaped this method before the legacy file
+	 * name was ever tried, and the whole action failed - which is exactly what happens on a node still
+	 * running the pre-2.7 file name, i.e. every node mid-upgrade. Same trap, and same fix, as
+	 * {@code FcResilienceConfig.read}.
+	 */
+	private String readConfigFile(String fileName)
+	{
+		try (InputStream is = FCConfig.getConfigInputStream(fileName))
+		{
+			return (null == is) ? null : new String(is.readAllBytes(), StandardCharsets.UTF_8);
+
+		} catch (Exception e) {
+			logger.debug("Can't read " + fileName, e);
+			return null;
+		}
 	}
 
 	/**
@@ -559,19 +589,18 @@ public class FrontCacheIOServlet extends HttpServlet {
 	{
 		GetGuardConfigActionResponse aResponse = new GetGuardConfigActionResponse();
 
-		try (InputStream is = FCConfig.getConfigInputStream("guard-rules.conf"))
+		// Same tolerant read as the resilience config above. This method used to catch only IOException,
+		// so on a node with no conf/guard-rules.conf - which is optional, and absent on both e2e nodes -
+		// the RuntimeException from getConfigInputStream escaped the action entirely instead of producing
+		// the "not found" response the branch below was written for.
+		String raw = readConfigFile(GUARD_RULES_CONFIG_FILE);
+
+		if (null == raw)
 		{
-			if (null == is)
-			{
-				aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-				aResponse.setErrorDescription("guard-rules.conf not found");
-			} else {
-				aResponse.setGuardConfig(new String(is.readAllBytes(), StandardCharsets.UTF_8));
-			}
-		} catch (IOException e) {
-			logger.error("Can't read guard-rules.conf", e);
 			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			aResponse.setErrorDescription(e.getMessage());
+			aResponse.setErrorDescription(GUARD_RULES_CONFIG_FILE + " not found");
+		} else {
+			aResponse.setGuardConfig(raw);
 		}
 
 		return aResponse;

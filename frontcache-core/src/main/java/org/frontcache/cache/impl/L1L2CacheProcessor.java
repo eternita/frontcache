@@ -19,6 +19,8 @@ import java.util.Properties;
 
 import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheStats;
+import org.frontcache.cache.FcCacheMetrics;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
@@ -54,7 +56,9 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	private Cache ehCache = null;
 
     // L2
-	private LuceneIndexManager luceneIndexManager;
+	// Package-private so a test in this package can compare the cheap doc count the metrics gauge uses
+	// against the reader-opening one the management API uses. Nothing outside this package reads it.
+	LuceneIndexManager luceneIndexManager;
 
 	private static String CACHE_BASE_DIR_DEFAULT = "/tmp/cache/";
 
@@ -248,10 +252,17 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 		Element el = ehCache.get(url); // check L1 - ehCache
 		if (null != el && null != el.getObjectValue())
+		{
+			FcCacheMetrics.record(FcCacheMetrics.Outcome.HIT_L1);
 			return (WebResponse) el.getObjectValue();
+		}
 
 		// check L2 - Lucene
 		WebResponse webResponse = luceneIndexManager.getResponse(url);
+
+		// Counted here rather than in the caller because this is the only place the TIER is known: one
+		// level up, an L1 hit and an L2 hit are the same non-null return.
+		FcCacheMetrics.recordHitOrMiss(webResponse, FcCacheMetrics.Outcome.HIT_L2);
 
 		return webResponse;
 	}
@@ -302,6 +313,31 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		return status;
 	}
 
+
+	/**
+	 * Read from the live Ehcache and the live IndexWriter - no reader opened, no directory rescanned
+	 * beyond a file listing. Every number is defensive: this feeds gauges, and a wedged L2 index must
+	 * degrade to "unknown" rather than break a scrape.
+	 */
+	@Override
+	public CacheStats getCacheStats() {
+
+		long l1Entries = CacheStats.UNKNOWN;
+		long l1Evictions = CacheStats.UNKNOWN;
+		try {
+			l1Entries = ehCache.getSize();
+
+			Long evicted = ehCache.getStatistics().cacheEvictionOperation().count().value();
+			if (null != evicted)
+				l1Evictions = evicted.longValue();
+
+		} catch (Exception e) {
+			logger.debug("Can't read L1 statistics", e);
+		}
+
+		return new CacheStats(l1Entries, l1Evictions,
+				luceneIndexManager.getIndexSizeFast(), luceneIndexManager.getIndexDiskBytes());
+	}
 
 	@Override
 	public List<String> getCachedKeys() {

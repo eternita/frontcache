@@ -20,7 +20,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import org.frontcache.FCConfig;
-import org.frontcache.hystrix.FcTestSupport;
+import org.frontcache.resilience.FcTestSupport;
 import org.junit.After;
 import org.junit.Test;
 

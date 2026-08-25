@@ -29,11 +29,11 @@ import org.frontcache.console.model.FallbackConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.GuardConfig;
 import org.frontcache.console.model.GuardRulesConfig;
-import org.frontcache.console.model.HystrixConfig;
-import org.frontcache.console.model.HystrixConnection;
+import org.frontcache.console.model.ResilienceConfig;
+import org.frontcache.console.model.DashboardStream;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
-import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.replication.CacheReplicator;
@@ -185,13 +185,13 @@ public class FrontcacheService {
 	 * @param domain
 	 * @return
 	 */
-	public Map<String, Map<String, Set<FallbackConfigEntry>>> getFallbackConfigs() {
+	public Map<String, Set<FallbackConfigEntry>> getFallbackConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Map<String, Set<FallbackConfigEntry>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<FallbackConfigEntry>>>();
+		Map<String, Set<FallbackConfigEntry>> clusterStatus = new LinkedHashMap<String, Set<FallbackConfigEntry>>();
 
         List<Future<FallbackConfig>> futureList = new ArrayList<Future<FallbackConfig>>();
 
@@ -222,14 +222,14 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String,  Map<String, Set<String>>> getBotConfigs() {
+	public Map<String, Set<String>> getBotConfigs() {
 
         List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Map<String, Set<String>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<String>>>();
+		Map<String, Set<String>> clusterStatus = new LinkedHashMap<String, Set<String>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
@@ -298,14 +298,14 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, Map<String, Set<String>>> getDynamicURLsConfigs() {
+	public Map<String, Set<String>> getDynamicURLsConfigs() {
 
         List<Future<DynamicURLsConfig>> futureList = new ArrayList<Future<DynamicURLsConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Map<String, Set<String>>> clusterStatus = new LinkedHashMap<String, Map<String, Set<String>>>();
+		Map<String, Set<String>> clusterStatus = new LinkedHashMap<String, Set<String>>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new DynamicURLsConfigsCaller(fcClient)));
@@ -370,9 +370,9 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, String> getHystrixConfigs() {
+	public Map<String, String> getResilienceConfigs() {
 
-        List<Future<HystrixConfig>> futureList = new ArrayList<Future<HystrixConfig>>();
+        List<Future<ResilienceConfig>> futureList = new ArrayList<Future<ResilienceConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
@@ -380,14 +380,14 @@ public class FrontcacheService {
 		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
-            futureList.add(executor.submit(new HystrixConfigsCaller(fcClient)));
+            futureList.add(executor.submit(new ResilienceConfigsCaller(fcClient)));
 
 		// processing timeouts
         boolean timeoutReached = false;
-        for (Future<HystrixConfig> f : futureList)
+        for (Future<ResilienceConfig> f : futureList)
         {
             try {
-            	HystrixConfig result = null;
+            	ResilienceConfig result = null;
             	if (timeoutReached)
             		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
             	else
@@ -407,35 +407,32 @@ public class FrontcacheService {
 	}
 
 	/**
+	 * The edges the realtime page subscribes to, as JSON.
 	 *
-	 * @param domain
-	 * @return
+	 * Only names and edge URLs - the page hands an edge URL back to
+	 * {@code DashboardStreamProxyServlet}, which is where the stream path and the site key live.
 	 */
-	public String getHystrixMonitorURLList()
+	public String getDashboardStreams()
 	{
-		// [{"name":"My Super App","stream":"http://sg.example.com/hystrix.stream","auth":"","delay":"2000"},{"name":"My Super App","stream":"http://or.example.com/hystrix.stream","auth":"","delay":"2000"}]
+		// [{"name":"My Super App","url":"http://sg.example.com/"},{"name":"My Super App","url":"http://or.example.com/"}]
 
-		List<FrontCacheClient> fcClients = getFrontCacheAgents();
+		List<DashboardStream> streams = new ArrayList<DashboardStream>();
 
-		List<HystrixConnection> hystrixConnections = new ArrayList<HystrixConnection>();
-
-		for (FrontCacheClient fcClient : fcClients)
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
 		{
 			String fcURL = fcClient.getFrontCacheURL();
 			if (!fcURL.endsWith("/"))
 				fcURL += "/";
-			hystrixConnections.add(new HystrixConnection(fcClient.getName(), fcURL + "hystrix.stream"));
+
+			streams.add(new DashboardStream(fcClient.getName(), fcURL));
 		}
 
-		String urlListStr = "";
 		try {
-			urlListStr = jsonMapper.writeValueAsString(hystrixConnections);
-		} catch (JsonProcessingException e1) {
-			logger.error("Can't serialize array of Hystrix connections", e1);
-			urlListStr = e1.getMessage();
-			e1.printStackTrace();
+			return jsonMapper.writeValueAsString(streams);
+		} catch (JsonProcessingException e) {
+			logger.error("Can't serialize the dashboard stream list", e);
+			return "[]";
 		}
-		return urlListStr;
 	}
 
 	public Set<String> getFrontCacheAgentURLs()

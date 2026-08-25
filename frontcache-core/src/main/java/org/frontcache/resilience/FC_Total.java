@@ -1,0 +1,77 @@
+/**
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ */
+package org.frontcache.resilience;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.frontcache.FrontCacheEngine;
+import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
+import org.frontcache.core.RequestContext;
+import org.frontcache.core.WebResponse;
+import org.frontcache.resilience.fr.FallbackResolverFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ *
+ * All requests through Frontcache engine
+ * Must use SEMAPHORE to access the same thread
+ *
+ */
+public class FC_Total extends FcCommand<Object> {
+
+	private final FrontCacheEngine frontCacheEngine;
+	private final RequestContext context;
+	private Logger logger = LoggerFactory.getLogger(FC_Total.class);
+
+    public FC_Total(FrontCacheEngine frontCacheEngine, RequestContext context) {
+
+        super(Setter
+                .withGroupKey(context.getDomain())
+                .andCommandKey("Input-Requests")
+                );
+        this.frontCacheEngine = frontCacheEngine;
+        this.context = context;
+
+    }
+
+    @Override
+    protected Object run() throws Exception {
+    	frontCacheEngine.processRequestInternal(context);
+    	return null;
+    }
+
+    @Override
+    protected Object getFallback() {
+		HttpServletRequest httpRequest = context.getRequest();
+		HttpServletResponse httpResponse = context.getResponse();
+		String url = FCUtils.getRequestURL(httpRequest);
+
+		try {
+			context.setFallbackUsed(FallbackLogger.failureType(getExecutionEvents()));
+			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
+			if (null != webResponse)
+			{
+				FCUtils.applyFallbackHeaders(httpResponse, webResponse);
+				httpResponse.getOutputStream().write(webResponse.getContent());
+			}
+
+			String failedExceptionMessage = "";
+			if (null != getFailedExecutionException())
+				failedExceptionMessage += getFailedExecutionException().getMessage();
+
+			logger.error("FC-Total - ERROR FOR - " + url + " " + failedExceptionMessage + ", Events " + getExecutionEvents() + ", " + context, getFailedExecutionException());
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+        return null;
+    }
+}

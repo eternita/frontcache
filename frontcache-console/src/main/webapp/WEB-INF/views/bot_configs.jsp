@@ -16,7 +16,7 @@
     </ul>
 
     <div class="tab-content">
-      <!-- start loop over edges - Map <clusterNode, Map <domain, Set <BotConfgi>>> -->
+      <!-- one panel per edge - Map <edge, Set <botKeyword>> -->
       <c:forEach var="edge" items="${botConfigs}" varStatus="status">
 
         <div role="tabpanel" class="tab-pane ${status.first ? 'active' : ''}" id="edge-tab-${status.index}">
@@ -30,42 +30,12 @@
             </tr>
           </thead>
           <tbody>
-          <!-- start loop over domain
-                first loop over default domain
-          -->
-          <c:forEach var="botsDomain" items="${edge.value}">
-
-            <c:if test="${'default-domain' == botsDomain.key}">
-              <tr>
-                <td align="center"><b> Default settings  </b></td>
-              </tr>
-
-              <c:forEach var="bot" items="${botsDomain.value}">
-                  <tr>
-                    <td>${bot}  &nbsp;</td>
-                  </tr>
-              </c:forEach>
-            </c:if>
+          <c:forEach var="bot" items="${edge.value}">
+            <tr>
+              <td>${bot}  &nbsp;</td>
+            </tr>
           </c:forEach>
-
-          <!--  the same loop for other domains (domain specific bots)  -->
-          <c:forEach var="botsDomain" items="${edge.value}">
-
-              <c:if test="${'default-domain' != botsDomain.key}">
-                <tr>
-                  <td align="center"><b> ${botsDomain.key}  </b></td>
-                </tr>
-
-                <c:forEach var="bot" items="${botsDomain.value}">
-                    <tr>
-                      <td>${bot}  &nbsp;</td>
-                    </tr>
-                </c:forEach>
-              </c:if>
-          </c:forEach>
-
           </tbody>
-          <!-- end loop over domains -->
         </table>
 
         </div>

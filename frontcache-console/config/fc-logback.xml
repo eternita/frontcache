@@ -2,16 +2,22 @@
 
 <!--
 Logback configuration for the Frontcache console.
-Only ERROR (and above) is emitted to stdout (sysout); lower levels are dropped.
+WARN and above is emitted to stdout (sysout); lower levels are dropped.
 Wired in via -Dlogback.configurationFile=.../config/fc-logback.xml (see the
 :frontcache-console appRun task in build.gradle).
+
+The threshold was ERROR until 2.7, which meant the console could not report either of
+the two things it is supposed to report about itself: a proxy request aimed at a host
+that is not one of its edges, and a relay abandoned because an edge went silent. Both
+are WARN. The cost of the lower threshold, measured: three Tomcat XML-schema notices
+at startup and nothing after.
 -->
 <configuration>
 
-	<!-- Console (stdout) — ERROR and above only. -->
+	<!-- Console (stdout) — WARN and above only. -->
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
 		<filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-			<level>ERROR</level>
+			<level>WARN</level>
 		</filter>
 		<encoder>
 			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>

@@ -82,7 +82,7 @@ frontcache-tests/
 ├── img/tests2.png                     ← topology diagram
 ├── FRONTCACHE_HOME_STANDALONE/        ← runtime config + cache + logs for the :9080 server
 │   └── conf/{frontcache.properties, bots.conf, dynamic-urls.conf, fallbacks.conf,
-│            fc-l1-ehcache-config.xml, hystrix.properties, fc-logback.xml, frontcache.id, ...}
+│            fc-l1-ehcache-config.xml, resilience.properties, fc-logback.xml, frontcache.id, ...}
 ├── FRONTCACHE_HOME_FILTER/            ← runtime config + cache + logs for the :8080 filter
 │   └── conf/...                        (same structure as STANDALONE)
 └── src/
@@ -98,7 +98,7 @@ frontcache-tests/
     │   │       ├── IncludeTests.java
     │   │       ├── ClientTests.java
     │   │       ├── AgentTests.java
-    │   │       ├── FallbackHystrixTests.java
+    │   │       ├── FallbackAndTimeoutTests.java
     │   │       ├── StaticReadTests.java
     │   │       ├── InvalidationTagsTests.java
     │   │       └── HTTPResponseCodeTests.java
@@ -139,7 +139,7 @@ All of the following run in **both** filter and standalone modes unless noted.
 | **IncludeTests** | Async include resolution (`includeAsync1..3`); client-specific include behaviour (`includeClientSpecific1..4`). |
 | **ClientTests** | `FrontCacheClient` API: `getFromCache` (hit/null), deep-include caching, `getCacheStatus`; single-node and **cluster** invalidation; invalidate-all (single + cluster); response-header de-duplication. |
 | **AgentTests** | `FrontCacheAgent` / `FrontCacheAgentCluster` remote invalidation (single node + cluster). |
-| **FallbackHystrixTests** | Hystrix circuit-breaking & fallbacks: custom timeouts; timeout failure; timeout inside an include; file-based custom fallback; fallback loaded from URL; URL-pattern fallback. |
+| **FallbackAndTimeoutTests** | Circuit-breaking & fallbacks: custom timeouts; timeout failure; timeout inside an include; file-based custom fallback; fallback loaded from URL; URL-pattern fallback. |
 | **StaticReadTests** | Static asset proxying & caching: `.txt`, `.js`, `.jpg`. |
 | **InvalidationTagsTests** | Tag-based invalidation — static tags and dynamically-emitted tags. |
 | **HTTPResponseCodeTests** | Origin status passthrough (`404`). |
@@ -167,7 +167,7 @@ includes `b.jsp` and the whole page must render exactly `"ab"`). Fixture familie
 - `common/methods` — HTTP-method caching (GET then HEAD).
 - `common/l1-l2-cache-level` — three fragments that distribute across L1/L2.
 - `common/redirect`, `common/debug`, `common/fc-headers`, `common/jsp-read`.
-- `common/hystrix`, `fallbacks/` — timeout/fallback fixtures (`fallback1..3`, patterns).
+- `common/resilience`, `fallbacks/` — timeout/fallback fixtures (`fallback1..3`, patterns).
 - `common/invalidation-tags`, `common/fc-client`, `common/fc-agent`,
   `common/refresh-regular-soft`.
 - `common/static-read`, `standalone/2` — static asset fixtures.

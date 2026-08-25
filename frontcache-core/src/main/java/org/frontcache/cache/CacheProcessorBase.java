@@ -25,7 +25,7 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
-import org.frontcache.hystrix.FC_ThroughCache;
+import org.frontcache.resilience.FC_ThroughCache;
 import org.frontcache.reqlog.RequestLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,7 +153,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				lengthBytes = cachedWebResponse.getContentLenth();
 
 				// save to cache
-				if (!context.isHystrixFallback() // don't cache hystrix fallbacks
+				if (!context.isFallbackUsed() // don't cache fallbacks
 						&& isCacheableForClientType
 						&& isFreshDataCacheableForClientType
 						&& cachedWebResponse.isCacheable()
@@ -221,7 +221,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					WebResponse copy4cache = FCUtils.dynamicCall(originUrlStr, requestHeadersCopy, client, ctxCopy);
 					copy4cache.setUrl(currentRequestURL);
 
-					if (!ctxCopy.isHystrixFallback()) // don't cache hystrix fallbacks
+					if (!ctxCopy.isFallbackUsed()) // don't cache fallbacks
 						putToCache(currentRequestURL, copy4cache); // put to cache copy
 
 				} catch (Exception e) {

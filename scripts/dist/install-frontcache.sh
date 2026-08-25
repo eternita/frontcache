@@ -387,9 +387,25 @@ WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/frontcache-install.XXXXXX")"
 # The rule: an existing config file is NEVER overwritten. New defaults land beside it as
 # <file>.new so the operator can diff them in. Only files the old install did not have are
 # taken from the new bundle as-is.
+#
+# legacy_conf_name is what keeps that rule true across a RENAMED config file. The loop below
+# sees the old name as "a file this release dropped" and carries it over, which is right - but
+# the new bundle also ships the renamed file full of DEFAULTS, and Frontcache resolves the new
+# name first. Left alone, the operator's carried-over tuning would sit next to a shipped default
+# that silently outranks it. So the shipped default is demoted to <file>.new, the same treatment
+# every other changed default gets here, and the carried-over file stays authoritative.
+#
+# One line per renamed config file. Drop a line once the release that still reads the old name
+# is out of support.
+legacy_conf_name() {
+  case "$1" in
+    resilience.properties) echo hystrix.properties ;;   # renamed in 2.7
+  esac
+}
+
 carry_over_conf() {
   local old_conf="$1" new_conf="$2" label="$3"
-  local name added=0 differs=0
+  local name added=0 differs=0 renamed=0 legacy
 
   if [ ! -d "$old_conf" ]; then
     log "No previous $label config to carry over - using the shipped defaults"
@@ -413,8 +429,26 @@ carry_over_conf() {
     fi
   done
 
+  # Renamed files: the operator's pre-rename file was carried over by the loop above, so the
+  # new bundle's default for the new name must not be left in place to outrank it.
+  for new in "$new_conf"/*; do
+    [ -f "$new" ] || continue
+    name="$(basename "$new")"
+    legacy="$(legacy_conf_name "$name")"
+    [ -n "$legacy" ] || continue
+    [ -f "$new_conf/$legacy" ] || continue
+    [ -f "$old_conf/$legacy" ] || continue
+
+    run mv "$new_conf/$name" "$new_conf/$name.new"
+    log "    $legacy was renamed to $name in this release - your $legacy is kept and stays"
+    log "      authoritative; the shipped $name is beside it as $name.new. Frontcache reads"
+    log "      $legacy for one more release and warns; rename it when convenient."
+    renamed=$((renamed + 1))
+  done
+
   log "    your config is in place; $differs file(s) whose shipped default changed have a .new beside them"
   [ "$added" -gt 0 ] && log "    $added file(s) not in this release were kept"
+  [ "$renamed" -gt 0 ] && log "    $renamed renamed file(s) left your pre-rename copy in charge"
   if [ "$differs" -gt 0 ]; then
     log "    review them with:  for f in $new_conf/*.new; do diff -u \"\${f%.new}\" \"\$f\"; done"
   fi

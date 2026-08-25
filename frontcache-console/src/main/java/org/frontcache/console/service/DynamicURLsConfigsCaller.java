@@ -25,6 +25,6 @@ public class DynamicURLsConfigsCaller implements Callable<DynamicURLsConfig> {
     @Override
     public DynamicURLsConfig call() throws Exception {
 
-		 return new DynamicURLsConfig(fcClient.getName(), fcClient.getDynamicURLs());
+		 return new DynamicURLsConfig(fcClient.getName(), fcClient.getDynamicUrlPatterns());
     }
 }

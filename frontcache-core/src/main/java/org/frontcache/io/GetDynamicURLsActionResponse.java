@@ -11,20 +11,40 @@ package org.frontcache.io;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * URL patterns that are never cached, from ./conf/dynamic-urls.conf.
+ *
+ * A flat set as of 2.7; see {@link GetBotsActionResponse} and {@link LegacyDomainKeyedField}.
+ */
 public class GetDynamicURLsActionResponse extends ActionResponse {
 
-	private Map<String, Set<String>> dynamicURLs;
+	private Set<String> dynamicUrlPatterns;
 
 	public GetDynamicURLsActionResponse() { // for JSON mapper
 		setResponseStatus(RESPONSE_STATUS_OK);
 	}
 
-	public Map<String, Set<String>> getDynamicURLs() {
-		return dynamicURLs;
+	public Set<String> getDynamicUrlPatterns() {
+		return dynamicUrlPatterns;
 	}
 
+	public void setDynamicUrlPatterns(Set<String> dynamicUrlPatterns) {
+		this.dynamicUrlPatterns = dynamicUrlPatterns;
+	}
+
+	/**
+	 * @deprecated pre-2.7 shape of {@link #getDynamicUrlPatterns()} - a single-entry map keyed by domain.
+	 */
+	@Deprecated
+	public Map<String, Set<String>> getDynamicURLs() {
+		return LegacyDomainKeyedField.wrap(dynamicUrlPatterns);
+	}
+
+	/** @deprecated pre-2.7 shape of {@link #setDynamicUrlPatterns(Set)} */
+	@Deprecated
 	public void setDynamicURLs(Map<String, Set<String>> dynamicURLs) {
-		this.dynamicURLs = dynamicURLs;
+		if (null == dynamicUrlPatterns)
+			dynamicUrlPatterns = LegacyDomainKeyedField.flatten(dynamicURLs);
 	}
 
 }

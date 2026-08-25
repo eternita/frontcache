@@ -1,231 +1,59 @@
-<%@ taglib uri="jakarta.tags.core" prefix="display"%>
-
-<%@ page language="java" contentType="text/html; charset=ISO-8859-1" pageEncoding="ISO-8859-1"%>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core"%>
 <html>
-	<head>
-		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-		<title>Frontcache console</title>
-	
-    <link rel="shortcut icon" href="static/images/favicon.ico" type="image/x-icon"/>
-         
-	<!-- Setup base for everything -->
-	<link rel="stylesheet" type="text/css" href="resources/hystrix/css/global.css" />
-	
-	<!-- Our custom CSS -->
-	<link rel="stylesheet" type="text/css" href="resources/hystrix/monitor/monitor.css" />
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<title>Frontcache console</title>
 
-	<!-- d3 -->
-	<script type="text/javascript" src="resources/hystrix/js/d3.v2.min.js"></script>
-	
-	<!-- Javascript to monitor and display 	-->
-	
+	<link rel="shortcut icon" href="static/images/favicon.ico" type="image/x-icon"/>
+
+	<%-- the console-wide chrome: bootstrap's navbar needs jQuery, same pair as inc/header.jsp --%>
 	<script src="<c:url value='https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js' />"></script>
-	<script type="text/javascript" src="resources/hystrix/js/jquery.tinysort.min.js"></script>
-	
-	<script type="text/javascript" src="resources/hystrix/js/tmpl.js"></script>
-	<script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
-	
-	<!-- HystrixCommand -->
-	<script type="text/javascript" src="resources/hystrix/components/hystrixCommand/hystrixCommand.js"></script>
-	<link rel="stylesheet" type="text/css" href="resources/hystrix/components/hystrixCommand/hystrixCommand.css" />
-	
-	<!-- HystrixThreadPool -->
-	<script type="text/javascript" src="resources/hystrix/components/hystrixThreadPool/hystrixThreadPool.js"></script>
-		<link rel="stylesheet" type="text/css" href="resources/hystrix/components/hystrixThreadPool/hystrixThreadPool.css" />
-	
 	<script src="<c:url value='/static/js/bootstrap.js' />"></script>
 	<link href="<c:url value='/static/css/app.css' />" rel="stylesheet"></link>
 	<link href="<c:url value='/static/css/bootstrap.css' />" rel="stylesheet"></link>
 
-	<!-- show all circuit charts in a single horizontal row -->
-	<style type="text/css">
-		/* let the monitoring area use the full window width instead of bootstrap's fixed .container width */
-		#mainWrapper .container { width: auto; max-width: none; }
-		#monitor .container { width: 100%; max-width: none; height: auto; }
-		#monitor .row { width: 100%; }
-		/* drop the fixed row height that clips charts; let chart boxes wrap responsively */
-		.dependencies { height: auto; min-height: 200px; display: flex; flex-wrap: wrap; align-content: flex-start; }
-		/* the box content (chart overlay + latency table) is all position:absolute, so the box
-		   can't auto-size to it; give it enough height to contain everything plus a row gap */
-		.dependencies div.monitor { float: none; height: 250px; margin-bottom: 15px; }
-
-		/* custom left-to-right order of the circuit charts (lower number = further left).
-		   matched by command name via the box id (CIRCUIT_<name>_<stream-index>).
-		   charts not listed here keep the default order (0) and appear before order:1. */
-		.dependencies [id^="CIRCUIT_Input-Requests_"]     { order: 1; }
-		.dependencies [id^="CIRCUIT_Cache-Hits_"]         { order: 2; }
-		.dependencies [id^="CIRCUIT_Cache-Origin-filter_"] { order: 3; }
-		.dependencies [id^="CIRCUIT_Cache-Origin-http_"]  { order: 4; }
-		.dependencies [id^="CIRCUIT_Origin-Hits_"]        { order: 5; }
-
-		/* put "Edges status" and "Real time performance monitoring" side by side on
-		   large screens; stack them on smaller ones (flex-wrap handles the fallback). */
-		.fc-layout { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px 40px; }
-		.fc-edges  { flex: 0 0 auto; }
-		/* the monitoring column takes the remaining width; min-width:0 lets it shrink
-		   below its wide chart content instead of forcing horizontal overflow. */
-		.fc-monitor { flex: 1 1 600px; min-width: 0; }
-	</style>
+	<!-- The realtime monitor. Uses none of the above - no d3, no underscore, no jQuery. -->
+	<link href="<c:url value='/static/css/fc-dashboard.css' />" rel="stylesheet"></link>
+	<script src="<c:url value='/static/js/fc-dashboard.js' />"></script>
 </head>
 
-	<body>
-		<div id="mainWrapper">
+<body>
+	<div id="mainWrapper">
 		<%@ include file="/WEB-INF/views/inc/menu.jsp"%>
+
 		<div class="container">
+			<div class="fc-layout">
+				<div class="fc-edges">
+					<p style="height: 10px">&nbsp;</p>
+					<%@ include file="/WEB-INF/views/inc/edges_status_stacked.jsp"%>
+				</div>
 
-<div class="container">
-    <div class="fc-layout">
-        <div class="fc-edges" style="padding-left: 20px;">
-            <p style="height: 10px">&nbsp;</p>
-            <%@ include file="/WEB-INF/views/inc/edges_status_stacked.jsp"%>
-        </div>
+				<div class="fc-monitor">
+					<h2 style="font-size: 22px; padding-left: 20px;">Real time performance monitoring</h2>
+					<div id="fc-monitor-content"></div>
+				</div>
+			</div>
 
-        <div class="fc-monitor">
-            <div id="header"><h2 style="font-size: 22px; padding-left: 20px;">Real time performance monitoring</h2></div>
-            <div id="content"></div>
-        </div>
-    </div>
-
-	<script>
-
-		$(window).load(function() { // within load with a setTimeout to prevent the infinite spinner
-			setTimeout(function() {
-				addStreams();
-			},0);
-		});
-
-		var hystrixStreams = [];
-
-		function addStreams() {
-			var streams = JSON.parse('${hystrixMonitorURLList}'); // hystrixMonitorURLList privided by controller
-			
-			_.map(streams, function(s, i) {
-				var dependenciesId = 'dependencies_' + i;
-
-				var hystrixMonitor = new HystrixCommandMonitor(i, dependenciesId, {includeDetailIcon:false});
-				var dependencyThreadPoolMonitor = new HystrixThreadPoolMonitor(i, 'dependencyThreadPools_' + i);
-
-				hystrixStreams[i] = {
-					titleName: s.name || s.stream,
-					hystrixMonitor: hystrixMonitor,
-					dependencyThreadPoolMonitor: dependencyThreadPoolMonitor
-				};
-
-				// sort sortAlphabetically by default
-				hystrixMonitor.sortAlphabetically();
-				dependencyThreadPoolMonitor.sortByVolume();
-
-				var origin;
-				if(s != undefined) {
-					origin = s.stream;
-
-					if(s.delay) {
-						origin = origin + "&delay=" + s.delay;
+			<%-- the edge list, as JSON, from IndexController --%>
+			<script type="application/json" id="fc-dashboard-streams">${dashboardStreams}</script>
+			<script>
+				(function () {
+					var streams = [];
+					try {
+						streams = JSON.parse(document.getElementById("fc-dashboard-streams").textContent);
+					} catch (e) {
+						console.error("Could not read the edge list", e);
 					}
+					FcDashboard.attach(document.getElementById("fc-monitor-content"), streams);
+				})();
+			</script>
 
-					//do not show authorization in stream title
-					if(s.auth) {
-						origin = origin + "&authorization=" + s.auth;
-					}
-				}
-
-				var proxyStream = "resources/hystrix/proxy.stream?origin=" + origin;
-
-				// start the EventSource which will open a streaming connection to the server
-				var source = new EventSource(proxyStream);
-
-				// add the listener that will process incoming events
-				source.addEventListener('message', hystrixMonitor.eventSourceMessageListener, false);
-				source.addEventListener('message', dependencyThreadPoolMonitor.eventSourceMessageListener, false);
-
-				//	source.addEventListener('open', function(e) {
-				//		console.console.log(">>> opened connection, phase: " + e.eventPhase);
-				//		// Connection was opened.
-				//	}, false);
-
-				source.addEventListener('error', function(e) {
-					$("#" + dependenciesId + " .loading").html("Unable to connect to Command Metric Stream.");
-					$("#" + dependenciesId + " .loading").addClass("failed");
-					if (e.eventPhase == EventSource.CLOSED) {
-						// Connection was closed.
-						console.log("Connection was closed on error: " + e);
-					} else {
-						console.log("Error occurred while streaming: " + e);
-					}
-				}, false);
-			});
-
-			addMonitors();
-		}
-
-		function addMonitors() {
-			$("#content").html(_.reduce(hystrixStreams, function(html, s, i) {
-				var hystrixMonitor = 'hystrixStreams[' + i + '].hystrixMonitor';
-				var dependencyThreadPoolMonitor = 'hystrixStreams[' + i + '].dependencyThreadPoolMonitor';
-				var dependenciesId = 'dependencies_' + i;
-				var dependencyThreadPoolsId = 'dependencyThreadPools_' + i;
-				var title_name = 'title_name_' + i;
-
-				return html +
-					'<div id="monitor">' +
-						'<div id="streamHeader">' +
-							'<h2><span id="' + title_name + '"></span>Hystrix Stream: ' + s.titleName + '</h2>' +
-						'</div>' +
-						'<div class="container">' +
-							'<div class="row">' +
-								'<div class="menubar">' +
-									'<div class="title">' +
-										'Circuit' +
-									'</div>' +
-									'<div class="menu_actions">' +
-/* 										'Sort: ' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByErrorThenVolume();">Error then Volume</a> |' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortAlphabetically();">Alphabetical</a> | ' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByVolume();">Volume</a> | ' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByError();">Error</a> | ' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByLatencyMean();">Mean</a> | ' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByLatencyMedian();">Median</a> | ' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByLatency90();">90</a> | ' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByLatency99();">99</a> | ' +
-										'<a href="javascript://" onclick="' + hystrixMonitor + '.sortByLatency995();">99.5</a> ' +
- */									'</div>' +
-									'<div class="menu_legend">' +
-										'<span class="success">Success</span> | <span class="shortCircuited">Short-Circuited</span> | <span class="badRequest"> Bad Request</span> | <span class="timeout">Timeout</span> | <span class="rejected">Rejected</span> | <span class="failure">Failure</span> | <span class="errorPercentage">Error %</span>' +
-									'</div>' +
-								'</div>' +
-							'</div>' +
-							'<div id="' + dependenciesId + '" class="row dependencies"><span class="loading">Loading ...</span></div>' +
-							'<div class="spacer"></div>' +
-
-/* 							'<div class="row">' +
-								'<div class="menubar">' +
-									'<div class="title">' +
-										'Thread Pools' +
-									'</div>' +
-									'<div class="menu_actions">' +
-										'Sort: <a href="javascript://" onclick="' + dependencyThreadPoolMonitor + '.sortAlphabetically();">Alphabetical</a> | ' +
-										'<a href="javascript://" onclick="' + dependencyThreadPoolMonitor + '.sortByVolume();">Volume</a> | ' +
-									'</div>' +
-								'</div>' +
-							'</div>' +
-							'<div id="' + dependencyThreadPoolsId + '" class="row dependencyThreadPools"><span class="loading">Loading ...</span></div>' +
-							'<div class="spacer"></div>' +
-							'<div class="spacer"></div>' +
- */						'</div>' +
-					'</div>';
-			}, ''));
-		}
-	</script>
-
-
-	<hr>
-	<footer>
-		<p><a href="https://github.com/eternita/frontcache/wiki" target="_blank">Frontcache Docs</a></p>
-	</footer>
-</div>
-
+			<hr>
+			<footer>
+				<p><a href="https://github.com/eternita/frontcache/wiki" target="_blank">Frontcache Docs</a></p>
+			</footer>
 		</div>
-		</div>
-	</body>
+	</div>
+</body>
 </html>

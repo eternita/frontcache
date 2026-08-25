@@ -10,7 +10,7 @@ conf/dynamic-urls.conf         URL patterns that must NEVER be cached (cart, log
 conf/fallbacks.conf            what to serve when a component fails or a circuit opens
 conf/guard-rules.conf          checks applied before cache and origin
 conf/fc-l1-ehcache-config.xml  L1 (in-memory) cache sizing
-conf/hystrix.properties        circuit-breaker thresholds and thread pools
+conf/resilience.properties     circuit-breaker thresholds and thread pools
 conf/fc-logback.xml            request / error / fallback / rejected-request logs
 fallbacks/                     fallback response bodies
 cache/                         the L2 Lucene index (created at runtime)

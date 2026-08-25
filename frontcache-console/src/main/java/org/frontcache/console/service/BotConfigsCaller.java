@@ -25,6 +25,6 @@ public class BotConfigsCaller implements Callable<BotConfig> {
     @Override
     public BotConfig call() throws Exception {
 
-		 return new BotConfig(fcClient.getName(), fcClient.getBots());
+		 return new BotConfig(fcClient.getName(), fcClient.getBotKeywords());
     }
 }

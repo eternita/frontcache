@@ -453,7 +453,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
     /**
-     * How many of the two parties (the Hystrix worker thread that opens the origin response, and
+     * How many of the two parties (the command worker thread that opens the origin response, and
      * the request thread that streams its body to the client) are done with it.
      * Not carried over by copy() - a copied context is a fresh exchange.
      */
@@ -462,8 +462,8 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     /**
      * Releases the origin response opened by FC_BypassCache, closing it once BOTH parties are done.
      *
-     * The response is opened on a Hystrix worker thread but its body is streamed by the request
-     * thread, so neither thread can close it unilaterally. On a Hystrix TIMEOUT the request thread
+     * The response is opened on a command worker thread but its body is streamed by the request
+     * thread, so neither thread can close it unilaterally. On a command TIMEOUT the request thread
      * finishes early (through the fallback) while the worker is still inside httpclient.execute() -
      * a blocking socket read ignores the interrupt - and then stashes a response nobody is left to
      * close, leaking the pooled connection permanently (leased entries are never reclaimed by
@@ -489,7 +489,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     /**
      * The fallback to serve instead of the origin response, parked here by FC_BypassCache.getFallback().
      *
-     * The fallback is resolved on the Hystrix thread but written by the request thread, which is the
+     * The fallback is resolved on the command worker thread but written by the request thread, which is the
      * only thread that may touch the servlet output stream in bypass mode. Writing it from
      * getFallback() instead raced with the request thread's own writeResponse(): the fallback body
      * went out first, then addResponseHeaders() stamped the context status over it - which defaults
@@ -558,25 +558,33 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return (String) get("frontCacheId");
     }
 
-    public void setHystrixFallback() {
+    /*
+     * The two context keys below keep their pre-2.7 spelling on purpose, unlike the accessors around
+     * them. They are map keys inside a RequestContext, so nothing outside this process reads them - but
+     * a fallback resolver or include processor compiled against 2.6 and dropped onto 2.7 does, via
+     * get()/set(), and renaming the key would make such a plugin stop seeing the flag rather than fail
+     * to link. See the rename plan in docs/hystrix-to-resilience4j-proposal.md section 8.
+     */
+
+    public void setFallbackUsed() {
         set("hystrixError", true);
     }
 
-    public void setHystrixFallback(String reason) {
+    public void setFallbackUsed(String reason) {
         set("hystrixError", true);
         if (null != reason)
             set("hystrixErrorReason", reason);
     }
 
-    public boolean isHystrixFallback() {
+    public boolean isFallbackUsed() {
         return getBoolean("hystrixError", false);
     }
 
     /**
-     * @return the hystrix failure category (short-circuited|timeout|rejected|bad-request|failure)
-     *         when known, otherwise "error". Only meaningful when {@link #isHystrixFallback()} is true.
+     * @return the failure category (short-circuited|timeout|rejected|bad-request|failure) when known,
+     *         otherwise "error". Only meaningful when {@link #isFallbackUsed()} is true.
      */
-    public String getHystrixReason() {
+    public String getFallbackReason() {
         Object reason = get("hystrixErrorReason");
         return (null != reason) ? reason.toString() : "error";
     }
@@ -673,7 +681,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 
     /**
      * The site this node serves (front-cache.default-domain), stamped on the context by the engine.
-     * Used for request logging, cache-entry ownership and the Hystrix command group.
+     * Used for request logging, cache-entry ownership and the command group key.
      */
     public void setDomain(String domain) {
         set("domain", domain);

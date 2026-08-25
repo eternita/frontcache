@@ -52,7 +52,7 @@ public class IndexController {
 
 		model.put("edges", frontcacheService.getClusterStatusList());
 
-		model.put("hystrixMonitorURLList", frontcacheService.getHystrixMonitorURLList());
+		model.put("dashboardStreams", frontcacheService.getDashboardStreams());
 
 		return "realtime";
 	}

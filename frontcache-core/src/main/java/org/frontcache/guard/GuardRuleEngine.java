@@ -246,9 +246,9 @@ public class GuardRuleEngine {
 
 	/**
 	 * Warns when a rule can terminate requests to the paths that must always work: the GSLB health
-	 * check, the management servlet, and the Hystrix metrics stream. All three are commonly
-	 * addressed by IP, which is exactly what an ip-access rule matches - a missing exemption turns
-	 * that rule into an outage.
+	 * check, the management servlet, the dashboard stream and the Prometheus scrape. All of them are
+	 * commonly addressed by IP, which is exactly what an ip-access rule matches - a missing exemption
+	 * turns that rule into an outage.
 	 *
 	 * The URL patterns come from web.xml (frontcache-server and the e2e webapps both map the IO
 	 * servlet at /frontcache-io).
@@ -257,7 +257,10 @@ public class GuardRuleEngine {
 	{
 		checkReachable("http://127.0.0.1/fc-ping.jsp", "GSLB health check (/fc-ping.jsp)");
 		checkReachable("http://127.0.0.1/frontcache-io?action=ping", "management API (/frontcache-io) used by frontcache-agent, the console and replication");
-		checkReachable("http://127.0.0.1/hystrix.stream", "metrics stream (/hystrix.stream) read by the console");
+		// Both paths, because the servlet answers on both and a rule that blocks only the legacy one
+		// still breaks every console still asking for it.
+		checkReachable("http://127.0.0.1/fc-dashboard.stream", "dashboard stream (/fc-dashboard.stream) read by the console");
+		checkReachable("http://127.0.0.1/hystrix.stream", "dashboard stream on its pre-2.7 path (/hystrix.stream)");
 		checkReachable("http://127.0.0.1/fc-metrics", "Prometheus scrape endpoint (/fc-metrics)");
 	}
 

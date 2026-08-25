@@ -39,8 +39,8 @@ import org.apache.http.message.BasicHeader;
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheProcessor;
-import org.frontcache.hystrix.FC_ThroughCache_HttpClient;
-import org.frontcache.hystrix.FC_ThroughCache_WebFilter;
+import org.frontcache.resilience.FC_ThroughCache_HttpClient;
+import org.frontcache.resilience.FC_ThroughCache_WebFilter;
 import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -320,7 +320,7 @@ public class FCUtils {
 		}
 
 		if (null != headers.get(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED))
-			context.setHystrixFallback();
+			context.setFallbackUsed();
 
 		return webResponse;
 	}
@@ -343,7 +343,7 @@ public class FCUtils {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		// entity is null for bodyless responses (e.g. 304 Not Modified from a conditional request,
 		// or 204 No Content). Guard it - dereferencing getContent() on null NPEs, which would escape
-		// run() as a Hystrix FAILURE and serve a fallback instead of relaying the bodyless response.
+		// run() as a command FAILURE and serve a fallback instead of relaying the bodyless response.
 		HttpEntity entity = response.getEntity();
 		if (null != entity)
 		{
@@ -387,9 +387,9 @@ public class FCUtils {
 			webResponse.addHeader("Location", fcLocation);
 		}
 
-		Header hystrixFallbackHeader = response.getFirstHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED);
-		if (null != hystrixFallbackHeader)
-			context.setHystrixFallback();
+		Header fallbackUsedHeader = response.getFirstHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED);
+		if (null != fallbackUsedHeader)
+			context.setFallbackUsed();
 
 		return webResponse;
 	}
@@ -777,7 +777,7 @@ public class FCUtils {
 	 * Apply a fallback {@link WebResponse}'s status code and headers (content type plus the
 	 * non-cacheable Cache-Control/Pragma markers) to the servlet response.
 	 *
-	 * Used by the Hystrix commands that stream the fallback body directly, so that the 503 status
+	 * Used by the commands that stream the fallback body directly, so that the 503 status
 	 * and no-store headers set on the fallback actually reach the client / downstream caches.
 	 * Must be called before the body is written.
 	 *

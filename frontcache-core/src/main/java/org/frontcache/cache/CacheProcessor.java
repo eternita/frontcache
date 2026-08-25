@@ -49,6 +49,22 @@ public interface CacheProcessor {
 
 	public Map<String, String> getCacheStatus();
 
+	/**
+	 * A cheap size-and-churn snapshot for the metrics exporter. See {@link CacheStats}.
+	 *
+	 * A {@code default} on purpose, unlike the breaking change made to {@code FallbackResolver} in the
+	 * same release. The difference is what a stale implementation does when it ignores the addition:
+	 * here it reports "not tracked" and simply exports no cache-size series, which is true and harmless.
+	 * A resolver that ignored ITS change would have served the wrong content during an outage. An
+	 * additive read-only accessor earns a default; a changed contract does not.
+	 *
+	 * {@code front-cache.cache-processor.impl} is an extension point, so a third-party processor keeps
+	 * compiling and running across this release either way.
+	 */
+	public default CacheStats getCacheStats() {
+		return CacheStats.NOT_TRACKED;
+	}
+
 	public List<String> getCachedKeys();
 
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context);

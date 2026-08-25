@@ -385,5 +385,70 @@ public abstract class ClientTests extends TestsBase {
 		return;
 	}
 
+	/**
+	 * The console's read-only config views, end to end.
+	 *
+	 * The suite never exercised these actions before, which is how a domain-keyed shape survived in the
+	 * wire format for a release after the feature behind it was retired. Asserted against a live node so
+	 * the flattening is proven through real HTTP and real Jackson, not only in a unit test.
+	 */
+	@Test
+	public void consoleConfigViewsReturnFlatCollections() throws Exception {
+		Set<String> botKeywords = frontcacheClient.getBotKeywords();
+		Assert.assertNotNull("get-bots returned nothing", botKeywords);
+		Assert.assertFalse("conf/bots.conf is not empty, so neither should this be", botKeywords.isEmpty());
+
+		Assert.assertNotNull("get-dynamic-urls returned nothing", frontcacheClient.getDynamicUrlPatterns());
+		Assert.assertNotNull("get-fallback-configs returned nothing", frontcacheClient.getFallbackEntries());
+
+		// the pre-2.7 shape has to keep arriving too - a 2.6 console reads it
+		@SuppressWarnings("deprecation")
+		Map<String, Set<String>> legacyShape = frontcacheClient.getBots();
+		Assert.assertNotNull("the legacy domain-keyed field is gone from the wire", legacyShape);
+		Assert.assertEquals("one node serves one site, so exactly one entry", 1, legacyShape.size());
+		Assert.assertEquals("a 2.6 console's JSPs switch on this literal",
+				"default-domain", legacyShape.keySet().iterator().next());
+		Assert.assertEquals("both shapes must carry the same data",
+				botKeywords, legacyShape.values().iterator().next());
+	}
+
+	/**
+	 * The resilience config panel, and its pre-2.7 action name. Both must return the file the node is
+	 * actually running on - which is conf/resilience.properties in standalone mode and the legacy
+	 * conf/hystrix.properties in filter mode, so this runs against both spellings of the file too.
+	 */
+	@Test
+	public void resilienceConfigIsServedUnderBothActionNames() throws Exception {
+		String config = frontcacheClient.getResilienceConfig();
+
+		Assert.assertNotNull("get-resilience-configs returned nothing", config);
+		Assert.assertTrue("expected the raw properties file, got: " + config,
+				config.contains("command.default.circuitBreaker.errorThresholdPercentage"));
+
+		@SuppressWarnings("deprecation")
+		String viaLegacyAccessor = frontcacheClient.getHystrixConfig();
+		Assert.assertEquals("the pre-2.7 path must return the same file", config, viaLegacyAccessor);
+	}
+
+	/**
+	 * conf/guard-rules.conf is optional and neither e2e node ships one, so this asserts the ABSENT case:
+	 * a well-formed ERROR response, not a blown-up action.
+	 *
+	 * It is here because that is not what used to happen. The handler caught only IOException while
+	 * FCConfig signals a missing file by throwing a RuntimeException, so the action failed outright and
+	 * the "not found" branch it was written for was unreachable. Nothing called the action in any test,
+	 * which is how it stayed that way.
+	 */
+	@Test
+	public void guardConfigActionReportsAMissingFileInsteadOfFailing() throws Exception {
+		org.frontcache.io.GetGuardConfigActionResponse response = frontcacheClient.getGuardConfigActionResponse();
+
+		Assert.assertNotNull("the action must answer, even with no guard-rules.conf on the node", response);
+		Assert.assertEquals("no guard-rules.conf on this node, so: a clean error",
+				org.frontcache.io.ActionResponse.RESPONSE_STATUS_ERROR, response.getResponseStatus());
+		Assert.assertEquals("guard-rules.conf not found", response.getErrorDescription());
+		Assert.assertNull(response.getGuardConfig());
+	}
+
 
 }

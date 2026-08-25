@@ -45,7 +45,7 @@ import org.apache.http.protocol.HttpContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
-import org.frontcache.hystrix.fr.FallbackConfigEntry;
+import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
@@ -57,7 +57,7 @@ import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.GetGuardRulesActionResponse;
 import org.frontcache.io.GetGuardConfigActionResponse;
-import org.frontcache.io.GetHystrixConfigActionResponse;
+import org.frontcache.io.GetResilienceConfigActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -348,6 +348,23 @@ public class FrontCacheClient {
 		return null;
 	}
 
+	/**
+	 * @return the fallback entries this edge has loaded, or null when the edge could not be reached
+	 */
+	public Set<FallbackConfigEntry> getFallbackEntries()
+	{
+		GetFallbackConfigActionResponse actionResponse = getFallbackConfigsActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getFallbackEntries();
+	}
+
+	/**
+	 * @deprecated pre-2.7 shape: a single-entry map keyed by domain. Use {@link #getFallbackEntries()}.
+	 */
+	@Deprecated
 	public Map <String, Set<FallbackConfigEntry>> getFallbackConfigs()
 	{
 		GetFallbackConfigActionResponse actionResponse = getFallbackConfigsActionResponse();
@@ -380,6 +397,23 @@ public class FrontCacheClient {
 		return null;
 	}
 
+	/**
+	 * @return the bot user-agent keywords this edge is using, or null when the edge could not be reached
+	 */
+	public Set<String> getBotKeywords()
+	{
+		GetBotsActionResponse actionResponse = getBotsActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getBotKeywords();
+	}
+
+	/**
+	 * @deprecated pre-2.7 shape: a single-entry map keyed by domain. Use {@link #getBotKeywords()}.
+	 */
+	@Deprecated
 	public Map<String, Set<String>> getBots()
 	{
 		GetBotsActionResponse actionResponse = getBotsActionResponse();
@@ -412,6 +446,23 @@ public class FrontCacheClient {
 		return null;
 	}
 
+	/**
+	 * @return the never-cached URL patterns this edge is using, or null when the edge could not be reached
+	 */
+	public Set<String> getDynamicUrlPatterns()
+	{
+		GetDynamicURLsActionResponse actionResponse = getDynamicURLsActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getDynamicUrlPatterns();
+	}
+
+	/**
+	 * @deprecated pre-2.7 shape: a single-entry map keyed by domain. Use {@link #getDynamicUrlPatterns()}.
+	 */
+	@Deprecated
 	public Map<String, Set<String>> getDynamicURLs()
 	{
 		GetDynamicURLsActionResponse actionResponse = getDynamicURLsActionResponse();
@@ -485,18 +536,38 @@ public class FrontCacheClient {
 	}
 
 	/**
+	 * Asks for the raw resilience config, falling back to the pre-2.7 action name when the edge does
+	 * not recognize the current one.
 	 *
-	 * @return
+	 * The fallback is needed because an unknown action is not an error on the wire: the management
+	 * servlet answers it with a ping response, which would render the console's panel empty with
+	 * nothing in any log to explain why. A ping is therefore the signal to retry with the old name -
+	 * a precise test, since this client never sends {@code ping} itself.
+	 *
+	 * @return the response, or null when the edge could not be reached
 	 */
-	public GetHystrixConfigActionResponse getHystrixConfigActionResponse()
+	public GetResilienceConfigActionResponse getResilienceConfigActionResponse()
+	{
+		GetResilienceConfigActionResponse actionResponse = resilienceConfigActionResponse(FrontcacheAction.GET_RESILIENCE_CONFIGS);
+
+		if (null != actionResponse && FrontcacheAction.PING.equals(actionResponse.getAction()))
+		{
+			logger.debug(getFrontCacheURL() + " does not know " + FrontcacheAction.GET_RESILIENCE_CONFIGS
+					+ " - it predates 2.7; retrying with " + FrontcacheAction.GET_HYSTRIX_CONFIGS);
+			return resilienceConfigActionResponse(FrontcacheAction.GET_HYSTRIX_CONFIGS);
+		}
+
+		return actionResponse;
+	}
+
+	private GetResilienceConfigActionResponse resilienceConfigActionResponse(String action)
 	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_HYSTRIX_CONFIGS));
+		urlParameters.add(new BasicNameValuePair("action", action));
 
 		try {
 			String responseStr = requestFrontCache(urlParameters);
-			GetHystrixConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetHystrixConfigActionResponse.class);
-			return actionResponse;
+			return jsonMapper.readValue(responseStr.getBytes(), GetResilienceConfigActionResponse.class);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -505,14 +576,32 @@ public class FrontCacheClient {
 		return null;
 	}
 
-	public String getHystrixConfig()
+	/**
+	 * @return the raw contents of the edge's conf/resilience.properties, or null when the edge could
+	 *         not be reached
+	 */
+	public String getResilienceConfig()
 	{
-		GetHystrixConfigActionResponse actionResponse = getHystrixConfigActionResponse();
+		GetResilienceConfigActionResponse actionResponse = getResilienceConfigActionResponse();
 
 		if (null == actionResponse)
 			return null;
 
-		return actionResponse.getHystrixConfig();
+		return actionResponse.getResilienceConfig();
+	}
+
+	/** @deprecated pre-2.7 name of {@link #getResilienceConfigActionResponse()} */
+	@Deprecated
+	public GetResilienceConfigActionResponse getHystrixConfigActionResponse()
+	{
+		return getResilienceConfigActionResponse();
+	}
+
+	/** @deprecated pre-2.7 name of {@link #getResilienceConfig()} */
+	@Deprecated
+	public String getHystrixConfig()
+	{
+		return getResilienceConfig();
 	}
 
 
