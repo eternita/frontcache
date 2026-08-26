@@ -15,7 +15,8 @@
 #
 # The layout it produces:
 #     /                -> local Frontcache  (80, and TLS-terminated 443 -> http $FRONTCACHE_HTTP_PORT)
-#     /hystrix.stream  -> local Frontcache, UNBUFFERED (it is a Server-Sent-Events stream)
+#     /fc-dashboard.stream (and the legacy /hystrix.stream)
+#                      -> local Frontcache, UNBUFFERED (they are Server-Sent-Events streams)
 #     $ORIGIN_PATHS    -> $ORIGIN_HOST over https, bypassing the cache entirely
 #
 # The embedded Jetty 12 launcher speaks HTTP only, so nginx owns TLS. Responses proxied from
@@ -123,8 +124,12 @@ ${RESOLVER_CONF}
 
 ${GZIP_CONF}
 
-${ORIGIN_LOCATIONS}    # Hystrix SSE metrics stream - must NOT be buffered.
-    location = /hystrix.stream {
+${ORIGIN_LOCATIONS}    # Dashboard SSE metrics stream - must NOT be buffered.
+    # Both paths: the node serves the stream on /fc-dashboard.stream and, indefinitely, on the
+    # pre-2.7 /hystrix.stream. A regex location so one block covers both - an exact-match location
+    # on either name alone would leave the other to fall through to 'location /' and be buffered,
+    # which is silent: the dashboard just receives nothing, forever, with no error anywhere.
+    location ~ ^/(fc-dashboard|hystrix)\.stream$ {
 ${PROXY_HDRS}
         proxy_set_header Host \$host;
         proxy_pass http://${FRONTCACHE_HOST}:${FRONTCACHE_HTTP_PORT};

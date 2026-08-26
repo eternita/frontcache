@@ -8,8 +8,9 @@
 #
 #   1. cache        - the stack is actually wired up: origin -> FC -> nginx, and the second
 #                     request is served from cache rather than re-fetched
-#   2. hystrix      - `proxy_buffering off` on /hystrix.stream. Without it the SSE stream is
-#                     buffered and the console dashboard receives nothing, forever
+#   2. stream       - `proxy_buffering off` on the dashboard stream. Without it the SSE stream is
+#                     buffered and the console dashboard receives nothing, forever. BOTH paths are
+#                     checked: an exact-match location on one name leaves the other buffered
 #   3. gzip         - `gzip_proxied any`. nginx's default is to NOT compress proxied responses,
 #                     and Frontcache serves plaintext (it cannot emit brotli), so without this
 #                     nothing on the site is compressed
@@ -101,14 +102,24 @@ case "$ENC" in
   *) bad "no Content-Encoding: gzip" "gzip_proxied any is what makes nginx compress a PROXIED response" ;;
 esac
 
-# ---- 2. /hystrix.stream is not buffered -------------------------------------
+# ---- 2. the dashboard stream is not buffered --------------------------------
 # An SSE stream never ends, so curl is expected to time out - what matters is whether any
 # bytes arrived BEFORE the timeout. Buffered, we would get nothing at all.
-STREAM="$(curl -sS --max-time 12 -H 'Accept: text/event-stream' "$BASE/hystrix.stream" 2>/dev/null | head -c 400)"
-if [ -n "$STREAM" ]; then
-  ok "/hystrix.stream delivers bytes without waiting for the response to end"
-else
-  bad "/hystrix.stream produced nothing in 12s" "proxy_buffering off is missing, or the stream is not enabled on this build"
+#
+# Both paths are checked. The node serves the stream on /fc-dashboard.stream and on the pre-2.7
+# /hystrix.stream, and nginx must not buffer EITHER: an exact-match location on one name leaves
+# the other falling through to `location /`, which buffers it. That failure is invisible - the
+# dashboard simply receives nothing - so a check on one path alone would not have caught it.
+STREAM_OK=1
+for STREAM_PATH in fc-dashboard.stream hystrix.stream; do
+  STREAM="$(curl -sS --max-time 12 -H 'Accept: text/event-stream' "$BASE/$STREAM_PATH" 2>/dev/null | head -c 400)"
+  if [ -z "$STREAM" ]; then
+    STREAM_OK=0
+    bad "/$STREAM_PATH produced nothing in 12s" "proxy_buffering off is missing for this path, or the stream is not enabled on this build"
+  fi
+done
+if [ "$STREAM_OK" = "1" ]; then
+  ok "both dashboard-stream paths deliver bytes without waiting for the response to end"
 fi
 
 # ---- 5. origin passthrough ---------------------------------------------------

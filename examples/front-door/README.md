@@ -96,7 +96,7 @@ defined. Five things in it are load-bearing, and each is a specific failure if y
 
 | Directive | Why | If missing |
 | --- | --- | --- |
-| `proxy_buffering off` on `/hystrix.stream` | it is a Server-Sent-Events stream | the console dashboard receives nothing, forever, with no error |
+| `proxy_buffering off` on the dashboard stream | `/fc-dashboard.stream` and the legacy `/hystrix.stream` are Server-Sent-Events streams; one regex location covers both | the console dashboard receives nothing, forever, with no error |
 | `gzip_proxied any` | nginx does **not** compress proxied responses by default, and Frontcache serves plaintext (its HTTP client only decodes gzip, so it cannot emit brotli) | nothing on the site is compressed |
 | `ignore_invalid_headers off` | defense in depth for legacy dotted `x.frontcache.*` header names | such headers are silently dropped before Frontcache sees them |
 | `X-Forwarded-*` on every proxy pass | Frontcache honours them for redirect rewriting and the management-port check | redirects and the management API misbehave behind the proxy |
@@ -140,8 +140,8 @@ Otherwise [`tls/make-self-signed.sh`](tls/make-self-signed.sh) generates a self-
 ```
 
 Brings the stack up on ports 8080/8443 against the stand-in origin and asserts the things that
-are easy to get quietly wrong: a second request is served **from cache**, `/hystrix.stream`
-delivers bytes without waiting for the response to end, responses are gzipped, hyphenated
+are easy to get quietly wrong: a second request is served **from cache**, both dashboard-stream
+paths deliver bytes without waiting for the response to end, responses are gzipped, hyphenated
 `x-frontcache-*` request headers survive the proxy hop, `ORIGIN_PATHS` reach the origin
 directly, and 443 answers. `KEEP=1 ./smoke-test.sh` leaves it running to poke at.
 
@@ -152,7 +152,7 @@ directly, and 443 answers. `KEEP=1 ./smoke-test.sh` leaves it running to poke at
 | `docker compose up` hangs on the nginx container | it waits for Frontcache to report healthy; `docker compose logs fc-server` |
 | nginx exits with `host not found in upstream` | the origin (or `fc-server`) does not resolve. In shape A that means the container is not up; on a VM it means DNS |
 | redirects send users to `:9080` | `front-cache.http-port` / `https-port` are not the client-facing ports — see shape C above |
-| the console dashboard is empty | `/hystrix.stream` is being buffered somewhere |
+| the console dashboard is empty | the dashboard stream is being buffered somewhere — check both `/fc-dashboard.stream` and `/hystrix.stream` |
 | nothing is compressed | `gzip_proxied any` — nginx skips proxied responses without it |
 
 ## Version note
