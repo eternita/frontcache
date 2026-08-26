@@ -528,11 +528,13 @@ public class FCUtils {
         {
         	// add parameters for storing
         	// POST method parameters are not stored because they can be huge (e.g. file upload)
-        	StringBuilder sb = new StringBuilder(requestURL);
-        	if (!request.getParameterMap().isEmpty())
-        		sb.append("?").append(request.getQueryString());
-
-        	requestURL = sb.toString();
+        	//
+        	// Asked via getQueryString(), not getParameterMap(). The latter makes the container parse
+        	// and materialise the entire parameter map, solely to learn whether the query string is
+        	// empty - which getQueryString() answers on its own.
+        	String queryString = request.getQueryString();
+        	if (null != queryString && !queryString.isEmpty())
+        		requestURL = requestURL + "?" + queryString;
         }
         return requestURL;
 	}

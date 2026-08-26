@@ -137,6 +137,10 @@ public class FrontCacheEngine {
 	// cache or origin. Guards against absurdly long URLs (e.g. a crawler's compounding &amp;-mangled
 	// query) that would otherwise each be a unique cache key hitting origin. Tunable via
 	// front-cache.max-request-uri-length; <= 0 disables the check.
+	// Compiled once. String.replaceAll() compiles its pattern on every call - only reached when the URI
+	// actually carries a jsessionid, but there is no reason to pay for it when it does.
+	private static final Pattern JSESSIONID_PATTERN = Pattern.compile(";jsessionid=.*?(?=\\?|$)");
+
 	private static final int DEFAULT_MAX_REQUEST_URI_LENGTH = 4096;
 	private static int maxRequestURILength = DEFAULT_MAX_REQUEST_URI_LENGTH;
 
@@ -383,6 +387,10 @@ public class FrontCacheEngine {
 		originHttpPort  = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 
+		// Built here, immediately after the values they depend on - so a bad origin-host fails at
+		// startup with a clear message rather than on the first request.
+		buildOriginUrls();
+
 		logger.info("Serving domain " + domain + " from origin " + originHost
 				+ " (http " + originHttpPort + " / https " + originHttpsPort + ")");
 
@@ -519,19 +527,34 @@ public class FrontCacheEngine {
 		}
 	}
 
-	private URL getOriginUrl(RequestContext context) {
-		boolean isSecure = context.getRequest().isSecure();
+	/**
+	 * The origin's base URL, one per scheme, built once at startup.
+	 *
+	 * This depends on exactly one property of a request - {@code isSecure()} - and otherwise only on
+	 * config that cannot change without a reload (which rebuilds the engine). It used to be rebuilt per
+	 * call: a StringBuilder, then {@code new URL(...)}, which is a string parse plus a
+	 * URLStreamHandler lookup. And it was called TWICE per request - init() stored it on the context
+	 * and processRequestInternal() computed it again and discarded the stored one.
+	 */
+	private URL originUrlHttp;
+	private URL originUrlHttps;
 
-		String port = isSecure ? originHttpsPort : originHttpPort;
+	private void buildOriginUrls() {
+		originUrlHttp = parseOriginUrl(false, originHttpPort);
+		originUrlHttps = parseOriginUrl(true, originHttpsPort);
+	}
 
+	private URL parseOriginUrl(boolean isSecure, String port) {
 		String urlStr = makeURL(isSecure, originHost, port);
 		try {
-			URL routeUrl = new URL(urlStr);
-			return  routeUrl;
+			return new URL(urlStr);
 		} catch (MalformedURLException e) {
 			throw new RuntimeException("Invalid front-cache.origin-host (" + originHost + ")", e);
 		}
+	}
 
+	private URL getOriginUrl(RequestContext context) {
+		return context.getRequest().isSecure() ? originUrlHttps : originUrlHttp;
 	}
 
 	private String makeURL(boolean isSecure, String host, String port)
@@ -680,7 +703,7 @@ public class FrontCacheEngine {
         context.setResponse(servletResponse);
 		String uri = FCUtils.buildRequestURI(servletRequest);
 		if (-1 < uri.indexOf(";jsessionid=")) // remove JSESSIONID from URI
-			uri = uri.replaceAll(";jsessionid=.*?(?=\\?|$)", "");
+			uri = JSESSIONID_PATTERN.matcher(uri).replaceAll("");
 
 		context.setRequestURI(uri);
 
@@ -888,7 +911,9 @@ public class FrontCacheEngine {
 	public void processRequestInternal(RequestContext context) throws Exception
 	{
 		HttpServletRequest httpRequest = context.getRequest();
-		String originRequestURL = getOriginUrl(context) + context.getRequestURI() + context.getRequestQueryString();
+		// The context already carries this - init() resolved it. Recomputing it here was the second of
+		// the two per-request URL parses.
+		String originRequestURL = context.getOriginURL() + context.getRequestURI() + context.getRequestQueryString();
 		logger.debug("originRequestURL: " + originRequestURL);
 
 		boolean isSecure = ("https".equalsIgnoreCase(context.getFrontCacheProtocol())) ? true : false;

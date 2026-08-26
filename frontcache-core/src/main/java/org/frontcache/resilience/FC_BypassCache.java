@@ -14,6 +14,7 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -39,6 +40,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FC_BypassCache extends FcCommand<Object> {
+
+	// Compiled once. This runs on EVERY bypassed (non-cacheable) request, and String.replaceAll()
+	// compiles its pattern each time it is called.
+	private static final Pattern DUPLICATE_SLASHES = Pattern.compile("/{2,}");
 
 	private final HttpClient client;
 	private final RequestContext context;
@@ -203,7 +208,7 @@ public class FC_BypassCache extends FcCommand<Object> {
 
 		URL host = context.getOriginURL();
 		HttpHost httpHost = FCUtils.getHttpHost(host);
-		uri = (host.getPath() + uri).replaceAll("/{2,}", "/");
+		uri = DUPLICATE_SLASHES.matcher(host.getPath() + uri).replaceAll("/");
 
 		HttpRequest httpRequest;
 		switch (verb.toUpperCase()) {

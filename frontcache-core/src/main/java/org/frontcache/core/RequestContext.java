@@ -743,12 +743,81 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     }
 
 
+	/**
+	 * A bounded, one-line summary for diagnostics - NOT a dump of the map.
+	 *
+	 * This used to be {@code super.toString()} (every entry, including the HttpServletRequest, the
+	 * HttpServletResponse, the open origin CloseableHttpResponse and the whole origin header map) put
+	 * through a freshly-compiled regex to squash newlines.
+	 *
+	 * The reason that mattered is where it is called from: all four command fallbacks log it - so it
+	 * runs on EVERY request precisely when the origin is failing and every request is taking the
+	 * fallback path. The log line meant to help diagnose an outage was amplifying the load during one,
+	 * and it dragged whole request/response objects through their own toString() to do it.
+	 *
+	 * Fixed fields, so there is nothing to escape: none of them can contain a newline, and the URI and
+	 * query string are the only caller-influenced values - they are length-capped rather than
+	 * pattern-matched.
+	 */
 	@Override
 	public String toString() {
-		String str = super.toString();
-		str = str.replaceAll("(\\r|\\n|\\r\\n)+", " ");
-		return "RequestContext: " + str;
+		StringBuilder sb = new StringBuilder(160);
+		sb.append("RequestContext: requestId=").append(getRequestId())
+			.append(", type=").append(getRequestType())
+			.append(", includeLevel=").append(getIncludeLevel())
+			.append(", clientType=").append(getClientType())
+			.append(", uri=").append(clip(getRequestURI()))
+			.append(clip(getRequestQueryString()))
+			.append(", fallbackUsed=").append(isFallbackUsed());
+
+		// getFallbackReason() answers "error" rather than null when nothing set one, so it is only
+		// meaningful - and only worth printing - once a fallback has actually fired
+		if (isFallbackUsed())
+			sb.append(", fallbackReason=").append(getFallbackReason());
+
+		return sb.toString();
 	}
+
+	/**
+	 * Makes a caller-supplied value safe to put in a log line: capped in length, and with any CR/LF
+	 * flattened to spaces.
+	 *
+	 * The line-break handling is not cosmetic. This goes into a single log record, and a newline in a
+	 * request URI would let a caller forge additional log entries. The version this replaced got the
+	 * same property by running a regex over the whole rendered string; doing it here means only the
+	 * two caller-influenced fields are scanned, and nothing is allocated unless there is something to
+	 * fix - which is the normal case, since containers reject a raw CR/LF in the request line anyway.
+	 */
+	private static String clip(String value) {
+		if (null == value)
+			return "";
+
+		String capped = (MAX_LOGGED_VALUE_LENGTH >= value.length())
+				? value
+				: value.substring(0, MAX_LOGGED_VALUE_LENGTH) + "...";
+
+		int firstBreak = -1;
+		for (int i = 0; i < capped.length(); i++)
+		{
+			char c = capped.charAt(i);
+			if ('\n' == c || '\r' == c)
+			{
+				firstBreak = i;
+				break;
+			}
+		}
+		if (0 > firstBreak)
+			return capped; // the common case - nothing to rewrite, nothing to allocate
+
+		char[] flattened = capped.toCharArray();
+		for (int i = firstBreak; i < flattened.length; i++)
+			if ('\n' == flattened[i] || '\r' == flattened[i])
+				flattened[i] = ' ';
+
+		return new String(flattened);
+	}
+
+	private static final int MAX_LOGGED_VALUE_LENGTH = 256;
 
 
 }
