@@ -23,7 +23,7 @@
              </td>
              <td class="fc-edge">
                 <div class="fc-edge-name">
-                    <c:out value="${edge.name}"/>
+                    <span class="fc-edge-host" title="<c:out value='${edge.name}'/>"><c:out value="${edge.name}"/></span>
                     <span class="fc-edge-uptime" data-field="uptime"></span>
                 </div>
 

@@ -51,14 +51,30 @@
 	vertical-align: top;
 }
 
+/* Hostname left, uptime hard right, on one line 190px wide.
+   A step down from the block's 18px, and a flex row rather than one nowrap line with ellipsis on
+   the whole thing: with both parts in one text flow the uptime is what falls off the end, because
+   it comes after the name - a long hostname did not squeeze it, it deleted it. Here only
+   .fc-edge-host may shrink (min-width:0 is what lets a flex item shrink below its text width, and
+   without it the ellipsis never engages), while the uptime keeps its intrinsic width. */
 .fc-edges-status .fc-edge-name {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	font-size: 15px;
 	max-width: 190px;
 }
 
+.fc-edges-status .fc-edge-host {
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .fc-edges-status .fc-edge-uptime {
+	flex: 0 0 auto;
+	margin-left: auto;   /* right-aligned: pinned to the end of the row, not trailing the name */
 	font-size: 12px;
 	color: #999;
 	font-weight: 400;
