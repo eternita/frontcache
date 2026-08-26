@@ -1,5 +1,8 @@
 # Frontcache — Concepts
 
+![Alt](images/how-it-works-details.png "Frontcache technical details")
+
+
 ## 1. What Frontcache is
 
 Frontcache is a **page-fragment cache** that sits in the request path — either as a reverse
@@ -11,7 +14,7 @@ proxy or as a servlet filter. It:
   concurrently);
 - serves bots differently from browsers, so crawlers can get long-lived SEO HTML while users get
   fresher content;
-- circuit-breaks each origin call through Hystrix and serves fallback content (uri pattern based) when the origin
+- circuit-breaks each origin call and serves fallback content (uri pattern based) when the origin
   fails.
 
 It is language-agnostic on the origin side: anything that can set a response header can drive it.
@@ -36,7 +39,7 @@ pluggable subsystems, all implemented in `frontcache-core`:
 1. **CacheProcessor** — `front-cache.cache-processor.impl`; default `L1L2CacheProcessor`
    (L1 = Ehcache in-memory, L2 = Lucene on-disk index under `FRONTCACHE_HOME/cache/`).
 2. **IncludeProcessor** — resolves `<fc:include/>`; default `ConcurrentIncludeProcessor` (parallel).
-3. **Hystrix wrappers + Fallback resolver** — circuit-break each origin call, serve fallback content on 5XX/open circuit.
+3. **Resilience commands + Fallback resolver** — circuit-break each origin call, serve fallback content on 5XX/open circuit.
 
 <img src="diagrams/01-engine.svg" alt="FrontCacheEngine subsystems" width="820"/>
 
@@ -48,9 +51,9 @@ every example and every install channel ships with.
 Applies to every topology, and recurses for each `fc:include` in the assembled page.
 <img src="diagrams/02-request-lifecycle.svg" alt="Request lifecycle" width="800"/>
 
-The Hystrix command names in that flow (`FC_Total`, `FC_ThroughCache*`, `FC_BypassCache`), their
+The resilience command names in that flow (`FC_Total`, `FC_ThroughCache*`, `FC_BypassCache`), their
 group keys and their isolation strategies are covered in
-[hystrix-command-flow.md](hystrix-command-flow.md).
+[resilience-command-flow.md](resilience-command-flow.md).
 
 ## 5. The origin is in charge of caching
 
@@ -122,7 +125,7 @@ Not in the application's own config. The directory is located via `-Dfrontcache.
 | `fallbacks.conf` | `URI_PATTERN \| fallback_file \| optional_origin_request`; served when the origin 5XXs or the circuit is open. Files seed at startup |
 | `guard-rules.conf` | request-rejection rules — see [guard-getting-started.md](guard-getting-started.md) |
 | `fc-l1-ehcache-config.xml` | L1 sizing |
-| `hystrix.properties` | circuit-breaker thresholds and pool sizes |
+| `resilience.properties` | circuit-breaker thresholds and pool sizes |
 | `fc-logback.xml` | logging |
 | `frontcache.id` | this node's id, kept in its own file so a deployment can stamp it per host; it is what `x-frontcache-id` reports |
 
@@ -170,7 +173,7 @@ the response, and `x-frontcache-fallback-is-used` marks a fallback.
 
 `FRONTCACHE_HOME/logs/` holds four logs — `frontcache-requests.log` (one line per
 request/fragment), `error.log`, `fallback.log`, and `frontcache-failed-requests.log` (guard-rule
-rejections and Hystrix fallbacks). The [log-analytics example](../examples/log-analytics) indexes
+rejections and circuit-breaker fallbacks). The [log-analytics example](../examples/log-analytics) indexes
 all four into Elasticsearch + Kibana with ready-made dashboards.
 
 ---
@@ -181,7 +184,7 @@ all four into Elasticsearch + Kibana with ready-made dashboards.
   [deployment-usecases.md](deployment-usecases.md)
 - Install it: [install-guide.md](install-guide.md)
 - Reject bad traffic at the edge: [guard-getting-started.md](guard-getting-started.md)
-- Circuit breakers in detail: [hystrix-command-flow.md](hystrix-command-flow.md)
+- Circuit breakers in detail: [resilience-command-flow.md](resilience-command-flow.md)
 - Run something: [JSP](../examples/frontcache-jsp) · [Spring Boot](../examples/frontcache-spring) · [PHP](../examples/frontcache-php)
 
 ---

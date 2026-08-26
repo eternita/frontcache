@@ -6,7 +6,8 @@
 # installer's --with-nginx used to do:
 #
 #     /                        -> Frontcache on 127.0.0.1:<port>  (80, and TLS-terminated 443)
-#     /hystrix.stream          -> Frontcache, UNBUFFERED (it is a Server-Sent-Events stream)
+#     /fc-dashboard.stream     -> Frontcache, UNBUFFERED (an SSE stream; the pre-2.7
+#     /hystrix.stream             /hystrix.stream is still served and is covered too)
 #     --origin-paths           -> your origin, bypassing the cache entirely
 #
 # ...plus the step that is easy to forget once the installer stops doing it: setting

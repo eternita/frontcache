@@ -21,7 +21,7 @@ Only one property differed between the two runs:
 | Everything else | identical | identical |
 
 Because `NoopCacheProcessor` keeps Frontcache in the request path — the proxy hop, `fc:include`
-stitching and the Hystrix wrappers all still run — **run B is not "no Frontcache". It is
+stitching and the resilience command wrappers all still run — **run B is not "no Frontcache". It is
 Frontcache with the cache disabled.** That makes this a measurement of what the *cache* is worth,
 with every other cost paid by both sides.
 

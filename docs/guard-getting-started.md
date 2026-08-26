@@ -96,18 +96,28 @@ visitors, but every request they make is a cache miss and an origin render.
 
 ```
 # exemptions FIRST - these paths must keep working when addressed by IP
-ping-by-ip     | uri~^/fc-ping\.jsp$   | allow
-mgmt-by-ip     | uri~^/frontcache-io   | allow
-hystrix-stream | uri~^/hystrix\.stream | allow
+ping-by-ip     | uri~^/fc-ping\.jsp$        | allow
+mgmt-by-ip     | uri~^/frontcache-io        | allow
+dash-stream    | uri~^/fc-dashboard\.stream | allow
+legacy-stream  | uri~^/hystrix\.stream      | allow
 
-ip-access      | host:ip               | redirect:301 https://www.example.com/en/welcome.htm
+ip-access      | host:ip                    | redirect:301 https://www.example.com/en/welcome.htm
 ```
 
-**The three exemptions are not optional.** Your load balancer health-checks
+**The exemptions are not optional.** Your load balancer health-checks
 `/fc-ping.jsp` by IP, and `frontcache-agent`, the console, and cache replication call
-`/frontcache-io` and `/hystrix.stream` the same way. Without the exemptions above the
+`/frontcache-io` and the dashboard stream the same way. The stream answers on both
+`/fc-dashboard.stream` and the legacy `/hystrix.stream`, so exempt both — external
+Turbine and older consoles still use the second one. Without the exemptions above the
 rule redirects your own infrastructure and the node looks unhealthy. Frontcache logs a
 warning at startup if it spots this, but the file is where you fix it.
+
+**An absolute redirect target needs its host allowed**, or the rule is refused at load
+(open-redirect protection — nothing is allowed implicitly, including your own site):
+
+```properties
+front-cache.guard-rules.allowed-redirect-hosts=www.example.com
+```
 
 ## 4. Recipe: send logged-out visitors to the login page
 
@@ -123,6 +133,7 @@ Worth knowing:
 
 - **The `login-page` exemption prevents a redirect loop.** If the login page itself
   could match the rule's pattern, every visit would bounce forever.
+- **`www.example.com` must be in `front-cache.guard-rules.allowed-redirect-hosts`**, as in §3.
 - **302, not 301.** The decision depends on a cookie that changes the moment someone
   logs in; a browser that cached a 301 would strand them.
 - **Bots get redirected too.** They carry no session cookie, so crawlers stop costing
@@ -186,7 +197,7 @@ cd examples/log-analytics
 ```
 
 It breaks everything down by rule, HTTP status, node, domain, country, client IP, URL
-and user agent, and separates *rejected* / *redirected* / *dry-run* / Hystrix
+and user agent, and separates *rejected* / *redirected* / *dry-run* / circuit-breaker
 fallbacks; that example's
 [README](../examples/log-analytics/README.md) covers the setup and every parsed field.
 
@@ -213,9 +224,9 @@ Common causes: an invalid regex, an unknown condition name, a missing action, or
 redirect status that is not a redirect.
 
 **"Redirect target host is not allowed."** Open-redirect protection. Absolute targets
-must point at a host in `front-cache.domains` or in
-`front-cache.guard-rules.allowed-redirect-hosts`. Add the host, or use a relative
-target.
+must point at a host listed in `front-cache.guard-rules.allowed-redirect-hosts` — and that
+is the *only* source of allowed hosts, so **your own site is not implicitly allowed**. Add
+the host, or use a relative target.
 
 **"…redirects to a URL its own condition matches."** A redirect loop, caught at load
 time. Add an `allow` exemption for the destination above the rule (as in §4).
@@ -252,7 +263,7 @@ re-reads live:
 | Property | Default | Meaning |
 | --- | --- | --- |
 | `front-cache.guard-rules.enabled` | `true` | load `guard-rules.conf` at all |
-| `front-cache.guard-rules.allowed-redirect-hosts` | *(empty)* | extra hosts an absolute redirect may target (comma-separated); everything in `front-cache.domains` is allowed already |
+| `front-cache.guard-rules.allowed-redirect-hosts` | *(empty)* | every host an absolute redirect may target (comma-separated). Nothing is allowed implicitly — not even `front-cache.default-domain` |
 | `front-cache.guard-rules.bad-request.enabled` | `true` | the built-in 400 rule |
 | `front-cache.max-request-uri-length` | `4096` | the built-in 414 rule; `0` or less disables it |
 

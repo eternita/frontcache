@@ -19,7 +19,7 @@
   <!-- messages -->
   <line x1="90" y1="80" x2="371" y2="80" stroke="#475569" marker-end="url(#a)"/><text x="100" y="74">GET /store/product/42</text>
   <line x1="375" y1="132" x2="94" y2="132" stroke="#475569" stroke-dasharray="5 3" marker-end="url(#a)"/><text x="120" y="126">cached page (assembled)</text>
-  <line x1="375" y1="195" x2="651" y2="195" stroke="#475569" marker-end="url(#a)"/><text x="390" y="189">GET ... (Hystrix FC_ThroughCache)</text>
+  <line x1="375" y1="195" x2="651" y2="195" stroke="#475569" marker-end="url(#a)"/><text x="390" y="189">GET ... (FC_ThroughCache)</text>
   <line x1="655" y1="245" x2="379" y2="245" stroke="#475569" stroke-dasharray="5 3" marker-end="url(#a)"/><text x="400" y="239">HTML + x-frontcache-* headers</text>
   <path d="M375,275 h60 v22 h-58" fill="none" stroke="#475569" marker-end="url(#a)"/><text x="440" y="282">store + resolve fc:include</text>
   <line x1="375" y1="322" x2="94" y2="322" stroke="#475569" stroke-dasharray="5 3" marker-end="url(#a)"/><text x="120" y="316">assembled page</text>

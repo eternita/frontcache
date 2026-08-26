@@ -19,7 +19,7 @@ Quickest look, if you have Docker:
 ```sh
 docker run -d --name frontcache -p 8080:9080 \
   -e ORIGIN_HOST=your-origin.example.com \
-  pavlikovskiy/frontcache-server:2.6.0
+  pavlikovskiy/frontcache-server:2.7.0
 ```
 
 
@@ -34,6 +34,6 @@ docker run -d --name frontcache -p 8080:9080 \
 * Can be used with web apps written in any language
 
 
-![Alt](docs/images/how-it-works.png "Frontcache overview")
+![Alt](docs/images/how-it-works-details.png "Frontcache overview")
 
 

@@ -51,13 +51,13 @@ passing the request down the filter chain.
    front-cache.include-processor.impl=org.frontcache.include.impl.ConcurrentIncludeProcessor
    front-cache.include-processor.impl.concurrent.thread-amount=8
    front-cache.include-processor.impl.concurrent.timeout=5000
-   front-cache.fallback-resolver.impl=org.frontcache.hystrix.fr.FileBasedFallbackResolver
+   front-cache.fallback-resolver.impl=org.frontcache.resilience.fr.FileBasedFallbackResolver
    front-cache.default-domain=myapp.com
    front-cache.site-key=CHANGE_ME
    ```
 
    Provide the rest of the `conf/` files — `bots.conf`, `dynamic-urls.conf`, `fallbacks.conf`,
-   `fc-l1-ehcache-config.xml`, `hystrix.properties`, `fc-logback.xml`; what each one does is in
+   `fc-l1-ehcache-config.xml`, `resilience.properties`, `fc-logback.xml`; what each one does is in
    [concept §7](concept.md#7-configuration-lives-in-frontcache_home).
 
 4. **Pass JVM system properties** when launching the container:
@@ -116,22 +116,18 @@ configured origin.
 
    front-cache.cache-processor.impl=org.frontcache.cache.impl.L1L2CacheProcessor
    front-cache.include-processor.impl=org.frontcache.include.impl.ConcurrentIncludeProcessor
-   front-cache.fallback-resolver.impl=org.frontcache.hystrix.fr.FileBasedFallbackResolver
+   front-cache.fallback-resolver.impl=org.frontcache.resilience.fr.FileBasedFallbackResolver
    front-cache.default-domain=www.example.com
    front-cache.site-key=CHANGE_ME
    ```
 
-   **Multi-domain** on one Frontcache (dots → underscores in the property key):
-
-   ```properties
-   front-cache.domains=fc1-test.org,fc2-test.org
-   front-cache.domain.fc1-test_org.origin-host=origin.fc1-test.org
-   front-cache.domain.fc1-test_org.origin-http-port=8080
-   front-cache.domain.fc1-test_org.origin-https-port=8443
-   ```
+   **One node serves one site.** Multi-domain configuration was retired in 2.6.0:
+   `front-cache.domains` and any `front-cache.domain.<domain>.*` key make the node **refuse to
+   start**. `front-cache.default-domain` above is this node's own hostname and is unaffected.
+   To front several sites, run a node per site.
 
 3. **Configure behavior in `conf/`** — `bots.conf`, `dynamic-urls.conf`, `fallbacks.conf`,
-   `fc-l1-ehcache-config.xml`, `hystrix.properties`; each file's job is in
+   `fc-l1-ehcache-config.xml`, `resilience.properties`; each file's job is in
    [concept §7](concept.md#7-configuration-lives-in-frontcache_home). For a proxy tier
    the two that matter most on day one are `dynamic-urls.conf` (keep carts/login/admin
    uncached) and `fallbacks.conf` (what users see when the origin is down).
@@ -206,8 +202,7 @@ Two caching tiers:
    front-cache.site-key=SHARED_SITE_KEY   # same key across the cluster
    ```
 
-   Keep `site-key` (and `domains`) consistent across the cluster so cluster invalidation and
-   multi-domain routing line up everywhere.
+   Keep `site-key` consistent across the cluster so cluster invalidation lines up everywhere.
 
 3. **Put a GSLB in front of the edges.** Configure geo/latency routing + health checks
    against each edge's `:9080` (or a health URL). GSLB returns the nearest healthy edge IP.
@@ -234,38 +229,6 @@ Two caching tiers:
    lets one product update clear every fragment carrying that tag.
 
 ### 3.3 Multi-region request + invalidation flow
-
-```mermaid
-sequenceDiagram
-    participant U as User (EU)
-    participant G as GSLB
-    participant E as Edge FC (EU)
-    participant J as Java app + FC filter
-    participant D as DB
-
-    U->>G: resolve www.example.com
-    G-->>U: nearest edge IP (EU)
-    U->>E: GET /page
-    alt edge hit
-        E-->>U: cached page (lowest latency)
-    else edge miss
-        E->>J: forward to origin
-        alt filter hit
-            J-->>E: cached fragment (no DB hit)
-        else filter miss
-            J->>D: query
-            D-->>J: data
-            J-->>E: HTML + x-frontcache-* headers
-        end
-        E->>E: store + resolve includes
-        E-->>U: page
-    end
-
-    Note over U,D: On content change
-    participant A as App (FrontCacheAgentCluster)
-    A->>E: invalidate(filter, site-key)
-    A->>J: invalidate(filter, site-key)
-```
 
 <img src="diagrams/07-multiregion-sequence.svg" alt="Multi-region request and invalidation sequence" width="850"/>
 
