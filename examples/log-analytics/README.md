@@ -6,7 +6,7 @@ Frontcache writes four logs under `FRONTCACHE_HOME/logs/`, one line per request 
 | --- | --- |
 | `frontcache-requests.log` | every request and every `<fc:include>` fragment — cache status, latency, bytes, client, bot flag |
 | `error.log` | errors, with stack traces |
-| `fallback.log` | every Hystrix fallback that was served, and where it came from |
+| `fallback.log` | every circuit-breaker fallback that was served, and where it came from |
 | `frontcache-failed-requests.log` | guard-rule rejections, redirects and dry-run matches, plus requests that completed through a fallback |
 
 They are readable with `grep`, and unreadable at volume. This example pulls them off your
@@ -133,13 +133,13 @@ indices, sincedb and pulled files consistent.
 Fed by `frontcache-failed-requests*.log`: everything a
 [guard rule](../../docs/guard-getting-started.md) did before cache or origin —
 rejected (400 / 414), redirected (301 / 302), or matched in dry-run — plus requests that
-completed through a Hystrix fallback. **`reject_reason` is the headline dimension: it holds the
+completed through a circuit-breaker fallback. **`reject_reason` is the headline dimension: it holds the
 rule name**, so a new rule appears in every panel without touching the dashboard.
 
 - **KPI tiles** — total guarded & failed requests, distinct client IPs, guard-action share
-  (rule acted vs Hystrix fallback), bot share.
+  (rule acted vs circuit-breaker fallback), bot share.
 - **Over time** — guard actions & failures by rule (stacked area) and by FC node.
-- **Breakdowns** — rule/reason pie and bar (top 10), guard-actions-vs-Hystrix-fallback pie,
+- **Breakdowns** — rule/reason pie and bar (top 10), guard-actions-vs-fallback pie,
   events by FC node, by domain, by country, and by HTTP status sent.
 - **Top-N tables** — top 20 client IPs (with per-reason columns and distinct-URL count), top 20
   URLs, top 10 user agents.
@@ -188,8 +188,15 @@ request log plus a trailing quoted reason, so everything above (including `geoip
 
 `http_status` is the status Frontcache actually sent, written as an extra unquoted column after
 the reason — on guard-action lines only, so grok matches it as an optional trailing group.
-Hystrix-fallback lines end at the reason: the response there is a normal (usually 200) fallback
+`hystrix-fallback` lines end at the reason: the response there is a normal (usually 200) fallback
 response. It is mapped as a `keyword` — a status code is a category, not a quantity.
+
+> **Two field names still say "hystrix", and are deliberate.** `hystrix_error` (the grok field,
+> the index-template mapping, and the dashboards' KQL) and the `hystrix-fallback` value of
+> `failure_type` are this example's own identifiers, baked into the Elasticsearch mappings and
+> the saved Kibana objects. Netflix Hystrix itself is long gone from Frontcache — the resilience
+> layer runs on Resilience4j — but the log column these read is positional and unchanged, so
+> renaming them here would only break existing indices and dashboards. Leave them.
 
 Note the filename: `frontcache-failed-requests*.log` does **not** match the request pipeline's
 `*frontcache-requests*.log` glob (nor the error pipeline, which excludes it explicitly), so each

@@ -1,5 +1,6 @@
 /.idea
 /.claude
+/_ignored
 CLAUDE.md
 
 # Build outputs and runtime state of the examples. None of this belongs in the repo: a fresh

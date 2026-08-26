@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="680" viewBox="0 0 680 510" role="img" font-family="sans-serif">
-<title>HTTP request flow through Hystrix commands in org.frontcache.hystrix</title>
+<title>HTTP request flow through resilience commands in org.frontcache.resilience</title>
 <desc>Requests enter FC_Total, branch to FC_ThroughCache for cacheable GETs or FC_BypassCache for other verbs; cache misses call origin via FC_ThroughCache_WebFilter or _HttpClient; origin failures and open circuits divert to the FallbackResolver.</desc>
 <defs>
 <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#73726c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
