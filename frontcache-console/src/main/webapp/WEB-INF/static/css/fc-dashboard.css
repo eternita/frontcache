@@ -93,8 +93,15 @@
 	height: 100%;
 }
 
+/* One continuous veil for the whole card, rather than a white background on each block of
+   numbers. The blocks are separated by margins, and a margin sits outside the background it
+   belongs to, so the per-block version left unveiled stripes across the chart - the widest of
+   them lands at the top of the bubble, which is why a green circle wore a dark green cap. The
+   bubble is a single flat colour; it has to be veiled uniformly to read as one. */
 .fc-dashboard .fc-circuit-body {
 	position: relative;
+	min-height: 100%;
+	background: rgba(255, 255, 255, 0.8);
 	pointer-events: none;
 }
 
@@ -106,14 +113,12 @@
 .fc-dashboard .fc-name {
 	font-weight: 700;
 	text-align: right;
-	background: rgba(255, 255, 255, 0.8);
 	padding-bottom: 5px;
 }
 
 .fc-dashboard .fc-counters {
 	text-align: right;
 	padding-bottom: 10px;
-	background: rgba(255, 255, 255, 0.8);
 }
 
 .fc-dashboard .fc-counters .fc-cell {
@@ -143,7 +148,6 @@
 .fc-dashboard .fc-rate {
 	text-align: right;
 	font-size: 11pt;
-	background: rgba(255, 255, 255, 0.8);
 	cursor: default;
 }
 
@@ -160,7 +164,6 @@
 	font-size: 9pt;
 	text-align: right;
 	padding-top: 4px;
-	background: rgba(255, 255, 255, 0.8);
 }
 
 /* the latency table */
@@ -169,7 +172,6 @@
 	font-size: 8pt;
 	border-collapse: collapse;
 	margin-top: 6px;
-	background: rgba(255, 255, 255, 0.8);
 }
 
 .fc-dashboard .fc-latency th {
@@ -195,8 +197,8 @@
 .fc-dashboard .fc-bad-request     { color: #20b2aa; }
 
 /* Navy rather than the vendored dashboard's steelblue. The chart sits BEHIND the card's
-   numbers, and those blocks carry an rgba(255,255,255,.8) background, so everything drawn
-   on the chart is seen through 80% white: an #rrggbb comes out at 204 + 0.2*c. That put
+   numbers, and .fc-circuit-body carries an rgba(255,255,255,.8) background, so everything
+   drawn on the chart is seen through 80% white: an #rrggbb comes out at 204 + 0.2*c. That put
    steelblue at a slightly HIGHER luminance than the veiled green bubble it crosses (+6),
    which is why the line disappeared over the circle. Navy lands 17 below it. The green
    channel is what does the work here - keeping it at 0 is what separates the line from

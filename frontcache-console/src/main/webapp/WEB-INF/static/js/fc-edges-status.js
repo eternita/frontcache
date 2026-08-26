@@ -90,28 +90,6 @@ var FcEdgesStatus = (function () {
 		return left + " / " + right;
 	}
 
-	// ---- the evictions rate ----------------------------------------------------------------------
-
-	/**
-	 * l1Evictions is a monotonic total since JVM start, and a total is not the interesting number - the
-	 * RATE is what says whether L1 is too small for the working set. So it is differenced here across
-	 * consecutive polls.
-	 *
-	 * Two guards, both of which happen in normal operation rather than in theory: there is no rate to
-	 * show until a second sample exists, and a node that restarted between polls resets its counter, so
-	 * a negative delta means "new process", not "negative evictions".
-	 */
-	function evictionRate(previous, current, elapsedMillis) {
-		if (!isKnown(previous) || !isKnown(current) || !(elapsedMillis > 0))
-			return null;
-
-		var delta = current - previous;
-		if (delta < 0)
-			return null;   // the node restarted; the next poll gives a real rate
-
-		return delta / (elapsedMillis / 1000);
-	}
-
 	// ---- rendering -------------------------------------------------------------------------------
 
 	function set(row, field, text) {
@@ -120,7 +98,7 @@ var FcEdgesStatus = (function () {
 			node.textContent = text;
 	}
 
-	function render(row, edge, rate) {
+	function render(row, edge) {
 
 		set(row, "uptime", uptime(edge.uptimeMillis));
 		set(row, "cachedEntries", count(edge.cachedAmount));
@@ -129,7 +107,6 @@ var FcEdgesStatus = (function () {
 		set(row, "l2", pair(count(edge.l2Entries) + (isKnown(edge.l2Entries) ? " items" : ""), bytes(edge.l2DiskBytes)));
 		set(row, "heap", pair(bytes(edge.heapUsedBytes), bytes(edge.heapMaxBytes)));
 		set(row, "cpu", percent(edge.cpuProcessLoad));
-		set(row, "evictions", (null === rate) ? "" : "evictions " + rate.toFixed(1) + "/s");
 
 		var offline = row.querySelector("[data-field='offline']");
 		if (offline)
@@ -153,7 +130,6 @@ var FcEdgesStatus = (function () {
 		this.root = root;
 		this.url = url;
 		this.intervalMs = intervalMs || DEFAULT_INTERVAL_MS;
-		this.previous = {};        // edge url -> { evictions, at }
 		this.timer = null;
 		this.inFlight = false;
 	}
@@ -165,19 +141,13 @@ var FcEdgesStatus = (function () {
 	Poller.prototype.apply = function (edges) {
 
 		var self = this;
-		var now = Date.now();
 
 		edges.forEach(function (edge) {
 			var row = self.rowFor(edge.url);
 			if (!row)
 				return;   // an edge added to the console since this page was rendered
 
-			var last = self.previous[edge.url];
-			var rate = last ? evictionRate(last.evictions, edge.l1Evictions, now - last.at) : null;
-
-			render(row, edge, rate);
-
-			self.previous[edge.url] = { evictions: edge.l1Evictions, at: now };
+			render(row, edge);
 		});
 	};
 
@@ -249,7 +219,7 @@ var FcEdgesStatus = (function () {
 		},
 
 		// exposed for tests
-		_format: { count: count, bytes: bytes, percent: percent, uptime: uptime, pair: pair, evictionRate: evictionRate }
+		_format: { count: count, bytes: bytes, percent: percent, uptime: uptime, pair: pair }
 	};
 
 })();

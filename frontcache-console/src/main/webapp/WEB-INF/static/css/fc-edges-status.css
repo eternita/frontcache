@@ -93,12 +93,6 @@
 	font-variant-numeric: tabular-nums;   /* so a changing number does not jitter its neighbours */
 }
 
-.fc-edges-status .fc-edge-note {
-	display: block;
-	font-size: 11px;
-	color: #aaa;
-}
-
 .fc-edges-status .fc-edge-offline {
 	font-size: 12px;
 	color: #c00;

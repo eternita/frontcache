@@ -39,8 +39,7 @@
                     <dd data-field="cacheSize">&mdash;</dd>
 
                     <dt>L1 (memory)</dt>
-                    <dd><span data-field="l1">&mdash;</span>
-                        <span class="fc-edge-note" data-field="evictions"></span></dd>
+                    <dd data-field="l1">&mdash;</dd>
 
                     <dt>L2 (Lucene)</dt>
                     <dd data-field="l2">&mdash;</dd>
