@@ -10,8 +10,17 @@ package org.frontcache.replication;
 
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.WebResponse;
@@ -44,6 +53,17 @@ public class CacheReplicator {
 	private final FrontCacheClient source;
 	private final FrontCacheClient target;
 
+	/**
+	 * How many entries are transferred at once.
+	 *
+	 * Kept at or below the per-route connection limit the clients are built with
+	 * (FrontCacheClient.CONNECTIONS_MAX_PER_ROUTE) - all traffic here goes to two nodes, i.e. two
+	 * routes, so a larger number would only queue on the connection pool instead.
+	 */
+	static final int DEFAULT_WORKER_COUNT = 8;
+
+	private int workerCount = DEFAULT_WORKER_COUNT;
+
 	private volatile boolean cancelled = false;
 	private volatile boolean running = false;
 
@@ -57,6 +77,14 @@ public class CacheReplicator {
 		this.source = source;
 		this.target = target;
 		this.result = new ReplicationResult(source.getFrontCacheURL(), target.getFrontCacheURL());
+	}
+
+	/**
+	 * Overrides how many entries are transferred concurrently. Values below 1 are clamped to 1, which
+	 * restores the pre-2.10 strictly-sequential behaviour.
+	 */
+	public void setWorkerCount(int workerCount) {
+		this.workerCount = Math.max(1, workerCount);
 	}
 
 	/**
@@ -167,44 +195,138 @@ public class CacheReplicator {
 		logger.info("Source has {} cached keys, diff = {} entries to transfer",
 				totalKeys, totalKeys - (int) targetKeys.size());
 
-		long transferred = 0;
+		// Keys already on the target cost nothing to resolve - no I/O - so they are counted here rather
+		// than occupying a worker.
 		long skipped = 0;
-		long errors = 0;
-
+		List<String> toTransfer = new ArrayList<String>();
 		for (String rawKey : sourceKeys) {
-			if (cancelled) {
-				logger.info("Replication cancelled by operator at {}/{} entries", transferred + skipped + errors, totalKeys);
-				break;
-			}
-
 			String key = rawKey.trim();
 			if (key.isEmpty())
 				continue;
 
-			if (targetKeys.contains(key)) {
+			if (targetKeys.contains(key))
 				skipped++;
-			} else {
-				boolean ok = transferEntry(key);
-				if (ok) {
+			else
+				toTransfer.add(key);
+		}
+		result.setSkipped(skipped);
+
+		transferInParallel(toTransfer, skipped, totalKeys, listener);
+	}
+
+	/**
+	 * Transfers the missing entries concurrently.
+	 *
+	 * Each entry is two synchronous HTTP round trips - a get from the source, a put to the target -
+	 * and they used to run strictly one after another. At a realistic 5ms per round trip a
+	 * 100 000-entry cache is about 17 minutes of pure latency, essentially all of it waiting.
+	 *
+	 * <b>Completions are consumed on THIS thread</b>, through an {@link ExecutorCompletionService}.
+	 * That is deliberate: {@link ReplicationResult}'s setters are plain, and a
+	 * {@link ReplicationProgressListener} is an interface the console implements, so neither can be
+	 * assumed thread safe. Only the two HTTP calls move to worker threads; every counter update and
+	 * every listener callback still happens on one thread, exactly as before.
+	 */
+	private void transferInParallel(List<String> keys, long skipped, int totalKeys,
+			ReplicationProgressListener listener) {
+
+		long transferred = 0;
+		long errors = 0;
+
+		if (keys.isEmpty()) {
+			if (null != listener)
+				listener.onProgress(transferred, skipped, errors, totalKeys - skipped);
+			return;
+		}
+
+		ExecutorService pool = Executors.newFixedThreadPool(Math.min(workerCount, keys.size()), new ThreadFactory() {
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread t = new Thread(r, "CacheReplicator-worker");
+				t.setDaemon(true); // replication must never hold up JVM shutdown
+				return t;
+			}
+		});
+
+		try {
+			CompletionService<TransferOutcome> completions = new ExecutorCompletionService<TransferOutcome>(pool);
+
+			int submitted = 0;
+			for (final String key : keys) {
+				if (cancelled)
+					break;
+
+				completions.submit(new Callable<TransferOutcome>() {
+					@Override
+					public TransferOutcome call() {
+						// checked again here: a task queued before the cancel should not still do its I/O
+						if (cancelled)
+							return null;
+						return new TransferOutcome(key, transferEntry(key));
+					}
+				});
+				submitted++;
+			}
+
+			for (int completed = 0; completed < submitted; completed++) {
+				TransferOutcome outcome;
+				try {
+					outcome = completions.take().get();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					logger.info("Replication interrupted at {}/{} entries", transferred + skipped + errors, totalKeys);
+					break;
+				} catch (ExecutionException e) {
+					// transferEntry() catches everything itself, so this is a defect rather than a
+					// transfer failure - count it as an error and carry on with the rest
+					logger.error("Replication task failed unexpectedly", e.getCause());
+					errors++;
+					continue;
+				}
+
+				if (null == outcome)
+					continue; // task saw the cancel flag and did nothing
+
+				if (outcome.ok) {
 					transferred++;
 				} else {
 					errors++;
 					if (listener != null) {
 						// best-effort: we don't have the original exception here,
 						// but the error is logged in transferEntry
-						listener.onError(key, new RuntimeException("putToCache failed for key: " + key));
+						listener.onError(outcome.key, new RuntimeException("putToCache failed for key: " + outcome.key));
 					}
 				}
-			}
 
-			// Update result counters and notify listener
-			result.setTransferred(transferred);
-			result.setSkipped(skipped);
-			result.setErrors(errors);
+				// Update result counters and notify listener
+				result.setTransferred(transferred);
+				result.setErrors(errors);
 
-			if (listener != null) {
-				listener.onProgress(transferred, skipped, errors, totalKeys - transferred - skipped - errors);
+				if (listener != null) {
+					listener.onProgress(transferred, skipped, errors, totalKeys - transferred - skipped - errors);
+				}
+
+				if (cancelled) {
+					logger.info("Replication cancelled by operator at {}/{} entries",
+							transferred + skipped + errors, totalKeys);
+					break;
+				}
 			}
+		} finally {
+			// shutdownNow: on cancel there may be queued tasks that must not start, and in-flight
+			// ones are bounded by the client's socket timeout
+			pool.shutdownNow();
+		}
+	}
+
+	/** What one transfer did, carried back to the consuming thread. */
+	private static final class TransferOutcome {
+		final String key;
+		final boolean ok;
+
+		TransferOutcome(String key, boolean ok) {
+			this.key = key;
+			this.ok = ok;
 		}
 	}
 

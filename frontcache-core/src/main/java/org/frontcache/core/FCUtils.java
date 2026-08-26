@@ -717,6 +717,15 @@ public class FCUtils {
 	}
 
 	public static Map<String, List<String>> buildRequestHeaders(HttpServletRequest request) {
+		return buildRequestHeaders(request, true);
+	}
+
+	/**
+	 * @param normalizeAcceptEncoding true to replace the client's Accept-Encoding with {@code gzip}
+	 *        (what every cacheable path wants - see below); false to forward the client's own, which
+	 *        only the bypass path does, and only when encoding passthrough is enabled
+	 */
+	public static Map<String, List<String>> buildRequestHeaders(HttpServletRequest request, boolean normalizeAcceptEncoding) {
 
 		Map<String, List<String>> headers = new HashMap<String, List<String>>();
 		Enumeration<String> headerNames = request.getHeaderNames();
@@ -746,8 +755,11 @@ public class FCUtils {
 		// it (ignoring Vary), and the include processor couldn't parse the compressed body.
 		// Forcing gzip means FC always holds plaintext; compression to the client is (re)applied
 		// at the edge (nginx / CDN).
-		headers.keySet().removeIf(name -> FCHeaders.ACCEPT_ENCODING.equalsIgnoreCase(name));
-		headers.put(FCHeaders.ACCEPT_ENCODING, new ArrayList<String>(Arrays.asList("gzip")));
+		if (normalizeAcceptEncoding)
+		{
+			headers.keySet().removeIf(name -> FCHeaders.ACCEPT_ENCODING.equalsIgnoreCase(name));
+			headers.put(FCHeaders.ACCEPT_ENCODING, new ArrayList<String>(Arrays.asList("gzip")));
+		}
 
 		return headers;
 	}

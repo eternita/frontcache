@@ -149,6 +149,31 @@ public class FrontCacheEngine {
 	// docs/frontcache-protection-tech-design.md.
 	private GuardRuleEngine guardRuleEngine = null;
 
+	/**
+	 * Whether a bypassed (non-cacheable) response keeps the origin's Content-Encoding.
+	 *
+	 * Off by default, and deliberately so for one release - it changes what goes on the wire.
+	 *
+	 * Frontcache forces {@code Accept-Encoding: gzip} to the origin and lets HttpClient transparently
+	 * decompress. On the CACHEABLE path that is required: the cached bytes have to be plaintext, or
+	 * the include processor cannot scan them and an encoding we cannot decode (br, zstd) would be
+	 * cached and served to clients that never asked for it. On the BYPASS path none of that applies -
+	 * the body is streamed straight through, never parsed and never cached - so the effect is that
+	 * Frontcache gunzips a response (CPU) and then ships it to the client uncompressed (bandwidth),
+	 * even when the client asked for gzip and the origin was willing to send it.
+	 *
+	 * Left off by default because an edge or CDN in front of Frontcache may be compressing today on
+	 * the assumption that what reaches it is identity; turning this on without checking that would
+	 * mean double compression.
+	 */
+	private static final String BYPASS_PASSTHROUGH_ENCODING_KEY = "front-cache.bypass.passthrough-encoding";
+	private boolean bypassPassthroughEncoding = false;
+
+	/** @return true when a bypassed response should keep the origin's Content-Encoding */
+	public boolean isBypassPassthroughEncoding() {
+		return bypassPassthroughEncoding;
+	}
+
 	private IncludeProcessor includeProcessor = null;
 
 	private CacheProcessor cacheProcessor = null;
@@ -413,6 +438,12 @@ public class FrontCacheEngine {
         logToHeadersConfig = "true".equals(FCConfig.getProperty("front-cache.log-to-headers", "false")) ? true : false;
 
         maxRequestURILength = getIntProperty("front-cache.max-request-uri-length", DEFAULT_MAX_REQUEST_URI_LENGTH);
+
+        bypassPassthroughEncoding = "true".equalsIgnoreCase(
+                FCConfig.getProperty(BYPASS_PASSTHROUGH_ENCODING_KEY, "false"));
+        if (bypassPassthroughEncoding)
+            logger.info("Bypass (non-cacheable) responses will pass the origin's Content-Encoding "
+                    + "through untouched (" + BYPASS_PASSTHROUGH_ENCODING_KEY + "=true)");
 
         // built from the current config; reload() rebuilds the engine, so it picks up both a changed
         // max-request-uri-length and an edited guard-rules.conf

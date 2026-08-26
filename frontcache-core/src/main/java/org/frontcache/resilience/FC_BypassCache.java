@@ -25,12 +25,15 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPatch;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.message.BasicHttpRequest;
+import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
@@ -121,7 +124,11 @@ public class FC_BypassCache extends FcCommand<Object> {
 
 			// stand alone mode
 
-			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request);
+			// With passthrough on, the client's own Accept-Encoding goes to the origin untouched -
+			// see FrontCacheEngine.isBypassPassthroughEncoding().
+			boolean passthroughEncoding = FrontCacheEngine.getFrontCache().isBypassPassthroughEncoding();
+
+			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request, !passthroughEncoding);
 			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{context.getClientIP()}));
 
 			String verb = request.getMethod();
@@ -129,7 +136,7 @@ public class FC_BypassCache extends FcCommand<Object> {
 			String uri = context.getRequestURI();
 
 			try {
-				HttpResponse response = forward(client, verb, uri, request, headers, requestEntity);
+				HttpResponse response = forward(client, verb, uri, request, headers, requestEntity, passthroughEncoding);
 
 				// response 2 context
 				setResponse(response);
@@ -205,6 +212,12 @@ public class FC_BypassCache extends FcCommand<Object> {
 	HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
 			Map<String, List<String>> headers, InputStream requestEntity)
 					throws Exception {
+		return forward(httpclient, verb, uri, request, headers, requestEntity, false);
+	}
+
+	HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
+			Map<String, List<String>> headers, InputStream requestEntity, boolean passthroughEncoding)
+					throws Exception {
 
 		URL host = context.getOriginURL();
 		HttpHost httpHost = FCUtils.getHttpHost(host);
@@ -234,6 +247,20 @@ public class FC_BypassCache extends FcCommand<Object> {
 
 		try {
 			httpRequest.setHeaders(FCUtils.convertHeaders(headers));
+
+			if (passthroughEncoding)
+			{
+				// Leave the client's Accept-Encoding alone AND stop HttpClient from decompressing the
+				// response, so the origin's Content-Encoding and its compressed bytes reach the client
+				// untouched. Applied through the context because the GET branch above builds a
+				// BasicHttpRequest, which has no setConfig() of its own.
+				HttpClientContext httpContext = HttpClientContext.create();
+				httpContext.setRequestConfig(RequestConfig.copy(RequestConfig.DEFAULT)
+						.setContentCompressionEnabled(false)
+						.build());
+				return httpclient.execute(httpHost, httpRequest, httpContext);
+			}
+
 			// Always advertise gzip (and only gzip) to the origin. Our HttpClient transparently
 			// decodes gzip, so Frontcache always receives plaintext it can parse/cache and never an
 			// encoding it cannot handle (e.g. br/zstd). buildRequestHeaders() normalizes this too;
