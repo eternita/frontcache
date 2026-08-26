@@ -8,10 +8,10 @@
  */
 package org.frontcache.resilience;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -63,7 +63,19 @@ public abstract class FcCommand<T> {
 	private final FcCommandConfig config;
 	private final FcCommandMetrics metrics;
 
-	private final List<FcEventType> executionEvents = new CopyOnWriteArrayList<FcEventType>();
+	/**
+	 * This execution's events, in order.
+	 *
+	 * A plain ArrayList guarded by its own monitor, not a CopyOnWriteArrayList. COW copies the whole
+	 * backing array on every {@code add} - so it paid a copy for each of the two to four events every
+	 * command records, on every request, to optimise for concurrent iteration that does not happen
+	 * here: every {@code recordEvent} runs on the thread that called {@code execute()}, and so does
+	 * every read (getFallback() is invoked from execute()'s own catch block).
+	 *
+	 * The synchronization is kept anyway - it is uncontended and nearly free, and it means a future
+	 * caller reading this from another thread sees a consistent list rather than a torn one.
+	 */
+	private final List<FcEventType> executionEvents = new ArrayList<FcEventType>(4);
 	private volatile Throwable failedExecutionException = null;
 
 	protected FcCommand(Setter setter) {
@@ -132,7 +144,7 @@ public abstract class FcCommand<T> {
 		// Only the semaphore path is watched. The thread path has a real TimeLimiter, so watching it too
 		// would report the same overrun twice. See proposal section 6.2.
 		long budgetMs = (Isolation.SEMAPHORE == config.getIsolation()) ? config.getTimeoutMs() : 0;
-		long executionId = metrics.markStart(budgetMs, getExecutionDescription());
+		FcCommandMetrics.InFlight execution = metrics.markStart(budgetMs, getExecutionDescription());
 		long startNanos = System.nanoTime();
 
 		try {
@@ -155,7 +167,7 @@ public abstract class FcCommand<T> {
 			return resolveFallback(failure, cause);
 		} finally {
 			metrics.recordLatency(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
-			metrics.markEnd(executionId);
+			metrics.markEnd(execution);
 		}
 	}
 
@@ -222,7 +234,9 @@ public abstract class FcCommand<T> {
 
 	private void recordEvent(FcEventType event)
 	{
-		executionEvents.add(event);
+		synchronized (executionEvents) {
+			executionEvents.add(event);
+		}
 		metrics.markEvent(event);
 	}
 
@@ -272,7 +286,12 @@ public abstract class FcCommand<T> {
 	 */
 	public List<FcEventType> getExecutionEvents()
 	{
-		return Collections.unmodifiableList(executionEvents);
+		// A snapshot, not a view: the list is no longer copy-on-write, so handing out a live view would
+		// let an iteration race a concurrent add. Only the failure/fallback paths call this - a
+		// successful command never does - so the copy is not on the hot path.
+		synchronized (executionEvents) {
+			return Collections.unmodifiableList(new ArrayList<FcEventType>(executionEvents));
+		}
 	}
 
 	/** Null unless run() itself threw - see the class javadoc. */

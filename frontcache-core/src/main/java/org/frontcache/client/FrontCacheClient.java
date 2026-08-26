@@ -38,6 +38,7 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
@@ -84,6 +85,28 @@ public class FrontCacheClient {
 	public static int CONNECTION_TIMEOUT = 5000;
 
 
+	/**
+	 * Connections this client may hold, in total and per target node.
+	 *
+	 * Set explicitly because {@code HttpClients.custom()} otherwise installs Apache's defaults -
+	 * <b>20 total, 2 per route</b>. Two per route is the binding constraint here: every call from this
+	 * client goes to ONE node, so it is a hard ceiling of two concurrent management calls no matter how
+	 * many threads ask. Cache replication (which issues a get + a put per key) and the console's
+	 * fan-out across edges both run into it.
+	 *
+	 * FrontCacheEngine.newClient() has always sized its pool deliberately for the same reason; this
+	 * brings the management/replication clients in line.
+	 */
+	private static final int CONNECTIONS_MAX_TOTAL = 64;
+	private static final int CONNECTIONS_MAX_PER_ROUTE = 32;
+
+	private static PoolingHttpClientConnectionManager newConnectionManager() {
+		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+		connectionManager.setMaxTotal(CONNECTIONS_MAX_TOTAL);
+		connectionManager.setDefaultMaxPerRoute(CONNECTIONS_MAX_PER_ROUTE);
+		return connectionManager;
+	}
+
 	private FrontCacheClient(String frontcacheURL) {
 		final RequestConfig requestConfig = RequestConfig.custom()
 				.setSocketTimeout(CONNECTION_TIMEOUT)
@@ -110,6 +133,7 @@ public class FrontCacheClient {
 	    };
 
 	    client = HttpClients.custom()
+				.setConnectionManager(newConnectionManager())
 				.setDefaultRequestConfig(requestConfig)
 				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
 				.setKeepAliveStrategy(keepAliveStrategy)
@@ -788,7 +812,7 @@ public class FrontCacheClient {
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 
-		StringBuffer result = new StringBuffer();
+		StringBuilder result = new StringBuilder();
 		CloseableHttpResponse response = (CloseableHttpResponse) client.execute(post);
 		try {
 			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));

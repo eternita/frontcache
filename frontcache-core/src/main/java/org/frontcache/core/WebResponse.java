@@ -11,11 +11,14 @@ package org.frontcache.core;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.frontcache.cache.CacheProcessor;
 
@@ -95,6 +98,18 @@ public class WebResponse implements Serializable {
 		this.content = content;
 		setExpireTime(maxAgeStr);
 		this.refreshType = refreshType;
+	}
+
+	/**
+	 * Builds an instance WITHOUT parsing a maxAge - for {@link #copy()}, which replaces the whole
+	 * expireTimeMap on the next line anyway.
+	 *
+	 * The marker argument exists only to keep this distinct from {@link #WebResponse()}, which does
+	 * parse (via {@code this("dummy", null, null, null)}) and so cannot be reused here.
+	 */
+	private WebResponse(boolean skipExpireTimeParsing) {
+		super();
+		this.headers = new HashMap<String, List<String>>();
 	}
 
 	public int getStatusCode() {
@@ -306,11 +321,29 @@ public class WebResponse implements Serializable {
 	}
 
     /**
+     * A shallow copy: the content {@code byte[]} is SHARED, not cloned. That is deliberate and is what
+     * keeps a cache hit from duplicating the whole page - the copy exists so that
+     * {@code putToCache}'s in-place header strip, and the response headers a caller adds, do not reach
+     * the instance held in the cache.
      *
-     * @return
+     * Two things here were wrong rather than merely slow, and both are fixed:
+     *
+     * <ul>
+     * <li>the header map came back as a plain {@code HashMap}. Every map built by
+     *     {@code FCUtils.revertHeaders} is a {@code TreeMap(String.CASE_INSENSITIVE_ORDER)}, because
+     *     header names are case-insensitive (RFC 7230) and intermediaries re-case them - so copying
+     *     into a HashMap silently made the copy case-SENSITIVE, and a re-cased {@code Content-Type}
+     *     stopped resolving on it. The comparator is preserved now;</li>
+     * <li>it routed through {@code new WebResponse(url, content)}, whose constructor calls
+     *     {@code setExpireTime(null)} - a trim, four {@code endsWith} checks and an
+     *     {@code Integer.parseInt} in {@link FCUtils#maxAgeStr2Int} - to populate an expireTimeMap that
+     *     the very next line overwrote. This runs on every cache hit.</li>
+     * </ul>
      */
     public WebResponse copy() {
-    	WebResponse copy = new WebResponse(this.url, this.content);
+    	WebResponse copy = new WebResponse(true); // no maxAge parsing - the map below replaces it wholesale
+    	copy.url = this.url;
+    	copy.content = this.content;
     	copy.expireTimeMap.putAll(this.getExpireTimeMap());
     	copy.statusCode = this.statusCode;
     	copy.refreshType = this.refreshType;
@@ -319,14 +352,28 @@ public class WebResponse implements Serializable {
 
     	if (null != headers)
     	{
-    		copy.headers = new HashMap<String, List<String>>(); //ArrayListValuedHashMap<String, String>();
+    		// same comparator as the source, so a case-insensitive map stays case-insensitive
+    		copy.headers = newHeaderMapLike(this.headers);
 
-    		for (String name : this.headers.keySet())
-    			for (String value : headers.get(name))
-    				copy.addHeader(name, value);
+    		for (Map.Entry<String, List<String>> header : this.headers.entrySet())
+    			copy.headers.put(header.getKey(), new ArrayList<String>(header.getValue()));
     	}
 
         return copy;
+    }
+
+    /**
+     * An empty header map with the same ordering/equality semantics as {@code source} - which for
+     * everything that came through {@code FCUtils.revertHeaders} means case-insensitive.
+     */
+    private static Map<String, List<String>> newHeaderMapLike(Map<String, List<String>> source) {
+    	if (source instanceof SortedMap)
+    	{
+    		Comparator<? super String> comparator = ((SortedMap<String, List<String>>) source).comparator();
+    		if (null != comparator)
+    			return new TreeMap<String, List<String>>(comparator);
+    	}
+    	return new HashMap<String, List<String>>();
     }
 
 	/**

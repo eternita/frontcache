@@ -114,9 +114,10 @@ public class L1L2CacheStatsTest {
 	}
 
 	/**
-	 * The reason {@code getIndexSizeFast()} exists. {@code getIndexSize()} opens a fresh FSDirectory and
-	 * DirectoryReader per call - acceptable for a console page, not for a scrape every few seconds
-	 * forever. This pins that the cheap path is actually used and agrees with the expensive one.
+	 * The reason {@code getIndexSizeFast()} exists: it reads the writer's own doc stats, where
+	 * {@code getIndexSize()} goes through the shared near-real-time searcher (and, before that, opened
+	 * a fresh FSDirectory and DirectoryReader per call). This pins that the cheap path is actually used
+	 * and agrees with the reader-based one.
 	 */
 	@Test
 	public void theCheapDocCountAgreesWithTheExpensiveOne()

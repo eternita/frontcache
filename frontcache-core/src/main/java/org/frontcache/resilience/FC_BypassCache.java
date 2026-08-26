@@ -14,6 +14,7 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,12 +25,15 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPatch;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.message.BasicHttpRequest;
+import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
@@ -39,6 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FC_BypassCache extends FcCommand<Object> {
+
+	// Compiled once. This runs on EVERY bypassed (non-cacheable) request, and String.replaceAll()
+	// compiles its pattern each time it is called.
+	private static final Pattern DUPLICATE_SLASHES = Pattern.compile("/{2,}");
 
 	private final HttpClient client;
 	private final RequestContext context;
@@ -116,15 +124,19 @@ public class FC_BypassCache extends FcCommand<Object> {
 
 			// stand alone mode
 
-			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request);
-			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{FCUtils.getClientIP(context.getRequest())}));
+			// With passthrough on, the client's own Accept-Encoding goes to the origin untouched -
+			// see FrontCacheEngine.isBypassPassthroughEncoding().
+			boolean passthroughEncoding = FrontCacheEngine.getFrontCache().isBypassPassthroughEncoding();
+
+			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request, !passthroughEncoding);
+			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{context.getClientIP()}));
 
 			String verb = request.getMethod();
 			InputStream requestEntity = getRequestBody(request);
 			String uri = context.getRequestURI();
 
 			try {
-				HttpResponse response = forward(client, verb, uri, request, headers, requestEntity);
+				HttpResponse response = forward(client, verb, uri, request, headers, requestEntity, passthroughEncoding);
 
 				// response 2 context
 				setResponse(response);
@@ -200,10 +212,16 @@ public class FC_BypassCache extends FcCommand<Object> {
 	HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
 			Map<String, List<String>> headers, InputStream requestEntity)
 					throws Exception {
+		return forward(httpclient, verb, uri, request, headers, requestEntity, false);
+	}
+
+	HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
+			Map<String, List<String>> headers, InputStream requestEntity, boolean passthroughEncoding)
+					throws Exception {
 
 		URL host = context.getOriginURL();
 		HttpHost httpHost = FCUtils.getHttpHost(host);
-		uri = (host.getPath() + uri).replaceAll("/{2,}", "/");
+		uri = DUPLICATE_SLASHES.matcher(host.getPath() + uri).replaceAll("/");
 
 		HttpRequest httpRequest;
 		switch (verb.toUpperCase()) {
@@ -229,6 +247,20 @@ public class FC_BypassCache extends FcCommand<Object> {
 
 		try {
 			httpRequest.setHeaders(FCUtils.convertHeaders(headers));
+
+			if (passthroughEncoding)
+			{
+				// Leave the client's Accept-Encoding alone AND stop HttpClient from decompressing the
+				// response, so the origin's Content-Encoding and its compressed bytes reach the client
+				// untouched. Applied through the context because the GET branch above builds a
+				// BasicHttpRequest, which has no setConfig() of its own.
+				HttpClientContext httpContext = HttpClientContext.create();
+				httpContext.setRequestConfig(RequestConfig.copy(RequestConfig.DEFAULT)
+						.setContentCompressionEnabled(false)
+						.build());
+				return httpclient.execute(httpHost, httpRequest, httpContext);
+			}
+
 			// Always advertise gzip (and only gzip) to the origin. Our HttpClient transparently
 			// decodes gzip, so Frontcache always receives plaintext it can parse/cache and never an
 			// encoding it cannot handle (e.g. br/zstd). buildRequestHeaders() normalizes this too;

@@ -361,19 +361,63 @@ public class FcMetricsExport {
 				.strongReference(true)
 				.register(registry);
 
-		Gauge.builder("command.latency.seconds", metrics, m -> m.getLatencyMean() / 1000.0)
+		// Seven latency gauges, ONE merge of the rolling histogram ring between them. Micrometer calls
+		// each gauge's lambda separately, so reading them straight off the metrics object meant seven
+		// full merges per command per scrape - each allocating a ~10k-counter Histogram, and six of them
+		// also building a nine-entry map only to pull one value out of it.
+		final LatencySnapshotCache latency = new LatencySnapshotCache(metrics);
+
+		Gauge.builder("command.latency.seconds", latency, c -> c.get().getMean() / 1000.0)
 				.description("Mean command latency over the rolling window")
 				.tags(commandTag.and("quantile", "mean"))
 				.strongReference(true)
 				.register(registry);
 
 		for (final String percentile : new String[] { "50", "90", "95", "99", "99.5", "100" })
-			Gauge.builder("command.latency.seconds", metrics,
-							m -> value(m.getLatencyPercentiles().get(percentile)) / 1000.0)
+			Gauge.builder("command.latency.seconds", latency,
+							c -> value(c.get().getPercentiles().get(percentile)) / 1000.0)
 					.description("Command latency percentile over the rolling window")
 					.tags(commandTag.and("quantile", percentile))
 					.strongReference(true)
 					.register(registry);
+	}
+
+	/**
+	 * Holds one command's latency snapshot for long enough that the seven gauges of a single scrape
+	 * share it.
+	 *
+	 * The TTL exists only to span a scrape, not to smooth the data: it is far shorter than any sane
+	 * scrape interval, so consecutive scrapes always see a fresh merge. The lambdas Micrometer holds
+	 * reference this object, which is why the gauges are registered against it - with
+	 * strongReference(true), as before, so it is not collected out from under the registry.
+	 *
+	 * Racy by construction: two threads scraping at once may both merge, and the second overwrites the
+	 * first. The cost of that is one redundant merge, and the numbers are equally valid either way.
+	 */
+	private static final class LatencySnapshotCache {
+
+		/** Long enough to cover one scrape's seven reads, far shorter than any scrape interval. */
+		private static final long TTL_NANOS = 1_000_000_000L; // 1s
+
+		private final FcCommandMetrics metrics;
+		private volatile FcCommandMetrics.LatencySnapshot snapshot;
+		private volatile long takenNanos;
+
+		LatencySnapshotCache(FcCommandMetrics metrics) {
+			this.metrics = metrics;
+		}
+
+		FcCommandMetrics.LatencySnapshot get() {
+			FcCommandMetrics.LatencySnapshot current = snapshot;
+			long now = System.nanoTime();
+			if (null == current || TTL_NANOS < now - takenNanos)
+			{
+				current = metrics.latencySnapshot();
+				snapshot = current;
+				takenNanos = now;
+			}
+			return current;
+		}
 	}
 
 	private synchronized void bindThreadPools()

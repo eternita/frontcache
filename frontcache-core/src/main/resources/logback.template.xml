@@ -76,6 +76,50 @@
 
 
 
+
+	<!-- ================= Async wrappers for the per-request logs =================
+
+	     These appenders carry one line per REQUEST and one per INCLUDE, at TRACE, which is their
+	     normal traffic rather than a debug setting. As plain RollingFileAppenders they are
+	     SYNCHRONOUS: the write and its flush happened on the Jetty thread that was trying to serve
+	     the response, and every thread logging at once contended on the appender's own lock. Log
+	     rolling - reopening the file, and zipping the previous day's - happened there too.
+
+	     Wrapping them hands the event to a queue and returns; one worker thread does the I/O.
+
+	       discardingThreshold MUST be 0. Logback's default (queueSize/5) drops TRACE/DEBUG/INFO
+	       events once the queue is 80% full - and these logs are ENTIRELY TRACE, so the default
+	       would silently discard request-log lines under exactly the load worth logging.
+
+	       neverBlock stays false, so a saturated queue applies back-pressure instead of losing
+	       lines. This is analytics-grade data; slowing down beats going quiet.
+
+	       includeCallerData stays false. Capturing it would take a stack trace per event, which
+	       costs far more than the write this is removing - and the format uses none of it.
+
+	     immediateFlush is deliberately left ON in the file appenders above. Turning it off buys
+	     more throughput but leaves up to a buffer's worth of lines invisible to anything tailing
+	     or shipping the file, which is not a trade to make silently. Add
+	     <immediateFlush>false</immediateFlush> to an appender if you want it.
+	     ========================================================================== -->
+
+	<appender name="AsyncRequestLogger" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>8192</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+		<includeCallerData>false</includeCallerData>
+		<appender-ref ref="ReguestLoggerFile" />
+	</appender>
+
+	<appender name="AsyncFailedRequestLogger" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>8192</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+		<includeCallerData>false</includeCallerData>
+		<appender-ref ref="FailedRequestLoggerFile" />
+	</appender>
+
+
 	<root>
 		<appender-ref ref="Error" />
 		<appender-ref ref="Info" />	
@@ -85,14 +129,20 @@
 	<!-- for request logger -->
 	<logger name="org.frontcache.reqlog.RequestLogger">
 	    <level value="TRACE" />
-		<appender-ref ref="ReguestLoggerFile" />
+		<appender-ref ref="AsyncRequestLogger" />
 	</logger>
 
 	<!-- for non-successful requests only (additivity=false -> kept out of the root/info logs) -->
 	<logger name="frontcache.failed-requests" additivity="false">
 	    <level value="TRACE" />
-		<appender-ref ref="FailedRequestLoggerFile" />
+		<appender-ref ref="AsyncFailedRequestLogger" />
 	</logger>
 
+
+
+	<!-- Drains the async queues on JVM shutdown. Without it, whatever is still queued when the
+	     process exits is simply lost - which for a per-request log is the tail of the traffic
+	     right before a restart, i.e. the part most likely to be interesting. -->
+	<shutdownHook class="ch.qos.logback.core.hook.DefaultShutdownHook"/>
 
 </configuration>

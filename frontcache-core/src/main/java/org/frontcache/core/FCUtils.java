@@ -176,9 +176,11 @@ public class FCUtils {
 
 		// add header with client IP - unless it was already resolved on the request thread (async
 		// includes pre-resolve it there, before the servlet request is recycled; see
-		// ConcurrentIncludeProcessor.parseIncludes). getClientIP is null/recycle-safe either way.
+		// ConcurrentIncludeProcessor.parseIncludes). The context caches the value the engine stamped
+		// in init(), so this is a map read rather than another 13-header scan, and it is still the
+		// right answer on a worker thread whose servlet request has been recycled.
 		if (!requestHeaders.containsKey(FCHeaders.X_FRONTCACHE_CLIENT_IP))
-			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, getClientIP(context.getRequest()));
+			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, context.getClientIP());
 
 		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
     }
@@ -325,6 +327,33 @@ public class FCUtils {
 		return webResponse;
 	}
 
+	/** Read buffer for pulling an origin body. 4000 bytes was under one TCP window's worth per read. */
+	private static final int ORIGIN_READ_BUFFER_SIZE = 16 * 1024;
+
+	/** Fallback capacity when the origin declares no usable Content-Length. */
+	private static final int ORIGIN_BODY_DEFAULT_CAPACITY = 16 * 1024;
+
+	/**
+	 * Initial capacity for the buffer collecting an origin body.
+	 *
+	 * Capped, because Content-Length is attacker-influenced in the general case and a declared
+	 * multi-gigabyte length must not become a multi-gigabyte allocation up front - the buffer still
+	 * grows to fit a genuinely large body, just from a sane starting point.
+	 */
+	private static final int ORIGIN_BODY_MAX_PREALLOC = 8 * 1024 * 1024;
+
+	private static int originBodyCapacity(HttpEntity entity)
+	{
+		if (null == entity)
+			return 32; // no body coming - do not allocate for one
+
+		long contentLength = entity.getContentLength(); // -1 when unknown (e.g. chunked)
+		if (0 < contentLength && contentLength <= ORIGIN_BODY_MAX_PREALLOC)
+			return (int) contentLength;
+
+		return ORIGIN_BODY_DEFAULT_CAPACITY;
+	}
+
 	public static WebResponse httpResponse2WebComponent(String url, HttpResponse response, RequestContext context) throws FrontCacheException, IOException
 	{
 
@@ -340,22 +369,27 @@ public class FCUtils {
 		WebResponse webResponse = null;
 
 		byte[] respData = null;
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		// entity is null for bodyless responses (e.g. 304 Not Modified from a conditional request,
 		// or 204 No Content). Guard it - dereferencing getContent() on null NPEs, which would escape
 		// run() as a command FAILURE and serve a fallback instead of relaying the bodyless response.
 		HttpEntity entity = response.getEntity();
+		// Sized from Content-Length when the origin gives a usable one. The default ByteArrayOutputStream
+		// starts at 32 bytes and doubles, so a 200 KB page used to take ~13 reallocations, each copying
+		// everything accumulated so far - roughly 400 KB of copying to collect 200 KB.
+		ByteArrayOutputStream baos = new ByteArrayOutputStream(originBodyCapacity(entity));
 		if (null != entity)
 		{
 			InputStream is = entity.getContent();
 			try {
 				int bytesRead = 0;
-	            int bufferSize = 4000;
-		         byte[] byteBuffer = new byte[bufferSize];
-		         while ((bytesRead = is.read(byteBuffer)) != -1) {
-		             baos.write(byteBuffer, 0, bytesRead);
-		         }
+				byte[] byteBuffer = new byte[ORIGIN_READ_BUFFER_SIZE];
+				while ((bytesRead = is.read(byteBuffer)) != -1) {
+					baos.write(byteBuffer, 0, bytesRead);
+				}
 			} catch (Exception e) {
+				// Deliberately still swallowed: a failed/truncated read degrades to whatever was read,
+				// exactly as before. Caching a truncated page is a real problem, but it is a behaviour
+				// question, not a performance one - see the perf proposal, section 4.5.
 				e.printStackTrace();
 			}
 		}
@@ -494,11 +528,13 @@ public class FCUtils {
         {
         	// add parameters for storing
         	// POST method parameters are not stored because they can be huge (e.g. file upload)
-        	StringBuffer sb = new StringBuffer(requestURL);
-        	if (!request.getParameterMap().isEmpty())
-        		sb.append("?").append(request.getQueryString());
-
-        	requestURL = sb.toString();
+        	//
+        	// Asked via getQueryString(), not getParameterMap(). The latter makes the container parse
+        	// and materialise the entire parameter map, solely to learn whether the query string is
+        	// empty - which getQueryString() answers on its own.
+        	String queryString = request.getQueryString();
+        	if (null != queryString && !queryString.isEmpty())
+        		requestURL = requestURL + "?" + queryString;
         }
         return requestURL;
 	}
@@ -617,7 +653,7 @@ public class FCUtils {
 			try {
 				Map<String, List<String>> parameterMap = splitQueryParameters(queryParams);
 
-				StringBuffer queryParamsSB = new StringBuffer("");
+				StringBuilder queryParamsSB = new StringBuilder(queryParams.length() + 16);
 
 				for (String key : parameterMap.keySet())
 				{
@@ -681,6 +717,15 @@ public class FCUtils {
 	}
 
 	public static Map<String, List<String>> buildRequestHeaders(HttpServletRequest request) {
+		return buildRequestHeaders(request, true);
+	}
+
+	/**
+	 * @param normalizeAcceptEncoding true to replace the client's Accept-Encoding with {@code gzip}
+	 *        (what every cacheable path wants - see below); false to forward the client's own, which
+	 *        only the bypass path does, and only when encoding passthrough is enabled
+	 */
+	public static Map<String, List<String>> buildRequestHeaders(HttpServletRequest request, boolean normalizeAcceptEncoding) {
 
 		Map<String, List<String>> headers = new HashMap<String, List<String>>();
 		Enumeration<String> headerNames = request.getHeaderNames();
@@ -710,8 +755,11 @@ public class FCUtils {
 		// it (ignoring Vary), and the include processor couldn't parse the compressed body.
 		// Forcing gzip means FC always holds plaintext; compression to the client is (re)applied
 		// at the edge (nginx / CDN).
-		headers.keySet().removeIf(name -> FCHeaders.ACCEPT_ENCODING.equalsIgnoreCase(name));
-		headers.put(FCHeaders.ACCEPT_ENCODING, new ArrayList<String>(Arrays.asList("gzip")));
+		if (normalizeAcceptEncoding)
+		{
+			headers.keySet().removeIf(name -> FCHeaders.ACCEPT_ENCODING.equalsIgnoreCase(name));
+			headers.put(FCHeaders.ACCEPT_ENCODING, new ArrayList<String>(Arrays.asList("gzip")));
+		}
 
 		return headers;
 	}
@@ -733,22 +781,39 @@ public class FCUtils {
 	}
 
 
-	public static void writeResponse(InputStream zin, OutputStream out) throws Exception {
-		byte[] bytes = new byte[1024];
-		int bytesRead = -1;
-		while ((bytesRead = zin.read(bytes)) != -1) {
-			try {
-				out.write(bytes, 0, bytesRead);
-				out.flush();
-			}
-			catch (IOException ex) {
-				ex.printStackTrace();
-			}
-			// doubles buffer size if previous read filled it
-			if (bytesRead == bytes.length) {
-				bytes = new byte[bytes.length * 2];
-			}
-		}
+	/**
+	 * Size of the copy buffer used to stream an origin body to the client. Fixed, and large enough
+	 * that a typical page moves in a handful of writes.
+	 */
+	private static final int STREAM_COPY_BUFFER_SIZE = 16 * 1024;
+
+	/**
+	 * Streams {@code in} to {@code out}. Neither is closed or flushed here - every caller already does
+	 * that in a {@code finally}.
+	 *
+	 * The previous version had three problems, all of them on the path that streams a bypassed origin
+	 * response to the client:
+	 *
+	 * <ul>
+	 * <li>it called {@code out.flush()} after EVERY chunk, so a 5 MB download meant thousands of
+	 *     flushes - a write syscall each, and a chunked-transfer boundary on the wire;</li>
+	 * <li>the buffer started at 1 KB and DOUBLED every time a read filled it, with no ceiling -
+	 *     allocating and abandoning 2 KB, 4 KB, ... up to megabytes while streaming from a fast
+	 *     origin;</li>
+	 * <li>it caught IOException INSIDE the loop and printed a stack trace. A client disconnect
+	 *     (broken pipe) was therefore swallowed, and the loop kept pulling the whole origin body into
+	 *     a socket nobody was listening to, printing a trace per kilobyte.</li>
+	 * </ul>
+	 *
+	 * The IOException now propagates: the callers' {@code finally} blocks release the pooled origin
+	 * connection, and a disconnected client should end the transfer rather than be written to 5000
+	 * more times.
+	 */
+	public static void writeResponse(InputStream in, OutputStream out) throws IOException {
+		byte[] buffer = new byte[STREAM_COPY_BUFFER_SIZE];
+		int bytesRead;
+		while (-1 != (bytesRead = in.read(buffer)))
+			out.write(buffer, 0, bytesRead);
 	}
 
 	/**

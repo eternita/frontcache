@@ -75,6 +75,11 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	private static final String L2_MAX_MERGED_SEGMENT_MB_KEY = "front-cache.cache-processor.impl.l2.max-merged-segment-mb";
 	private static final String L2_DELETES_PCT_ALLOWED_KEY = "front-cache.cache-processor.impl.l2.deletes-pct-allowed";
 
+	// L2 Lucene commit / visibility tuning - see LuceneIndexManager.Tuning for what each one trades.
+	private static final String L2_COMMIT_INTERVAL_MS_KEY = "front-cache.cache-processor.impl.l2.commit-interval-ms";
+	private static final String L2_REFRESH_ON_WRITE_KEY = "front-cache.cache-processor.impl.l2.refresh-on-write";
+	private static final String L2_REFRESH_INTERVAL_MS_KEY = "front-cache.cache-processor.impl.l2.refresh-interval-ms";
+
 	private static String CACHE_RELATIVE_DIR = "cache/l2-lucene-index/";
 
 	private static String INDEX_BASE_DIR = CACHE_BASE_DIR_DEFAULT + CACHE_RELATIVE_DIR;
@@ -155,9 +160,16 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		double maxMergedSegmentMB = getDoubleProperty(properties, L2_MAX_MERGED_SEGMENT_MB_KEY, LuceneIndexManager.DEFAULT_MAX_MERGED_SEGMENT_MB);
 		double deletesPctAllowed = getDoubleProperty(properties, L2_DELETES_PCT_ALLOWED_KEY, LuceneIndexManager.DEFAULT_DELETES_PCT_ALLOWED);
 
+		LuceneIndexManager.Tuning tuning = new LuceneIndexManager.Tuning(
+				maxMergedSegmentMB,
+				deletesPctAllowed,
+				getLongProperty(properties, L2_COMMIT_INTERVAL_MS_KEY, LuceneIndexManager.Tuning.DEFAULT_COMMIT_INTERVAL_MS),
+				getBooleanProperty(properties, L2_REFRESH_ON_WRITE_KEY, true),
+				getLongProperty(properties, L2_REFRESH_INTERVAL_MS_KEY, LuceneIndexManager.Tuning.DEFAULT_REFRESH_INTERVAL_MS));
+
 		// getInstance(), never new: one manager (hence one IndexWriter) per index dir, so a duplicate
 		// cache processor can't leave a second, permanently lock-starved writer behind.
-		luceneIndexManager = LuceneIndexManager.getInstance(INDEX_BASE_DIR, maxMergedSegmentMB, deletesPctAllowed);
+		luceneIndexManager = LuceneIndexManager.getInstance(INDEX_BASE_DIR, tuning);
 	}
 
 	/**
@@ -174,6 +186,39 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 			logger.warn("Can't parse {}='{}' as a number - using default {}", key, raw, defaultValue);
 			return defaultValue;
 		}
+	}
+
+	/**
+	 * Reads a long-valued property, falling back to the default (with a warning) if it is
+	 * absent or unparseable.
+	 */
+	private long getLongProperty(Properties properties, String key, long defaultValue) {
+		String raw = properties.getProperty(key);
+		if (null == raw)
+			return defaultValue;
+		try {
+			return Long.parseLong(raw.trim());
+		} catch (NumberFormatException e) {
+			logger.warn("Can't parse {}='{}' as a number - using default {}", key, raw, defaultValue);
+			return defaultValue;
+		}
+	}
+
+	/**
+	 * Reads a boolean-valued property. Anything other than an explicit {@code true}/{@code false}
+	 * warns and falls back, rather than silently reading as false the way Boolean.parseBoolean would.
+	 */
+	private boolean getBooleanProperty(Properties properties, String key, boolean defaultValue) {
+		String raw = properties.getProperty(key);
+		if (null == raw)
+			return defaultValue;
+		String value = raw.trim();
+		if ("true".equalsIgnoreCase(value))
+			return true;
+		if ("false".equalsIgnoreCase(value))
+			return false;
+		logger.warn("Can't parse {}='{}' as a boolean - using default {}", key, raw, defaultValue);
+		return defaultValue;
 	}
 
 	@Override
@@ -313,6 +358,11 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 		ehCache.removeAll();
 		luceneIndexManager.deleteAll();
+		// Emptying the cache is only ever operator-initiated. L2 writes are committed on a timer
+		// (LuceneIndexManager.Tuning), which is right for a cache entry - it would be re-fetched from
+		// origin - and wrong here: an operator who truncated the cache should not find it restored by
+		// an ungraceful restart moments later.
+		luceneIndexManager.commit();
 	}
 
 
@@ -410,6 +460,7 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 
 		// L2 - Lucene
 		luceneIndexManager.deleteExpired();
+		luceneIndexManager.commit(); // maintenance, not the request path - see removeFromCacheAll()
 	}
 
 	/**

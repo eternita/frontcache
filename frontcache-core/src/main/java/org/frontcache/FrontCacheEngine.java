@@ -8,7 +8,6 @@
  */
 package org.frontcache;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -16,6 +15,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -136,6 +137,10 @@ public class FrontCacheEngine {
 	// cache or origin. Guards against absurdly long URLs (e.g. a crawler's compounding &amp;-mangled
 	// query) that would otherwise each be a unique cache key hitting origin. Tunable via
 	// front-cache.max-request-uri-length; <= 0 disables the check.
+	// Compiled once. String.replaceAll() compiles its pattern on every call - only reached when the URI
+	// actually carries a jsessionid, but there is no reason to pay for it when it does.
+	private static final Pattern JSESSIONID_PATTERN = Pattern.compile(";jsessionid=.*?(?=\\?|$)");
+
 	private static final int DEFAULT_MAX_REQUEST_URI_LENGTH = 4096;
 	private static int maxRequestURILength = DEFAULT_MAX_REQUEST_URI_LENGTH;
 
@@ -143,6 +148,31 @@ public class FrontCacheEngine {
 	// conf/guard-rules.conf adds (reject / redirect / allow). See
 	// docs/frontcache-protection-tech-design.md.
 	private GuardRuleEngine guardRuleEngine = null;
+
+	/**
+	 * Whether a bypassed (non-cacheable) response keeps the origin's Content-Encoding.
+	 *
+	 * Off by default, and deliberately so for one release - it changes what goes on the wire.
+	 *
+	 * Frontcache forces {@code Accept-Encoding: gzip} to the origin and lets HttpClient transparently
+	 * decompress. On the CACHEABLE path that is required: the cached bytes have to be plaintext, or
+	 * the include processor cannot scan them and an encoding we cannot decode (br, zstd) would be
+	 * cached and served to clients that never asked for it. On the BYPASS path none of that applies -
+	 * the body is streamed straight through, never parsed and never cached - so the effect is that
+	 * Frontcache gunzips a response (CPU) and then ships it to the client uncompressed (bandwidth),
+	 * even when the client asked for gzip and the origin was willing to send it.
+	 *
+	 * Left off by default because an edge or CDN in front of Frontcache may be compressing today on
+	 * the assumption that what reaches it is identity; turning this on without checking that would
+	 * mean double compression.
+	 */
+	private static final String BYPASS_PASSTHROUGH_ENCODING_KEY = "front-cache.bypass.passthrough-encoding";
+	private boolean bypassPassthroughEncoding = false;
+
+	/** @return true when a bypassed response should keep the origin's Content-Encoding */
+	public boolean isBypassPassthroughEncoding() {
+		return bypassPassthroughEncoding;
+	}
 
 	private IncludeProcessor includeProcessor = null;
 
@@ -382,6 +412,10 @@ public class FrontCacheEngine {
 		originHttpPort  = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
 
+		// Built here, immediately after the values they depend on - so a bad origin-host fails at
+		// startup with a clear message rather than on the first request.
+		buildOriginUrls();
+
 		logger.info("Serving domain " + domain + " from origin " + originHost
 				+ " (http " + originHttpPort + " / https " + originHttpsPort + ")");
 
@@ -404,6 +438,12 @@ public class FrontCacheEngine {
         logToHeadersConfig = "true".equals(FCConfig.getProperty("front-cache.log-to-headers", "false")) ? true : false;
 
         maxRequestURILength = getIntProperty("front-cache.max-request-uri-length", DEFAULT_MAX_REQUEST_URI_LENGTH);
+
+        bypassPassthroughEncoding = "true".equalsIgnoreCase(
+                FCConfig.getProperty(BYPASS_PASSTHROUGH_ENCODING_KEY, "false"));
+        if (bypassPassthroughEncoding)
+            logger.info("Bypass (non-cacheable) responses will pass the origin's Content-Encoding "
+                    + "through untouched (" + BYPASS_PASSTHROUGH_ENCODING_KEY + "=true)");
 
         // built from the current config; reload() rebuilds the engine, so it picks up both a changed
         // max-request-uri-length and an edited guard-rules.conf
@@ -518,24 +558,39 @@ public class FrontCacheEngine {
 		}
 	}
 
-	private URL getOriginUrl(RequestContext context) {
-		boolean isSecure = context.getRequest().isSecure();
+	/**
+	 * The origin's base URL, one per scheme, built once at startup.
+	 *
+	 * This depends on exactly one property of a request - {@code isSecure()} - and otherwise only on
+	 * config that cannot change without a reload (which rebuilds the engine). It used to be rebuilt per
+	 * call: a StringBuilder, then {@code new URL(...)}, which is a string parse plus a
+	 * URLStreamHandler lookup. And it was called TWICE per request - init() stored it on the context
+	 * and processRequestInternal() computed it again and discarded the stored one.
+	 */
+	private URL originUrlHttp;
+	private URL originUrlHttps;
 
-		String port = isSecure ? originHttpsPort : originHttpPort;
+	private void buildOriginUrls() {
+		originUrlHttp = parseOriginUrl(false, originHttpPort);
+		originUrlHttps = parseOriginUrl(true, originHttpsPort);
+	}
 
+	private URL parseOriginUrl(boolean isSecure, String port) {
 		String urlStr = makeURL(isSecure, originHost, port);
 		try {
-			URL routeUrl = new URL(urlStr);
-			return  routeUrl;
+			return new URL(urlStr);
 		} catch (MalformedURLException e) {
 			throw new RuntimeException("Invalid front-cache.origin-host (" + originHost + ")", e);
 		}
+	}
 
+	private URL getOriginUrl(RequestContext context) {
+		return context.getRequest().isSecure() ? originUrlHttps : originUrlHttp;
 	}
 
 	private String makeURL(boolean isSecure, String host, String port)
 	{
-		StringBuffer str = new StringBuffer();
+		StringBuilder str = new StringBuilder(32);
 		if (isSecure)
 			str.append("https");
 		else
@@ -679,7 +734,7 @@ public class FrontCacheEngine {
         context.setResponse(servletResponse);
 		String uri = FCUtils.buildRequestURI(servletRequest);
 		if (-1 < uri.indexOf(";jsessionid=")) // remove JSESSIONID from URI
-			uri = uri.replaceAll(";jsessionid=.*?(?=\\?|$)", "");
+			uri = JSESSIONID_PATTERN.matcher(uri).replaceAll("");
 
 		context.setRequestURI(uri);
 
@@ -739,6 +794,11 @@ public class FrontCacheEngine {
         context.setRequestType(requestType);
 
         context.setClientType(getClientType(servletRequest)); // client type = bot | browser based on User-Agent Header and bots.conf
+
+        // Resolved here, on the request thread, for two reasons: it is a 13-header scan that every log
+        // line and the origin call would otherwise repeat, and it is the only point at which the answer
+        // is still knowable - an async include reads it after the container has recycled the request.
+        context.setClientIP(FCUtils.getClientIP(servletRequest));
 
         if (null != filterChain)
             context.setFilterChain(filterChain);
@@ -882,7 +942,9 @@ public class FrontCacheEngine {
 	public void processRequestInternal(RequestContext context) throws Exception
 	{
 		HttpServletRequest httpRequest = context.getRequest();
-		String originRequestURL = getOriginUrl(context) + context.getRequestURI() + context.getRequestQueryString();
+		// The context already carries this - init() resolved it. Recomputing it here was the second of
+		// the two per-request URL parses.
+		String originRequestURL = context.getOriginURL() + context.getRequestURI() + context.getRequestQueryString();
 		logger.debug("originRequestURL: " + originRequestURL);
 
 		boolean isSecure = ("https".equalsIgnoreCase(context.getFrontCacheProtocol())) ? true : false;
@@ -992,6 +1054,22 @@ public class FrontCacheEngine {
 	}
 
 
+	/**
+	 * The charset the response declares, falling back to UTF-8. Only used for the String-bodied
+	 * branch of {@link #writeResponse(RequestContext)}.
+	 */
+	private static Charset responseCharset(RequestContext context) {
+		try {
+			HttpServletResponse servletResponse = context.getResponse();
+			String encoding = (null == servletResponse) ? null : servletResponse.getCharacterEncoding();
+			if (null != encoding && 0 < encoding.length())
+				return Charset.forName(encoding);
+		} catch (Exception e) {
+			// unknown / unsupported charset name - fall through to UTF-8
+		}
+		return StandardCharsets.UTF_8;
+	}
+
 	private void writeResponse(RequestContext context) throws Exception {
 		// there is no body to send
 		if (context.getResponseBody() == null && context.getResponseDataStream() == null) {
@@ -1002,8 +1080,12 @@ public class FrontCacheEngine {
 		InputStream is = null;
 		try {
 			if (context.getResponseBody() != null) {
-				String body = context.getResponseBody();
-				FCUtils.writeResponse(new ByteArrayInputStream(body.getBytes()), outStream);
+				// Nothing in the codebase calls setResponseBody() today, so this branch is currently
+				// unreachable - but it is public API on RequestContext. Written directly rather than
+				// streamed through a ByteArrayInputStream, and with an explicit charset: getBytes()
+				// used the platform default, which is not necessarily the encoding the response
+				// declares.
+				outStream.write(context.getResponseBody().getBytes(responseCharset(context)));
 				return;
 			}
 
@@ -1047,7 +1129,9 @@ public class FrontCacheEngine {
 
 		OutputStream outStream = servletResponse.getOutputStream();
 		try {
-			FCUtils.writeResponse(new ByteArrayInputStream(content), outStream);
+			// The body is already a byte[] - write it. Streaming it through a ByteArrayInputStream
+			// only to have it copied back out 16 KB at a time is a second pass over the whole page.
+			outStream.write(content);
 		}
 		finally {
 			try {
@@ -1071,8 +1155,10 @@ public class FrontCacheEngine {
 		servletResponse.setCharacterEncoding("UTF-8");
 		OutputStream outStream = servletResponse.getOutputStream();
 		try {
-			byte[] body = webResponse.getContent();
-			FCUtils.writeResponse(new ByteArrayInputStream(body), outStream);
+			// This is the cache-hit path: the body is a fully materialised byte[], so write it in one
+			// call. It used to be wrapped in a ByteArrayInputStream and copied back out through
+			// FCUtils.writeResponse's buffer - a whole extra pass over every page served from cache.
+			outStream.write(webResponse.getContent());
 		}
 		finally {
 			try {

@@ -9,8 +9,10 @@
 package org.frontcache.cache;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -242,6 +244,26 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	 *
 	 * @param headers
 	 */
+	/**
+	 * The lowercased form of {@link #NON_PERSISTENT_HEADERS}, and the trace-request prefix.
+	 *
+	 * Static, because both derive from compile-time constants. They were rebuilt - a HashSet plus a
+	 * toLowerCase() per entry - on every single cache write.
+	 */
+	private static final Set<String> NON_PERSISTENT_HEADERS_LOWER = buildNonPersistentLower();
+
+	private static final String TRACE_REQUEST_PREFIX_LOWER =
+			FCHeaders.X_FRONTCACHE_TRACE_REQUEST.toLowerCase();
+
+	private static Set<String> buildNonPersistentLower()
+	{
+		Set<String> lower = new HashSet<String>();
+		for (String name : NON_PERSISTENT_HEADERS)
+			lower.add(name.toLowerCase());
+
+		return Collections.unmodifiableSet(lower);
+	}
+
 	private void cleanupNonPersistentHeaders(Map<String, List<String>> headers)
 	{
 		if (null == headers)
@@ -251,23 +273,18 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		// may re-case them - so match case-insensitively. Otherwise a downstream node's trace
 		// headers that arrive re-cased (e.g. "X-Frontcache-Trace-Request.1.0") slip past the strip,
 		// get cached and are replayed frozen on every cache hit instead of being (re)stamped live.
-		Set<String> nonPersistentLower = new HashSet<String>();
-		for (String name : NON_PERSISTENT_HEADERS)
-			nonPersistentLower.add(name.toLowerCase());
-
-		String traceRequestPrefixLower = FCHeaders.X_FRONTCACHE_TRACE_REQUEST.toLowerCase();
-
-		Set<String> cleanupKeys = new HashSet<String>();
-		for(String key : headers.keySet())
+		//
+		// Removed through the iterator rather than collected into a second Set and removed afterwards:
+		// that Set existed only to avoid a ConcurrentModificationException, which Iterator.remove()
+		// does not have.
+		Iterator<String> keys = headers.keySet().iterator();
+		while (keys.hasNext())
 		{
-			String keyLower = key.toLowerCase();
-			if (nonPersistentLower.contains(keyLower)
-					|| keyLower.startsWith(traceRequestPrefixLower)) // x-frontcache-trace-request.0, x-frontcache-trace-request.1.1.2.3.4.33, etc
-				cleanupKeys.add(key);
+			String keyLower = keys.next().toLowerCase();
+			if (NON_PERSISTENT_HEADERS_LOWER.contains(keyLower)
+					|| keyLower.startsWith(TRACE_REQUEST_PREFIX_LOWER)) // x-frontcache-trace-request.0, x-frontcache-trace-request.1.1.2.3.4.33, etc
+				keys.remove();
 		}
-
-		for (String removeKey : cleanupKeys)
-			headers.remove(removeKey);
 
 		return;
 	}
