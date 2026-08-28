@@ -14,12 +14,12 @@ import static org.junit.Assert.assertTrue;
 
 import java.net.URL;
 
-import org.apache.http.Header;
-import org.apache.http.HttpHost;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.junit.After;
@@ -90,9 +90,9 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	public void acceptEncodingIdentity() throws Exception {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
-			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, "identity");
+			ClassicHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, "identity");
 			try {
-				assertEquals(200, response.getStatusLine().getStatusCode());
+				assertEquals(200, response.getCode());
 				assertNotBrotli(response);
 				assertNotCompressed(response); // client refused compression -> must be identity
 				assertEquals(STATIC_EXPECTED, bodyAsString(response));
@@ -111,9 +111,9 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	public void acceptEncodingAbsent() throws Exception {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
-			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, null);
+			ClassicHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, null);
 			try {
-				assertEquals(200, response.getStatusLine().getStatusCode());
+				assertEquals(200, response.getCode());
 				assertNotBrotli(response);
 				assertNotCompressed(response);
 				assertEquals(STATIC_EXPECTED, bodyAsString(response));
@@ -134,9 +134,9 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	public void acceptEncodingZstdOnly() throws Exception {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
-			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, "zstd");
+			ClassicHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + STATIC_FIXTURE, "zstd");
 			try {
-				assertEquals(200, response.getStatusLine().getStatusCode());
+				assertEquals(200, response.getCode());
 				assertNotBrotli(response);
 				Header ce = response.getFirstHeader("Content-Encoding");
 				assertFalse("must not return zstd it can't produce",
@@ -162,9 +162,9 @@ public abstract class AcceptEncodingTests extends TestsBase {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
 			// 1st request - populate the cache; identity client
-			CloseableHttpResponse first = rawGet(client, url, "identity");
+			ClassicHttpResponse first = rawGet(client, url, "identity");
 			try {
-				assertEquals(200, first.getStatusLine().getStatusCode());
+				assertEquals(200, first.getCode());
 				assertNotBrotli(first);
 				assertNotCompressed(first);
 				assertEquals(CACHEABLE_EXPECTED, bodyAsString(first).trim());
@@ -174,9 +174,9 @@ public abstract class AcceptEncodingTests extends TestsBase {
 			}
 
 			// 2nd request - served from cache; still decodable identity bytes
-			CloseableHttpResponse second = rawGet(client, url, "identity");
+			ClassicHttpResponse second = rawGet(client, url, "identity");
 			try {
-				assertEquals(200, second.getStatusLine().getStatusCode());
+				assertEquals(200, second.getCode());
 				assertNotBrotli(second);
 				assertNotCompressed(second);
 				assertEquals(CACHEABLE_EXPECTED, bodyAsString(second).trim());
@@ -198,9 +198,9 @@ public abstract class AcceptEncodingTests extends TestsBase {
 	private String assertServedDecodable(String path, String acceptEncoding) throws Exception {
 		CloseableHttpClient client = HttpClients.custom().disableContentCompression().build();
 		try {
-			CloseableHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + path, acceptEncoding);
+			ClassicHttpResponse response = rawGet(client, getFrontCacheBaseURLLocalhost() + path, acceptEncoding);
 			try {
-				assertEquals(200, response.getStatusLine().getStatusCode());
+				assertEquals(200, response.getCode());
 				assertNotBrotli(response);
 				return bodyAsString(response);
 			} finally {
@@ -211,32 +211,32 @@ public abstract class AcceptEncodingTests extends TestsBase {
 		}
 	}
 
-	private CloseableHttpResponse rawGet(CloseableHttpClient client, String url, String acceptEncoding) throws Exception {
+	private ClassicHttpResponse rawGet(CloseableHttpClient client, String url, String acceptEncoding) throws Exception {
 		HttpHost httpHost = FCUtils.getHttpHost(new URL(url));
 		HttpGet httpRequest = new HttpGet(FCUtils.buildRequestURI(url));
 		if (null != acceptEncoding)
 			httpRequest.addHeader(FCHeaders.ACCEPT_ENCODING, acceptEncoding);
 		httpRequest.addHeader(FCHeaders.X_FRONTCACHE_TRACE, "true"); // so trace headers are emitted
-		return (CloseableHttpResponse) client.execute(httpHost, httpRequest);
+		return (ClassicHttpResponse) client.execute(httpHost, httpRequest);
 	}
 
-	private String bodyAsString(CloseableHttpResponse response) throws Exception {
+	private String bodyAsString(ClassicHttpResponse response) throws Exception {
 		return new String(getBytes(response.getEntity().getContent()), "UTF-8");
 	}
 
-	private void assertNotBrotli(CloseableHttpResponse response) {
+	private void assertNotBrotli(ClassicHttpResponse response) {
 		Header ce = response.getFirstHeader("Content-Encoding");
 		assertFalse("Frontcache must never emit brotli (it cannot produce it): Content-Encoding=" + (ce == null ? null : ce.getValue()),
 				ce != null && ce.getValue().toLowerCase().contains("br"));
 	}
 
-	private void assertNotCompressed(CloseableHttpResponse response) {
+	private void assertNotCompressed(ClassicHttpResponse response) {
 		Header ce = response.getFirstHeader("Content-Encoding");
 		assertTrue("client did not accept compression - response must be identity, but Content-Encoding=" + (ce == null ? null : ce.getValue()),
 				ce == null || ce.getValue().trim().isEmpty() || ce.getValue().equalsIgnoreCase("identity"));
 	}
 
-	private boolean isFromCache(CloseableHttpResponse response) {
+	private boolean isFromCache(ClassicHttpResponse response) {
 		Header trace = response.getFirstHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
 		return trace != null && TestUtils.isRequestFromCache(trace.getValue());
 	}

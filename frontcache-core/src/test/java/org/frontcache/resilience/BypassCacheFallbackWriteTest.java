@@ -26,7 +26,8 @@ import java.util.Collections;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.apache.http.client.HttpClient;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.FCConfig;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -59,7 +60,7 @@ public class BypassCacheFallbackWriteTest {
 		System.setProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY, fallbackHome.getAbsolutePath());
 
 		// resolves against the fixture files already on disk; the client is never used for them
-		FallbackResolverFactory.init(mock(HttpClient.class));
+		FallbackResolverFactory.init(mock(FcHttpClient.class));
 	}
 
 	private RequestContext newContext(HttpServletResponse servletResponse) {

@@ -16,13 +16,14 @@ import static org.junit.Assert.assertTrue;
 import java.net.URL;
 import java.util.Map;
 
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpHead;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpHead;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.core.FCHeaders;
@@ -462,18 +463,18 @@ public abstract class CommonTests extends TestsBase {
 		String urlStr = getFrontCacheBaseURLLocalhost() + "common/methods/a.jsp";
 		CloseableHttpClient httpclient = HttpClients.createDefault();
 
-		HttpResponse response = null;
+		ClassicHttpResponse response = null;
 
 		HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
-		HttpRequest httpRequest = new HttpHead(FCUtils.buildRequestURI(urlStr));
+		ClassicHttpRequest httpRequest = new HttpHead(FCUtils.buildRequestURI(urlStr));
 		httpRequest.addHeader(FCHeaders.ACCEPT, "text/html");
 		httpRequest.addHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 
-		response = httpclient.execute(httpHost, httpRequest);
+		response = httpclient.executeOpen(httpHost, httpRequest, null);
 
 		assertEquals(true, TestUtils.isRequestFromCache(response.getFirstHeader(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0").getValue()));
 
-		((CloseableHttpResponse) response).close();
+		((ClassicHttpResponse) response).close();
 
 		return;
 	}

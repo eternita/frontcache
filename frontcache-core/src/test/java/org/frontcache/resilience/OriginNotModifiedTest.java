@@ -18,13 +18,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.http.Header;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.ProtocolVersion;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.message.BasicStatusLine;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -50,12 +49,13 @@ public class OriginNotModifiedTest {
 		return ctx;
 	}
 
-	/** A mock CloseableHttpResponse with the given status code and NO entity (bodyless response). */
-	private CloseableHttpResponse bodylessResponse(int statusCode, String reason) {
-		CloseableHttpResponse response = mock(CloseableHttpResponse.class);
-		when(response.getStatusLine()).thenReturn(new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), statusCode, reason));
+	/** A mock ClassicHttpResponse with the given status code and NO entity (bodyless response). */
+	private ClassicHttpResponse bodylessResponse(int statusCode, String reason) {
+		ClassicHttpResponse response = mock(ClassicHttpResponse.class);
+		when(response.getCode()).thenReturn(statusCode);
+		when(response.getReasonPhrase()).thenReturn(reason);
 		when(response.getEntity()).thenReturn(null); // 304 / 204 carry no entity
-		when(response.getAllHeaders()).thenReturn(new Header[0]);
+		when(response.getHeaders()).thenReturn(new Header[0]);
 		return response;
 	}
 
@@ -68,9 +68,9 @@ public class OriginNotModifiedTest {
 		RequestContext ctx = newContext();
 		Map<String, List<String>> requestHeaders = new HashMap<String, List<String>>();
 
-		CloseableHttpResponse response = bodylessResponse(304, "Not Modified");
+		ClassicHttpResponse response = bodylessResponse(304, "Not Modified");
 		HttpClient client = mock(HttpClient.class);
-		when(client.execute(any(HttpHost.class), any(HttpRequest.class))).thenReturn(response);
+		when(client.executeOpen(any(HttpHost.class), any(ClassicHttpRequest.class), any())).thenReturn(response);
 
 		// before the fix this threw NullPointerException
 		WebResponse resp = new FC_ThroughCache_HttpClient(

@@ -15,7 +15,7 @@ import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 
-import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.junit.Test;
 
 /**
@@ -34,7 +34,7 @@ public class RequestContextReleaseHttpClientResponseTest {
 	public void closedByRequestThreadWhenWorkerFinishesFirst() throws IOException {
 
 		RequestContext context = new RequestContext();
-		CloseableHttpResponse response = mock(CloseableHttpResponse.class);
+		ClassicHttpResponse response = mock(ClassicHttpResponse.class);
 
 		context.setHttpClientResponse(response); // worker: origin response received
 		context.releaseHttpClientResponse();     // worker: run() done
@@ -55,7 +55,7 @@ public class RequestContextReleaseHttpClientResponseTest {
 	public void closedByWorkerWhenRequestThreadTimedOutFirst() throws IOException {
 
 		RequestContext context = new RequestContext();
-		CloseableHttpResponse response = mock(CloseableHttpResponse.class);
+		ClassicHttpResponse response = mock(ClassicHttpResponse.class);
 
 		context.releaseHttpClientResponse();     // request thread: gave up, served the fallback
 
@@ -86,7 +86,7 @@ public class RequestContextReleaseHttpClientResponseTest {
 	public void closeFailureIsContained() throws IOException {
 
 		RequestContext context = new RequestContext();
-		CloseableHttpResponse response = mock(CloseableHttpResponse.class);
+		ClassicHttpResponse response = mock(ClassicHttpResponse.class);
 		org.mockito.Mockito.doThrow(new IOException("connection already gone")).when(response).close();
 
 		context.setHttpClientResponse(response);
@@ -104,7 +104,7 @@ public class RequestContextReleaseHttpClientResponseTest {
 	public void copyDoesNotInheritHandshakeState() throws IOException {
 
 		RequestContext context = new RequestContext();
-		CloseableHttpResponse response = mock(CloseableHttpResponse.class);
+		ClassicHttpResponse response = mock(ClassicHttpResponse.class);
 
 		context.setHttpClientResponse(response);
 		context.releaseHttpClientResponse(); // one party arrived on the original

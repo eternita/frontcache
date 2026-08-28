@@ -34,25 +34,29 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.apache.http.HeaderElement;
-import org.apache.http.HeaderElementIterator;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.ProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.RedirectStrategy;
-import org.apache.http.client.config.CookieSpecs;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.conn.ConnectionKeepAliveStrategy;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.message.BasicHeaderElementIterator;
-import org.apache.http.pool.PoolStats;
-import org.apache.http.protocol.HTTP;
-import org.apache.http.protocol.HttpContext;
+import org.apache.hc.core5.http.HeaderElement;
+import org.apache.hc.core5.http.message.MessageSupport;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.ProtocolException;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.protocol.RedirectStrategy;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
+import org.apache.hc.client5.http.ConnectionKeepAliveStrategy;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.cookie.StandardCookieSpec;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
+import org.apache.hc.core5.http.io.SocketConfig;
+import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.core5.util.Timeout;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.core5.http.message.MessageSupport;
+import org.apache.hc.core5.pool.PoolStats;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
@@ -61,6 +65,8 @@ import org.frontcache.guard.GuardOutcome;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEngine;
 import org.frontcache.core.FCUtils;
+import org.frontcache.core.ApacheFcHttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.FrontCacheException;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -186,6 +192,11 @@ public class FrontCacheEngine {
 
 	private CloseableHttpClient httpClient;
 
+	// The FcHttpClient view of the same client. This is what the three reflection-loaded extension
+	// points (CacheProcessor / IncludeProcessor / FallbackResolver) are handed - they no longer see
+	// an Apache type. See docs/httpclient5-upgrade-proposal.md section 5.1.
+	private FcHttpClient fcHttpClient;
+
 	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output
 
 	// volatile + double-checked locking - see CacheManager.getInstance(): the unsynchronized
@@ -260,6 +271,12 @@ public class FrontCacheEngine {
 	private FrontCacheEngine() {
 
 		initialize();
+	}
+
+	// used by FrontCacheIOServlet
+	public FcHttpClient getFcHttpClient()
+	{
+		return fcHttpClient;
 	}
 
 	// used by FrontCacheIOServlet
@@ -460,6 +477,7 @@ public class FrontCacheEngine {
 		includeProcessor = IncludeProcessorManager.getInstance();
 
 		this.httpClient = newClient();
+		this.fcHttpClient = new ApacheFcHttpClient(this.httpClient);
 
 		logger.info("HTTP client pool - max total " + fcConnectionsMaxTotal + ", max per route " + fcConnectionsMaxPerRoute
 				+ ", connection request timeout " + fcConnectionRequestTimeout + "ms, connect timeout " + fcConnectTimeout
@@ -471,7 +489,7 @@ public class FrontCacheEngine {
 				if (connectionManager == null) {
 					return;
 				}
-				connectionManager.closeExpiredConnections();
+				connectionManager.closeExpired();
 			}
 		}, 30000, 5000);
 
@@ -508,7 +526,7 @@ public class FrontCacheEngine {
 					e.printStackTrace();
 				}
 
-				FallbackResolverFactory.init(httpClient);
+				FallbackResolverFactory.init(fcHttpClient);
 			}
 		});
 		t.start();
@@ -626,6 +644,7 @@ public class FrontCacheEngine {
 		// out SHUTDOWN_GRACE_PERIOD_MS lets them drain and keeps a config reload non-disruptive.
 		closeQuietlyAfterGracePeriod(httpClient);
 		httpClient = null;
+		fcHttpClient = null;
 		connectionManager = null;
 
 		if (null != includeProcessor)
@@ -638,35 +657,19 @@ public class FrontCacheEngine {
 
 
 	private CloseableHttpClient newClient() {
+		// HttpClient 5 moved the socket and connect timeouts off RequestConfig: the socket read
+		// timeout lives on SocketConfig and the connect timeout on ConnectionConfig, both applied to
+		// the connection manager (see newConnectionManager()). RequestConfig.setResponseTimeout is
+		// NOT the old socket timeout - it bounds the wait for the response head, not inactivity on
+		// each read - so mapping onto it would have quietly changed what the config key means.
+		// See docs/httpclient5-upgrade-proposal.md section 4.1.
 		final RequestConfig requestConfig = RequestConfig.custom()
-				// Keep both below the command timeouts (resilience.properties: Cache-Origin-http
-				// 10s, Origin-Hits 20s) so a slow origin is ended by HttpClient - which releases the
-				// connection - rather than by the command timeout, which only sets an interrupt flag that a
-				// blocking socket read ignores while the connection stays leased.
-				.setSocketTimeout(fcSocketTimeout)
-				.setConnectTimeout(fcConnectTimeout)
 				// bounded wait for a pooled connection - never block a worker thread indefinitely
-				.setConnectionRequestTimeout(fcConnectionRequestTimeout)
-				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
+				.setConnectionRequestTimeout(Timeout.ofMilliseconds(fcConnectionRequestTimeout))
+				.setCookieSpec(StandardCookieSpec.IGNORE)
 				.build();
 
-	    ConnectionKeepAliveStrategy keepAliveStrategy = new ConnectionKeepAliveStrategy() {
-	        @Override
-	        public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
-	            HeaderElementIterator it = new BasicHeaderElementIterator
-	                (response.headerIterator(HTTP.CONN_KEEP_ALIVE));
-	            while (it.hasNext()) {
-	                HeaderElement he = it.nextElement();
-	                String param = he.getName();
-	                String value = he.getValue();
-	                if (value != null && param.equalsIgnoreCase
-	                   ("timeout")) {
-	                    return Long.parseLong(value) * 1000;
-	                }
-	            }
-	            return 10 * 1000;
-	        }
-	    };
+	    ConnectionKeepAliveStrategy keepAliveStrategy = FCUtils.keepAliveStrategy();
 
 		return HttpClients.custom()
 				.setConnectionManager(newConnectionManager())
@@ -677,19 +680,20 @@ public class FrontCacheEngine {
 				// stale one throws NoHttpResponseException. A single retry transparently
 				// re-issues on a fresh connection. (Jetty 12's connection-reuse timing
 				// surfaces this stale-connection race that Jetty 9.4 masked.)
-				.setRetryHandler(new DefaultHttpRequestRetryHandler(1, false))
+				//
+				// DefaultHttpRequestRetryStrategy does cover this: NoHttpResponseException extends
+				// IOException directly, not the non-retriable ConnectionClosedException, so it is
+				// retried for idempotent requests. TimeValue.ZERO_MILLISECONDS is load-bearing - the no-arg
+				// constructor is (1, TimeValue.ofSeconds(1)) and HttpRequestRetryExec honours that
+				// interval by sleeping, which would park a command worker for a full second before a
+				// retry that is instant on a fresh connection. 4.5's handler retried immediately.
+				// See docs/httpclient5-upgrade-proposal.md section 4.3.1.
+				.setRetryStrategy(new DefaultHttpRequestRetryStrategy(1, TimeValue.ZERO_MILLISECONDS))
 				.setKeepAliveStrategy(keepAliveStrategy)
-				.setRedirectStrategy(new RedirectStrategy() {
-					@Override
-					public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
-						return false;
-					}
-
-					@Override
-					public HttpUriRequest getRedirect(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
-						return null;
-					}
-				})
+				// Frontcache relays the origin's redirect to the client (rewriting Location itself in
+				// FCUtils.transformRedirectURL); it must never follow one on the origin's behalf.
+				// 5.x says that in one call - 4.5 needed a no-op RedirectStrategy.
+				.disableRedirectHandling()
 				.build();
 	}
 
@@ -712,6 +716,22 @@ public class FrontCacheEngine {
 
 			connectionManager.setMaxTotal(fcConnectionsMaxTotal);
 			connectionManager.setDefaultMaxPerRoute(fcConnectionsMaxPerRoute);
+
+			// Origin socket read timeout. In 4.5 this was RequestConfig.setSocketTimeout; in 5.x it
+			// belongs to the connection manager. Keep it below the command timeouts so a slow origin
+			// is ended by the HTTP client - which releases the connection - rather than by the
+			// command timeout, which only sets an interrupt flag a blocking socket read ignores
+			// while the connection stays leased. This is what front-cache.http-client.socket-timeout
+			// configures, and it must keep meaning exactly that.
+			connectionManager.setDefaultSocketConfig(SocketConfig.custom()
+					.setSoTimeout(Timeout.ofMilliseconds(fcSocketTimeout))
+					.build());
+
+			// Connect timeout. Also accepted (deprecated) on RequestConfig in 5.3 - ConnectionConfig
+			// is the non-deprecated home and is where it will stay.
+			connectionManager.setDefaultConnectionConfig(ConnectionConfig.custom()
+					.setConnectTimeout(Timeout.ofMilliseconds(fcConnectTimeout))
+					.build());
 
 			return connectionManager;
 		} catch (Exception ex) {
@@ -963,7 +983,7 @@ public class FrontCacheEngine {
 			WebResponse webResponse = null;
 			try
 			{
-				webResponse = cacheProcessor.processRequest(originRequestURL, requestHeaders, httpClient, context);
+				webResponse = cacheProcessor.processRequest(originRequestURL, requestHeaders, fcHttpClient, context);
 			} catch (FrontCacheException fce) {
 				// content/response is not cacheable (e.g. response type is not text)
 				fce.printStackTrace();
@@ -980,7 +1000,7 @@ public class FrontCacheEngine {
 					while (includeProcessor.hasIncludes(webResponse, recursionLevel++))
 					{
 						// include processor return new webResponse with processed includes and merged headers
-						WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, httpClient, context, recursionLevel);
+						WebResponse incWebResponse = includeProcessor.processIncludes(webResponse, currentRequestBaseURL, requestHeaders, fcHttpClient, context, recursionLevel);
 
 						// copy content only (cache setting use this (parent), headers are merged inside IncludeProcessor )
 						webResponse.setContent(incWebResponse.getContent());

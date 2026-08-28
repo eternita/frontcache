@@ -12,7 +12,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.WebResponse;
 import org.frontcache.resilience.FallbackLogger;
@@ -41,7 +41,7 @@ public class DefaultFallbackResolver implements FallbackResolver {
 	}
 
 	@Override
-	public void init(HttpClient client) {
+	public void init(FcHttpClient client) {
 	}
 
 	/** No configuration to show: this resolver serves one generic body for every URL. */

@@ -21,28 +21,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.http.HeaderElement;
-import org.apache.http.HeaderElementIterator;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
-import org.apache.http.ProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.RedirectStrategy;
-import org.apache.http.client.config.CookieSpecs;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.conn.ConnectionKeepAliveStrategy;
-import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.message.BasicHeaderElementIterator;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.protocol.HTTP;
-import org.apache.http.protocol.HttpContext;
+import org.apache.hc.core5.http.HeaderElement;
+import org.apache.hc.core5.http.message.MessageSupport;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.ProtocolException;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.protocol.RedirectStrategy;
+import org.apache.hc.client5.http.cookie.StandardCookieSpec;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.core5.http.io.SocketConfig;
+import org.apache.hc.core5.util.Timeout;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
+import org.apache.hc.client5.http.ConnectionKeepAliveStrategy;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.core5.http.message.MessageSupport;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.protocol.HttpContext;
+import org.frontcache.core.FCUtils;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
@@ -104,50 +108,34 @@ public class FrontCacheClient {
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
 		connectionManager.setMaxTotal(CONNECTIONS_MAX_TOTAL);
 		connectionManager.setDefaultMaxPerRoute(CONNECTIONS_MAX_PER_ROUTE);
+
+		// HttpClient 5 moved these off RequestConfig - socket read timeout to SocketConfig, connect
+		// timeout to ConnectionConfig, both on the connection manager. RequestConfig.setResponseTimeout
+		// is NOT the old socket timeout. See docs/httpclient5-upgrade-proposal.md section 4.1.
+		connectionManager.setDefaultSocketConfig(SocketConfig.custom()
+				.setSoTimeout(Timeout.ofMilliseconds(CONNECTION_TIMEOUT))
+				.build());
+		connectionManager.setDefaultConnectionConfig(ConnectionConfig.custom()
+				.setConnectTimeout(Timeout.ofMilliseconds(CONNECTION_TIMEOUT))
+				.build());
+
 		return connectionManager;
 	}
 
 	private FrontCacheClient(String frontcacheURL) {
 		final RequestConfig requestConfig = RequestConfig.custom()
-				.setSocketTimeout(CONNECTION_TIMEOUT)
-				.setConnectTimeout(CONNECTION_TIMEOUT)
-				.setCookieSpec(CookieSpecs.IGNORE_COOKIES)
+				.setCookieSpec(StandardCookieSpec.IGNORE)
 				.build();
-
-	    ConnectionKeepAliveStrategy keepAliveStrategy = new ConnectionKeepAliveStrategy() {
-	        @Override
-	        public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
-	            HeaderElementIterator it = new BasicHeaderElementIterator
-	                (response.headerIterator(HTTP.CONN_KEEP_ALIVE));
-	            while (it.hasNext()) {
-	                HeaderElement he = it.nextElement();
-	                String param = he.getName();
-	                String value = he.getValue();
-	                if (value != null && param.equalsIgnoreCase
-	                   ("timeout")) {
-	                    return Long.parseLong(value) * 1000;
-	                }
-	            }
-	            return 10 * 1000;
-	        }
-	    };
 
 	    client = HttpClients.custom()
 				.setConnectionManager(newConnectionManager())
 				.setDefaultRequestConfig(requestConfig)
-				.setRetryHandler(new DefaultHttpRequestRetryHandler(0, false))
-				.setKeepAliveStrategy(keepAliveStrategy)
-				.setRedirectStrategy(new RedirectStrategy() {
-					@Override
-					public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
-						return false;
-					}
-
-					@Override
-					public HttpUriRequest getRedirect(HttpRequest request, HttpResponse response, HttpContext context) throws ProtocolException {
-						return null;
-					}
-				})
+				// Management calls are not idempotent (invalidate, put-to-cache) - never retry them.
+				// 4.5 said this as DefaultHttpRequestRetryHandler(0, false).
+				.disableAutomaticRetries()
+				.setKeepAliveStrategy(FCUtils.keepAliveStrategy())
+				// A management endpoint must never be followed to somewhere else.
+				.disableRedirectHandling()
 				.build();
 
 		this.frontCacheURL = frontcacheURL;
@@ -375,10 +363,10 @@ public class FrontCacheClient {
 			post.addHeader("Authorization", "Bearer " + siteKey);
 
 		InputStream is = null;
-		CloseableHttpResponse response = null;
+		ClassicHttpResponse response = null;
 		try {
 			post.setEntity(new UrlEncodedFormEntity(urlParameters));
-			response = (CloseableHttpResponse) client.execute(post);
+			response = client.executeOpen(null, post, null);
 			is = response.getEntity().getContent();
 	        int bytesRead = 0;
 	        int bufferSize = 4000;
@@ -813,7 +801,7 @@ public class FrontCacheClient {
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 
 		StringBuilder result = new StringBuilder();
-		CloseableHttpResponse response = (CloseableHttpResponse) client.execute(post);
+		ClassicHttpResponse response = client.executeOpen(null, post, null);
 		try {
 			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
 

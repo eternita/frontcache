@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.util.Date;
@@ -25,13 +26,13 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import org.apache.http.Header;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.HttpResponse;
+import org.frontcache.core.FcHttpClient;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.frontcache.FCConfig;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
@@ -64,7 +65,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	// URI pattern -> fallback, in conf/fallbacks.conf order (first match wins)
 	private Set<FallbackConfigEntryImpl> fallbackConfigs = new LinkedHashSet<FallbackConfigEntryImpl>();
 
-	private HttpClient client;
+	private FcHttpClient client;
 
 
 	public FileBasedFallbackResolver() {
@@ -72,7 +73,7 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 	}
 
 	@Override
-	public void init(HttpClient client) {
+	public void init(FcHttpClient client) {
 		this.client = client;
 		populateFallbacksFromOrigin();
 	}
@@ -263,61 +264,30 @@ public class FileBasedFallbackResolver implements FallbackResolver {
 			if (null == fetchURL)
 				continue;
 
-			// get content from URL
-			HttpResponse response = null;
-
+			// Fetch through FcHttpClient. This used to be a hand-rolled execute() -> getStatusLine()
+			// -> getFirstHeader() -> buffer-copy-to-file block with three nested try/finally levels;
+			// fetch(url) returns a WebResponse that already carries status, headers and body. The
+			// bodies are fallback pages fetched once at startup, so materialising them is free.
 			try {
-				HttpHost httpHost = FCUtils.getHttpHost(new URL(fetchURL));
-				HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(fetchURL));
+				WebResponse fallbackResponse = client.fetch(fetchURL);
 
-				response = client.execute(httpHost, httpRequest);
-
-				int httpResponseCode = response.getStatusLine().getStatusCode();
-
+				int httpResponseCode = fallbackResponse.getStatusCode();
 				if (httpResponseCode < 200 || httpResponseCode > 299)
 					continue;
 
-				OutputStream fos = new FileOutputStream(fallbackDataFile);
+				try (OutputStream fos = new FileOutputStream(fallbackDataFile)) {
 
-				Header contentTypeHeader = response.getFirstHeader(FCHeaders.CONTENT_TYPE);
-				if (null != contentTypeHeader)
-				{
-					String contentType = contentTypeHeader.getValue();
-					fos.write((FCHeaders.CONTENT_TYPE + ":" + contentType + "\n").getBytes());
+					String contentType = fallbackResponse.getHeader(FCHeaders.CONTENT_TYPE);
+					if (null != contentType)
+						fos.write((FCHeaders.CONTENT_TYPE + ":" + contentType + "\n").getBytes(StandardCharsets.UTF_8));
+
+					byte[] content = fallbackResponse.getContent();
+					if (null != content)
+						fos.write(content);
 				}
 
-				// save response to file
-				InputStream is = response.getEntity().getContent();
-				try {
-					int bytesRead = 0;
-			            int bufferSize = 4000;
-			         byte[] byteBuffer = new byte[bufferSize];
-			         while ((bytesRead = is.read(byteBuffer)) != -1) {
-			             fos.write(byteBuffer, 0, bytesRead);
-			         }
-				} catch (Exception e) {
-					e.printStackTrace();
-				} finally {
-					try
-					{
-						fos.flush();
-						fos.close();
-					} catch (Exception ex) {
-						ex.printStackTrace();
-					}
-				}
-
-			} catch (Exception ioe) {
-				ioe.printStackTrace();
-			} finally {
-				if (null != response)
-				{
-					try {
-						((CloseableHttpResponse) response).close();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
+			} catch (Exception e) {
+				logger.error("Can't load fallback for " + fetchURL, e);
 			}
 		} // for (FallbackConfigEntryImpl fallbackConfig : fallbackConfigs)
 

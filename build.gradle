@@ -257,7 +257,11 @@ project(':frontcache-core') {
 
 		api 			'com.fasterxml.jackson.core:jackson-databind:2.22.1'
 		api         	'com.fasterxml.jackson.core:jackson-annotations:2.22'
-        api         	'org.apache.httpcomponents:httpclient:4.5.14' // final 4.5.x; 5.x is a package/API migration
+        // HttpClient 5.3.1. The 4.5 branch ended at 4.5.14 (maintenance only), and 5.x is where
+        // every future fix lands. See docs/httpclient5-upgrade-proposal.md - the migration also
+        // took org.apache.http.client.HttpClient out of the CacheProcessor / IncludeProcessor /
+        // FallbackResolver signatures, which now take org.frontcache.core.FcHttpClient instead.
+        api         	'org.apache.httpcomponents.client5:httpclient5:5.3.1'
         api         	'commons-io:commons-io:2.22.0'
         api         	'ch.qos.logback:logback-classic:1.5.38'
 		// Resilience4j replaced Hystrix (see docs/archive/hystrix-to-resilience4j-proposal.md). Removing
@@ -308,7 +312,9 @@ project(':frontcache-core') {
 
 project(':frontcache-agent') {
 	dependencies {
-        api         'org.apache.httpcomponents:httpclient:4.5.14' // final 4.5.x; 5.x is a package/API migration
+        // Moves with core: the agent's public API is String-in/String-out, so no customer source
+        // breaks. See docs/httpclient5-upgrade-proposal.md section 6.
+        api         'org.apache.httpcomponents.client5:httpclient5:5.3.1'
 	}
 }
 

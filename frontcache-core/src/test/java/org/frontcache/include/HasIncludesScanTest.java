@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
@@ -53,7 +53,7 @@ public class HasIncludesScanTest {
 	private static final class Probe extends IncludeProcessorBase {
 		@Override
 		public WebResponse processIncludes(WebResponse parent, String base, Map<String, List<String>> headers,
-				HttpClient client, RequestContext context, int recursionLevel) {
+				FcHttpClient client, RequestContext context, int recursionLevel) {
 			throw new UnsupportedOperationException();
 		}
 		@Override

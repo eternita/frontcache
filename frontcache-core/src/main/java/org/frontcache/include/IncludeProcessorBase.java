@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.FCHeaders;
@@ -245,7 +245,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * @param client
 	 * @return
 	 */
-	protected WebResponse callInclude(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context, String includeLevel, String includeType) throws FrontCacheException
+	protected WebResponse callInclude(String urlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context, String includeLevel, String includeType) throws FrontCacheException
     {
 
 		// in case response is from cache -> log request

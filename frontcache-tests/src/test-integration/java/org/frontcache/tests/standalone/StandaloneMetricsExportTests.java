@@ -12,11 +12,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.frontcache.tests.TestConfig;
 import org.frontcache.tests.base.SiteKeys;
 import org.frontcache.tests.base.TestsBase;
@@ -55,9 +55,9 @@ public class StandaloneMetricsExportTests extends TestsBase {
 
 		CloseableHttpClient client = HttpClients.createDefault();
 		try {
-			CloseableHttpResponse response = client.execute(authenticatedScrape());
+			ClassicHttpResponse response = client.execute(authenticatedScrape());
 			try {
-				assertEquals(200, response.getStatusLine().getStatusCode());
+				assertEquals(200, response.getCode());
 				assertTrue("Prometheus text format expected, got "
 								+ response.getFirstHeader("Content-Type").getValue(),
 						response.getFirstHeader("Content-Type").getValue().contains("version=0.0.4"));
@@ -107,9 +107,9 @@ public class StandaloneMetricsExportTests extends TestsBase {
 
 		CloseableHttpClient client = HttpClients.createDefault();
 		try {
-			CloseableHttpResponse response = client.execute(authenticatedScrape());
+			ClassicHttpResponse response = client.execute(authenticatedScrape());
 			try {
-				assertEquals(200, response.getStatusLine().getStatusCode());
+				assertEquals(200, response.getCode());
 				String body = EntityUtils.toString(response.getEntity());
 
 				// Hit ratio is the number an operator alerts on, and it needs both labels on the wire.
@@ -153,10 +153,10 @@ public class StandaloneMetricsExportTests extends TestsBase {
 	{
 		CloseableHttpClient client = HttpClients.createDefault();
 		try {
-			CloseableHttpResponse response = client.execute(new HttpGet(METRICS_URL));
+			ClassicHttpResponse response = client.execute(new HttpGet(METRICS_URL));
 			try {
 				assertEquals("a scrape with no credentials must not be served", 401,
-						response.getStatusLine().getStatusCode());
+						response.getCode());
 			} finally {
 				response.close();
 			}
@@ -165,7 +165,7 @@ public class StandaloneMetricsExportTests extends TestsBase {
 			wrongKey.addHeader("Authorization", "Bearer not-this-nodes-key");
 			response = client.execute(wrongKey);
 			try {
-				assertEquals(401, response.getStatusLine().getStatusCode());
+				assertEquals(401, response.getCode());
 			} finally {
 				response.close();
 			}
