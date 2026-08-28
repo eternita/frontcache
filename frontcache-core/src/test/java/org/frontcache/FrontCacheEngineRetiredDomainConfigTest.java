@@ -140,7 +140,7 @@ public class FrontCacheEngineRetiredDomainConfigTest {
 		assertTrue(message, message.contains("one Frontcache node per site"));
 		assertTrue(message, message.contains("front-cache.default-domain"));
 		assertTrue(message, message.contains("front-cache.origin-host"));
-		assertTrue(message, message.contains("docs/multi-domain-retirement-proposal.md"));
+		assertTrue(message, message.contains("docs/archive/multi-domain-retirement-proposal.md"));
 	}
 
 }

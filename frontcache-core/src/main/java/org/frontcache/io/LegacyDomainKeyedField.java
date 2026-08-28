@@ -26,7 +26,7 @@ import java.util.Set;
  * Why the map had to go: one node serves one site, so it always held exactly one entry, and the
  * console's JSPs had to switch on the literal {@code "default-domain"} to find it - a domain concept
  * surviving in the wire format after the feature behind it was retired. See
- * docs/multi-domain-retirement-proposal.md section 8.
+ * docs/archive/multi-domain-retirement-proposal.md section 8.
  *
  * The legacy field can be dropped once no supported console predates 2.7.
  */

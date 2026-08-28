@@ -8,7 +8,7 @@
  * stream's JSON is a pinned wire contract read by external Turbine across a mixed fleet, it ticks at
  * 500ms because circuit metrics move that fast, and it only exists on this one page - the same block
  * renders on the cache and config pages. One poll serves all of it. See
- * docs/edges-status-realtime-proposal.md section 4.
+ * docs/archive/edges-status-realtime-proposal.md section 4.
  *
  * Formatting lives here and only here. The JSP renders placeholders rather than formatted values, so
  * there is one implementation of "what does 4402341888 look like" rather than one in Java for the

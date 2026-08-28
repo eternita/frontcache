@@ -110,7 +110,7 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 	 * Deliberately still the pre-2.7 path, not {@code /fc-dashboard.stream}: the console is deployed
 	 * separately from the nodes it monitors, so it has to work against a mixed fleet, and only the old
 	 * path exists on a 2.6 node. 2.7+ serves both. Switch this when the oldest supported node is 2.7 -
-	 * see docs/hystrix-to-resilience4j-proposal.md section 8.2.
+	 * see docs/archive/hystrix-to-resilience4j-proposal.md section 8.2.
 	 */
 	static final String STREAM_PATH = "hystrix.stream";
 
@@ -203,7 +203,7 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 
 					if (200 != upstreamResponse.statusCode()) {
 						// Propagate the refusal rather than swallowing it. The node answers 401 for a
-						// missing or wrong site key (docs/hystrix-to-resilience4j-proposal.md section
+						// missing or wrong site key (docs/archive/hystrix-to-resilience4j-proposal.md section
 						// 14.6), and an operator looking at a blank dashboard needs to see that.
 						logger.warn("Upstream {} returned {} - propagating to the client", streamUrl,
 								upstreamResponse.statusCode());

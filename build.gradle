@@ -260,7 +260,7 @@ project(':frontcache-core') {
         api         	'org.apache.httpcomponents:httpclient:4.5.14' // final 4.5.x; 5.x is a package/API migration
         api         	'commons-io:commons-io:2.22.0'
         api         	'ch.qos.logback:logback-classic:1.5.38'
-		// Resilience4j replaced Hystrix (see docs/hystrix-to-resilience4j-proposal.md). Removing
+		// Resilience4j replaced Hystrix (see docs/archive/hystrix-to-resilience4j-proposal.md). Removing
 		// hystrix-core took five unmaintained artifacts off the runtime classpath of every origin call
 		// with it: archaius-core (2014), commons-configuration (2012), commons-lang (2011) and
 		// rxjava 1.x (EOL 2018). Each of these declares only resilience4j-core + slf4j-api.
@@ -272,7 +272,7 @@ project(':frontcache-core') {
 		// removal of Hystrix and stops being an accident of someone else's dependency tree.
 		api         	'org.hdrhistogram:HdrHistogram:2.2.2'
 
-		// Prometheus / OTLP export (docs/hystrix-to-resilience4j-proposal.md section 7.5). Additive:
+		// Prometheus / OTLP export (docs/archive/hystrix-to-resilience4j-proposal.md section 7.5). Additive:
 		// the dashboard SSE contract is unaffected, and export defaults to none, so an upgrade
 		// starts no listener and no push loop until front-cache.metrics.export says so.
 		// 1.17.1 is the current STABLE micrometer; 1.18.0-M1 exists and is deliberately not used - a

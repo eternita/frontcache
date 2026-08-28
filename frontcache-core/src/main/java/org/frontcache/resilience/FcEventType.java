@@ -18,7 +18,7 @@ package org.frontcache.resilience;
  * registers no collapsers and does not use request caching), but the dashboard asserts their fields
  * exist, so the emitter needs a counter to read a zero from.
  *
- * See docs/hystrix-to-resilience4j-proposal.md sections 4.1 and 7.3.
+ * See docs/archive/hystrix-to-resilience4j-proposal.md sections 4.1 and 7.3.
  */
 public enum FcEventType {
 

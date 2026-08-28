@@ -14,7 +14,7 @@ import java.util.Set;
  * One edge's bot user-agent keywords.
  *
  * A flat set as of 2.7: the management API used to return these keyed by domain, which always held a
- * single entry once one node served one site. See docs/multi-domain-retirement-proposal.md section 8.
+ * single entry once one node served one site. See docs/archive/multi-domain-retirement-proposal.md section 8.
  */
 public class BotConfig {
 

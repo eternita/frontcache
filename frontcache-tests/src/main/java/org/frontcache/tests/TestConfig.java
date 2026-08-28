@@ -21,7 +21,7 @@ public class TestConfig {
 	// A second spelling of the SAME node. FrontCacheCluster / FrontCacheAgentCluster key their
 	// result maps by member URL, so a cluster fan-out test needs two distinct member URLs; there is
 	// no second node. This used to be a second virtual hostname (www.fc2-test.org) back when a node
-	// could serve several domains - see docs/multi-domain-retirement-proposal.md.
+	// could serve several domains - see docs/archive/multi-domain-retirement-proposal.md.
 	public static final String FRONTCACHE_STANDALONE_TEST_BASE_URI_LOOPBACK = "http://127.0.0.1:9080/";
 
 	public static final String FRONTCACHE_FILTER_TEST_BASE_URI_LOOPBACK = "http://127.0.0.1:8080/";

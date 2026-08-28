@@ -24,7 +24,7 @@ import org.junit.Test;
  * They used to be layered per domain: FCConfig scanned conf/ for subdirectories, treated each as a
  * domain, and looked up conf/&lt;domain&gt;/bots.conf with the top-level file as the fallback. One node
  * now serves one site, so each config is a single flat collection loaded from the top-level file.
- * See docs/multi-domain-retirement-proposal.md.
+ * See docs/archive/multi-domain-retirement-proposal.md.
  *
  * Fixture: src/test/resources/fallback-home/conf/{bots.conf,dynamic-urls.conf}, pinned as
  * -Dfrontcache.home by the frontcache-core test task.

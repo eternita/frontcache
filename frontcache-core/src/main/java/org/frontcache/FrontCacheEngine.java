@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
 public class FrontCacheEngine {
 
 
-	// This node's site. One node serves one site - see docs/multi-domain-retirement-proposal.md.
+	// This node's site. One node serves one site - see docs/archive/multi-domain-retirement-proposal.md.
 	private String domain;          // front-cache.default-domain
 	private String siteKey;         // front-cache.site-key
 	private String originHost;      // front-cache.origin-host
@@ -269,7 +269,7 @@ public class FrontCacheEngine {
 	}
 
 	// Retired multi-domain config. One node serves one site; these keys used to make a node serve
-	// several. See docs/multi-domain-retirement-proposal.md.
+	// several. See docs/archive/multi-domain-retirement-proposal.md.
 	private static final String RETIRED_DOMAIN_LIST_KEY = "front-cache.domains";
 	private static final String RETIRED_DOMAIN_KEY_PREFIX = "front-cache.domain.";
 
@@ -368,7 +368,7 @@ public class FrontCacheEngine {
 		  .append("\nown domain with front-cache.default-domain and its origin with front-cache.origin-host")
 		  .append("\n(front-cache.origin-http-port / front-cache.origin-https-port). Per-domain config")
 		  .append("\nfiles move to the top-level conf/bots.conf, conf/dynamic-urls.conf, conf/fallbacks.conf.")
-		  .append("\n\nSee docs/multi-domain-retirement-proposal.md");
+		  .append("\n\nSee docs/archive/multi-domain-retirement-proposal.md");
 
 		return sb.toString();
 	}

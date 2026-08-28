@@ -563,7 +563,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * them. They are map keys inside a RequestContext, so nothing outside this process reads them - but
      * a fallback resolver or include processor compiled against 2.6 and dropped onto 2.7 does, via
      * get()/set(), and renaming the key would make such a plugin stop seeing the flag rather than fail
-     * to link. See the rename plan in docs/hystrix-to-resilience4j-proposal.md section 8.
+     * to link. See the rename plan in docs/archive/hystrix-to-resilience4j-proposal.md section 8.
      */
 
     public void setFallbackUsed() {

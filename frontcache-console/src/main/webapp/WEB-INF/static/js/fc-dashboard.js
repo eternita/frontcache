@@ -14,7 +14,7 @@
  * The console is deployed separately from the nodes it monitors, so this has to read a 2.6 node's
  * frames as well as a 2.7 one's - and 'type':'HystrixCommand' is pinned indefinitely anyway, because
  * an external Hystrix Dashboard or Turbine may be reading the same stream (see
- * docs/hystrix-to-resilience4j-proposal.md sections 7.1 and 8.2). So the field names below are the
+ * docs/archive/hystrix-to-resilience4j-proposal.md sections 7.1 and 8.2). So the field names below are the
  * documented contract, deliberately unchanged; only the renderer was replaced.
  *
  * What did change is what happens when a field is absent. The vendored dashboard asserted 36 keys and
@@ -428,7 +428,7 @@ var FcDashboard = (function () {
 
 		// Thread-pool frames ride the same stream. The console has not rendered them since the pool
 		// section was commented out; frontcache_threadpool_* in the Prometheus export is where those
-		// numbers live now (docs/hystrix-to-resilience4j-proposal.md section 7.5).
+		// numbers live now (docs/archive/hystrix-to-resilience4j-proposal.md section 7.5).
 		if (!frame || "HystrixCommand" !== frame.type || !frame.name)
 			return;
 

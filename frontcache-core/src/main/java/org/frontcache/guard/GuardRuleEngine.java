@@ -195,7 +195,7 @@ public class GuardRuleEngine {
 	 * front-cache.guard-rules.allowed-redirect-hosts.
 	 *
 	 * This used to also add front-cache.domains. That key is retired (a node configured with it
-	 * refuses to start - see docs/multi-domain-retirement-proposal.md), so the read is gone. Note
+	 * refuses to start - see docs/archive/multi-domain-retirement-proposal.md), so the read is gone. Note
 	 * that front-cache.default-domain has never been added here either, despite what this javadoc
 	 * used to claim: a redirect to your own site must be listed explicitly.
 	 */

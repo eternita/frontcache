@@ -209,7 +209,7 @@ That is all gone. A node configured for multi-domain now **refuses to start**
 (`FrontCacheEngine.rejectRetiredDomainConfig`); both nodes serve a single site and reach their
 origin through `front-cache.origin-host` / `front-cache.origin-http-port`; and every base URL is
 loopback. See
-[docs/multi-domain-retirement-proposal.md](../docs/multi-domain-retirement-proposal.md).
+[docs/archive/multi-domain-retirement-proposal.md](../docs/archive/multi-domain-retirement-proposal.md).
 
 ---
 
