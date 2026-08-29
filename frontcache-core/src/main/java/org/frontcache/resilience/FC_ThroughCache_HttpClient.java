@@ -13,12 +13,12 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.http.Header;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
@@ -55,7 +55,7 @@ public class FC_ThroughCache_HttpClient extends FcCommand<WebResponse> {
 
     @Override
     protected WebResponse run() throws FrontCacheException {
-		HttpResponse response = null;
+		ClassicHttpResponse response = null;
 
 		try {
 			logger.debug("calling " + originRequestURL);
@@ -75,7 +75,9 @@ public class FC_ThroughCache_HttpClient extends FcCommand<WebResponse> {
 			// call self-contained, independent of the inbound headers.
 			httpRequest.setHeader(FCHeaders.ACCEPT_ENCODING, "gzip");
 
-			response = client.execute(httpHost, httpRequest);
+			// executeOpen(), not execute(): the execute() overload returning an open response is
+			// deprecated in 5.3 and this one is its replacement.
+			response = client.executeOpen(httpHost, httpRequest, null);
 			WebResponse webResp = FCUtils.httpResponse2WebComponent(originRequestURL, response, context);
 			return webResp;
 
@@ -85,7 +87,7 @@ public class FC_ThroughCache_HttpClient extends FcCommand<WebResponse> {
 		} finally {
 			if (null != response)
 				try {
-					((CloseableHttpResponse) response).close();
+					response.close();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}

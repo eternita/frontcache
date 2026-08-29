@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 
@@ -33,6 +33,6 @@ public interface IncludeProcessor {
 
 	public boolean hasIncludes(WebResponse webResponse, int recursionLevel);
 
-	public WebResponse processIncludes(WebResponse parentWebResponse, String appOriginBaseURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context, int recursionLevel);
+	public WebResponse processIncludes(WebResponse parentWebResponse, String appOriginBaseURL, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context, int recursionLevel);
 
 }

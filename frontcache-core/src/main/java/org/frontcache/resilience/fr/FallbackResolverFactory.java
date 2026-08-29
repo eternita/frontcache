@@ -9,7 +9,7 @@
 package org.frontcache.resilience.fr;
 
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.FCConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +30,7 @@ public class FallbackResolverFactory {
 		return instance;
 	}
 
-	public static FallbackResolver init(HttpClient client){
+	public static FallbackResolver init(FcHttpClient client){
 		if (null == instance) {
 			instance = getFallbackResolver();
 			instance.init(client);

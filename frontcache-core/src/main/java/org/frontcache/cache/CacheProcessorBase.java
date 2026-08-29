@@ -21,7 +21,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
@@ -98,7 +98,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 
 	@Override
-	public WebResponse processRequest(String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException {
+	public WebResponse processRequest(String originUrlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) throws FrontCacheException {
 
 		long start = System.currentTimeMillis();
 		boolean isRequestCacheable = true;
@@ -196,7 +196,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	 * @param client
 	 * @param context
 	 */
-	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
+	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context)
 	{
 		// Snapshot the request headers synchronously on the caller's thread. The async task below
 		// runs later on a pool thread while the original request thread keeps mutating the shared

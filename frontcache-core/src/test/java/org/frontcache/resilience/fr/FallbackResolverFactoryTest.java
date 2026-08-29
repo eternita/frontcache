@@ -16,7 +16,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.WebResponse;
 import org.junit.Test;
 
@@ -148,7 +148,7 @@ public class FallbackResolverFactoryTest {
 			constructed++;
 		}
 
-		public void init(HttpClient client) { }
+		public void init(FcHttpClient client) { }
 
 		public WebResponse getFallback(String fallbackSource, String urlStr) { return null; }
 
@@ -158,7 +158,7 @@ public class FallbackResolverFactoryTest {
 	public static class CurrentResolver implements FallbackResolver {
 
 		@Override
-		public void init(HttpClient client) { }
+		public void init(FcHttpClient client) { }
 
 		@Override
 		public WebResponse getFallback(String fallbackSource, String urlStr) { return null; }

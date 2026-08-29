@@ -23,7 +23,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
@@ -88,7 +88,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param hostURL
 	 * @return
 	 */
-	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context, int recursionLevel)
+	public WebResponse processIncludes(WebResponse parentWebResponse, String hostURL, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context, int recursionLevel)
 	{
 		// The ONE decode of the parent page per recursion level. hasIncludes() used to decode it too,
 		// immediately before this, purely to test for the marker - it now scans the bytes instead
@@ -170,7 +170,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * @param hostURL
 	 * @return
 	 */
-	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context)
+	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context)
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
 
@@ -319,12 +319,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		String includeClientType; // bot|browser
 		WebResponse webResponse;
 		Map<String, List<String>> requestHeaders;
-		HttpClient client;
+		FcHttpClient client;
 		RequestContext context;
 		boolean performInclude = true;
 		String includeLevel = null;
 
-		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String includeType, String includeClientType, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) {
+		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String includeType, String includeClientType, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) {
 			super();
 			this.startIdx = startIdx;
 			this.endIdx = endIdx;

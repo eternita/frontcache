@@ -14,16 +14,21 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.core5.http.io.SocketConfig;
+import org.apache.hc.core5.util.Timeout;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.frontcache.tests.TestConfig;
 import org.frontcache.tests.base.SiteKeys;
 import org.frontcache.tests.base.TestsBase;
@@ -77,11 +82,20 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 
 	private static CloseableHttpClient client()
 	{
+		// HttpClient 5: the socket read timeout is SocketConfig on the connection manager, not
+		// RequestConfig. This test reads an SSE stream, so the read timeout is what bounds it.
+		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+		connectionManager.setDefaultSocketConfig(SocketConfig.custom()
+				.setSoTimeout(Timeout.ofMilliseconds(SOCKET_TIMEOUT_MS))
+				.build());
+		connectionManager.setDefaultConnectionConfig(ConnectionConfig.custom()
+				.setConnectTimeout(Timeout.ofMilliseconds(SOCKET_TIMEOUT_MS))
+				.build());
+
 		return HttpClients.custom()
+				.setConnectionManager(connectionManager)
 				.setDefaultRequestConfig(RequestConfig.custom()
-						.setSocketTimeout(SOCKET_TIMEOUT_MS)
-						.setConnectTimeout(SOCKET_TIMEOUT_MS)
-						.setConnectionRequestTimeout(SOCKET_TIMEOUT_MS)
+						.setConnectionRequestTimeout(Timeout.ofMilliseconds(SOCKET_TIMEOUT_MS))
 						.build())
 				.build();
 	}
@@ -209,9 +223,9 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 		CloseableHttpClient httpClient = client();
 		try {
 			long start = System.currentTimeMillis();
-			CloseableHttpResponse response = httpClient.execute(get);
+			ClassicHttpResponse response = httpClient.execute(get);
 			try {
-				assertEquals(200, response.getStatusLine().getStatusCode());
+				assertEquals(200, response.getCode());
 
 				BufferedReader reader = new BufferedReader(new InputStreamReader(
 						response.getEntity().getContent(), StandardCharsets.UTF_8));
@@ -228,7 +242,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 						+ " than flushed per frame", elapsed < FIRST_FRAME_DEADLINE_MS);
 			} finally {
 				get.abort();
-				response.close();
+				closeQuietly(response);
 			}
 		} finally {
 			httpClient.close();
@@ -313,12 +327,12 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 
 		CloseableHttpClient httpClient = client();
 		try {
-			CloseableHttpResponse response = httpClient.execute(get);
+			ClassicHttpResponse response = httpClient.execute(get);
 			try {
-				return response.getStatusLine().getStatusCode();
+				return response.getCode();
 			} finally {
 				get.abort();
-				response.close();
+				closeQuietly(response);
 			}
 		} finally {
 			httpClient.close();
@@ -334,10 +348,10 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 
 		CloseableHttpClient httpClient = client();
 		try {
-			CloseableHttpResponse response = httpClient.execute(get);
+			ClassicHttpResponse response = httpClient.execute(get);
 			try {
 				assertEquals("stream should be served for a valid site key",
-						200, response.getStatusLine().getStatusCode());
+						200, response.getCode());
 
 				BufferedReader reader = new BufferedReader(new InputStreamReader(
 						response.getEntity().getContent(), StandardCharsets.UTF_8));
@@ -365,7 +379,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 			} finally {
 				// The stream is infinite; abort before close or close() blocks on more data.
 				get.abort();
-				response.close();
+				closeQuietly(response);
 			}
 		} finally {
 			httpClient.close();
@@ -382,14 +396,14 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 
 		final CloseableHttpClient httpClient;
 		final HttpGet get;
-		final CloseableHttpResponse response;
+		final ClassicHttpResponse response;
 		final int status;
 
-		OpenStream(CloseableHttpClient httpClient, HttpGet get, CloseableHttpResponse response) {
+		OpenStream(CloseableHttpClient httpClient, HttpGet get, ClassicHttpResponse response) {
 			this.httpClient = httpClient;
 			this.get = get;
 			this.response = response;
-			this.status = response.getStatusLine().getStatusCode();
+			this.status = response.getCode();
 		}
 
 		void close() {
@@ -432,5 +446,20 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 		}
 
 		fail(message);
+	}
+
+	/**
+	 * Closes an abandoned streaming response. Always paired with {@code get.abort()}: the abort has
+	 * already discarded the connection, so ChunkedInputStream.close()'s attempt to drain the
+	 * remaining chunks - which on an endless SSE stream could never finish anyway - throws
+	 * "Socket closed". HttpClient 4.5 swallowed that inside CloseableHttpResponse.close(); 5.x
+	 * propagates it. Nothing here is recoverable or informative.
+	 */
+	private static void closeQuietly(ClassicHttpResponse response) {
+		try {
+			response.close();
+		} catch (IOException e) {
+			// expected - see above
+		}
 	}
 }

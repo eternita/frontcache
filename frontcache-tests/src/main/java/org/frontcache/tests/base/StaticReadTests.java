@@ -12,13 +12,14 @@ import static org.junit.Assert.assertEquals;
 
 import java.net.URL;
 
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.junit.After;
@@ -94,19 +95,19 @@ public abstract class StaticReadTests extends TestsBase {
 		String urlStr = getFrontCacheBaseURLLocalhost() + "common/static-read/image.jpg";
 		CloseableHttpClient httpclient = HttpClients.createDefault();
 
-		HttpResponse response = null;
+		ClassicHttpResponse response = null;
 
 		HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
-		HttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(urlStr));
+		ClassicHttpRequest httpRequest = new HttpGet(FCUtils.buildRequestURI(urlStr));
 		httpRequest.addHeader(FCHeaders.ACCEPT, "image/webp,image/*,*/*;q=0.8");
 
-		response = httpclient.execute(httpHost, httpRequest);
+		response = httpclient.executeOpen(httpHost, httpRequest, null);
 
 		byte[] data = getBytes(response.getEntity().getContent());
 
 		assertEquals(167579, data.length);
 
-		((CloseableHttpResponse) response).close();
+		((ClassicHttpResponse) response).close();
 		return;
 	}
 

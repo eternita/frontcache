@@ -26,7 +26,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -444,11 +444,11 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         put("requestQueryParams", qp);
     }
 
-    public CloseableHttpResponse getHttpClientResponse() {
-        return (CloseableHttpResponse) get("httpClientResponse");
+    public ClassicHttpResponse getHttpClientResponse() {
+        return (ClassicHttpResponse) get("httpClientResponse");
     }
 
-    public void setHttpClientResponse(CloseableHttpResponse response) {
+    public void setHttpClientResponse(ClassicHttpResponse response) {
     	this.set("httpClientResponse", response);
     }
 
@@ -475,7 +475,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     	if (2 > httpClientResponseParties.incrementAndGet())
     		return; // the other party is still using the response (or has yet to open it)
 
-    	CloseableHttpResponse response = getHttpClientResponse();
+    	ClassicHttpResponse response = getHttpClientResponse();
     	if (null == response)
     		return; // no origin response was ever opened (filter mode, or the call failed)
 
@@ -747,7 +747,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 	 * A bounded, one-line summary for diagnostics - NOT a dump of the map.
 	 *
 	 * This used to be {@code super.toString()} (every entry, including the HttpServletRequest, the
-	 * HttpServletResponse, the open origin CloseableHttpResponse and the whole origin header map) put
+	 * HttpServletResponse, the open origin ClassicHttpResponse and the whole origin header map) put
 	 * through a freshly-compiled regex to squash newlines.
 	 *
 	 * The reason that mattered is where it is called from: all four command fallbacks log it - so it

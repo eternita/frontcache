@@ -25,14 +25,16 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.pool.PoolStats;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.core5.util.Timeout;
+import org.apache.hc.core5.pool.PoolStats;
 import org.frontcache.FCConfig;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
+import org.frontcache.core.FcHttpClient;
 import org.junit.AfterClass;
 import org.junit.After;
 import org.junit.BeforeClass;
@@ -76,7 +78,7 @@ public class OriginTimeoutAbortTest {
 		File fallbackHome = new File(confMarker.toURI()).getParentFile().getParentFile();
 		System.setProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY, fallbackHome.getAbsolutePath());
 
-		FallbackResolverFactory.init(mock(HttpClient.class));
+		FallbackResolverFactory.init(mock(FcHttpClient.class));
 
 		blackHole = new ServerSocket(0);
 		accepter = new Thread(new Runnable() {
@@ -162,9 +164,9 @@ public class OriginTimeoutAbortTest {
 				// Deliberately far longer than the command timeout: without the abort, the connection
 				// would be held for this long after the command has already given up. That gap IS the
 				// leak, so the test has to leave room for it to show.
-				.setDefaultRequestConfig(org.apache.http.client.config.RequestConfig.custom()
-						.setSocketTimeout(30000)
-						.setConnectTimeout(2000)
+				// 5.x: socket read timeout is SocketConfig, connect timeout is ConnectionConfig -
+						// both on the connection manager, not RequestConfig.
+				.setDefaultRequestConfig(org.apache.hc.client5.http.config.RequestConfig.custom()
 						.build())
 				.build();
 
@@ -208,15 +210,14 @@ public class OriginTimeoutAbortTest {
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
 		connectionManager.setMaxTotal(2);
 		connectionManager.setDefaultMaxPerRoute(2);
+		configureTimeouts(connectionManager);
 
 		HttpClient client = HttpClients.custom()
 				.setConnectionManager(connectionManager)
-				.setDefaultRequestConfig(org.apache.http.client.config.RequestConfig.custom()
-						.setSocketTimeout(30000)
-						.setConnectTimeout(2000)
+				.setDefaultRequestConfig(org.apache.hc.client5.http.config.RequestConfig.custom()
 						// Fail fast rather than block forever once the pool is exhausted, so an actual
 						// leak shows up as a failed assertion instead of a hung build.
-						.setConnectionRequestTimeout(3000)
+						.setConnectionRequestTimeout(Timeout.ofMilliseconds(3000))
 						.build())
 				.build();
 
@@ -253,5 +254,21 @@ public class OriginTimeoutAbortTest {
 		}
 
 		return stats;
+	}
+
+	/**
+	 * The long socket timeout this test depends on. Deliberately far longer than the command timeout:
+	 * without the abort, the connection would be held for this long after the command has already
+	 * given up. That gap IS the leak, so the test has to leave room for it to show.
+	 *
+	 * In 4.5 these two lived on RequestConfig; HttpClient 5 moved them to the connection manager.
+	 */
+	private static void configureTimeouts(PoolingHttpClientConnectionManager connectionManager) {
+		connectionManager.setDefaultSocketConfig(org.apache.hc.core5.http.io.SocketConfig.custom()
+				.setSoTimeout(Timeout.ofMilliseconds(30000))
+				.build());
+		connectionManager.setDefaultConnectionConfig(org.apache.hc.client5.http.config.ConnectionConfig.custom()
+				.setConnectTimeout(Timeout.ofMilliseconds(2000))
+				.build());
 	}
 }

@@ -23,6 +23,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -30,12 +31,18 @@ import java.util.TreeMap;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.message.BasicHeader;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HeaderElement;
+import org.apache.hc.core5.http.message.MessageSupport;
+import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.client5.http.ConnectionKeepAliveStrategy;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheProcessor;
@@ -152,7 +159,7 @@ public class FCUtils {
 	 * @param httpResponse
 	 * @return
 	 */
-	public static WebResponse dynamicCall(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
+	public static WebResponse dynamicCall(String urlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) throws FrontCacheException
     {
 		// add include-level header - to trace include tree
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL, "" + context.getIncludeLevel());
@@ -160,16 +167,15 @@ public class FCUtils {
 		// add request-id header - to distinguish if sent by frontcache or not (for include processing)
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 
-		if (context.isFilterMode())
-			 return new FC_ThroughCache_WebFilter(context).execute();
-		else
-			 return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
+		// The filter-mode / standalone split lives in the FcHttpClient implementation now - reaching
+		// the origin through the app's own filter chain is just another origin transport.
+		return client.fetch(urlStr, requestHeaders, context);
     }
 
 	/**
 	 * for includes ONLY - they allways use httpClient
 	 */
-	public static WebResponse includeDynamicCallHttpClient(String urlStr, Map<String, List<String>> requestHeaders, HttpClient client, RequestContext context) throws FrontCacheException
+	public static WebResponse includeDynamicCallHttpClient(String urlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) throws FrontCacheException
     {
 		// add request-id header - to trace include tree
 		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
@@ -182,7 +188,7 @@ public class FCUtils {
 		if (!requestHeaders.containsKey(FCHeaders.X_FRONTCACHE_CLIENT_IP))
 			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, context.getClientIP());
 
-		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
+		return client.fetchOverHttp(urlStr, requestHeaders, context);
     }
 
 	public static String getClientIP(HttpServletRequest request) {
@@ -354,11 +360,11 @@ public class FCUtils {
 		return ORIGIN_BODY_DEFAULT_CAPACITY;
 	}
 
-	public static WebResponse httpResponse2WebComponent(String url, HttpResponse response, RequestContext context) throws FrontCacheException, IOException
+	public static WebResponse httpResponse2WebComponent(String url, ClassicHttpResponse response, RequestContext context) throws FrontCacheException, IOException
 	{
 
 
-		int httpResponseCode = response.getStatusLine().getStatusCode();
+		int httpResponseCode = response.getCode();
 
 
 		String contentType = "";
@@ -395,7 +401,7 @@ public class FCUtils {
 		}
 		respData = baos.toByteArray(); // empty byte[] when there is no entity
 
-		Map<String, List<String>> headers = revertHeaders(response.getAllHeaders());
+		Map<String, List<String>> headers = revertHeaders(response.getHeaders());
 		webResponse = parseWebComponent(url, respData, headers);
 
 		webResponse.setHeaders(headers);
@@ -711,8 +717,38 @@ public class FCUtils {
 		return ""; // default
 	}
 
+	/**
+	 * The keep-alive strategy shared by the engine's origin client and FrontCacheClient: honour the
+	 * origin's own {@code Keep-Alive: timeout=N}, defaulting to 10s when it does not say.
+	 *
+	 * Extracted during the HttpClient 5 migration - the same anonymous class was pasted into
+	 * FrontCacheEngine and FrontCacheClient (and into FrontCacheAgent, which cannot share it because
+	 * the agent must not depend on frontcache-core). 5.x also replaced the hand-rolled
+	 * BasicHeaderElementIterator with MessageSupport.iterate().
+	 */
+	public static ConnectionKeepAliveStrategy keepAliveStrategy() {
+		return (response, context) -> {
+			Iterator<HeaderElement> it = MessageSupport.iterate(response, HttpHeaders.KEEP_ALIVE);
+			while (it.hasNext()) {
+				HeaderElement he = it.next();
+				String param = he.getName();
+				String value = he.getValue();
+				if (null != value && param.equalsIgnoreCase("timeout")) {
+					try {
+						return TimeValue.ofSeconds(Long.parseLong(value));
+					} catch (NumberFormatException e) {
+						break; // origin sent a non-numeric timeout - fall through to the default
+					}
+				}
+			}
+			return TimeValue.ofSeconds(10);
+		};
+	}
+
 	public static HttpHost getHttpHost(URL host) {
-		HttpHost httpHost = new HttpHost(host.getHost(), host.getPort(), host.getProtocol());
+		// HttpClient 5 reordered these: 4.5 was (hostname, port, scheme), 5.x is (scheme, hostname,
+		// port). Same arity, so the only thing that caught it was the type change.
+		HttpHost httpHost = new HttpHost(host.getProtocol(), host.getHost(), host.getPort());
 		return httpHost;
 	}
 

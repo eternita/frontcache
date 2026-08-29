@@ -10,7 +10,7 @@ package org.frontcache.resilience.fr;
 
 import java.util.Set;
 
-import org.apache.http.client.HttpClient;
+import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.WebResponse;
 
 /**
@@ -32,7 +32,7 @@ import org.frontcache.core.WebResponse;
  */
 public interface FallbackResolver {
 
-	public void init(HttpClient client);
+	public void init(FcHttpClient client);
 
 	public WebResponse getFallback(String fallbackSource, String urlStr);
 

@@ -21,18 +21,20 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPatch;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.entity.InputStreamEntity;
-import org.apache.http.message.BasicHttpRequest;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.client5.http.classic.methods.HttpPatch;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpPut;
+import org.apache.hc.core5.http.io.entity.InputStreamEntity;
+import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
@@ -136,7 +138,7 @@ public class FC_BypassCache extends FcCommand<Object> {
 			String uri = context.getRequestURI();
 
 			try {
-				HttpResponse response = forward(client, verb, uri, request, headers, requestEntity, passthroughEncoding);
+				ClassicHttpResponse response = forward(client, verb, uri, request, headers, requestEntity, passthroughEncoding);
 
 				// response 2 context
 				setResponse(response);
@@ -157,13 +159,13 @@ public class FC_BypassCache extends FcCommand<Object> {
 	}
 
 
-	private void setResponse(HttpResponse response) throws IOException {
+	private void setResponse(ClassicHttpResponse response) throws IOException {
 
-		context.setHttpClientResponse((CloseableHttpResponse) response);
+		context.setHttpClientResponse(response);
 
-		setResponse(response.getStatusLine().getStatusCode(),
+		setResponse(response.getCode(),
 				response.getEntity() == null ? null : response.getEntity().getContent(),
-				FCUtils.revertHeaders(response.getAllHeaders()));
+				FCUtils.revertHeaders(response.getHeaders()));
 	}
 
 
@@ -196,6 +198,31 @@ public class FC_BypassCache extends FcCommand<Object> {
 	}
 
 	/**
+	 * The ContentType for a forwarded request entity. HttpClient 5's InputStreamEntity requires one
+	 * where 4.5's (stream, length) constructor did not; forward the client's own, null when it did not
+	 * declare one or could not be parsed. The header itself is still forwarded separately by
+	 * convertHeaders(), and setHeaders() replaces whatever the entity contributed, so the origin sees
+	 * exactly one Content-Type. See docs/httpclient5-upgrade-proposal.md section 4.4.
+	 *
+	 * Only ever called from the POST/PUT/PATCH branches: a GET has no entity, and on that path the
+	 * servlet request may legitimately be null.
+	 */
+	private static ContentType entityContentType(HttpServletRequest request) {
+		if (null == request)
+			return null;
+
+		String contentType = request.getContentType();
+		if (null == contentType)
+			return null;
+
+		try {
+			return ContentType.parse(contentType);
+		} catch (Exception e) {
+			return null; // client sent a malformed Content-Type - forward the header, not the parse
+		}
+	}
+
+	/**
 	 * forward all kind of requests (GET, POST, PUT, ...)
 	 *
 	 * @param httpclient
@@ -209,13 +236,13 @@ public class FC_BypassCache extends FcCommand<Object> {
 	 * @throws Exception
 	 */
 	// package-private (not private) so unit tests in this package can drive the origin call directly
-	HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
+	ClassicHttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
 			Map<String, List<String>> headers, InputStream requestEntity)
 					throws Exception {
 		return forward(httpclient, verb, uri, request, headers, requestEntity, false);
 	}
 
-	HttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
+	ClassicHttpResponse forward(HttpClient httpclient, String verb, String uri, HttpServletRequest request,
 			Map<String, List<String>> headers, InputStream requestEntity, boolean passthroughEncoding)
 					throws Exception {
 
@@ -223,25 +250,25 @@ public class FC_BypassCache extends FcCommand<Object> {
 		HttpHost httpHost = FCUtils.getHttpHost(host);
 		uri = DUPLICATE_SLASHES.matcher(host.getPath() + uri).replaceAll("/");
 
-		HttpRequest httpRequest;
+		ClassicHttpRequest httpRequest;
 		switch (verb.toUpperCase()) {
 		case "POST":
 			HttpPost httpPost = new HttpPost(uri + context.getRequestQueryString());
 			httpRequest = httpPost;
-			httpPost.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
+			httpPost.setEntity(new InputStreamEntity(requestEntity, request.getContentLength(), entityContentType(request)));
 			break;
 		case "PUT":
 			HttpPut httpPut = new HttpPut(uri + context.getRequestQueryString());
 			httpRequest = httpPut;
-			httpPut.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
+			httpPut.setEntity(new InputStreamEntity(requestEntity, request.getContentLength(), entityContentType(request)));
 			break;
 		case "PATCH":
 			HttpPatch httpPatch = new HttpPatch(uri + context.getRequestQueryString());
 			httpRequest = httpPatch;
-			httpPatch.setEntity(new InputStreamEntity(requestEntity, request.getContentLength()));
+			httpPatch.setEntity(new InputStreamEntity(requestEntity, request.getContentLength(), entityContentType(request)));
 			break;
 		default:
-			httpRequest = new BasicHttpRequest(verb, uri + context.getRequestQueryString());
+			httpRequest = new BasicClassicHttpRequest(verb, uri + context.getRequestQueryString());
 		}
 
 
@@ -253,12 +280,12 @@ public class FC_BypassCache extends FcCommand<Object> {
 				// Leave the client's Accept-Encoding alone AND stop HttpClient from decompressing the
 				// response, so the origin's Content-Encoding and its compressed bytes reach the client
 				// untouched. Applied through the context because the GET branch above builds a
-				// BasicHttpRequest, which has no setConfig() of its own.
+				// BasicClassicHttpRequest, which has no setConfig() of its own.
 				HttpClientContext httpContext = HttpClientContext.create();
 				httpContext.setRequestConfig(RequestConfig.copy(RequestConfig.DEFAULT)
 						.setContentCompressionEnabled(false)
 						.build());
-				return httpclient.execute(httpHost, httpRequest, httpContext);
+				return httpclient.executeOpen(httpHost, httpRequest, httpContext);
 			}
 
 			// Always advertise gzip (and only gzip) to the origin. Our HttpClient transparently
@@ -266,7 +293,7 @@ public class FC_BypassCache extends FcCommand<Object> {
 			// encoding it cannot handle (e.g. br/zstd). buildRequestHeaders() normalizes this too;
 			// setting it here makes the origin call self-contained, independent of the inbound headers.
 			httpRequest.setHeader(FCHeaders.ACCEPT_ENCODING, "gzip");
-			HttpResponse originResponse = httpclient.execute(httpHost, httpRequest);
+			ClassicHttpResponse originResponse = httpclient.executeOpen(httpHost, httpRequest, null);
 			return originResponse;
 		} finally {
 			// When HttpClient instance is no longer needed,

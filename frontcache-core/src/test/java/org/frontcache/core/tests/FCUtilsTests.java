@@ -16,8 +16,8 @@ import static org.junit.Assert.assertTrue;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.http.Header;
-import org.apache.http.message.BasicHeader;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.junit.Test;

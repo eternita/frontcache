@@ -19,15 +19,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.http.Header;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.ProtocolVersion;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.message.BasicStatusLine;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
 import org.junit.Test;
@@ -52,12 +51,13 @@ public class OriginAcceptEncodingTest {
 		return ctx;
 	}
 
-	/** A CloseableHttpResponse minimal enough for FCUtils.httpResponse2WebComponent to consume. */
-	private CloseableHttpResponse okResponse() throws Exception {
-		CloseableHttpResponse response = mock(CloseableHttpResponse.class);
-		when(response.getStatusLine()).thenReturn(new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"));
+	/** A ClassicHttpResponse minimal enough for FCUtils.httpResponse2WebComponent to consume. */
+	private ClassicHttpResponse okResponse() throws Exception {
+		ClassicHttpResponse response = mock(ClassicHttpResponse.class);
+		when(response.getCode()).thenReturn(200);
+		when(response.getReasonPhrase()).thenReturn("OK");
 		when(response.getEntity()).thenReturn(new StringEntity("ok"));
-		when(response.getAllHeaders()).thenReturn(new Header[0]);
+		when(response.getHeaders()).thenReturn(new Header[0]);
 		return response;
 	}
 
@@ -79,10 +79,10 @@ public class OriginAcceptEncodingTest {
 		Map<String, List<String>> requestHeaders = new HashMap<String, List<String>>();
 		requestHeaders.put(FCHeaders.ACCEPT_ENCODING, Arrays.asList("gzip, deflate, br"));
 
-		CloseableHttpResponse response = okResponse(); // build mock before stubbing client.execute
+		ClassicHttpResponse response = okResponse(); // build mock before stubbing client.execute
 		HttpClient client = mock(HttpClient.class);
-		ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
-		when(client.execute(any(HttpHost.class), captor.capture())).thenReturn(response);
+		ArgumentCaptor<ClassicHttpRequest> captor = ArgumentCaptor.forClass(ClassicHttpRequest.class);
+		when(client.executeOpen(any(HttpHost.class), captor.capture(), any())).thenReturn(response);
 
 		new FC_ThroughCache_HttpClient("http://origin.test.org/page.htm", requestHeaders, client, ctx).run();
 
@@ -102,10 +102,10 @@ public class OriginAcceptEncodingTest {
 		Map<String, List<String>> headers = new HashMap<String, List<String>>();
 		headers.put(FCHeaders.ACCEPT_ENCODING, Arrays.asList("gzip, deflate, br"));
 
-		CloseableHttpResponse response = okResponse(); // build mock before stubbing client.execute
+		ClassicHttpResponse response = okResponse(); // build mock before stubbing client.execute
 		HttpClient client = mock(HttpClient.class);
-		ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
-		when(client.execute(any(HttpHost.class), captor.capture())).thenReturn(response);
+		ArgumentCaptor<ClassicHttpRequest> captor = ArgumentCaptor.forClass(ClassicHttpRequest.class);
+		when(client.executeOpen(any(HttpHost.class), captor.capture(), any())).thenReturn(response);
 
 		FC_BypassCache cmd = new FC_BypassCache(client, ctx);
 		cmd.forward(client, "GET", "/page.htm", null, headers, null);
@@ -124,10 +124,10 @@ public class OriginAcceptEncodingTest {
 		Map<String, List<String>> requestHeaders = new HashMap<String, List<String>>();
 		requestHeaders.put(FCHeaders.ACCEPT_ENCODING, Arrays.asList("zstd"));
 
-		CloseableHttpResponse response = okResponse(); // build mock before stubbing client.execute
+		ClassicHttpResponse response = okResponse(); // build mock before stubbing client.execute
 		HttpClient client = mock(HttpClient.class);
-		ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
-		when(client.execute(any(HttpHost.class), captor.capture())).thenReturn(response);
+		ArgumentCaptor<ClassicHttpRequest> captor = ArgumentCaptor.forClass(ClassicHttpRequest.class);
+		when(client.executeOpen(any(HttpHost.class), captor.capture(), any())).thenReturn(response);
 
 		new FC_ThroughCache_HttpClient("http://origin.test.org/page.htm", requestHeaders, client, ctx).run();
 
