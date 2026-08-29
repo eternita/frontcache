@@ -696,6 +696,65 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         set(CLIENT_IP, clientIP);
     }
 
+    private static final String RATE_LIMIT_KEY = "rateLimitKey";
+    private static final String RATE_LIMIT_KEY_NONE = ""; // sentinel: resolved, and there is no answer
+
+    /**
+     * The client address rate limiting counts against, resolved once per request.
+     *
+     * Deliberately NOT {@link #getClientIP()}. That one walks thirteen client-supplied headers and
+     * returns the first non-empty value, which is right for a log column and would let any client
+     * mint itself a fresh counter per request by sending its own X-Forwarded-For. This goes through
+     * {@link ClientIpResolver}, which reads a forwarding header only from a configured trusted proxy
+     * and walks it right to left. The two can legitimately disagree, which is why the guard log line
+     * carries this one explicitly.
+     *
+     * @return canonical client address, or null when it cannot be established
+     */
+    public String getRateLimitKey() {
+        String key = (String) get(RATE_LIMIT_KEY);
+        if (null == key) {
+            key = ClientIpResolver.getInstance().resolve(getRequest());
+            // ConcurrentHashMap cannot hold a null, and "unresolved" must not be re-resolved per
+            // predicate, so an empty string stands for "resolved to nothing"
+            set(RATE_LIMIT_KEY, (null != key) ? key : RATE_LIMIT_KEY_NONE);
+        }
+        return RATE_LIMIT_KEY_NONE.equals(key) ? null : key;
+    }
+
+    private static final String GUARD_PROBE = "guardProbe";
+
+    /**
+     * Marks a synthetic context built for a load-time guard self-check (redirect-loop detection,
+     * the exemption warnings) rather than for a real request. Predicates with side effects - today,
+     * the rate limiter - must do nothing for one of these.
+     */
+    public void setGuardProbe() {
+        set(GUARD_PROBE);
+    }
+
+    public boolean isGuardProbe() {
+        return getBoolean(GUARD_PROBE);
+    }
+
+    private static final String GUARD_RETRY_AFTER_SECONDS = "guardRetryAfterSeconds";
+
+    /**
+     * Seconds until a rate-limited client's window rolls over, stashed by the rate predicate and
+     * emitted as Retry-After by the guard response.
+     */
+    public void setGuardRetryAfterSeconds(int seconds) {
+        set(GUARD_RETRY_AFTER_SECONDS, Integer.valueOf(seconds));
+    }
+
+    /**
+     * @return the Retry-After value in seconds, or 0 when the matching rule had nothing to say
+     */
+    public int getGuardRetryAfterSeconds() {
+        Integer seconds = (Integer) get(GUARD_RETRY_AFTER_SECONDS);
+        return (null != seconds) ? seconds.intValue() : 0;
+    }
+
 	public RequestContext copy() {
 
 		RequestContext copy = new RequestContext();

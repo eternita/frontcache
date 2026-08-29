@@ -13,7 +13,10 @@ import java.util.regex.PatternSyntaxException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
+import org.frontcache.guard.ratelimit.RateLimitPredicate;
+import org.frontcache.guard.ratelimit.RateLimitSpec;
 
 /**
  * Parses a single predicate expression from guard-rules.conf into a {@link GuardPredicate}.
@@ -29,6 +32,8 @@ import org.frontcache.core.RequestContext;
  *   [!] client-type:&lt;bot|browser&gt;
  *   [!] cookie:&lt;name&gt;
  *   [!] header:&lt;name&gt;[~&lt;regex&gt;]
+ *   [!] request-type:&lt;toplevel|include|include-async&gt;
+ *       rate:&lt;limit&gt;/&lt;window&gt; [bucket=&lt;name&gt;] [scope=&lt;toplevel|all&gt;]   (never negated)
  *
  * Regexes are compiled once, here, and matched with find() semantics - the same behaviour as
  * dynamic-urls.conf patterns.
@@ -69,6 +74,12 @@ public class GuardPredicateFactory {
 
 		if (!negated)
 			return predicate;
+
+		// A counting predicate cannot be negated: "!rate:" would read as admission control, would
+		// count on the ALLOWED path, and would then let evaluation continue past it.
+		if (predicate instanceof RateLimitPredicate)
+			throw new GuardConfigException("rate predicate cannot be negated in '!" + expr
+					+ "' - write the rule around the over-limit case and use an 'allow' rule above it for exemptions");
 
 		final GuardPredicate delegate = predicate;
 		final String described = "!" + delegate.describe();
@@ -147,6 +158,23 @@ public class GuardPredicateFactory {
 				throw new GuardConfigException("cookie predicate needs a name in '" + expr + "'");
 			return simplePredicate(expr, ctx -> ctx.getCookieNames().contains(cookieName));
 		}
+
+		case "request-type":
+		{
+			// toplevel | include | include-async - set by FrontCacheEngine.init() from the
+			// X-Frontcache-Request-Id / X-Frontcache-Include-Level headers
+			final String requestType = arg;
+			if (0 == requestType.length())
+				throw new GuardConfigException("request-type predicate needs a value in '" + expr
+						+ "' (" + FCHeaders.COMPONENT_TOPLEVEL + ", " + FCHeaders.COMPONENT_INCLUDE
+						+ " or " + FCHeaders.COMPONENT_ASYNC_INCLUDE + ")");
+			return simplePredicate(expr, ctx -> requestType.equals(ctx.getRequestType()));
+		}
+
+		case "rate":
+			// The bucket defaults to the rule name, which is not known here - GuardRuleParser binds
+			// it (and resolves the limiter) once it has parsed the whole line.
+			return new RateLimitPredicate(RateLimitSpec.parse(arg, expr));
 
 		case "header":
 		{

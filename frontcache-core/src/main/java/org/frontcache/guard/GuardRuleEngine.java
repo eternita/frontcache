@@ -18,10 +18,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.frontcache.FCConfig;
+import org.frontcache.core.ClientIpResolver;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
+import org.frontcache.guard.ratelimit.GuardRateLimiterRegistry;
+import org.frontcache.guard.ratelimit.RateLimitPredicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +74,10 @@ public class GuardRuleEngine {
 
 	private void load()
 	{
+		// Before the rules, because a rate: predicate is bound while they parse and the resolver
+		// decides what its counter is keyed on.
+		ClientIpResolver.reload();
+
 		List<GuardRule> loaded = new ArrayList<GuardRule>();
 
 		loaded.addAll(buildInRules());
@@ -85,7 +93,50 @@ public class GuardRuleEngine {
 		for (GuardRule rule : this.rules)
 			logger.info("   " + rule);
 
+		releaseUnusedRateLimitBuckets();
 		warnOnMissingExemptions();
+		warnOnRateLimitWithoutTrustedProxies();
+	}
+
+	/**
+	 * Gives back the memory of rate-limit buckets no longer named by any rule. Runs after the new
+	 * rule list is live, so a bucket that survived the reload keeps the counts it already had.
+	 */
+	private void releaseUnusedRateLimitBuckets()
+	{
+		Set<String> inUse = new TreeSet<String>();
+
+		for (GuardRule rule : this.rules)
+			for (GuardPredicate predicate : rule.getPredicates())
+				if (predicate instanceof RateLimitPredicate)
+					inUse.add(((RateLimitPredicate) predicate).getBucket());
+
+		GuardRateLimiterRegistry.retain(inUse);
+	}
+
+	/**
+	 * Rate limiting behind a reverse proxy with no trusted proxies configured keys EVERY request on
+	 * the proxy's own address - which in the documented deployment (TLS terminated upstream,
+	 * proxied to 127.0.0.1) is one address for the whole site, so the first request over the limit
+	 * takes everyone down with it. Warn loudly rather than refuse: the pipeline's stance is that a
+	 * guard misconfiguration must degrade to "Frontcache as usual", not to an outage.
+	 */
+	private void warnOnRateLimitWithoutTrustedProxies()
+	{
+		if (ClientIpResolver.getInstance().hasTrustedProxies())
+			return;
+
+		for (GuardRule rule : this.rules)
+			for (GuardPredicate predicate : rule.getPredicates())
+				if (predicate instanceof RateLimitPredicate)
+				{
+					logger.warn("Guard rule '" + rule.getName() + "' rate-limits per client IP, but "
+							+ ClientIpResolver.TRUSTED_PROXIES_PROPERTY + " is empty, so the limiter keys on the socket"
+							+ " peer and ignores every forwarding header. That is correct only if clients connect to"
+							+ " this node DIRECTLY - behind nginx/a CDN it counts the whole site as one client."
+							+ " Set " + ClientIpResolver.TRUSTED_PROXIES_PROPERTY + " to the proxy's address.");
+					return;
+				}
 	}
 
 	/**
@@ -307,6 +358,10 @@ public class GuardRuleEngine {
 		String query = (-1 < queryIdx) ? pathAndQuery.substring(queryIdx) : "";
 
 		RequestContext context = new RequestContext();
+		// A probe is not traffic: predicates with side effects (the rate limiter) must do nothing
+		// for it. evaluate()'s countHits flag cannot carry this - rule.matches() never sees it, and
+		// checkNoSelfRedirect() calls matches() directly.
+		context.setGuardProbe();
 		context.setFrontCacheProtocol(protocol);
 		context.setFrontCacheHost(host);
 		context.setRequestURI(uri);

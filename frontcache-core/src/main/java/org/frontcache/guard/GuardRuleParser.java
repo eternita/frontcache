@@ -14,12 +14,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.frontcache.guard.ratelimit.RateLimitPredicate;
+
 /**
  * Parses one line of guard-rules.conf into a {@link GuardRule}.
  *
  * Line format (see docs/frontcache-protection-tech-design.md):
  *
  *   &lt;name&gt; | &lt;predicate&gt; ; &lt;predicate&gt; ... | &lt;action&gt; [| dry-run]
+ *
+ * A {@code rate:} predicate is moved to the END of its condition here (see
+ * {@link #parseCondition}); a rule may hold at most one.
  *
  * Actions:
  *   allow
@@ -55,6 +60,7 @@ public class GuardRuleParser {
 			throw new GuardConfigException("rule name is empty in '" + line + "'");
 
 		List<GuardPredicate> predicates = parseCondition(parts[1], line);
+		bindRateLimit(predicates, name, line);
 		GuardAction action = parseAction(parts[2].trim(), line);
 
 		boolean dryRun = false;
@@ -86,6 +92,44 @@ public class GuardRuleParser {
 			throw new GuardConfigException("rule has no condition in '" + line + "' - a rule matching everything is never what is meant");
 
 		return predicates;
+	}
+
+	/**
+	 * Puts the rule's {@code rate:} predicate last and binds it to its counter.
+	 *
+	 * <b>Order matters here in a way it does not for any other predicate.</b> The condition is an
+	 * AND evaluated with short-circuit, so moving the counting predicate to the end is
+	 * semantics-preserving for the match - but it is the difference between metering only the
+	 * requests the rest of the condition selected and metering every request that reaches the rule.
+	 * Written as {@code rate:5/10s ; uri~^/search}, the rule would count the whole site's traffic and
+	 * then report hits against a URI it never matched.
+	 *
+	 * Two rate predicates in one rule are refused rather than silently AND-ed: "over budget A and
+	 * over budget B" always consumes both budgets, which is not what anyone means by it.
+	 */
+	private void bindRateLimit(List<GuardPredicate> predicates, String ruleName, String line)
+	{
+		RateLimitPredicate rateLimit = null;
+		int index = -1;
+
+		for (int i = 0; i < predicates.size(); i++)
+		{
+			if (!(predicates.get(i) instanceof RateLimitPredicate))
+				continue;
+
+			if (null != rateLimit)
+				throw new GuardConfigException("rule '" + ruleName + "' has more than one rate predicate in '" + line
+						+ "' - split it into two rules, sharing a counter with bucket=<name> if that is what is meant");
+
+			rateLimit = (RateLimitPredicate) predicates.get(i);
+			index = i;
+		}
+
+		if (null == rateLimit)
+			return;
+
+		predicates.remove(index);
+		predicates.add(rateLimit.bind(ruleName));
 	}
 
 	private GuardAction parseAction(String action, String line)
