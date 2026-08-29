@@ -175,8 +175,92 @@ public class StandaloneMetricsExportTests extends TestsBase {
 		}
 	}
 
+	/**
+	 * Just the {@code # TYPE} lines. {@link #head(String)} truncates alphabetically-early series, which
+	 * is exactly the wrong window when the assertion that failed is about frontcache_guard_*.
+	 */
+	private static String typeLines(String body)
+	{
+		StringBuilder types = new StringBuilder();
+		for (String line : body.split("\n"))
+			if (line.startsWith("# TYPE "))
+				types.append(line).append('\n');
+
+		return types.toString();
+	}
+
 	private static String head(String body)
 	{
 		return body.length() > 2000 ? body.substring(0, 2000) : body;
 	}
+
+	/**
+	 * The guard series, added in phase 2 of the rate-limit work.
+	 *
+	 * Their counts existed before this only behind {@code get-guard-rules}, i.e. reachable by the
+	 * console and by nothing else - so "is this rule firing?" and "is a new dry-run rule about to
+	 * refuse real visitors?" could not be alerted on. The standalone node carries a rate rule scoped to
+	 * /common/rate-limit/ (see FRONTCACHE_HOME_STANDALONE/conf/guard-rules.conf), so driving that path
+	 * over its limit is what makes the counter move.
+	 */
+	@Test
+	public void scrapeExposesGuardRuleCountsAndRateLimitBuckets() throws Exception
+	{
+		// The 429s are the point of this test, so they must not abort it. webClient is rebuilt per test
+		// by TestsBase.setUp(), so this needs no restoring.
+		webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
+
+		// 3 per 2-second slot on this path - a few extra guarantee at least one rejection, whether or
+		// not the burst straddles a window boundary
+		for (int i = 0; i < 8; i++)
+			webClient.getPage(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST + "common/rate-limit/a.jsp");
+
+		CloseableHttpClient client = HttpClients.createDefault();
+		try {
+			ClassicHttpResponse response = client.execute(authenticatedScrape());
+			try {
+				assertEquals(200, response.getCode());
+				String body = EntityUtils.toString(response.getEntity());
+
+				assertTrue("no guard action series:\n" + head(body), body.contains("frontcache_guard_actions"));
+
+				// The rule that did the rejecting, labelled with the log's own disposition word.
+				assertTrue("rate rule not exported:\n" + head(body),
+						body.contains("name=\"ratelimit-e2e\""));
+				assertTrue("rejections not labelled as the log labels them:\n" + head(body),
+						body.contains("result=\"rejected\""));
+
+				// The built-ins report through the same model, so they are exported too - which is what
+				// makes "how much traffic is structurally broken?" a query rather than a log grep.
+				assertTrue("built-in guard rules not exported:\n" + head(body),
+						body.contains("name=\"uri-too-long\""));
+
+				// Exemptions are counted even though they write no log line: an allow rule with no hits
+				// is dead config sitting in front of the rules that matter.
+				assertTrue("allow rules not exported:\n" + head(body),
+						body.contains("result=\"allowed\""));
+
+				// The slot-array sizing signal for the rate-limit bucket.
+				assertTrue("rate-limit takeover series missing:\n" + head(body),
+						body.contains("frontcache_guard_ratelimit_takeovers"));
+
+				// Monotonic, so counters - a reload resets these, and Prometheus must read that as a
+				// counter reset rather than as a real decrease.
+				assertTrue("guard actions must be a counter:\n" + typeLines(body),
+						body.contains("# TYPE frontcache_guard_actions_total counter"));
+
+				// Same cardinality rule as everywhere else: the limiter key never becomes a label. It is
+				// recorded in the guard log line instead, where retention bounds it.
+				for (String line : body.split("\n"))
+					if (line.startsWith("frontcache_guard_"))
+						assertFalse("guard series must never be labelled by client address: " + line,
+								line.contains("127.0.0.1") || line.contains("#"));
+			} finally {
+				response.close();
+			}
+		} finally {
+			client.close();
+		}
+	}
+
 }

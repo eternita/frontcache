@@ -206,6 +206,19 @@ public class FrontCacheEngine {
 
     private static final String INCLUDE_LEVEL_TOP_LEVEL = "0";
 
+	/**
+	 * The engine if one has been built, without building one.
+	 *
+	 * {@link #getFrontCache()} constructs the engine on first call, which is right for the request
+	 * path and wrong for anything that merely observes: a Prometheus scrape must never be what starts
+	 * a node. Mirrors {@code CacheManager.existingInstance()}, and for the same reason.
+	 *
+	 * @return the current engine, or null if none has been created yet
+	 */
+	public static FrontCacheEngine existingInstance() {
+		return instance;
+	}
+
 	public static FrontCacheEngine getFrontCache() {
 		FrontCacheEngine localInstance = instance;
 		if (null == localInstance) {
