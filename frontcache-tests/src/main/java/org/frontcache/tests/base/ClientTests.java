@@ -431,23 +431,41 @@ public abstract class ClientTests extends TestsBase {
 	}
 
 	/**
-	 * conf/guard-rules.conf is optional and neither e2e node ships one, so this asserts the ABSENT case:
-	 * a well-formed ERROR response, not a blown-up action.
+	 * Whether this node's FRONTCACHE_HOME ships conf/guard-rules.conf. The two e2e nodes differ on
+	 * purpose - the standalone one carries the rate-limit rule the guard tests exercise, the filter
+	 * one carries nothing - so both branches of the get-guard-config action stay covered.
+	 */
+	protected abstract boolean nodeShipsGuardRules();
+
+	/**
+	 * conf/guard-rules.conf is optional, so the action has two shapes: the raw file, or a well-formed
+	 * ERROR - never a blown-up action.
 	 *
-	 * It is here because that is not what used to happen. The handler caught only IOException while
-	 * FCConfig signals a missing file by throwing a RuntimeException, so the action failed outright and
-	 * the "not found" branch it was written for was unreachable. Nothing called the action in any test,
-	 * which is how it stayed that way.
+	 * The absent case is here because that is not what used to happen. The handler caught only
+	 * IOException while FCConfig signals a missing file by throwing a RuntimeException, so the action
+	 * failed outright and the "not found" branch it was written for was unreachable. Nothing called
+	 * the action in any test, which is how it stayed that way.
 	 */
 	@Test
-	public void guardConfigActionReportsAMissingFileInsteadOfFailing() throws Exception {
+	public void guardConfigActionHandlesBothAPresentAndAMissingFile() throws Exception {
 		org.frontcache.io.GetGuardConfigActionResponse response = frontcacheClient.getGuardConfigActionResponse();
 
-		Assert.assertNotNull("the action must answer, even with no guard-rules.conf on the node", response);
-		Assert.assertEquals("no guard-rules.conf on this node, so: a clean error",
-				org.frontcache.io.ActionResponse.RESPONSE_STATUS_ERROR, response.getResponseStatus());
-		Assert.assertEquals("guard-rules.conf not found", response.getErrorDescription());
-		Assert.assertNull(response.getGuardConfig());
+		Assert.assertNotNull("the action must answer either way", response);
+
+		if (nodeShipsGuardRules())
+		{
+			Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+			Assert.assertNotNull("the raw file is what the console's guard config screen renders", response.getGuardConfig());
+			Assert.assertTrue("expected the raw file, got: " + response.getGuardConfig(),
+					response.getGuardConfig().contains("ratelimit-e2e"));
+		}
+		else
+		{
+			Assert.assertEquals("no guard-rules.conf on this node, so: a clean error",
+					org.frontcache.io.ActionResponse.RESPONSE_STATUS_ERROR, response.getResponseStatus());
+			Assert.assertEquals("guard-rules.conf not found", response.getErrorDescription());
+			Assert.assertNull(response.getGuardConfig());
+		}
 	}
 
 

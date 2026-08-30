@@ -20,4 +20,10 @@ public class StandaloneClientTests extends ClientTests {
 		return getStandaloneBaseURLLoopback();
 	}
 
+	/** the standalone node carries the rate-limit rule the guard e2e tests exercise */
+	@Override
+	protected boolean nodeShipsGuardRules() {
+		return true;
+	}
+
 }

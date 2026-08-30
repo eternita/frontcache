@@ -6,8 +6,10 @@
  *  limitations under the License.
  *
  */
-package org.frontcache.cache;
+package org.frontcache.cache.impl;
 
+import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.WebResponse;
 
 import java.util.List;

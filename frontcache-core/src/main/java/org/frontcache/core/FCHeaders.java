@@ -14,6 +14,7 @@ public class FCHeaders {
     public static final String ACCEPT = "Accept";
     public static final String CONTENT_TYPE = "Content-Type";
     public static final String CACHE_CONTROL = "Cache-Control";
+    public static final String RETRY_AFTER = "Retry-After";
     public static final String PRAGMA = "Pragma";
 
     public static final String REQUEST_CLIENT_TYPE_BOT = "bot";

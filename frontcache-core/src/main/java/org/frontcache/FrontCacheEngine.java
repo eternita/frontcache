@@ -206,6 +206,19 @@ public class FrontCacheEngine {
 
     private static final String INCLUDE_LEVEL_TOP_LEVEL = "0";
 
+	/**
+	 * The engine if one has been built, without building one.
+	 *
+	 * {@link #getFrontCache()} constructs the engine on first call, which is right for the request
+	 * path and wrong for anything that merely observes: a Prometheus scrape must never be what starts
+	 * a node. Mirrors {@code CacheManager.existingInstance()}, and for the same reason.
+	 *
+	 * @return the current engine, or null if none has been created yet
+	 */
+	public static FrontCacheEngine existingInstance() {
+		return instance;
+	}
+
 	public static FrontCacheEngine getFrontCache() {
 		FrontCacheEngine localInstance = instance;
 		if (null == localInstance) {
@@ -892,15 +905,24 @@ public class FrontCacheEngine {
 		int status = action.getStatus();
 
 		try {
+			servletResponse.setStatus(status);
+
+			// Never let a browser or CDN cache a guard response - REJECTS INCLUDED. The decision
+			// depends on the request (host, cookies) or on how fast this client is sending, and must
+			// be re-made at the edge on every visit: a cached 429 would pin a client to a rejection
+			// long after its window ended.
+			servletResponse.setHeader(FCHeaders.CACHE_CONTROL, "no-store, no-cache, max-age=0, must-revalidate");
+
+			// Set by the rate-limit predicate: seconds until the client's window rolls over. RFC 6585
+			// expects it on a 429, and a well-behaved crawler backs off when it sees one.
+			int retryAfterSeconds = context.getGuardRetryAfterSeconds();
+			if (0 < retryAfterSeconds)
+				servletResponse.setHeader(FCHeaders.RETRY_AFTER, Integer.toString(retryAfterSeconds));
+
 			if (GuardAction.Type.REDIRECT == action.getType())
 			{
-				servletResponse.setStatus(status);
 				servletResponse.setHeader("Location", outcome.getResolvedTarget());
-				// never let a browser or CDN cache the decision: it depends on the request (host,
-				// cookies) and must be re-made at the edge on every visit
-				servletResponse.setHeader(FCHeaders.CACHE_CONTROL, "no-store, no-cache, max-age=0, must-revalidate");
 			} else {
-				servletResponse.setStatus(status);
 				servletResponse.setContentType("text/plain; charset=UTF-8");
 				servletResponse.getWriter().write(action.getBody());
 			}
@@ -908,8 +930,27 @@ public class FrontCacheEngine {
 			logger.debug("Error writing guard rule '" + rule.getName() + "' response (" + status + "): " + e);
 		}
 
-		logGuardAction(context, rule.getName(), status, action.getDisposition());
+		logGuardAction(context, guardReason(context, rule), status, action.getDisposition());
 		return;
+	}
+
+	/**
+	 * The reason column of the guard log line: the rule name, and for a rate-limit rule the address
+	 * that was actually counted, as "&lt;rule&gt;#&lt;address&gt;".
+	 *
+	 * The limiter resolves the client address differently from FCUtils.getClientIP() - it reads a
+	 * forwarding header only from a configured trusted proxy - so the two CAN disagree, and the log's
+	 * own client-IP column may name an address the limiter refused to trust. "Which address was
+	 * counted?" is the first question anyone debugging a 429 asks, so it is recorded rather than left
+	 * to be inferred.
+	 */
+	private String guardReason(RequestContext context, GuardRule rule)
+	{
+		if (0 == context.getGuardRetryAfterSeconds())
+			return rule.getName();
+
+		String limiterKey = context.getRateLimitKey();
+		return (null != limiterKey) ? rule.getName() + "#" + limiterKey : rule.getName();
 	}
 
 	/**

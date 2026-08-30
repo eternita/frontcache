@@ -15,11 +15,15 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeSet;
 
 import org.frontcache.FCConfig;
+import org.frontcache.guard.GuardAction;
+import org.frontcache.guard.GuardPredicate;
+import org.frontcache.guard.GuardRule;
 import org.frontcache.resilience.FcCommand;
 import org.frontcache.resilience.FcCommandMetrics;
 import org.frontcache.resilience.FcTestSupport;
@@ -206,6 +210,8 @@ public class FcMetricsExportTest {
 		//   result -> hit|miss          tier -> L1|L2|none        (FcCacheMetrics.Outcome, 3 combinations)
 		//   command -> the five FC_* keys   event -> FcEventType   quantile -> a fixed list
 		//   pool -> the named thread pools  name/kind/state -> resilience4j's own, one per breaker
+		//   name -> ALSO the guard rule / rate-limit bucket names, which come from a config file and are
+		//           therefore bounded by it; result -> ALSO the guard dispositions (a fixed set of four)
 		//   area -> heap|nonheap        id -> JVM memory pool names   (JvmMemoryMetrics)
 		// area and id come from the JVM, not from anything request-shaped: the memory pool set is fixed
 		// by the collector at startup and is under a dozen entries, so it cannot grow with traffic -
@@ -306,4 +312,59 @@ public class FcMetricsExportTest {
 		@Override protected String run() { throw new RuntimeException("origin down"); }
 		@Override protected String getFallback() { return "fallback"; }
 	}
+
+	// ---- guard rules -----------------------------------------------------------------------
+
+	/**
+	 * The label vocabulary of the guard series, which is deliberately the LOG's vocabulary: a rule's
+	 * {@code result} label reads the same as the disposition column written to
+	 * frontcache-failed-requests.log, so a Grafana panel and a Kibana panel name the same event the
+	 * same way. Wiring the series to a running engine is covered end to end by
+	 * StandaloneMetricsExportTests - here only the mapping, which is where a silent divergence would
+	 * start.
+	 */
+	@Test
+	public void guardRuleOutcomeLabelsUseTheSameWordsAsTheLog()
+	{
+		assertEquals(GuardAction.DISPOSITION_REJECTED, FcMetricsExport.resultOf(rule(GuardAction.reject(429, "no"), false)));
+		assertEquals(GuardAction.DISPOSITION_REDIRECTED, FcMetricsExport.resultOf(rule(GuardAction.redirect(302, "/x"), false)));
+
+		// dry-run wins over the action: the rule did not do the thing its action describes
+		assertEquals(GuardAction.DISPOSITION_DRY_RUN, FcMetricsExport.resultOf(rule(GuardAction.reject(429, "no"), true)));
+
+		// the one label with no log counterpart - an 'allow' rule writes no line, but "is this
+		// exemption doing anything?" is still worth a series
+		assertEquals("allowed", FcMetricsExport.resultOf(rule(GuardAction.allow(), false)));
+	}
+
+	@Test
+	public void guardSeriesAreAbsentUntilAnEngineExists()
+	{
+		// A scrape must never be what builds the engine, so with none built there is simply nothing to
+		// report - not a zero-valued series standing in for a node that has not started.
+		enable("prometheus");
+		FcMetricsExport.refresh();
+
+		for (Meter meter : FcMetricsExport.registry().getMeters())
+			assertFalse("guard series without an engine: " + meter.getId().getName(),
+					meter.getId().getName().startsWith("frontcache.guard."));
+	}
+
+	private static GuardRule rule(GuardAction action, boolean dryRun)
+	{
+		GuardPredicate always = new GuardPredicate() {
+			@Override
+			public boolean test(org.frontcache.core.RequestContext context) {
+				return true;
+			}
+
+			@Override
+			public String describe() {
+				return "always";
+			}
+		};
+
+		return new GuardRule("a-rule", Arrays.asList(always), action, dryRun);
+	}
+
 }

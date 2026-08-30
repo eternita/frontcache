@@ -24,7 +24,10 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.frontcache.FCConfig;
+import org.frontcache.core.ClientIpResolver;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
+import org.frontcache.guard.ratelimit.GuardRateLimiterRegistry;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -55,6 +58,10 @@ public class GuardRuleEngineTest {
 		// ...but properties come from whichever frontcache.properties FCConfig loaded first, so set
 		// the one value the fixture rules depend on explicitly.
 		FCConfig.setProperty("front-cache.guard-rules.allowed-redirect-hosts", "www.example-site.com");
+
+		// The rate-limit registry is process-scoped (it has to survive a reload), so start from a
+		// known state rather than from whatever another test class left behind.
+		GuardRateLimiterRegistry.reset();
 
 		engine = new GuardRuleEngine(MAX_URI_LENGTH);
 	}
@@ -194,8 +201,16 @@ public class GuardRuleEngineTest {
 			assertFalse("action-less rule must not load", "no-action".equals(name));
 		}
 
-		// 2 built-ins + 3 allow + ip-access + anon-analytics + noisy-bots(dry-run)
-		assertEquals(8, engine.getRules().size());
+		for (GuardRule rule : engine.getRules())
+		{
+			String name = rule.getName();
+			assertFalse("unparseable rate window must not load", "bad-rate".equals(name));
+			assertFalse("two rate predicates in one rule must not load", "double-rate".equals(name));
+			assertFalse("a negated rate predicate must not load", "negated-rate".equals(name));
+		}
+
+		// 2 built-ins + 3 allow + ip-access + anon-analytics + noisy-bots(dry-run) + api-flood
+		assertEquals(9, engine.getRules().size());
 	}
 
 	@Test
@@ -217,6 +232,88 @@ public class GuardRuleEngineTest {
 		engine.evaluate(GuardRuleEngine.probeContext("http://160.202.254.65/b.htm"));
 
 		assertEquals(before + 2, ipAccess.getHits());
+	}
+
+	// ---- per-IP rate limiting ----------------------------------------------------------------
+
+	@Test
+	public void aRateLimitedClientIsRejectedWith429AndTheConditionReadsAsWritten() {
+		ClientIpResolver.install(new ClientIpResolver("", "X-Forwarded-For"));
+		try {
+			GuardRule apiFlood = ruleByName("api-flood");
+			assertEquals("uri~^/api/ ; rate:3/10s", apiFlood.getCondition());
+
+			for (int i = 0; i < 3; i++)
+				assertFalse("request " + (i + 1) + " of 3 must pass",
+						engine.evaluate(apiRequest("203.0.113.7")).isTerminal());
+
+			RequestContext overLimit = apiRequest("203.0.113.7");
+			GuardOutcome outcome = engine.evaluate(overLimit);
+
+			assertTrue(outcome.isTerminal());
+			assertEquals("api-flood", outcome.getRule().getName());
+			assertEquals(429, outcome.getAction().getStatus());
+			assertTrue("Retry-After must be carried to the response", 0 < overLimit.getGuardRetryAfterSeconds());
+
+			assertFalse("a different client is unaffected", engine.evaluate(apiRequest("198.51.100.9")).isTerminal());
+		} finally {
+			ClientIpResolver.reload();
+		}
+	}
+
+	@Test
+	public void theStartupSelfCheckDoesNotSpendAnyClientsBudget() {
+		// load() evaluates the health-check / management / dashboard paths against every rule. Those
+		// probes must not touch the counter - otherwise every reload quietly consumes a budget, and
+		// the self-check would report nonsense for a rate rule.
+		GuardRuleEngine fresh = new GuardRuleEngine(MAX_URI_LENGTH);
+
+		for (GuardRule rule : fresh.getRules())
+			assertEquals("rule " + rule.getName() + " counted a startup probe", 0, rule.getHits());
+	}
+
+	/**
+	 * A top-level request to /api from one address. Rate limiting keys on the socket peer here (the
+	 * test installs a resolver with no trusted proxies), and only counts toplevel requests.
+	 */
+	private static RequestContext apiRequest(final String remoteAddr) {
+		RequestContext context = probeRequestContext("/api/items.htm", remoteAddr);
+		context.setRequestType(FCHeaders.COMPONENT_TOPLEVEL);
+		return context;
+	}
+
+	private static RequestContext probeRequestContext(String uri, final String remoteAddr) {
+		// Built by hand rather than from probeContext(): that one marks itself as a load-time probe,
+		// and this stands in for real traffic.
+		RequestContext context = new RequestContext();
+		context.setFrontCacheProtocol("https");
+		context.setFrontCacheHost("www.example-site.com");
+		context.setRequestURI(uri);
+		context.setRequestQueryString("");
+
+		context.setRequest((HttpServletRequest) Proxy.newProxyInstance(
+				GuardRuleEngineTest.class.getClassLoader(),
+				new Class[] { HttpServletRequest.class },
+				new InvocationHandler() {
+					@Override
+					public Object invoke(Object proxy, Method method, Object[] args) {
+						switch (method.getName())
+						{
+						case "getRemoteAddr":
+							return remoteAddr;
+						case "getHeaders":
+							return java.util.Collections.enumeration(java.util.Collections.<String>emptyList());
+						case "getMethod":
+							return "GET";
+						case "getServerPort":
+							return Integer.valueOf(443);
+						default:
+							return null;
+						}
+					}
+				}));
+
+		return context;
 	}
 
 	private GuardRule ruleByName(String name) {

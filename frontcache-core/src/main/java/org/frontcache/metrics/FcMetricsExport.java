@@ -14,10 +14,16 @@ import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import org.frontcache.FCConfig;
+import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheStats;
 import org.frontcache.cache.FcCacheMetrics;
+import org.frontcache.guard.GuardAction;
+import org.frontcache.guard.GuardRule;
+import org.frontcache.guard.GuardRuleEngine;
+import org.frontcache.guard.ratelimit.GuardRateLimiterRegistry;
+import org.frontcache.guard.ratelimit.WindowLimiter;
 import org.frontcache.resilience.FcCommandMetrics;
 import org.frontcache.resilience.FcEventType;
 import org.frontcache.resilience.FcThreadPools;
@@ -193,6 +199,7 @@ public class FcMetricsExport {
 		bindCommandMetrics();
 		bindThreadPools();
 		bindCacheMetrics();
+		bindGuardMetrics();
 		bindJvmMetrics();
 	}
 
@@ -420,6 +427,132 @@ public class FcMetricsExport {
 		}
 	}
 
+	// ---- guard rules ---------------------------------------------------------
+
+	private final Map<String, Boolean> boundGuardRules = new HashMap<String, Boolean>();
+	private final Map<String, Boolean> boundRateLimitBuckets = new HashMap<String, Boolean>();
+
+	/**
+	 * What the guard pipeline rejected, redirected, exempted or would have caught.
+	 *
+	 * Until now these counts existed only behind {@code get-guard-rules}, i.e. reachable by the console
+	 * and by nothing else. They answer the questions an operator asks of a guard rule - is it firing at
+	 * all, is a new dry-run rule about to refuse real visitors, did the rate limit start biting after a
+	 * traffic change - and none of those should require opening a web UI to see.
+	 *
+	 * <h3>One counter per rule, with the outcome as a fixed label</h3>
+	 *
+	 * A rule has one action and one dry-run flag, both decided at load time, so its outcome never varies
+	 * per request: the single hit counter plus a constant {@code result} label is the whole truth. The
+	 * label vocabulary is the log's, not a new one - {@code rejected} / {@code redirected} / {@code
+	 * dry-run} are exactly the dispositions written to frontcache-failed-requests.log, so a Grafana panel
+	 * and a Kibana panel name the same thing the same way. {@code allowed} is the one addition, for
+	 * exemption rules, which are never logged but are worth counting: an {@code allow} rule with no hits
+	 * is dead config sitting in front of the rules that matter.
+	 *
+	 * <h3>Read by name, not by reference</h3>
+	 *
+	 * {@code reload-guard-rules} builds new GuardRule objects and resets their counters, so a meter
+	 * closing over a rule instance would silently freeze at the pre-reload value. Each counter therefore
+	 * looks its rule up by name on every read - the same reason {@link #cacheGauge} re-reads through
+	 * {@code CacheManager.existingInstance()}. The reset that a reload causes is real and is reported as
+	 * one: these are counters, and Prometheus already understands a counter going backwards as a reset.
+	 */
+	private synchronized void bindGuardMetrics()
+	{
+		// existingInstance(), not getFrontCache(): a scrape must not be what starts the node. Early in
+		// startup this is legitimately null - the engine calls start() from its own constructor - and the
+		// rules are picked up by the next refresh(), like commands and pools.
+		FrontCacheEngine engine = FrontCacheEngine.existingInstance();
+		if (null == engine)
+			return;
+
+		GuardRuleEngine guards = engine.getGuardRuleEngine();
+		if (null != guards)
+			for (GuardRule rule : guards.getRules())
+			{
+				final String name = rule.getName();
+				String key = name + "|" + resultOf(rule);
+
+				if (Boolean.TRUE.equals(boundGuardRules.get(key)))
+					continue;
+				boundGuardRules.put(key, Boolean.TRUE);
+
+				FunctionCounter.builder("guard.actions", name, n -> guardHits(n))
+						.description("Requests matched by a guard rule, since the rules were last loaded")
+						.tags(Tags.of("name", name, "result", resultOf(rule)))
+						.register(registry);
+			}
+
+		for (WindowLimiter limiter : GuardRateLimiterRegistry.getLimiters())
+		{
+			final String bucket = limiter.getBucket();
+
+			if (Boolean.TRUE.equals(boundRateLimitBuckets.get(bucket)))
+				continue;
+			boundRateLimitBuckets.put(bucket, Boolean.TRUE);
+
+			// The undersizing signal. A rate-limit bucket is a fixed slot array with no eviction, so two
+			// addresses hashing to one slot make the arriving one take it over and start a fresh count.
+			// That is deliberate and it fails safe - it can only under-count, never refuse a visitor
+			// wrongly - but a takeover rate climbing with traffic means front-cache.guard-rules.rate-limit.slots
+			// is too small for the address space actually being seen.
+			FunctionCounter.builder("guard.ratelimit.takeovers", bucket, b -> rateLimitTakeovers(b))
+					.description("Rate-limit slot takeovers - a rising rate means the slot array is undersized")
+					.tags(Tags.of("name", bucket))
+					.register(registry);
+		}
+	}
+
+	/**
+	 * Hits of every currently loaded rule with this name.
+	 *
+	 * Summed rather than first-match because nothing stops two rules sharing a name, and two meters with
+	 * identical tags would be one meter in the registry - so the sum is the only reading that is not
+	 * silently wrong. With unique names, which is the norm, it is the rule's own count.
+	 *
+	 * @return 0 when no rule of that name is loaded any more, which is what a deleted rule should read
+	 */
+	private static double guardHits(String name)
+	{
+		FrontCacheEngine engine = FrontCacheEngine.existingInstance();
+		if (null == engine)
+			return 0;
+
+		GuardRuleEngine guards = engine.getGuardRuleEngine();
+		if (null == guards)
+			return 0;
+
+		long hits = 0;
+		for (GuardRule rule : guards.getRules())
+			if (name.equals(rule.getName()))
+				hits += rule.getHits();
+
+		return hits;
+	}
+
+	private static double rateLimitTakeovers(String bucket)
+	{
+		for (WindowLimiter limiter : GuardRateLimiterRegistry.getLimiters())
+			if (bucket.equals(limiter.getBucket()))
+				return limiter.getTakeovers();
+
+		return 0;
+	}
+
+	/**
+	 * The rule's outcome as a label value, in the log's own vocabulary so a metric and a log line about
+	 * the same rule agree on what happened.
+	 */
+	static String resultOf(GuardRule rule)
+	{
+		if (rule.isDryRun())
+			return GuardAction.DISPOSITION_DRY_RUN;
+
+		String disposition = rule.getAction().getDisposition();
+		return (null != disposition) ? disposition : "allowed"; // an 'allow' rule writes no log line
+	}
+
 	private synchronized void bindThreadPools()
 	{
 		for (String poolKey : FcThreadPools.all())
@@ -458,6 +591,7 @@ public class FcMetricsExport {
 		local.bindCommandMetrics();
 		local.bindThreadPools();
 		local.bindCacheMetrics();
+		local.bindGuardMetrics();
 	}
 
 	// ---- config -------------------------------------------------------------
