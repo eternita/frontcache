@@ -242,6 +242,71 @@ public class ClientIpResolverTest {
 				resolver.resolve(request("10.0.0.4", "X-Forwarded-For", "203.0.113.7")));
 	}
 
+	// ---- a real deployment shape: Cloudflare in front of nginx in front of Frontcache ----------
+
+	/**
+	 * The topology this was configured against: client -> Cloudflare -> nginx -> Frontcache, with
+	 * nginx proxying to 127.0.0.1:9080 and setting {@code X-Forwarded-For $proxy_add_x_forwarded_for},
+	 * which APPENDS the peer it saw. So Frontcache receives "&lt;visitor&gt;, &lt;cloudflare edge&gt;"
+	 * and both hops in front of it have to be trusted for the visitor to be what gets counted.
+	 *
+	 * Addresses here are documentation ranges standing in for the real ones; what is being pinned is
+	 * the SHAPE, which was taken from production logs.
+	 */
+	private static final String CDN_AND_LOCAL = "127.0.0.1/32,::1/128,198.51.100.0/24,203.0.113.9/32";
+
+	@Test
+	public void behindACdnAndNginxTheVisitorIsWhatGetsCounted() {
+		ClientIpResolver resolver = new ClientIpResolver(CDN_AND_LOCAL, "X-Forwarded-For");
+
+		// nginx appended the CDN edge (198.51.100.7) to the chain the CDN sent
+		assertEquals("192.0.2.55",
+				resolver.resolve(request("127.0.0.1", "X-Forwarded-For", "192.0.2.55, 198.51.100.7")));
+	}
+
+	@Test
+	public void aNodeThatRefetchesThroughItsOwnPublicNameIsNotCountedAsTheClient() {
+		// The chain that appears when a node's origin URL resolves back through the CDN to itself:
+		//   visitor, cdn-edge, THE NODE'S OWN PUBLIC IP, cdn-edge
+		// Without the node's own address in the trust list the walk stops there, and every one of
+		// those requests - 18% of traffic on the deployment this was measured against - would share a
+		// single counter, i.e. the node would rate-limit itself.
+		ClientIpResolver resolver = new ClientIpResolver(CDN_AND_LOCAL, "X-Forwarded-For");
+
+		assertEquals("192.0.2.55", resolver.resolve(request("127.0.0.1", "X-Forwarded-For",
+				"192.0.2.55, 198.51.100.7,203.0.113.9, 198.51.100.31")));
+
+		// ...and with it missing, this is the wrong answer that would be counted instead
+		ClientIpResolver withoutSelf = new ClientIpResolver("127.0.0.1/32,198.51.100.0/24", "X-Forwarded-For");
+		assertEquals("203.0.113.9", withoutSelf.resolve(request("127.0.0.1", "X-Forwarded-For",
+				"192.0.2.55, 198.51.100.7,203.0.113.9, 198.51.100.31")));
+	}
+
+	@Test
+	public void aRequestThatBypassesTheCdnIsCountedOnItsRealAddress() {
+		// 0.011% of traffic on the measured deployment reaches the origin directly, skipping the CDN -
+		// scanners that resolved the origin address. nginx still appends the true peer, so the
+		// right-to-left walk lands on it however the attacker forged the rest of the header. This is
+		// the case a CDN-specific header (CF-Connecting-IP and friends) cannot cover: nothing
+		// overwrites it when the CDN is not in the path.
+		ClientIpResolver resolver = new ClientIpResolver(CDN_AND_LOCAL, "X-Forwarded-For");
+
+		assertEquals("192.0.2.200", resolver.resolve(request("127.0.0.1", "X-Forwarded-For",
+				"10.9.9.9, 192.0.2.200")));
+	}
+
+	@Test
+	public void anIpv6VisitorBehindTheCdnKeepsItsOwnCounter() {
+		// real traffic on the measured deployment is a mix; the CDN hop is v4 either way
+		ClientIpResolver resolver = new ClientIpResolver(CDN_AND_LOCAL, "X-Forwarded-For");
+
+		String a = resolver.resolve(request("127.0.0.1", "X-Forwarded-For", "2001:db8:1:2::a, 198.51.100.7"));
+		String b = resolver.resolve(request("127.0.0.1", "X-Forwarded-For", "2001:db8:1:2::b, 198.51.100.7"));
+
+		assertEquals("2001:db8:1:2:0:0:0:a", a);
+		assertFalse(a.equals(b));
+	}
+
 	// ---- stand-in request ------------------------------------------------------------------------
 
 	private static HttpServletRequest request(String remoteAddr, String headerName, String headerValue) {
