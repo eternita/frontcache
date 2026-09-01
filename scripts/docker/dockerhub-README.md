@@ -13,7 +13,7 @@ page fragments, stitches together `<fc:include url="..."/>` markers (concurrentl
 circuit breaking and fallbacks.
 
 - Docs and examples: https://github.com/eternita/frontcache
-- Install guide: https://github.com/eternita/frontcache/blob/master/docs/HOWTO-install.md
+- Install guide: https://github.com/eternita/frontcache/blob/master/docs/install-guide.md
 
 ## Run it
 
@@ -22,7 +22,7 @@ docker run -d --name frontcache --restart unless-stopped \
   -p 9080:9080 \
   -e ORIGIN_HOST=your-origin.example.com \
   -v /srv/frontcache/conf:/opt/frontcache-server/FRONTCACHE_HOME/conf \
-  pavlikovskiy/frontcache-server:2.6.0
+  pavlikovskiy/frontcache-server:2.8.0
 ```
 
 Frontcache serves **plain HTTP on 9080 and terminates no TLS.** Whatever fronts it owns 80/443 —
@@ -34,9 +34,9 @@ https://github.com/eternita/frontcache/tree/master/examples/front-door.
 
 | Tag | |
 | --- | --- |
-| `2.6.0`, `2.6` | the release, and its patch-tracking alias |
-| `latest` | currently 2.6.0 |
-| `2.6.0-slim`, `2.6-slim` | **the same image** as `2.6.0`. A compatibility alias for deployments pinned to `-slim`; **2.6.0 is the last release to publish it** |
+| `2.8.0`, `2.8` | the release, and its patch-tracking alias |
+| `latest` | currently 2.8.0 |
+| `*-slim` | **not published since 2.6.0.** The plain tag is what `-slim` was; the `-slim` tags through 2.6.0 stay where they are |
 
 Multi-arch (`linux/amd64`, `linux/arm64`). Pin an exact version.
 
@@ -45,7 +45,7 @@ Multi-arch (`linux/amd64`, `linux/arm64`). Pin an exact version.
 > is what `-slim` was, so **`-p 80:80` no longer works** — publish 9080 instead, and put your own
 > front door in front. Any tag you already pinned is untouched; nothing was deleted or rewritten.
 > If you pin `-slim`, move to the plain tag: 2.6.0 is the last release published under it.
-> Details: https://github.com/eternita/frontcache/blob/master/docs/release-notes-2.6.0.md
+> Details: https://github.com/eternita/frontcache/blob/master/docs/docker.md
 
 ## Configuration
 
