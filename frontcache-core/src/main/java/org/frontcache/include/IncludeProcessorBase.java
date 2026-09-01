@@ -239,6 +239,36 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	}
 
 	/**
+	 * The {@code combine} attribute's value, or null when the include is not marked combinable.
+	 *
+	 * {@code combine="true"} groups by the include's endpoint alone; any other value adds itself to
+	 * the group key, so one endpoint can serve two logically different sets on the same page without
+	 * their members being merged into one batch. See docs/combine-reduce-proposal.md section 8.
+	 *
+	 * Absent means today's behaviour, unchanged: combining is opt-in per include, because it is a
+	 * contract with the origin rather than a transparent edge optimisation.
+	 */
+	protected String getIncludeCombineGroup(String content)
+	{
+		final String START_MARKER = "combine=\"";
+		int startIdx = content.indexOf(START_MARKER);
+		if (-1 == startIdx)
+			return null; // no combine attribute - not combinable
+
+		int endIdx = content.indexOf("\"", startIdx + START_MARKER.length());
+		if (-1 == endIdx)
+			return null; // can't find closing
+
+		String combineValue = content.substring(startIdx + START_MARKER.length(), endIdx).trim();
+
+		if (combineValue.isEmpty() || "false".equalsIgnoreCase(combineValue))
+			return null;
+
+		logger.debug("include combine group - " + combineValue);
+		return combineValue;
+	}
+
+	/**
 	 *
 	 * @param urlStr
 	 * @param requestHeaders
@@ -252,6 +282,28 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		// otherwise (response is not cached) it will be logged in FrontcacheEngine
 
 		long start = System.currentTimeMillis();
+
+		WebResponse cachedWebResponse = getIncludeFromCache(urlStr, requestHeaders, client, context, includeLevel, includeType, start);
+		if (null != cachedWebResponse)
+			return cachedWebResponse;
+
+		return fetchIncludeFromOrigin(urlStr, requestHeaders, client, context, includeLevel, includeType, start);
+    }
+
+	/**
+	 * The cache half of {@link #callInclude}: the entry to serve, or null when this include must go
+	 * to the origin.
+	 *
+	 * Split out for the combine path, which has to know which members missed <em>before</em> it can
+	 * decide what goes into a batch (docs/combine-reduce-proposal.md section 4.3). Everything the
+	 * single-include path did on a hit - the client-type cacheability check, soft vs regular
+	 * expiration, both request-log writes - still happens here and only here, so the two paths cannot
+	 * drift on what a hit means.
+	 *
+	 * @param start when the include began, so a hit reports the same elapsed time it always did
+	 */
+	protected WebResponse getIncludeFromCache(String urlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context, String includeLevel, String includeType, long start)
+    {
 
 		CacheProcessor cacheProcessor = CacheManager.getInstance();
 		WebResponse webResponse = cacheProcessor.getFromCache(urlStr, context);
@@ -315,6 +367,20 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			return webResponse;
 		}
 
+		return null; // not in cache (or not cacheable for this client type) - go to origin
+    }
+
+	/**
+	 * The origin half of {@link #callInclude}, reached when {@link #getIncludeFromCache} found
+	 * nothing serveable.
+	 *
+	 * @param start when the include began - including the cache lookup that just missed, so the
+	 *              reported time is the whole include and not just its origin leg
+	 */
+	protected WebResponse fetchIncludeFromOrigin(String urlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context, String includeLevel, String includeType, long start) throws FrontCacheException
+    {
+		boolean softRefresh = false;
+
 		// recursive call to FCServlet
  		requestHeaders.put(FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL, Arrays.asList(new String[]{includeLevel})); // add include-level header
 
@@ -337,6 +403,41 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 
  		return outWebResponse;
     }
+
+	/**
+	 * Request-log and trace-header lines for one member of a combined batch.
+	 *
+	 * A single include that misses the cache is logged twice: once here as a trace header, and once
+	 * by {@code FrontCacheEngine} when the loopback request for it arrives. A combined member has no
+	 * loopback request of its own - that is the saving - so without this it would vanish from the
+	 * request log entirely, and the log would show one origin request where fifteen fragments were
+	 * served. Both lines are therefore written here.
+	 *
+	 * @param elapsed the BATCH's elapsed time; see {@link FCHeaders#COMPONENT_COMBINED_INCLUDE}
+	 */
+	protected void logCombinedInclude(String urlStr, RequestContext context, String includeLevel, long elapsed, long lengthBytes)
+	{
+		RequestContext contextCopy = new RequestContext();
+		contextCopy.putAll(context);
+		contextCopy.setRequestType(FCHeaders.COMPONENT_INCLUDE);
+
+		RequestLogger.logRequest(
+				urlStr,
+				true,  // isRequestCacheable
+				false, // isCached - a combined member is by construction one that missed
+				elapsed,
+				lengthBytes,
+				contextCopy);
+
+		RequestLogger.logRequestToHeader(
+				urlStr,
+				FCHeaders.COMPONENT_COMBINED_INCLUDE,
+				false, // isCached
+				false, // softRefresh
+				elapsed,
+				lengthBytes,
+				contextCopy, includeLevel);
+	}
 
 	@Override
 	public void init(Properties properties) {
