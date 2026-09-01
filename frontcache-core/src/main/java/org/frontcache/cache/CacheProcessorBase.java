@@ -198,10 +198,14 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	 */
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context)
 	{
-		// Snapshot the request headers synchronously on the caller's thread. The async task below
-		// runs later on a pool thread while the original request thread keeps mutating the shared
-		// requestHeaders map - iterating it there (via putAll) races and throws
-		// ConcurrentModificationException. Copying it now, before submitting, avoids that race.
+		// Snapshot the request headers synchronously on the caller's thread. The async task below runs
+		// later on a pool thread, while the caller carries on adding trace headers to this same map
+		// (the include level, the request id, the client IP) - iterating it there would race and throw
+		// ConcurrentModificationException. Copying it now, before submitting, avoids that.
+		//
+		// The copy is only safe because the map belongs to this one caller: includes are handed a copy
+		// per include in ConcurrentIncludeProcessor.parseIncludes, made on the request thread. When
+		// they all shared the parent's map, this line was itself the racing reader.
 		final Map<String, List<String>> requestHeadersCopy = new HashMap<String, List<String>>(requestHeaders);
 
 		// async invalidation

@@ -188,12 +188,18 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					String includeURL = getIncludeURL(includeTagStr);
 					String includeType = getIncludeType(includeTagStr);
 
-					Map<String, List<String>> includeRequestHeaders = requestHeaders;
+					// Every include gets its OWN copy of the headers, made here on the request thread
+					// before any task is submitted. The includes of one page are resolved concurrently,
+					// and each of them adds trace headers to the map it was handed - the include level
+					// (IncludeProcessorBase.callInclude), the request id and the client IP
+					// (FCUtils.includeDynamicCallHttpClient). Sharing the parent's map used to mean N
+					// pool threads mutating one HashMap: entries written for one include leaked into
+					// the next one's request, and a concurrent read of that map (the snapshot in
+					// CacheProcessorBase.doSoftInvalidation) threw ConcurrentModificationException.
+					// With a copy per include the parent map is only ever read after this point.
+					Map<String, List<String>> includeRequestHeaders = new HashMap<String, List<String>>(requestHeaders);
 					if (INCLUDE_TYPE_ASYNC.equals(includeType))
 					{
-						// create a copy and extend it
-						includeRequestHeaders = new HashMap<String, List<String>>();
-						includeRequestHeaders.putAll(requestHeaders);
 						includeRequestHeaders.put(FCHeaders.X_FRONTCACHE_ASYNC_INCLUDE, Arrays.asList(new String[]{"true"}));
 						// The client IP was resolved on the request thread while the servlet request was
 						// still live (FrontCacheEngine.init) and cached on the context. Async includes
