@@ -40,6 +40,7 @@ import org.frontcache.include.combine.CombineEnvelope;
 import org.frontcache.include.combine.CombinePart;
 import org.frontcache.include.combine.CombineProtocol;
 import org.frontcache.include.combine.CombineUnsupportedMemo;
+import org.frontcache.include.combine.FcCombineMetrics;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
@@ -258,12 +259,14 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		{
 			logger.warn("include " + inc.includeURL + " carries a reserved '" + CombineProtocol.PARAM_PREFIX
 					+ "' query parameter and cannot be combined - resolving it individually");
+			FcCombineMetrics.record(FcCombineMetrics.Member.INDIVIDUAL);
 			return false;
 		}
 
 		if (combineUnsupportedMemo.isUnsupported(CombineProtocol.groupKey(inc.includeURL, inc.combineGroup)))
 		{
 			logger.debug("combine is memoised as unsupported for " + inc.includeURL + " - resolving it individually");
+			FcCombineMetrics.record(FcCombineMetrics.Member.INDIVIDUAL);
 			return false;
 		}
 
@@ -289,7 +292,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		for (IncludeResolutionPlaceholder inc : combinables)
 		{
 			if (null != inc.webResponse)
+			{
+				FcCombineMetrics.record(FcCombineMetrics.Member.CACHED);
 				continue; // the probe served it from cache - nothing to ask the origin for
+			}
 
 			String groupKey = CombineProtocol.groupKey(inc.includeURL, inc.combineGroup);
 
@@ -324,7 +330,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			{
 				for (List<IncludeResolutionPlaceholder> members : byUrl.values())
 					for (IncludeResolutionPlaceholder member : members)
+					{
+						FcCombineMetrics.record(FcCombineMetrics.Member.INDIVIDUAL);
 						futures.add(executor.submit(member));
+					}
 
 				continue;
 			}
@@ -738,6 +747,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			{
 				logger.error("combined call to " + combinedURL + " returned nothing - its " + urls.size()
 						+ " members fall back individually");
+				recordBatchFailure(FcCombineMetrics.Batch.FAILED, null);
 				return;
 			}
 
@@ -753,6 +763,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			} catch (Exception e) {
 				logger.error("malformed combine envelope from " + combinedURL + " - its " + urls.size()
 						+ " members fall back individually", e);
+				recordBatchFailure(FcCombineMetrics.Batch.ERROR, FcCombineMetrics.Error.PARSE);
 				return;
 			}
 
@@ -762,6 +773,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				logger.error("combine envelope from " + combinedURL + " has "
 						+ (null == parts ? "no" : "" + parts.size()) + " parts for " + urls.size()
 						+ " members - its members fall back individually");
+				recordBatchFailure(FcCombineMetrics.Batch.ERROR, FcCombineMetrics.Error.COUNT);
 				return;
 			}
 
@@ -770,7 +782,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			// happened to be noticed - and applying the good ones first would cache fragments under
 			// the wrong keys, which nothing later would detect.
 			if (!echoesMatch(parts, queries, combinedURL))
+			{
+				recordBatchFailure(FcCombineMetrics.Batch.ERROR, FcCombineMetrics.Error.ECHO);
 				return;
+			}
+
+			FcCombineMetrics.record(FcCombineMetrics.Batch.OK);
 
 			long elapsed = System.currentTimeMillis() - start;
 			for (int i = 0; i < urls.size(); i++)
@@ -791,9 +808,11 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			{
 				logger.error("combined call to " + endpointURL + " failed (status " + status + ") - its "
 						+ urls.size() + " members fall back individually");
+				recordBatchFailure(FcCombineMetrics.Batch.FAILED, null);
 				return;
 			}
 
+			FcCombineMetrics.record(FcCombineMetrics.Batch.UNSUPPORTED);
 			combineUnsupportedMemo.mark(groupKey, combineUnsupportedTtl);
 			logger.warn("origin does not implement combine for " + endpointURL
 					+ " - resolving its " + urls.size() + " members individually, and not combining this group for "
@@ -817,6 +836,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				for (IncludeResolutionPlaceholder member : byUrl.get(url))
 				{
 					try {
+						FcCombineMetrics.record(FcCombineMetrics.Member.INDIVIDUAL);
 						member.call();
 					} catch (Exception e) {
 						logger.error("error resolving combined member " + url + " individually", e);
@@ -867,6 +887,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			{
 				logger.warn("combined member " + url + " answered " + part.getStatus()
 						+ " - not cached, that member falls back");
+				FcCombineMetrics.record(FcCombineMetrics.Member.FALLBACK, members.size());
 				return;
 			}
 
@@ -894,11 +915,32 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				// and this instance is about to be served.
 				CacheManager.getInstance().putToCache(url, webResponse.copy());
 
+			FcCombineMetrics.record(FcCombineMetrics.Member.COMBINED, members.size());
+
 			for (IncludeResolutionPlaceholder member : members)
 			{
 				member.webResponse = webResponse;
 				logCombinedInclude(url, context, member.includeLevel, elapsed, body.length);
 			}
+		}
+
+		/**
+		 * One batch outcome, plus the fallback that every member of a batch that produced no usable
+		 * envelope takes. Kept in one place so the batch counter and the member counter cannot
+		 * disagree - the members-per-batch ratio is only meaningful while they add up.
+		 */
+		private void recordBatchFailure(FcCombineMetrics.Batch outcome, FcCombineMetrics.Error kind) {
+
+			FcCombineMetrics.record(outcome);
+
+			if (null != kind)
+				FcCombineMetrics.record(kind);
+
+			int fallenBack = 0;
+			for (String url : urls)
+				fallenBack += byUrl.get(url).size();
+
+			FcCombineMetrics.record(FcCombineMetrics.Member.FALLBACK, fallenBack);
 		}
 
 		/**

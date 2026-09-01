@@ -20,6 +20,7 @@ import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheStats;
 import org.frontcache.cache.FcCacheMetrics;
 import org.frontcache.guard.GuardAction;
+import org.frontcache.include.combine.FcCombineMetrics;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEngine;
 import org.frontcache.guard.ratelimit.GuardRateLimiterRegistry;
@@ -199,6 +200,7 @@ public class FcMetricsExport {
 		bindCommandMetrics();
 		bindThreadPools();
 		bindCacheMetrics();
+		bindCombineMetrics();
 		bindGuardMetrics();
 		bindJvmMetrics();
 	}
@@ -431,6 +433,62 @@ public class FcMetricsExport {
 
 	private final Map<String, Boolean> boundGuardRules = new HashMap<String, Boolean>();
 	private final Map<String, Boolean> boundRateLimitBuckets = new HashMap<String, Boolean>();
+
+	private boolean combineBound = false;
+
+	/**
+	 * Combine-and-reduce: batches, members and envelope errors.
+	 * See docs/combine-reduce-proposal.md section 12.
+	 *
+	 * <h3>The number these exist for</h3>
+	 *
+	 * <pre>
+	 * rate(frontcache_include_combine_members_total{result="combined"}[5m])
+	 *   / rate(frontcache_include_combine_batches_total{result="ok"}[5m])
+	 * </pre>
+	 *
+	 * Average fragments per origin request - the feature's entire claim, and a number nothing else in
+	 * the process can produce. The command metrics count origin calls but not how many fragments each
+	 * carried; the cache metrics count hits, and a batch IS the miss path.
+	 *
+	 * <h3>What to alert on</h3>
+	 *
+	 * {@code frontcache_include_combine_errors_total}. Every value of its {@code kind} label is an
+	 * origin that claims to implement the contract and does not, and there is no other signal for it:
+	 * the page still renders, out of fallbacks, and every other meter reads healthy.
+	 * {@code batches_total{result="unsupported"}} is the softer version - an origin with the markup but
+	 * not the handler - which costs one wasted request per group per memo window and otherwise hides.
+	 *
+	 * <h3>Bound unconditionally</h3>
+	 *
+	 * Like the cache read counters and unlike the cache SIZE gauges, these need no cache processor and
+	 * no engine: a zero means "no combining yet", which is true and is itself worth being able to see
+	 * on a node whose markup was supposed to have been switched over.
+	 */
+	private synchronized void bindCombineMetrics()
+	{
+		if (combineBound)
+			return;
+		combineBound = true;
+
+		for (final FcCombineMetrics.Batch outcome : FcCombineMetrics.Batch.values())
+			FunctionCounter.builder("include.combine.batches", outcome, o -> FcCombineMetrics.count(o))
+					.description("Combined origin calls by outcome, since JVM start")
+					.tags(Tags.of("result", outcome.getResult()))
+					.register(registry);
+
+		for (final FcCombineMetrics.Member outcome : FcCombineMetrics.Member.values())
+			FunctionCounter.builder("include.combine.members", outcome, o -> FcCombineMetrics.count(o))
+					.description("Combinable includes by how they were resolved, since JVM start")
+					.tags(Tags.of("result", outcome.getResult()))
+					.register(registry);
+
+		for (final FcCombineMetrics.Error kind : FcCombineMetrics.Error.values())
+			FunctionCounter.builder("include.combine.errors", kind, k -> FcCombineMetrics.count(k))
+					.description("Combine envelopes rejected as malformed, since JVM start - an origin bug")
+					.tags(Tags.of("kind", kind.getKind()))
+					.register(registry);
+	}
 
 	/**
 	 * What the guard pipeline rejected, redirected, exempted or would have caught.
