@@ -140,6 +140,79 @@ public class StandaloneMetricsExportTests extends TestsBase {
 	}
 
 	/**
+	 * The combine series, as deltas across one real page render.
+	 *
+	 * Values, not presence. The claim the whole feature rests on is "N fragments, one origin request",
+	 * and it is exported as a ratio of two counters -
+	 * {@code members{result="combined"} / batches{result="ok"}} - so a test that only asserted the
+	 * series existed would pass with the ratio wrong. A three-cell page on an empty cache must move
+	 * those two by exactly 3 and exactly 1.
+	 *
+	 * The second assertion is the accounting invariant: every combine candidate lands in exactly one
+	 * member bucket. A member counted twice, or not at all, makes the ratio quietly wrong in a way no
+	 * single counter reveals.
+	 */
+	@Test
+	public void scrapeExposesCombineSeriesFromRealTraffic() throws Exception
+	{
+		frontcacheClientStandalone.removeFromCacheAll();
+		frontcacheClientFilter.removeFromCacheAll();
+
+		String before = scrapeBody();
+
+		webClient.getPage(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST + "common/combine/page.jsp");
+
+		String after = scrapeBody();
+
+		assertTrue("no combine series:\n" + head(after), after.contains("frontcache_include_combine_batches_total"));
+
+		assertEquals("three cells must have cost exactly one combined origin call",
+				1, delta(before, after, "frontcache_include_combine_batches_total{result=\"ok\"}"));
+		assertEquals("and that one call must have served all three",
+				3, delta(before, after, "frontcache_include_combine_members_total{result=\"combined\"}"));
+
+		long members = 0;
+		for (String result : new String[]{"cached", "combined", "individual", "fallback"})
+			members += delta(before, after, "frontcache_include_combine_members_total{result=\"" + result + "\"}");
+
+		assertEquals("every combine candidate must land in exactly one bucket", 3, members);
+
+		assertFalse("a combine series is labelled with a URL - unbounded cardinality",
+				after.contains("frontcache_include_combine_members_total{result=\"combined\",url"));
+	}
+
+	private String scrapeBody() throws Exception
+	{
+		CloseableHttpClient client = HttpClients.createDefault();
+		try {
+			ClassicHttpResponse response = client.execute(authenticatedScrape());
+			try {
+				assertEquals(200, response.getCode());
+				return EntityUtils.toString(response.getEntity());
+			} finally {
+				response.close();
+			}
+		} finally {
+			client.close();
+		}
+	}
+
+	/** How far one Prometheus series moved between two scrapes. An absent series reads as 0. */
+	private static long delta(String before, String after, String series)
+	{
+		return value(after, series) - value(before, series);
+	}
+
+	private static long value(String body, String series)
+	{
+		for (String line : body.split("\n"))
+			if (line.startsWith(series + " "))
+				return (long) Double.parseDouble(line.substring(series.length() + 1).trim());
+
+		return 0;
+	}
+
+	/**
 	 * The endpoint's access control, over real HTTP.
 	 *
 	 * It publishes traffic volumes, error rates, circuit state and this node's heap - and before the

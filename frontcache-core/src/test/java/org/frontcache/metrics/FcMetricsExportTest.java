@@ -24,6 +24,7 @@ import org.frontcache.FCConfig;
 import org.frontcache.guard.GuardAction;
 import org.frontcache.guard.GuardPredicate;
 import org.frontcache.guard.GuardRule;
+import org.frontcache.include.combine.FcCombineMetrics;
 import org.frontcache.resilience.FcCommand;
 import org.frontcache.resilience.FcCommandMetrics;
 import org.frontcache.resilience.FcTestSupport;
@@ -48,6 +49,7 @@ public class FcMetricsExportTest {
 		FcMetricsExport.stop();
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "none");
 		FcTestSupport.resetAll();
+		FcCombineMetrics.reset();
 	}
 
 	private static void enable(String mode)
@@ -298,6 +300,78 @@ public class FcMetricsExportTest {
 		assertEquals("team", headers.get("X-Scope"));
 		assertTrue(FcMetricsExport.parseHeaders("").isEmpty());
 		assertTrue(FcMetricsExport.parseHeaders(null).isEmpty());
+	}
+
+	// ---- combine-and-reduce --------------------------------------------------------------
+
+	/**
+	 * The combine series and their label vocabulary (docs/combine-reduce-proposal.md section 12).
+	 *
+	 * The pair that carries the feature's whole claim is asserted by value, not merely by presence:
+	 * members{result="combined"} over batches{result="ok"} is the average number of fragments one
+	 * origin request served, and it is the only place that ratio exists.
+	 */
+	@Test
+	public void combineSeriesAreExportedWithTheirOutcomeLabels()
+	{
+		FcCombineMetrics.record(FcCombineMetrics.Batch.OK);
+		FcCombineMetrics.record(FcCombineMetrics.Member.COMBINED, 3);
+		FcCombineMetrics.record(FcCombineMetrics.Member.CACHED, 12);
+		FcCombineMetrics.record(FcCombineMetrics.Batch.UNSUPPORTED);
+		FcCombineMetrics.record(FcCombineMetrics.Batch.ERROR);
+		FcCombineMetrics.record(FcCombineMetrics.Error.ECHO);
+
+		enable("prometheus");
+		String scrape = FcMetricsExport.scrape();
+
+		assertTrue("no combine batch series in:\n" + scrape,
+				scrape.contains("frontcache_include_combine_batches_total"));
+		assertTrue("no combine member series", scrape.contains("frontcache_include_combine_members_total"));
+		assertTrue("no combine error series", scrape.contains("frontcache_include_combine_errors_total"));
+
+		assertTrue("ok batches not exported",
+				scrape.contains("frontcache_include_combine_batches_total{result=\"ok\"} 1"));
+		assertTrue("the members-per-batch numerator is wrong",
+				scrape.contains("frontcache_include_combine_members_total{result=\"combined\"} 3"));
+		assertTrue("an origin with no combine handler must be visible",
+				scrape.contains("frontcache_include_combine_batches_total{result=\"unsupported\"} 1"));
+		assertTrue("the series to alert on carries WHICH way the envelope was malformed",
+				scrape.contains("frontcache_include_combine_errors_total{kind=\"echo\"} 1"));
+	}
+
+	/**
+	 * Bound whether or not anything has combined yet. A zero here is a true statement - and on a node
+	 * whose markup was supposed to have been switched over, the absence of the series and a flat zero
+	 * mean very different things.
+	 */
+	@Test
+	public void combineSeriesExistBeforeAnythingHasBeenCombined()
+	{
+		enable("prometheus");
+
+		String scrape = FcMetricsExport.scrape();
+
+		assertTrue("a node that has not combined yet must still report zeros:\n" + scrape,
+				scrape.contains("frontcache_include_combine_batches_total{result=\"ok\"} 0"));
+		assertTrue(scrape.contains("frontcache_include_combine_members_total{result=\"individual\"} 0"));
+	}
+
+	/** Restarts must read as resets, not as a large negative rate. */
+	@Test
+	public void combineSeriesAreCountersNotGauges()
+	{
+		enable("prometheus");
+
+		int seen = 0;
+		for (Meter meter : FcMetricsExport.registry().getMeters())
+			if (meter.getId().getName().startsWith("frontcache.include.combine."))
+			{
+				seen++;
+				assertEquals(meter.getId().getName() + " must be a counter",
+						Meter.Type.COUNTER, meter.getId().getType());
+			}
+
+		assertEquals("four batch outcomes, four member outcomes, three error kinds", 11, seen);
 	}
 
 	// ---- fixtures -----------------------------------------------------------

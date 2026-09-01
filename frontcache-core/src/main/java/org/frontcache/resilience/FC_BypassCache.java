@@ -122,6 +122,18 @@ public class FC_BypassCache extends FcCommand<Object> {
 			HttpServletResponse response = context.getResponse();
 			FilterChain chain = context.getFilterChain();
 			chain.doFilter(request, response);
+
+			// Record the status the app just set. Nothing else on this branch does - the standalone
+			// branch below gets it from setResponse(), and RequestContext.getResponseStatusCode()
+			// answers 500 when nobody set one. FrontCacheEngine then stamps that 500 over the app's
+			// own status in addResponseHeaders().
+			//
+			// It stayed hidden because it only bites when the response is still UNCOMMITTED here:
+			// an app that wrote through getOutputStream() with a Content-Length has already been
+			// flushed, and setStatus() on a committed response is a no-op. An app that wrote a small
+			// body through getWriter() has not, and its 200 became a 500 - with the correct body
+			// attached, which is what made it invisible to any test asserting on content.
+			context.setResponseStatusCode(response.getStatus());
 		} else {
 
 			// stand alone mode

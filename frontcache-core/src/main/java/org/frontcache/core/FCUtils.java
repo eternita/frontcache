@@ -595,6 +595,28 @@ public class FCUtils {
 		return component;
 	}
 
+	/**
+	 * Builds a {@link WebResponse} from a body and a header map, applying the same
+	 * {@code x-frontcache-component-*} reading every origin response goes through.
+	 *
+	 * The public door onto {@link #parseWebComponent}, for the one caller that has a fragment and its
+	 * headers but no HTTP response to hand: the include processor unpacking a combined response
+	 * (docs/combine-reduce-proposal.md section 6). Routing it here rather than letting that code
+	 * assemble a WebResponse itself is what keeps maxAge, tags, refresh type and cache level meaning
+	 * exactly the same for a combined member as for a single include - the invariant in section 4.2,
+	 * which is silent when broken.
+	 *
+	 * @param headers the part's headers; a case-insensitive map is expected (header names are
+	 *                case-insensitive per RFC 7230) and is what the caller is given
+	 */
+	public static WebResponse buildWebComponent(String url, byte[] content, Map<String, List<String>> headers)
+	{
+		WebResponse webResponse = parseWebComponent(url, content, headers);
+		webResponse.setHeaders(headers);
+
+		return webResponse;
+	}
+
 	public static long maxAgeStr2Int(String maxAgeStr)
 	{
 		try
