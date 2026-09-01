@@ -10,7 +10,7 @@
 | **D. Container** | a Docker image | Docker | containers, Kubernetes, quickest trial, **and Windows**     |
 | **E. Console** | the management UI | JDK 25 or Docker | realtime stats, cache invalidation                          |
 
-Frontcache 2.7.0 requires **Java 25** and is **Jakarta EE 10** (`jakarta.servlet`, Servlet 6.0).
+Frontcache 2.8.0 requires **Java 25** and is **Jakarta EE 10** (`jakarta.servlet`, Servlet 6.0).
 It will not load in a `javax.servlet` container or on an older JVM. The container images and the
 bundled-runtime archives carry their own runtime, so those two need no JDK at all.
 
@@ -28,8 +28,8 @@ repositories {
     maven { url = 'https://repo.eternita.co/maven2' }
 }
 dependencies {
-    implementation 'org.frontcache:frontcache-core:2.7.0'
-    implementation 'org.frontcache:frontcache-agent:2.7.0'   // optional: invalidate from app code
+    implementation 'org.frontcache:frontcache-core:2.8.0'
+    implementation 'org.frontcache:frontcache-agent:2.8.0'   // optional: invalidate from app code
 }
 ```
 
@@ -38,7 +38,7 @@ dependencies {
   <repository><id>eternita</id><url>https://repo.eternita.co/maven2</url></repository>
 </repositories>
 <dependency>
-  <groupId>org.frontcache</groupId><artifactId>frontcache-core</artifactId><version>2.7.0</version>
+  <groupId>org.frontcache</groupId><artifactId>frontcache-core</artifactId><version>2.8.0</version>
 </dependency>
 ```
 
@@ -47,8 +47,8 @@ dependencies {
 Frontcache reads its configuration from a directory, not from your app's config:
 
 ```sh
-curl -fLO https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.7.0/frontcache-core-2.7.0-home.zip
-unzip frontcache-core-2.7.0-home.zip
+curl -fLO https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.8.0/frontcache-core-2.8.0-home.zip
+unzip frontcache-core-2.8.0-home.zip
 ```
 
 It contains a filter-mode `conf/frontcache.properties` plus `README-FILTER.md` with the rest of
@@ -100,7 +100,7 @@ command and show cached vs. dynamic fragments in the response headers.
 Use case #2: a standalone reverse proxy in front of an app in any language.
 
 ```sh
-V=2.7.0
+V=2.8.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V.tar.gz
@@ -211,7 +211,7 @@ Frontcache and nothing else — a front door on 80/443 is a separate, optional s
 [examples/front-door](../examples/front-door).
 
 ```sh
-V=2.7.0
+V=2.8.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V-installer.sh
@@ -265,7 +265,7 @@ docker run -d --name frontcache --restart unless-stopped \
   -e ORIGIN_HOST=origin.example.com \
   -v /srv/frontcache/conf:/opt/frontcache-server/FRONTCACHE_HOME/conf \
   -v fc-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache \
-  pavlikovskiy/frontcache-server:2.7.0
+  pavlikovskiy/frontcache-server:2.8.0
 ```
 
 The image is **Frontcache alone** — plain HTTP on 9080, no TLS. That is what a Kubernetes
@@ -278,7 +278,7 @@ It is multi-arch (amd64 + arm64) and carries a `HEALTHCHECK`.
 ### With compose
 
 ```sh
-V=2.7.0
+V=2.8.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 curl -fLO $BASE/frontcache-server-$V-compose.yml
 curl -fL  $BASE/frontcache-server-$V-env.example -o .env
@@ -299,7 +299,7 @@ docker compose -f frontcache-server-$V-compose.yml --profile console up -d   # +
 - **TLS is not this container's job.** It serves plain HTTP; terminate TLS in front of it.
 - **Upgrade** with `docker compose pull && docker compose up -d` on a new tag. The `cache` volume
   is pure cache and can be dropped at any time.
-- Pin the exact version. `latest` exists and currently points at 2.7.0; naming it in production is how you get surprised.
+- Pin the exact version. `latest` exists and currently points at 2.8.0; naming it in production is how you get surprised.
 
 ---
 
@@ -311,13 +311,13 @@ The console is a **separate process** from the server, on port 7080.
 docker run -d --name frontcache-console --restart unless-stopped \
   -p 127.0.0.1:7080:7080 \
   -e FC_NODES=http://fc-server:9080/ -e FC_SITE_KEY=YOUR_SITE_KEY \
-  pavlikovskiy/frontcache-console:2.7.0
+  pavlikovskiy/frontcache-console:2.8.0
 ```
 
 Or as an archive:
 
 ```sh
-V=2.7.0
+V=2.8.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-console/$V
 curl -fLO $BASE/frontcache-console-$V.tar.gz
 curl -fLO $BASE/frontcache-console-$V.tar.gz.sha256
@@ -391,16 +391,16 @@ a companion `.sha256`.
 
 | What | Coordinate / file |
 | --- | --- |
-| Library | `org.frontcache:frontcache-core:2.7.0` |
-| Config skeleton | `frontcache-core-2.7.0-home.zip` |
-| Invalidation client | `org.frontcache:frontcache-agent:2.7.0` |
-| Standalone server | `frontcache-server-2.7.0.tar.gz` / `.zip` |
-| Server, bundled runtime | `frontcache-server-2.7.0-{linux-x64,linux-aarch64,macos-aarch64}.tar.gz` |
-| Console | `frontcache-console-2.7.0.tar.gz` / `.zip` (+ the same platform builds) |
-| Installer | `frontcache-server-2.7.0-installer.sh` |
-| Compose + env | `frontcache-server-2.7.0-compose.yml`, `-env.example` |
-| Container, server | `pavlikovskiy/frontcache-server:2.7.0` |
-| Container, console | `pavlikovskiy/frontcache-console:2.7.0` |
+| Library | `org.frontcache:frontcache-core:2.8.0` |
+| Config skeleton | `frontcache-core-2.8.0-home.zip` |
+| Invalidation client | `org.frontcache:frontcache-agent:2.8.0` |
+| Standalone server | `frontcache-server-2.8.0.tar.gz` / `.zip` |
+| Server, bundled runtime | `frontcache-server-2.8.0-{linux-x64,linux-aarch64,macos-aarch64}.tar.gz` |
+| Console | `frontcache-console-2.8.0.tar.gz` / `.zip` (+ the same platform builds) |
+| Installer | `frontcache-server-2.8.0-installer.sh` |
+| Compose + env | `frontcache-server-2.8.0-compose.yml`, `-env.example` |
+| Container, server | `pavlikovskiy/frontcache-server:2.8.0` |
+| Container, console | `pavlikovskiy/frontcache-console:2.8.0` |
 
 ---
 
