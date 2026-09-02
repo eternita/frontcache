@@ -7,7 +7,7 @@ filter inside your own app, with no separate proxy tier — but wired up the Spr
 
 **Requirements**
 
-- **JDK 25** — Frontcache 2.6.0 is Java 25 bytecode and Jakarta EE 10 (`jakarta.servlet`),
+- **JDK 25** — Frontcache 2.8.0 is Java 25 bytecode and Jakarta EE 10 (`jakarta.servlet`),
   which is why this example is on Spring Boot 3.x. Boot 2.x and earlier are `javax.servlet`
   and cannot load it.
 - **Maven 3.6.3+**
@@ -64,6 +64,6 @@ the `spring-boot-maven-plugin` config in `pom.xml`:
 
 Add the dependency and the repository from `pom.xml`, copy the `FilterRegistrationBean` above,
 and take a `FRONTCACHE_HOME` skeleton from
-`org.frontcache:frontcache-core:2.6.0:home@zip` (it ships a filter-mode
+`org.frontcache:frontcache-core:2.8.0:home@zip` (it ships a filter-mode
 `frontcache.properties` and a `README-FILTER.md`). See the
 [install guide](../../docs/install-guide.md).

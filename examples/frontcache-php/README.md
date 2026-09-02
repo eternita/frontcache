@@ -21,13 +21,13 @@ Two ways; pick either. Both are described in full in the
 ```sh
 docker run -d --name frontcache -p 9080:9080 \
   -e ORIGIN_HOST=host.docker.internal \
-  pavlikovskiy/frontcache-server:2.6.0
+  pavlikovskiy/frontcache-server:2.8.0
 ```
 
 *Archive:*
 
 ```sh
-V=2.6.0
+V=2.8.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 curl -fLO $BASE/frontcache-server-$V.tar.gz
 curl -fLO $BASE/frontcache-server-$V.tar.gz.sha256
@@ -65,7 +65,7 @@ Copy everything in this directory into your web server's `DocumentRoot`.
 **4. Start Frontcache**
 
 ```sh
-./frontcache-server-2.6.0/bin/frontcache        # listens on 9080
+./frontcache-server-2.8.0/bin/frontcache        # listens on 9080
 ```
 
 **5. Open it**

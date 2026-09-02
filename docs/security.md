@@ -1,6 +1,6 @@
 # Frontcache — Security
 
-Notes on what protects what. Current as of **2.7.0**.
+Notes on what protects what. Current as of **2.8.0**.
 
 The model is small, and worth stating plainly because two of its three parts are weaker than
 their names suggest:
