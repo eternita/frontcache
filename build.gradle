@@ -258,7 +258,7 @@ project(':frontcache-core') {
 		api 			'com.fasterxml.jackson.core:jackson-databind:2.22.1'
 		api         	'com.fasterxml.jackson.core:jackson-annotations:2.22'
         // HttpClient 5.3.1. The 4.5 branch ended at 4.5.14 (maintenance only), and 5.x is where
-        // every future fix lands. See docs/httpclient5-upgrade-proposal.md - the migration also
+        // every future fix lands. See docs/archive/httpclient5-upgrade-proposal.md - the migration also
         // took org.apache.http.client.HttpClient out of the CacheProcessor / IncludeProcessor /
         // FallbackResolver signatures, which now take org.frontcache.core.FcHttpClient instead.
         api         	'org.apache.httpcomponents.client5:httpclient5:5.3.1'
@@ -313,7 +313,7 @@ project(':frontcache-core') {
 project(':frontcache-agent') {
 	dependencies {
         // Moves with core: the agent's public API is String-in/String-out, so no customer source
-        // breaks. See docs/httpclient5-upgrade-proposal.md section 6.
+        // breaks. See docs/archive/httpclient5-upgrade-proposal.md section 6.
         api         'org.apache.httpcomponents.client5:httpclient5:5.3.1'
 	}
 }

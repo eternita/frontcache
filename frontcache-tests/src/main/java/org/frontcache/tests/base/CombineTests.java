@@ -29,7 +29,7 @@ import org.junit.Test;
 import org.htmlunit.html.HtmlPage;
 
 /**
- * Combine-and-reduce, end to end - docs/combine-reduce-proposal.md.
+ * Combine-and-reduce, end to end - docs/archive/combine-reduce-proposal.md.
  *
  * Run in both topologies. The standalone run is the one that matters for section 4.1's second
  * claim: the combined request crosses TWO Frontcache nodes, and neither may cache the envelope.

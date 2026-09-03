@@ -305,7 +305,7 @@ public class FcMetricsExportTest {
 	// ---- combine-and-reduce --------------------------------------------------------------
 
 	/**
-	 * The combine series and their label vocabulary (docs/combine-reduce-proposal.md section 12).
+	 * The combine series and their label vocabulary (docs/archive/combine-reduce-proposal.md section 12).
 	 *
 	 * The pair that carries the feature's whole claim is asserted by value, not merely by presence:
 	 * members{result="combined"} over batches{result="ok"} is the average number of fragments one

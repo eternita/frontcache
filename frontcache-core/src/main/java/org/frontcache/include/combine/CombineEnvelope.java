@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * The combined response: one part per requested member, in the order the members were sent.
- * See docs/combine-reduce-proposal.md section 6.
+ * See docs/archive/combine-reduce-proposal.md section 6.
  *
  * <pre>
  * {"v":1,"parts":[{"q":"id=1","status":200,"headers":{...},"body":"..."}, ...]}

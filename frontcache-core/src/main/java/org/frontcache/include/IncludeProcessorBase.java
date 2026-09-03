@@ -243,7 +243,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 *
 	 * {@code combine="true"} groups by the include's endpoint alone; any other value adds itself to
 	 * the group key, so one endpoint can serve two logically different sets on the same page without
-	 * their members being merged into one batch. See docs/combine-reduce-proposal.md section 8.
+	 * their members being merged into one batch. See docs/archive/combine-reduce-proposal.md section 8.
 	 *
 	 * Absent means today's behaviour, unchanged: combining is opt-in per include, because it is a
 	 * contract with the origin rather than a transparent edge optimisation.
@@ -295,7 +295,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * to the origin.
 	 *
 	 * Split out for the combine path, which has to know which members missed <em>before</em> it can
-	 * decide what goes into a batch (docs/combine-reduce-proposal.md section 4.3). Everything the
+	 * decide what goes into a batch (docs/archive/combine-reduce-proposal.md section 4.3). Everything the
 	 * single-include path did on a hit - the client-type cacheability check, soft vs regular
 	 * expiration, both request-log writes - still happens here and only here, so the two paths cannot
 	 * drift on what a hit means.

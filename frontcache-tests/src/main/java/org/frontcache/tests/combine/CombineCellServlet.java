@@ -30,7 +30,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * reach this servlet once, not N times. That is the entire feature - a real origin's saving is the
  * batched DB/Solr query behind this counter, which a test webapp has nothing to stand in for.
  *
- * Also serves the two deliberately-broken variants (docs/combine-reduce-proposal.md section 9),
+ * Also serves the two deliberately-broken variants (docs/archive/combine-reduce-proposal.md section 9),
  * selected by path so a test can point a page at one of them:
  *
  * <ul>

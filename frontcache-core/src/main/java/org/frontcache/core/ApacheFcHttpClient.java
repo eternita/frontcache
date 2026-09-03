@@ -28,7 +28,7 @@ import org.frontcache.resilience.FC_ThroughCache_WebFilter;
  * in {@code frontcache-core} that know an HTTP library exists - everything else, including all three
  * reflection-loaded extension points, sees only {@link FcHttpClient}.
  *
- * See docs/httpclient5-upgrade-proposal.md section 5.1.
+ * See docs/archive/httpclient5-upgrade-proposal.md section 5.1.
  */
 public class ApacheFcHttpClient implements FcHttpClient {
 

@@ -194,7 +194,7 @@ public class FrontCacheEngine {
 
 	// The FcHttpClient view of the same client. This is what the three reflection-loaded extension
 	// points (CacheProcessor / IncludeProcessor / FallbackResolver) are handed - they no longer see
-	// an Apache type. See docs/httpclient5-upgrade-proposal.md section 5.1.
+	// an Apache type. See docs/archive/httpclient5-upgrade-proposal.md section 5.1.
 	private FcHttpClient fcHttpClient;
 
 	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output
@@ -675,7 +675,7 @@ public class FrontCacheEngine {
 		// the connection manager (see newConnectionManager()). RequestConfig.setResponseTimeout is
 		// NOT the old socket timeout - it bounds the wait for the response head, not inactivity on
 		// each read - so mapping onto it would have quietly changed what the config key means.
-		// See docs/httpclient5-upgrade-proposal.md section 4.1.
+		// See docs/archive/httpclient5-upgrade-proposal.md section 4.1.
 		final RequestConfig requestConfig = RequestConfig.custom()
 				// bounded wait for a pooled connection - never block a worker thread indefinitely
 				.setConnectionRequestTimeout(Timeout.ofMilliseconds(fcConnectionRequestTimeout))
@@ -700,7 +700,7 @@ public class FrontCacheEngine {
 				// constructor is (1, TimeValue.ofSeconds(1)) and HttpRequestRetryExec honours that
 				// interval by sleeping, which would park a command worker for a full second before a
 				// retry that is instant on a fresh connection. 4.5's handler retried immediately.
-				// See docs/httpclient5-upgrade-proposal.md section 4.3.1.
+				// See docs/archive/httpclient5-upgrade-proposal.md section 4.3.1.
 				.setRetryStrategy(new DefaultHttpRequestRetryStrategy(1, TimeValue.ZERO_MILLISECONDS))
 				.setKeepAliveStrategy(keepAliveStrategy)
 				// Frontcache relays the origin's redirect to the client (rewriting Location itself in

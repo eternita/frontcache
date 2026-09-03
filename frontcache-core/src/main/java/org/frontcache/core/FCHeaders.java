@@ -59,7 +59,7 @@ public class FCHeaders {
 
     /**
      * A sync include that was resolved as one member of a combined origin call
-     * (docs/combine-reduce-proposal.md). Its own line in the trace headers carries the BATCH's
+     * (docs/archive/combine-reduce-proposal.md). Its own line in the trace headers carries the BATCH's
      * elapsed time, not a time of its own - so N members of one batch report N identical durations
      * that do not sum to the page time. This marker is what tells a reader of
      * front-cache.log-to-headers why.

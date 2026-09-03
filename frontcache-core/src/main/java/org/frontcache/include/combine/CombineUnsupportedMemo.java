@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Remembers, per batch group, that the origin does not implement combining.
- * See docs/combine-reduce-proposal.md section 9.1.
+ * See docs/archive/combine-reduce-proposal.md section 9.1.
  *
  * Without it, an origin that has the {@code combine} attribute in its markup but not the handler
  * behind it pays one wasted request per group on every single page view, forever. With it, that

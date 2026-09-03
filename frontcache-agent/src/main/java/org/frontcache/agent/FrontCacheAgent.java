@@ -81,7 +81,7 @@ public class FrontCacheAgent {
 
 		// HttpClient 5 moved these off RequestConfig - socket read timeout to SocketConfig, connect
 		// timeout to ConnectionConfig, both on the connection manager. RequestConfig.setResponseTimeout
-		// is NOT the old socket timeout. See docs/httpclient5-upgrade-proposal.md section 4.1.
+		// is NOT the old socket timeout. See docs/archive/httpclient5-upgrade-proposal.md section 4.1.
 		connectionManager.setDefaultSocketConfig(SocketConfig.custom()
 				.setSoTimeout(Timeout.ofMilliseconds(SOCKET_TIMEOUT))
 				.build());
