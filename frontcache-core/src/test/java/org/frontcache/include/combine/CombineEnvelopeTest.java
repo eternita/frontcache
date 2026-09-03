@@ -134,6 +134,48 @@ public class CombineEnvelopeTest {
 		assertNull("a part with nothing to declare declares nothing", parts.get(2).getHeaders());
 	}
 
+	/**
+	 * A non-JVM origin's envelope, read by the edge's own parser.
+	 *
+	 * These are the literal bytes emitted by the PHP endpoint in
+	 * docs/combine-reduce-proposal.md section 13.2, captured from a run of it - not a hand-written
+	 * approximation of them. The contract's whole point is that it is implementable without Java, and
+	 * the documented example is the thing most likely to be copied; if it drifts from what the parser
+	 * accepts, this is where that shows up rather than in somebody's origin.
+	 *
+	 * Note the third member: a part with a non-2xx status and no body at all, which is what the
+	 * example emits for a row it could not load. The edge must read that as "this member falls back"
+	 * and leave its siblings alone.
+	 */
+	@Test
+	public void thePhpExamplesEnvelopeParses() throws Exception {
+
+		String fromPhp = "{\"v\":1,\"parts\":["
+				+ "{\"q\":\"id=1&lang=en\",\"status\":200,\"headers\":{\"Content-Type\":[\"text/html;charset=UTF-8\"],"
+				+ "\"x-frontcache-component-maxage\":[\"10d\"],\"x-frontcache-component-tags\":[\"item|item-1\"]},"
+				+ "\"body\":\"<div class=\\\"cell\\\">Coin 1</div>\"},"
+				+ "{\"q\":\"id=9\",\"status\":404},"
+				+ "{\"q\":\"id=3\",\"status\":200,\"headers\":{\"Content-Type\":[\"text/html;charset=UTF-8\"],"
+				+ "\"x-frontcache-component-maxage\":[\"10d\"],\"x-frontcache-component-tags\":[\"item|item-3\"]},"
+				+ "\"body\":\"<div class=\\\"cell\\\">Coin 3</div>\"}]}";
+
+		List<CombinePart> parts = CombineEnvelope.fromJson(fromPhp).getParts();
+
+		assertEquals(3, parts.size());
+
+		assertEquals("id=1&lang=en", parts.get(0).getQ());
+		assertEquals("<div class=\"cell\">Coin 1</div>", parts.get(0).getBody());
+		assertEquals(Arrays.asList("10d"), parts.get(0).getHeaders().get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE));
+		assertEquals(Arrays.asList("item|item-1"), parts.get(0).getHeaders().get(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS));
+
+		assertEquals("a row the origin could not load", 404, parts.get(1).getStatus());
+		assertNull(parts.get(1).getBody());
+		assertNull(parts.get(1).getHeaders());
+
+		assertEquals("a sibling of a failed member renders normally", 200, parts.get(2).getStatus());
+		assertEquals("<div class=\"cell\">Coin 3</div>", parts.get(2).getBody());
+	}
+
 	/** Null fields are omitted, so the common part - body only - is not padded with nulls. */
 	@Test
 	public void nullFieldsAreNotSerialised() throws Exception {
