@@ -530,6 +530,11 @@ public class FrontCacheEngine {
 		}, POOL_STATS_LOG_PERIOD_MS, POOL_STATS_LOG_PERIOD_MS);
 
 
+		// Created here, not on the thread below: this reads conf/fallbacks.conf and needs no server, so
+		// doing it now means a fallback is answerable from the very first request and a bad config line
+		// is logged at startup. Only the origin warm-up has to wait for the node to be listening.
+		FallbackResolverFactory.getInstance();
+
 		Thread t = new Thread(new Runnable() {
 
 			public void run() {

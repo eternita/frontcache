@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -188,6 +189,21 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	}
 
 	/**
+	 * Keys with a soft refresh already queued or running.
+	 *
+	 * Soft refresh is a per-key singleton: a second refresh of the same URL while one is in flight
+	 * fetches the same bytes from the same origin and overwrites them with themselves. Without this
+	 * set, every request arriving during the refresh window submits its own task, because the entry
+	 * stays expired until the winner's putToCache lands - so a hot fragment turns one expiry into a
+	 * herd of identical origin calls that grows with request rate. Measured on a production node:
+	 * 33 fragment URLs generating 608 origin fetches per second, one URL taking 170/s of it.
+	 *
+	 * A plain set, not a map of futures: callers never wait for the refresh - they serve the stale
+	 * entry and return - so there is nothing to hand back to a loser.
+	 */
+	private final Set<String> softRefreshInFlight = ConcurrentHashMap.newKeySet();
+
+	/**
 	 * perform async invalidation
 	 *
 	 * @param currentRequestURL
@@ -198,6 +214,11 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 	 */
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context)
 	{
+		// Single-flight. Losing this race is the normal case under load and is not an error: the
+		// caller has a stale entry in hand and serves it, which is the whole point of a soft refresh.
+		if (!softRefreshInFlight.add(currentRequestURL))
+			return;
+
 		// Snapshot the request headers synchronously on the caller's thread. The async task below runs
 		// later on a pool thread, while the caller carries on adding trace headers to this same map
 		// (the include level, the request id, the client IP) - iterating it there would race and throw
@@ -208,37 +229,61 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		// they all shared the parent's map, this line was itself the racing reader.
 		final Map<String, List<String>> requestHeadersCopy = new HashMap<String, List<String>>(requestHeaders);
 
-		// async invalidation
-		softInvalidationExecutor.submit(new Runnable(){
+		boolean submitted = false;
+		try {
+			// async invalidation
+			softInvalidationExecutor.submit(new Runnable(){
 
-			@Override
-			public void run() {
-				try {
+				@Override
+				public void run() {
+					try {
 
-//					logger.info("Soft invalidation: removing form cache: " + currentRequestURL);
-					removeFromCache(currentRequestURL);
+						// The entry is deliberately NOT removed first. Soft refresh exists to keep
+						// serving the stale value while a fresh one is fetched, and putToCache
+						// overwrites, so a removal buys nothing and costs everything: it opens a window,
+						// one origin round trip wide, in which getFromCache returns null and every
+						// request in flight falls through to the origin. That window was the herd this
+						// method now suppresses. It also means a refresh that FAILS leaves the stale
+						// entry in place instead of leaving the key empty.
+						RequestContext ctxCopy = context.copy();
+						ctxCopy.setFilterChain(null); // async calls for ServletFilter doesnt works (some objects already disposed), so use http calls for soft resets
 
-					RequestContext ctxCopy = context.copy();
-					ctxCopy.setFilterChain(null); // async calls for ServletFilter doesnt works (some objects already disposed), so use http calls for soft resets
+						requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
+						requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_SOFT_REFRESH, Arrays.asList(new String[]{"true"}));
 
-					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
-					requestHeadersCopy.put(FCHeaders.X_FRONTCACHE_SOFT_REFRESH, Arrays.asList(new String[]{"true"}));
+						WebResponse copy4cache = FCUtils.dynamicCall(originUrlStr, requestHeadersCopy, client, ctxCopy);
+						copy4cache.setUrl(currentRequestURL);
 
-					WebResponse copy4cache = FCUtils.dynamicCall(originUrlStr, requestHeadersCopy, client, ctxCopy);
-					copy4cache.setUrl(currentRequestURL);
+						if (!ctxCopy.isFallbackUsed()) // don't cache fallbacks
+							putToCache(currentRequestURL, copy4cache); // put to cache copy
 
-					if (!ctxCopy.isFallbackUsed()) // don't cache fallbacks
-						putToCache(currentRequestURL, copy4cache); // put to cache copy
+					} catch (Exception e) {
 
-				} catch (Exception e) {
-
-					logger.error("Soft invalidation/refresh failed: " + originUrlStr, e);
+						logger.error("Soft invalidation/refresh failed: " + originUrlStr, e);
+					} finally {
+						// Released here rather than in the submitting method: the claim must outlive the
+						// submit and cover the whole run, or the next request re-submits while this task
+						// is still fetching - which is exactly the herd.
+						softRefreshInFlight.remove(currentRequestURL);
+					}
 				}
-			}
 
-		});
+			});
+			submitted = true;
+		} finally {
+			// A rejected submit (pool shut down) would otherwise leave the key claimed forever, and
+			// that key would never refresh again for the life of the process.
+			if (!submitted)
+				softRefreshInFlight.remove(currentRequestURL);
+		}
 
 		return;
+	}
+
+	/** Test seam: how many soft refreshes are queued or running. */
+	int softRefreshInFlightCount()
+	{
+		return softRefreshInFlight.size();
 	}
 
 

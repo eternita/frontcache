@@ -306,7 +306,16 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
     {
 
 		CacheProcessor cacheProcessor = CacheManager.getInstance();
-		WebResponse webResponse = cacheProcessor.getFromCache(urlStr, context);
+
+		// The key must be the URL this include is actually FETCHED with, not the URL as written in
+		// the tag. fetchIncludeFromOrigin goes out through FCUtils.buildRequestURI, which drops
+		// valueless query parameters, and the serving node stores the entry under what it received -
+		// so keying the lookup on the raw tag URL means an include carrying an empty parameter
+		// (?locale=zh&id=) looks up a key nothing is ever stored under, misses forever, and refetches
+		// on every single request. See FCUtils.canonicalizeURL.
+		String cacheKey = FCUtils.canonicalizeURL(urlStr);
+
+		WebResponse webResponse = cacheProcessor.getFromCache(cacheKey, context);
 
 		boolean isCacheableForClientType = true;
 
@@ -327,12 +336,12 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 				String refreshType = webResponse.getRefreshType();
 				if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType))
 				{
-					// soft expiration
-					cacheProcessor.doSoftInvalidation(urlStr, urlStr, requestHeaders, client, context);
+					// soft expiration - both arguments are cache keys / fetch targets, so both canonical
+					cacheProcessor.doSoftInvalidation(cacheKey, cacheKey, requestHeaders, client, context);
 					softRefresh = true;
 				} else {
 					// regular expiration
-					cacheProcessor.removeFromCache(urlStr);
+					cacheProcessor.removeFromCache(cacheKey);
 					webResponse = null; // refresh from origin
 				}
 			}

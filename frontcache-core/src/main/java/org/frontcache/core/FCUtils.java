@@ -709,6 +709,53 @@ public class FCUtils {
 	}
 
 
+	/**
+	 * The URL a request for {@code urlStr} will actually be made with: scheme and host untouched,
+	 * path and query normalised exactly as {@link #buildRequestURI(String)} normalises them for the
+	 * wire.
+	 *
+	 * <b>This is the only correct cache key for a URL that is fetched through buildRequestURI</b>,
+	 * and the two must not be allowed to drift apart. buildRequestURI re-serializes the query and
+	 * silently drops any parameter with no value - {@code splitQueryParameters} maps {@code id=} to
+	 * a null value, because its guard is {@code pair.length() > idx + 1}, which for {@code "id="} is
+	 * {@code 3 > 3}. So a URL keyed raw and fetched normalised is a cache entry that can never be
+	 * read back:
+	 *
+	 * <pre>
+	 *   probe   ?locale=zh&amp;id=   miss - nothing is ever stored under this
+	 *   fetch   ?locale=zh         the empty parameter is gone by the time it reaches the wire
+	 *   store   ?locale=zh         what the serving node receives, and stores
+	 *   probe   ?locale=zh&amp;id=   miss again, for the life of the entry
+	 * </pre>
+	 *
+	 * That loop ran in production: 33 fragment URLs generating 608 origin fetches a second, each
+	 * one re-fetching a fragment that was already cached, unexpired and cacheable - because the key
+	 * being looked up had never existed. See docs/input-request-count-fix.md section 3.
+	 *
+	 * Idempotent: canonicalizing an already-canonical URL returns it unchanged, so it is safe to
+	 * apply on a path that may already have applied it.
+	 */
+	public static String canonicalizeURL(String urlStr) {
+
+		if (null == urlStr)
+			return null;
+
+		String uri = buildRequestURI(urlStr);
+
+		// buildRequestURI returns everything from the first '/' after the '//', so put the
+		// scheme+host back in front of it. When there is no scheme+host it already returned the
+		// whole thing.
+		int schemeIdx = urlStr.indexOf("//");
+		if (-1 < schemeIdx)
+		{
+			int pathIdx = urlStr.indexOf("/", schemeIdx + "//".length());
+			if (-1 < pathIdx)
+				return urlStr.substring(0, pathIdx) + uri;
+		}
+
+		return uri;
+	}
+
 	public static Map<String, List<String>> splitQueryParameters(String paramsStr) throws UnsupportedEncodingException {
 		final Map<String, List<String>> queryPairs = new LinkedHashMap<String, List<String>>();
 		final String[] pairs = paramsStr.split("&");

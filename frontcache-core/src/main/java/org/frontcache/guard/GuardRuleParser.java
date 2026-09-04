@@ -51,22 +51,26 @@ public class GuardRuleParser {
 
 	public GuardRule parse(String line)
 	{
-		String[] parts = line.split("\\|");
-		if (3 > parts.length)
-			throw new GuardConfigException("expected '<name> | <condition> | <action>' but got '" + line + "'");
+		List<String> parts = splitFields(line);
+		if (3 > parts.size())
+			throw new GuardConfigException("expected '<name> | <condition> | <action>' but got '" + line + "'"
+					+ (-1 < line.indexOf('|')
+						? " - the '|' in it is inside a (group) or [class], so it did not separate fields;"
+						  + " check for an unbalanced parenthesis or bracket"
+						: ""));
 
-		String name = parts[0].trim();
+		String name = parts.get(0).trim();
 		if (0 == name.length())
 			throw new GuardConfigException("rule name is empty in '" + line + "'");
 
-		List<GuardPredicate> predicates = parseCondition(parts[1], line);
+		List<GuardPredicate> predicates = parseCondition(parts.get(1), line);
 		bindRateLimit(predicates, name, line);
-		GuardAction action = parseAction(parts[2].trim(), line);
+		GuardAction action = parseAction(parts.get(2).trim(), line);
 
 		boolean dryRun = false;
-		if (3 < parts.length)
+		if (3 < parts.size())
 		{
-			String flag = parts[3].trim();
+			String flag = parts.get(3).trim();
 			if ("dry-run".equalsIgnoreCase(flag))
 				dryRun = true;
 			else if (0 < flag.length())
@@ -74,6 +78,65 @@ public class GuardRuleParser {
 		}
 
 		return new GuardRule(name, predicates, action, dryRun);
+	}
+
+	/**
+	 * Splits a rule line into its {@code name | condition | action [| flag]} fields.
+	 *
+	 * The obvious {@code line.split("\\|")} is wrong, and was: {@code |} is also regex alternation, so
+	 * a perfectly ordinary predicate like {@code uri~^/(recent|user)-contributions\.htm} got shredded
+	 * at the alternation and the rule was refused at load time as "invalid regex ... Unclosed group".
+	 * The rest of the file kept working, which is what made it invisible: on a production node this
+	 * silently disabled 5 of 19 rules - and they were every anti-scraper redirect, i.e. exactly the
+	 * rules whose absence costs nothing until a flood arrives.
+	 *
+	 * So a {@code |} separates fields only where a regex cannot be using it: outside any {@code (...)}
+	 * group, outside any {@code [...]} character class, and not backslash-escaped. Fields come back
+	 * byte-identical - nothing is unescaped - so {@code \|} still reads as a literal pipe to the regex
+	 * engine, and a top-level alternation is written the way it already was, in parentheses.
+	 */
+	static List<String> splitFields(String line)
+	{
+		List<String> fields = new ArrayList<String>();
+		StringBuilder field = new StringBuilder();
+		int groupDepth = 0;
+		boolean inCharClass = false;
+
+		for (int i = 0; i < line.length(); i++)
+		{
+			char c = line.charAt(i);
+
+			// A backslash escapes whatever follows it, for the regex and for us alike: an escaped
+			// pipe is not a separator, and an escaped bracket does not open a group or a class.
+			if ('\\' == c && i + 1 < line.length())
+			{
+				field.append(c).append(line.charAt(++i));
+				continue;
+			}
+
+			if (inCharClass)
+			{
+				if (']' == c)
+					inCharClass = false;
+			}
+			else if ('[' == c)
+				inCharClass = true;
+			else if ('(' == c)
+				groupDepth++;
+			else if (')' == c && 0 < groupDepth)
+				groupDepth--;
+			else if ('|' == c && 0 == groupDepth)
+			{
+				fields.add(field.toString());
+				field.setLength(0);
+				continue;
+			}
+
+			field.append(c);
+		}
+
+		fields.add(field.toString());
+		return fields;
 	}
 
 	private List<GuardPredicate> parseCondition(String condition, String line)
