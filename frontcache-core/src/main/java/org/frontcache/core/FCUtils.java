@@ -756,6 +756,38 @@ public class FCUtils {
 		return uri;
 	}
 
+	/**
+	 * The same path and query, addressed at a different {@code scheme://host[:port]}.
+	 *
+	 * This is what splits an include's two jobs apart (docs/include-fetch-fix.md section 5). A
+	 * cache-missing {@code <fc:include>} is keyed on the public URL and fetched from
+	 * {@code front-cache.origin-host}; the two differ only in the base, so the fetch URL is derived
+	 * from the public one rather than re-concatenated from the tag - re-concatenating would give a
+	 * second string to keep in step with {@link #canonicalizeURL}, and that drift is what section 2
+	 * of docs/input-request-count-fix.md was.
+	 *
+	 * The base is expected without a trailing slash, which is what {@code FrontCacheEngine.makeURL}
+	 * and {@code URL.toString()} produce for a host-only URL.
+	 *
+	 * @param urlStr absolute URL, or a path (which is returned appended to the base)
+	 * @param baseURL {@code scheme://host[:port]}
+	 */
+	public static String rebaseURL(String urlStr, String baseURL) {
+
+		if (null == urlStr || null == baseURL)
+			return urlStr;
+
+		int schemeIdx = urlStr.indexOf("//");
+		if (-1 == schemeIdx)
+			return baseURL + urlStr; // already a path
+
+		int pathIdx = urlStr.indexOf("/", schemeIdx + "//".length());
+		if (-1 == pathIdx)
+			return baseURL + "/"; // scheme + host, nothing else
+
+		return baseURL + urlStr.substring(pathIdx);
+	}
+
 	public static Map<String, List<String>> splitQueryParameters(String paramsStr) throws UnsupportedEncodingException {
 		final Map<String, List<String>> queryPairs = new LinkedHashMap<String, List<String>>();
 		final String[] pairs = paramsStr.split("&");

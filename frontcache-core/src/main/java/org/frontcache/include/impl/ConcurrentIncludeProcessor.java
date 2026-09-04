@@ -25,9 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.regex.Pattern;
 
-import org.frontcache.FCConfig;
 import org.frontcache.core.FcHttpClient;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.cache.CacheManager;
@@ -77,6 +75,9 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	@Override
 	public void init(Properties properties) {
+
+		super.init(properties); // front-cache.include-fetch-target
+
 		try
 		{
 			String threadAmountStr = properties.getProperty("front-cache.include-processor.impl.concurrent.thread-amount");
@@ -149,7 +150,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		// immediately before this, purely to test for the marker - it now scans the bytes instead
 		// (IncludeProcessorBase.hasIncludes), so this is no longer the second copy of the same page.
 		String contentStr = new String(parentWebResponse.getContent(), StandardCharsets.UTF_8);
-		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, requestHeaders, client, context);
+
+		// Resolved once for the page rather than per include: it depends only on config and on the
+		// request's scheme. Equal to hostURL unless includes are fetched straight from the origin.
+		String fetchBaseURL = includeFetchBaseURL(hostURL, context);
+
+		List<IncludeResolutionPlaceholder> includes = parseIncludes(contentStr, hostURL, fetchBaseURL, requestHeaders, client, context);
 
 		if (null == includes)
 			return parentWebResponse;
@@ -345,10 +351,15 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				// One header map per batch, made here on the request thread and owned by the batch -
 				// the same rule the per-include copies follow, and for the same reason: the batch adds
 				// trace headers of its own, and the parent's map is only ever read after parse.
+				// The batch endpoint has to be built from the FETCH base, or single includes go to the
+				// origin while combined ones keep looping back - the same fragment reachable two ways,
+				// which is how section 2 of docs/input-request-count-fix.md happened. Members stay
+				// keyed on their public URLs; only the endpoint moves.
 				CombinedIncludeBatch batch = new CombinedIncludeBatch(
 						group.getKey(),
 						chunk,
 						byUrl,
+						CombineProtocol.endpointOf(byUrl.get(chunk.get(0)).get(0).fetchURL),
 						new HashMap<String, List<String>>(requestHeaders),
 						client, context, includeLevel);
 
@@ -423,30 +434,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	}
 
 	/**
-	 * Would {@code dynamic-urls.conf} have stopped the loopback from caching this member?
-	 *
-	 * Matched against the URI path, which is what {@code FrontCacheEngine.ignoreCache} matches - a
-	 * combined member must be cacheable exactly when a single include for the same URL would have
-	 * been.
-	 */
-	private static boolean isDynamicURL(String url)
-	{
-		String uri = CombineProtocol.pathOf(url);
-
-		for (Pattern p : FCConfig.getDynamicURLPatterns())
-			if (p.matcher(uri).find())
-				return true;
-
-		return false;
-	}
-
-	/**
 	 *
 	 * @param content
 	 * @param hostURL
 	 * @return
 	 */
-	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context)
+	private List<IncludeResolutionPlaceholder> parseIncludes(String content, String hostURL, String fetchBaseURL, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context)
 	{
 		List<IncludeResolutionPlaceholder> includes = null;
 
@@ -495,8 +488,15 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					if (null == includes)
 						includes = new ArrayList<IncludeResolutionPlaceholder>();
 
-					// save placeholder
-					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, hostURL + includeURL, includeType, includeClientType, combineGroup, includeRequestHeaders, client, context));
+					// save placeholder. Two URLs, differing only in scheme/host/port: the public one is
+					// what this fragment is keyed, logged and fallen back on, and the fetch one is what
+					// goes on the wire. The fetch URL is DERIVED from the public one rather than
+					// re-concatenated from the tag, so FCUtils.canonicalizeURL stays the single
+					// normaliser for both - see docs/include-fetch-fix.md section 5.
+					String publicIncludeURL = hostURL + includeURL;
+					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, publicIncludeURL,
+							FCUtils.rebaseURL(publicIncludeURL, fetchBaseURL),
+							includeType, includeClientType, combineGroup, includeRequestHeaders, client, context));
 
 					scanIdx = endIdx;
 				} else {
@@ -601,7 +601,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	class IncludeResolutionPlaceholder implements Callable<IncludeResolutionPlaceholder> {
 		int startIdx;
 		int endIdx;
+		/** Edge-facing: the cache key, the request-log line and the fallbacks.conf lookup. */
 		String includeURL;
+		/** What goes on the wire. Same as includeURL unless includes are fetched from the origin. */
+		String fetchURL;
 		String includeType; // sync|async
 		String includeClientType; // bot|browser
 		String combineGroup; // null unless the markup says combine="..."
@@ -612,11 +615,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		boolean performInclude = true;
 		String includeLevel = null;
 
-		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String includeType, String includeClientType, String combineGroup, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) {
+		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String fetchURL, String includeType, String includeClientType, String combineGroup, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) {
 			super();
 			this.startIdx = startIdx;
 			this.endIdx = endIdx;
 			this.includeURL = includeURL;
+			this.fetchURL = fetchURL;
 			this.includeType = includeType;
 			this.includeClientType = includeClientType;
 			this.combineGroup = combineGroup;
@@ -634,7 +638,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				@Override
 				public Void call() {
 					try {
-						webResponse = getIncludeFromCache(includeURL, requestHeaders, client, context,
+						webResponse = getIncludeFromCache(includeURL, fetchURL, requestHeaders, client, context,
 								includeLevel, includeType, System.currentTimeMillis());
 					} catch (Throwable e) {
 						logger.error("unexpected error probing cache for include " + includeURL, e);
@@ -648,7 +652,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	    public IncludeResolutionPlaceholder call() throws Exception {
 
 			try {
-				this.webResponse = callInclude(this.includeURL, this.requestHeaders, this.client, this.context, this.includeLevel, this.includeType);
+				this.webResponse = callInclude(this.includeURL, this.fetchURL, this.requestHeaders, this.client, this.context, this.includeLevel, this.includeType);
 
 			} catch (FrontCacheException e) {
 				logger.error("FrontCacheException: unexpected error processing include " + includeURL, e);
@@ -690,6 +694,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 		private final String groupKey;
 		private final String endpointURL;                                    // edge-facing, no query
+		private final String fetchEndpointURL;                               // what the batch is asked of, no query
 		private final List<String> urls;                                     // distinct member URLs, in order
 		private final Map<String, List<IncludeResolutionPlaceholder>> byUrl; // URL -> placeholders sharing it
 		private final Map<String, List<String>> requestHeaders;              // owned by this batch
@@ -698,9 +703,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		private final String includeLevel;
 
 		CombinedIncludeBatch(String groupKey, List<String> urls, Map<String, List<IncludeResolutionPlaceholder>> byUrl,
-				Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context, String includeLevel) {
+				String fetchEndpointURL, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context, String includeLevel) {
 			this.groupKey = groupKey;
 			this.endpointURL = CombineProtocol.endpointOf(urls.get(0));
+			this.fetchEndpointURL = fetchEndpointURL;
 			this.urls = urls;
 			this.byUrl = byUrl;
 			this.requestHeaders = requestHeaders;
@@ -730,7 +736,9 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			for (String url : urls)
 				queries.add(CombineProtocol.queryOf(url));
 
-			String combinedURL = endpointURL + CombineProtocol.buildCombinedQuery(queries);
+			String combinedQuery = CombineProtocol.buildCombinedQuery(queries);
+			String combinedURL = endpointURL + combinedQuery;             // what the log lines name
+			String fetchCombinedURL = fetchEndpointURL + combinedQuery;   // what is actually requested
 
 			// The envelope must be cached by NOBODY. Its URL carries whichever members happened to
 			// miss, so the set of distinct combined URLs for one page is combinatorial in its members -
@@ -740,7 +748,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			// forward. See section 4.1 of the proposal.
 			requestHeaders.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
 
-			WebResponse envelopeResponse = fetchIncludeFromOrigin(combinedURL, requestHeaders, client, context,
+			WebResponse envelopeResponse = fetchIncludeFromOrigin(combinedURL, fetchCombinedURL, requestHeaders, client, context,
 					includeLevel, FCHeaders.COMPONENT_COMBINED_INCLUDE, start);
 
 			if (null == envelopeResponse || null == envelopeResponse.getContent())
@@ -910,7 +918,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			WebResponse webResponse = FCUtils.buildWebComponent(url, body, headers);
 			webResponse.setStatusCode(part.getStatus());
 
-			if (isPartCacheable(webResponse, body))
+			if (isPartCacheable(webResponse))
 				// copy(), because putToCache strips the non-persistent headers from what it is handed
 				// and this instance is about to be served.
 				CacheManager.getInstance().putToCache(url, webResponse.copy());
@@ -944,32 +952,20 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		}
 
 		/**
-		 * The same four conditions {@code CacheProcessorBase.processRequest} applies to an origin
-		 * response before storing it, applied to a part.
+		 * The same conditions a single include applies before storing what the origin answered -
+		 * {@link IncludeProcessorBase#isIncludeResponseCacheable}, shared so the two paths cannot
+		 * drift on what "cacheable" means.
 		 *
-		 * {@code isCacheable()} on its own is NOT the guard, and that is the trap: it answers true for
-		 * a response whose expireTimeMap says NO_CACHE for every client type, because it only checks
-		 * that the map is non-empty. A part with no maxage would therefore be stored as an entry that
-		 * is expired the instant it is written - churning the index and never serving anything.
-		 *
-		 * One condition of the four is deliberately not carried over: {@code !isFallbackUsed()}. There
-		 * it reads a context belonging to that one loopback request; here the context belongs to the
-		 * whole page, so an unrelated include's fallback would stop this batch's parts from ever being
-		 * cached. This batch is known not to be a fallback - it is a 2xx that carried the combine
-		 * header, which no fallback resolver produces.
+		 * One condition applied elsewhere is deliberately not part of it: {@code !isFallbackUsed()}.
+		 * In {@code CacheProcessorBase.processRequest} that reads a context belonging to one loopback
+		 * request; here the context belongs to the whole page, so an unrelated include's fallback
+		 * would stop this batch's parts from ever being cached. This batch is known not to be a
+		 * fallback - it is a 2xx that carried the combine header, which no fallback resolver
+		 * produces, and {@link #applyPart} has already refused any part that is not itself 2xx.
 		 */
-		private boolean isPartCacheable(WebResponse webResponse, byte[] body) {
+		private boolean isPartCacheable(WebResponse webResponse) {
 
-			if (0 == body.length) // don't cache empty responses
-				return false;
-
-			if (!webResponse.isCacheable())
-				return false;
-
-			if (!FCUtils.isWebComponentCacheableForClientType(webResponse.getExpireTimeMap(), context.getClientType()))
-				return false;
-
-			return !isDynamicURL(webResponse.getUrl());
+			return isIncludeResponseCacheable(webResponse, context);
 		}
 	}
 }

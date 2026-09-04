@@ -125,6 +125,43 @@ public class RequestLogger {
 	}
 
 	/**
+	 * A header off a request that may no longer exist.
+	 *
+	 * An include is logged from whichever thread resolved it, and an ASYNC include is resolved
+	 * fire-and-forget after the top-level response has completed - by which time the container has
+	 * recycled the servlet request and reading it throws
+	 * {@code NullPointerException: ... ServletApiRequest.getRequest() is null} rather than returning
+	 * null. That escaped as a Throwable out of the include, which then resolved a fallback for a
+	 * fragment it had already successfully fetched. The same hazard {@code FCUtils.getClientIP}
+	 * documents, in the same place, for the same reason: a log field is best-effort and must never
+	 * fail the request it describes.
+	 */
+	private static String header(HttpServletRequest request, String name) {
+
+		if (null == request)
+			return null;
+
+		try {
+			return request.getHeader(name);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	/** The method of a request that may no longer exist - {@code "-"}, as {@link #logGuardedRequest} writes it. */
+	private static String method(HttpServletRequest request) {
+
+		if (null == request)
+			return "-";
+
+		try {
+			return request.getMethod();
+		} catch (Exception e) {
+			return "-";
+		}
+	}
+
+	/**
 	 *
 	 * @param url - request URL
 	 * @param isCacheable - true if request is run through FrontCache engine (e.g. GET method, text data). false - otherwise (request forwarded to origin)
@@ -137,16 +174,16 @@ public class RequestLogger {
 		StringBuilder sb4file = new StringBuilder();
         HttpServletRequest request = context.getRequest();
         boolean isFallbackError = context.isFallbackUsed();
-        String userAgent = request.getHeader("User-Agent");
+        String userAgent = header(request, "User-Agent");
 
         String requestTypeDynamicCachedSoft = (isCached) ? "from-cache" : "dynamic";
-        if (!isCached && "true".equals(request.getHeader(FCHeaders.X_FRONTCACHE_SOFT_REFRESH)))
+        if (!isCached && "true".equals(header(request, FCHeaders.X_FRONTCACHE_SOFT_REFRESH)))
         	requestTypeDynamicCachedSoft = "dynamic-soft";
 
 		sb4file.append(formatLogTime(Instant.now()))
 		.append(SEPARATOR).append(context.getRequestId())
 		.append(SEPARATOR).append(context.getDomain())
-		.append(SEPARATOR).append(request.getMethod())
+		.append(SEPARATOR).append(method(request))
 		.append(SEPARATOR).append((isFallbackError) ? "error" : "success")
 		.append(SEPARATOR).append(context.getRequestType()) // toplevel | include | include-async
 		.append(SEPARATOR).append((isCacheable) ? "cacheable" : "direct")

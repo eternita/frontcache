@@ -71,7 +71,9 @@ public class IncludeRequestHeadersIsolationTest {
 				m = candidate;
 
 		m.setAccessible(true);
-		return (List<Object>) m.invoke(processor, content, "http://localhost", requestHeaders, null, context);
+		// hostURL and fetchBaseURL - the same here; the header isolation this pins is independent of
+		// where the include is fetched from (see IncludeFetchTargetTest)
+		return (List<Object>) m.invoke(processor, content, "http://localhost", "http://localhost", requestHeaders, null, context);
 	}
 
 	@SuppressWarnings("unchecked")
