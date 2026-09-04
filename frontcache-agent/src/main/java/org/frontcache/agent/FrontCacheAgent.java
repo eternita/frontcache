@@ -172,7 +172,7 @@ public class FrontCacheAgent {
 
 		// Standard bearer auth, the one form every Frontcache caller uses. Spelled out rather than
 		// referenced because this module deliberately does not depend on frontcache-core.
-		// A node older than 2.9 will not recognise it - those accept only the pre-2.9
+		// A node older than 2.7 will not recognise it - those accept only the pre-2.7
 		// x-frontcache-site-key header, so an agent this new needs a node at least this new.
 		if (null != siteKey)
 			post.addHeader("Authorization", "Bearer " + siteKey);

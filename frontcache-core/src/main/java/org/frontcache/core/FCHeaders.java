@@ -30,10 +30,10 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_ID = "x-frontcache-id";
 
     /**
-     * The pre-2.9 way to send the management site key. Nothing sends it any more - every Frontcache
+     * The pre-2.7 way to send the management site key. Nothing sends it any more - every Frontcache
      * caller now uses {@code Authorization: Bearer <site-key>} - but nodes still ACCEPT it, because an
      * embedded frontcache-agent, a separately deployed console or an older peer node may be older than
-     * the node it is calling. See {@link SiteKey}. Remove once no supported caller predates 2.9.
+     * the node it is calling. See {@link SiteKey}. Remove once every supported caller is 2.7 or later.
      *
      * @deprecated send {@code Authorization: Bearer <site-key>} instead
      */

@@ -33,7 +33,7 @@ import jakarta.servlet.http.HttpServletRequest;
  *
  * The rules worth pinning are the ones that decide whether a deployment keeps working: an unconfigured
  * node stays open (refusing on upgrade would take away an operator's dashboards to protect a node that
- * never asked), {@code Authorization: Bearer} is the form everything sends now, and the pre-2.9 header
+ * never asked), {@code Authorization: Bearer} is the form everything sends now, and the pre-2.7 header
  * is still ACCEPTED - because an embedded agent, a separately deployed console or an older peer node
  * can be older than the node it calls, and none of them upgrade on our schedule.
  */
@@ -103,7 +103,7 @@ public class SiteKeyTest {
 	{
 		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
 
-		assertTrue("a pre-2.9 agent must keep working against a 2.9 node",
+		assertTrue("a pre-2.7 agent must keep working against a 2.7-or-later node",
 				SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret")));
 		assertFalse(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "wrong")));
 		assertFalse(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "")));
