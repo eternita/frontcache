@@ -177,41 +177,64 @@ public class IncludeFetchTargetTest {
 	}
 
 	/**
-	 * Filter mode stays on {@code edge} whatever the flag says, and the reason is not the one this
-	 * was expected to be.
-	 *
-	 * The suspected blocker - that {@code origin-host} addresses nothing usable in filter mode -
-	 * is false: {@code SoftRefreshOriginAddressTest} shows soft refresh has always fetched that
-	 * address over HTTP. The real one is that in filter mode the origin IS this same Frontcache. The
-	 * fetch re-enters the filter, so nothing is bypassed, and the re-entered request keys its cache
-	 * write on the {@code Host} it arrived at - so re-addressing it puts the same fragment under two
-	 * keys while this side stores it under the public URL.
-	 *
-	 * Measured: with the e2e filter node given an origin hostname distinct from its public one, every
-	 * missing include wrote two request-log lines and {@code CommonTests.l1l2Cache} counted four
-	 * cached entries where three were expected. See docs/include-fetch-fix.md section 11.
+	 * Filter mode fetches the origin too - but only because the fetch is marked
+	 * {@code x-frontcache-dynamic-request} on its way out, which is what keeps the re-entry from
+	 * caching it under a second key. See {@link IncludeProcessorBase#isLoopbackOriginFetch}.
 	 */
 	@Test
-	public void filterModeStaysOnTheEdge() throws Exception {
-
-		RequestContext context = context();
-		context.setFilterChain((FilterChain) Proxy.newProxyInstance(
-				IncludeFetchTargetTest.class.getClassLoader(),
-				new Class[] { FilterChain.class },
-				new InvocationHandler() {
-					@Override
-					public Object invoke(Object proxy, Method method, Object[] args) {
-						return null;
-					}
-				}));
+	public void filterModeFetchesTheOriginAndOwnsTheEntry() throws Exception {
 
 		RecordingClient client = new RecordingClient();
-		resolveOneInclude(originTarget(), client, context);
+		resolveOneInclude(originTarget(), client, filterModeContext());
 
-		assertEquals("a filter-mode include was re-addressed to the origin - that splits the cache key",
-				Arrays.asList(new String[]{PUBLIC_URL}), client.fetched);
-		assertTrue("filter mode cached on the requesting side - the re-entry already does that",
+		assertEquals(Arrays.asList(new String[]{ORIGIN_URL}), client.fetched);
+		assertEquals("filter mode must still key on the public URL",
+				Arrays.asList(new String[]{PUBLIC_URL}), cache.putKeys);
+	}
+
+	/**
+	 * The marker that makes the above safe. Without it the re-entered request caches the fragment
+	 * under the origin-facing URL while this side caches it under the public one - two entries per
+	 * fragment, silently, and only visible when the two hostnames differ.
+	 */
+	@Test
+	public void aFilterModeIncludeFetchIsMarkedDynamic() throws Exception {
+
+		RecordingClient client = new RecordingClient();
+		resolveOneInclude(originTarget(), client, filterModeContext());
+
+		assertEquals("the re-entry was not told to skip its own cache write",
+				Arrays.asList(new String[]{"true"}),
+				client.lastRequestHeaders.get(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST));
+	}
+
+	/**
+	 * And it must NOT be marked in standalone mode. There the fetch reaches the origin app, which
+	 * does not read the header - but a chained topology puts another Frontcache in the path, and
+	 * telling that node not to cache would quietly disable caching on it.
+	 */
+	@Test
+	public void aStandaloneIncludeFetchIsNotMarkedDynamic() throws Exception {
+
+		RecordingClient client = new RecordingClient();
+		resolveOneInclude(originTarget(), client, context());
+
+		assertNull("a standalone include fetch must not carry the dynamic marker",
+				client.lastRequestHeaders.get(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST));
+		assertEquals(Arrays.asList(new String[]{PUBLIC_URL}), cache.putKeys);
+	}
+
+	/** The escape hatch has to work in filter mode too, or there is no way back. */
+	@Test
+	public void filterModeHonoursTheEdgeEscapeHatch() throws Exception {
+
+		RecordingClient client = new RecordingClient();
+		resolveOneInclude(edgeTarget(), client, filterModeContext());
+
+		assertEquals(Arrays.asList(new String[]{PUBLIC_URL}), client.fetched);
+		assertTrue("edge mode cached on the requesting side - the loopback already does that",
 				cache.putKeys.isEmpty());
+		assertNull(client.lastRequestHeaders.get(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST));
 	}
 
 	// ---- what is not cached ----------------------------------------------------------------------
@@ -336,13 +359,7 @@ public class IncludeFetchTargetTest {
 		EnvelopeClient client = new EnvelopeClient();
 		ConcurrentIncludeProcessor processor = originTarget();
 		try {
-			String page = "<html><body>"
-					+ "<fc:include url=\"/fc/part.htm?id=1\" combine=\"true\"/>"
-					+ "<fc:include url=\"/fc/part.htm?id=2\" combine=\"true\"/>"
-					+ "</body></html>";
-
-			WebResponse parent = new WebResponse(EDGE_BASE + "/index.htm", page.getBytes(StandardCharsets.UTF_8));
-			processor.processIncludes(parent, EDGE_BASE, new HashMap<String, List<String>>(), client, context(), 1);
+			resolveCombinedPage(processor, client, context());
 		} finally {
 			processor.destroy();
 		}
@@ -359,6 +376,29 @@ public class IncludeFetchTargetTest {
 	}
 
 	/**
+	 * The envelope is not an include leg, so it gets no request-log line either - the members do,
+	 * through {@code logCombinedInclude}. Logging it as well adds one phantom include per batch:
+	 * nothing breaks, and "includes per page" quietly reads high forever. Failure mode 4 wearing the
+	 * other face, and it took comparing marker counts across two e2e runs to notice.
+	 */
+	@Test
+	public void theCombinedEnvelopeWritesNoRequestLogLineOfItsOwn() throws Exception {
+
+		List<ILoggingEvent> lines = captureRequestLog();
+		ConcurrentIncludeProcessor processor = originTarget();
+		try {
+			resolveCombinedPage(processor, new EnvelopeClient(), context());
+		} finally {
+			processor.destroy();
+			releaseRequestLog();
+		}
+
+		for (ILoggingEvent line : lines)
+			assertFalse("the combine envelope was logged as an include leg: " + line.getFormattedMessage(),
+					line.getFormattedMessage().contains(CombineProtocol.PARAM_COMBINE));
+	}
+
+	/**
 	 * The envelope itself must be cached by NOBODY: its URL carries whichever members happened to
 	 * miss, so the set of distinct envelope URLs for one page is combinatorial in its members.
 	 */
@@ -368,13 +408,7 @@ public class IncludeFetchTargetTest {
 		EnvelopeClient client = new EnvelopeClient();
 		ConcurrentIncludeProcessor processor = originTarget();
 		try {
-			String page = "<html><body>"
-					+ "<fc:include url=\"/fc/part.htm?id=1\" combine=\"true\"/>"
-					+ "<fc:include url=\"/fc/part.htm?id=2\" combine=\"true\"/>"
-					+ "</body></html>";
-
-			WebResponse parent = new WebResponse(EDGE_BASE + "/index.htm", page.getBytes(StandardCharsets.UTF_8));
-			processor.processIncludes(parent, EDGE_BASE, new HashMap<String, List<String>>(), client, context(), 1);
+			resolveCombinedPage(processor, client, context());
 		} finally {
 			processor.destroy();
 		}
@@ -447,6 +481,35 @@ public class IncludeFetchTargetTest {
 		WebResponse parent = new WebResponse(EDGE_BASE + "/index.htm", page.getBytes(StandardCharsets.UTF_8));
 
 		processor.processIncludes(parent, EDGE_BASE, new HashMap<String, List<String>>(), client, context, 1);
+	}
+
+	/** One page carrying two combinable includes of the same endpoint. */
+	private void resolveCombinedPage(ConcurrentIncludeProcessor processor, EnvelopeClient client, RequestContext context) {
+
+		String page = "<html><body>"
+				+ "<fc:include url=\"/fc/part.htm?id=1\" combine=\"true\"/>"
+				+ "<fc:include url=\"/fc/part.htm?id=2\" combine=\"true\"/>"
+				+ "</body></html>";
+
+		WebResponse parent = new WebResponse(EDGE_BASE + "/index.htm", page.getBytes(StandardCharsets.UTF_8));
+		processor.processIncludes(parent, EDGE_BASE, new HashMap<String, List<String>>(), client, context, 1);
+	}
+
+	/** A request being served by the servlet FILTER: it carries a chain. */
+	private RequestContext filterModeContext() throws Exception {
+
+		RequestContext context = context();
+		context.setFilterChain((FilterChain) Proxy.newProxyInstance(
+				IncludeFetchTargetTest.class.getClassLoader(),
+				new Class[] { FilterChain.class },
+				new InvocationHandler() {
+					@Override
+					public Object invoke(Object proxy, Method method, Object[] args) {
+						return null;
+					}
+				}));
+
+		return context;
 	}
 
 	private RequestContext context() throws Exception {
@@ -523,6 +586,7 @@ public class IncludeFetchTargetTest {
 		int status = 200;
 
 		volatile WebResponse lastServed;
+		volatile Map<String, List<String>> lastRequestHeaders = new HashMap<String, List<String>>();
 
 		@Override
 		public WebResponse fetch(String urlStr, Map<String, List<String>> requestHeaders, RequestContext context) {
@@ -535,6 +599,8 @@ public class IncludeFetchTargetTest {
 			synchronized (fetched) {
 				fetched.add(urlStr);
 			}
+
+			lastRequestHeaders = new HashMap<String, List<String>>(requestHeaders);
 
 			Map<String, List<String>> headers = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 			headers.put(FCHeaders.CONTENT_TYPE, Arrays.asList(new String[]{"text/html;charset=UTF-8"}));
@@ -564,6 +630,8 @@ public class IncludeFetchTargetTest {
 			synchronized (fetched) {
 				fetched.add(urlStr);
 			}
+
+			lastRequestHeaders = new HashMap<String, List<String>>(requestHeaders);
 
 			StringBuilder json = new StringBuilder("{\"v\":1,\"parts\":[");
 			for (int i = 0; i < partCount(urlStr); i++)

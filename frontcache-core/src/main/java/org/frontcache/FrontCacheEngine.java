@@ -1093,7 +1093,16 @@ public class FrontCacheEngine {
 			new FC_BypassCache(httpClient, context).execute();
 
 			try {
-				RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
+				// A Frontcache that marked its OWN call dynamic logs that leg itself, on the requesting
+				// side - a cache-missing include fetched straight from the origin in filter mode (where
+				// the origin is this same node, so the fetch necessarily comes back here), or a combine
+				// envelope. Logging it again here would double every such leg in the include counts, and
+				// do it under the origin-facing url with no byte count, where the requesting side has
+				// the public url and the real length. Whoever set the flag owns the line.
+				boolean loggedByCaller = dynamicRequest && context.getRequestFromFrontcache();
+
+				if (!loggedByCaller)
+					RequestLogger.logRequest(originRequestURL, isRequestCacheable, isCached, System.currentTimeMillis() - start, lengthBytes, context);
 
 				// Exactly one writer. When the command fell back, FC_BypassCache parked the fallback
 				// rather than writing it, so serve that and ignore whatever the abandoned origin call

@@ -86,34 +86,51 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * it does not, none of them happen here, which is what makes {@code edge} a true no-op rather
 	 * than a second implementation of the same behaviour.
 	 *
-	 * <b>Filter mode is always {@code edge}</b>, whatever the flag says - but not for the reason it
-	 * first looked like, and the real one is worth stating because it is invisible in the common
-	 * deployment.
-	 *
-	 * The suspected blocker was that {@code front-cache.origin-host} might address nothing usable in
-	 * filter mode: it is optional there, defaults to {@code "localhost"}, and top-level requests
-	 * reach the app through its own filter chain without the origin URL being consulted at all. That
-	 * turned out to be false. {@code doSoftInvalidation} drops the filter chain
-	 * ({@code ctxCopy.setFilterChain(null)} - a refresh runs on a pool thread after the servlet
-	 * objects are disposed) and fetches the origin URL over HTTP, so every soft-expired entry in a
-	 * filter-mode deployment has always refreshed itself from {@code origin-host:origin-http-port},
-	 * exactly as the shipped properties say. {@code SoftRefreshOriginAddressTest} pins that.
-	 *
-	 * The actual blocker is that in filter mode <b>the origin is this same Frontcache</b>. An HTTP
-	 * fetch to it re-enters the filter, so nothing is bypassed - and the re-entered request keys its
-	 * own cache write on the {@code Host} it arrived at. Re-address the fetch and that key moves,
-	 * while this side stores the same fragment under the public URL: two entries per fragment, the
-	 * failure this whole change exists to avoid. Measured, not reasoned - with the e2e filter node
-	 * given an origin hostname distinct from its public one, every missing include produced two
-	 * request-log lines and {@code CommonTests.l1l2Cache} counted four cached entries where three
-	 * were expected. See docs/include-fetch-fix.md section 11.
+	 * Filter mode is included, but only because {@link #isLoopbackOriginFetch} makes the ownership
+	 * true there - read that first, it is where the interesting part is.
 	 */
 	protected boolean isDirectOriginFetch(RequestContext context)
 	{
-		if (context.isFilterMode())
-			return false;
-
 		return INCLUDE_FETCH_TARGET_ORIGIN.equals(includeFetchTarget);
+	}
+
+	/**
+	 * Will this fetch come back through THIS Frontcache?
+	 *
+	 * Only in filter mode, and there always: the origin is the app this filter is installed in, so an
+	 * HTTP call to {@code front-cache.origin-host} necessarily re-enters the filter. (In standalone
+	 * mode the origin is a different process. A chained topology puts another Frontcache in the path,
+	 * but that is a different node with its own keyspace, which is not this problem.)
+	 *
+	 * <h3>Why this has to be known, and what it costs to get wrong</h3>
+	 *
+	 * A re-entered request keys its own cache write on {@code context.getCurrentRequestURL()}, which
+	 * is built from the {@code Host} it arrived at. So the moment the fetch is re-addressed from the
+	 * public hostname to {@code origin-host}, that node - us - starts writing the fragment under a
+	 * SECOND key, while this side writes it under the public one. Two entries per fragment: exactly
+	 * the failure this whole change exists to avoid, arriving through a door section 8 of
+	 * docs/include-fetch-fix.md did not know about.
+	 *
+	 * It is invisible in the obvious deployment, because {@code origin-host} usually resolves to the
+	 * same name the node is reached at - the two keys coincide and nothing looks wrong. It took
+	 * giving the e2e filter node an origin hostname distinct from its public one to see it: every
+	 * missing include wrote two request-log lines, and {@code CommonTests.l1l2Cache} counted four
+	 * cached entries where three were expected.
+	 *
+	 * <h3>The answer</h3>
+	 *
+	 * The fetch is marked {@code x-frontcache-dynamic-request}, which is the existing, node-wide
+	 * signal for "serve this, do not cache it" ({@code FrontCacheEngine.processRequestInternal} gates
+	 * its whole cacheable branch on it, and the combine envelope has always used it for the same
+	 * reason). The re-entry then runs the app and returns its response without storing anything, and
+	 * this side keeps sole ownership of the single public key - the same division of labour
+	 * standalone mode gets for free. What filter mode buys is smaller than standalone's: the request
+	 * still lands on this node's own front door, so it is one local hop rather than a trip out to the
+	 * CDN and back.
+	 */
+	protected boolean isLoopbackOriginFetch(RequestContext context)
+	{
+		return isDirectOriginFetch(context) && context.isFilterMode();
 	}
 
 	/**
@@ -499,12 +516,29 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
     {
 		boolean softRefresh = false;
 
+		// Read BEFORE the loopback marker is added below - the two mean opposite things. A caller that
+		// marked its own call dynamic (the combine envelope) is saying "this response is not
+		// cacheable"; the marker we add is saying "we will cache it ourselves, you must not".
+		boolean callerMarkedDynamic = isDynamicRequest(requestHeaders);
+
 		// recursive call to FCServlet, unless include-fetch-target says to go straight to the origin
  		requestHeaders.put(FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL, Arrays.asList(new String[]{includeLevel})); // add include-level header
 
+ 		// In filter mode the origin is this same node, so this fetch comes back through our own front
+ 		// door. Tell it not to cache what it serves: this side owns the entry, under the public URL.
+ 		// See isLoopbackOriginFetch.
+ 		if (isLoopbackOriginFetch(context))
+ 			requestHeaders.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
+
  		WebResponse outWebResponse =  FCUtils.includeDynamicCallHttpClient(fetchURL, requestHeaders, client, context);
 
- 		if (isDirectOriginFetch(context))
+ 		// A combined batch's ENVELOPE is not an include leg and gets neither of the two below. It is
+ 		// never cached - its URL carries whichever members happened to miss, so the set of distinct
+ 		// envelope URLs for one page is combinatorial in its members - and it is not logged either,
+ 		// because logCombinedInclude already writes a line per member, which is the accounting that
+ 		// matches what the page actually used. Logging the envelope too adds one phantom include leg
+ 		// per batch: measured as 11 such lines in one e2e run before this guard was hoisted here.
+ 		if (isDirectOriginFetch(context) && !FCHeaders.COMPONENT_COMBINED_INCLUDE.equals(includeType))
  		{
  			// The URL the response reports must be the public one: putToCache is keyed on it, and
  			// FCUtils.httpResponse2WebComponent stamped the FETCH url on the way in. Forget this and
@@ -512,7 +546,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
  			// all (failure mode 3).
  			outWebResponse.setUrl(publicURL);
 
- 			cacheInclude(publicURL, outWebResponse, requestHeaders, context, includeType);
+ 			cacheInclude(publicURL, outWebResponse, callerMarkedDynamic, context);
  			logIncludeFromOrigin(publicURL, context, includeType, System.currentTimeMillis() - start, outWebResponse.getContentLenth());
  		}
 
@@ -538,8 +572,11 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * Store an include this node fetched from the origin itself, under its public URL.
 	 *
 	 * Reproduces what the loopback request used to be gated by, in the two places that gating lived:
-	 * {@code FrontCacheEngine.processRequestInternal} refused to cache a request marked dynamic, and
-	 * {@code CacheProcessorBase.processRequest} applied {@link #isIncludeResponseCacheable}.
+	 * {@code FrontCacheEngine.processRequestInternal} refused to cache a request the CALLER marked
+	 * dynamic, and {@code CacheProcessorBase.processRequest} applied
+	 * {@link #isIncludeResponseCacheable}. Note that {@code callerMarkedDynamic} is read before this
+	 * path adds its own loopback marker - see {@link #isLoopbackOriginFetch}; the two carry opposite
+	 * meanings and conflating them would stop filter mode from ever caching an include.
 	 *
 	 * The status check is this path's substitute for {@code !context.isFallbackUsed()}. That flag
 	 * cannot be read here: the {@link RequestContext} belongs to the whole page, so one include's
@@ -548,16 +585,9 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * {@code FileBasedFallbackResolver.markNonCacheable}), and a resolver that sets no status at all
 	 * leaves -1, so 2xx-only is the conservative reading either way.
 	 */
-	private void cacheInclude(String publicURL, WebResponse webResponse, Map<String, List<String>> requestHeaders, RequestContext context, String includeType)
+	private void cacheInclude(String publicURL, WebResponse webResponse, boolean callerMarkedDynamic, RequestContext context)
 	{
-		// A combined batch's envelope must be cached by NOBODY - its URL carries whichever members
-		// happened to miss, so the set of distinct envelope URLs for one page is combinatorial in its
-		// members. It also announces itself as dynamic, which the next check would catch on its own;
-		// both are here because the cost of the second one is an equals().
-		if (FCHeaders.COMPONENT_COMBINED_INCLUDE.equals(includeType))
-			return;
-
-		if (isDynamicRequest(requestHeaders))
+		if (callerMarkedDynamic)
 			return;
 
 		int status = webResponse.getStatusCode();
