@@ -22,7 +22,7 @@ import org.frontcache.core.FCHeaders;
 import org.junit.Test;
 
 /**
- * The combine wire contract's envelope half (docs/combine-reduce-proposal.md section 6).
+ * The combine wire contract's envelope half (docs/archive/combine-reduce-proposal.md section 6).
  */
 public class CombineEnvelopeTest {
 
@@ -138,7 +138,7 @@ public class CombineEnvelopeTest {
 	 * A non-JVM origin's envelope, read by the edge's own parser.
 	 *
 	 * These are the literal bytes emitted by the PHP endpoint in
-	 * docs/combine-reduce-proposal.md section 13.2, captured from a run of it - not a hand-written
+	 * docs/archive/combine-reduce-proposal.md section 13.2, captured from a run of it - not a hand-written
 	 * approximation of them. The contract's whole point is that it is implementable without Java, and
 	 * the documented example is the thing most likely to be copied; if it drifts from what the parser
 	 * accepts, this is where that shows up rather than in somebody's origin.

@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Combine-and-reduce outcomes, counted per batch and per member.
- * See docs/combine-reduce-proposal.md section 12.
+ * See docs/archive/combine-reduce-proposal.md section 12.
  *
  * <h2>What these are for</h2>
  *

@@ -15,7 +15,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
- * One member's answer inside a {@link CombineEnvelope}. See docs/combine-reduce-proposal.md
+ * One member's answer inside a {@link CombineEnvelope}. See docs/archive/combine-reduce-proposal.md
  * section 6.
  *
  * {@code @JsonIgnoreProperties(ignoreUnknown = true)} is not decoration: it is what lets a later

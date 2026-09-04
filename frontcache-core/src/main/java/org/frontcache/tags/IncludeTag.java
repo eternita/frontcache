@@ -25,7 +25,7 @@ public class IncludeTag extends IncludeSupport {
 
    /**
     * {@code combine="true"}, or a group name. Marks this fragment as one the origin can serve
-    * batched with its siblings - see docs/combine-reduce-proposal.md.
+    * batched with its siblings - see docs/archive/combine-reduce-proposal.md.
     */
    public void setCombine(Object combine) {
 	   super.includeCombine = combine;

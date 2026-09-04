@@ -16,7 +16,7 @@ import org.junit.Test;
 
 /**
  * The memo that stops an origin without a combine handler from costing one wasted request per group
- * on every page view - docs/combine-reduce-proposal.md section 9.1.
+ * on every page view - docs/archive/combine-reduce-proposal.md section 9.1.
  */
 public class CombineUnsupportedMemoTest {
 

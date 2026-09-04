@@ -60,7 +60,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	/** Content type given to a combined part whose own headers name none. */
 	private static final String DEFAULT_PART_CONTENT_TYPE = "text/html;charset=UTF-8";
 
-	// --- combine-and-reduce (docs/combine-reduce-proposal.md) ---------------------------------
+	// --- combine-and-reduce (docs/archive/combine-reduce-proposal.md) ---------------------------------
 	// A kill switch, not the default posture: combining only ever acts on includes that carry a
 	// combine="..." attribute, so leaving this true changes nothing for markup that does not ask.
 	private boolean combineEnabled = true;
@@ -158,7 +158,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
         // Combinable includes are held back rather than submitted: which of them go into a batch
         // depends on which of them missed the cache, and that is not known yet. See section 4.3 of
-        // docs/combine-reduce-proposal.md - everything else is submitted first, so the non-combinable
+        // docs/archive/combine-reduce-proposal.md - everything else is submitted first, so the non-combinable
         // includes of a page overlap with the combinables' cache probe instead of queueing behind it.
         List<IncludeResolutionPlaceholder> combinables = null;
 
@@ -679,7 +679,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	/**
 	 * One combined origin call: N cache-missing members of one group, asked for and answered together.
-	 * See docs/combine-reduce-proposal.md.
+	 * See docs/archive/combine-reduce-proposal.md.
 	 *
 	 * Leaving a member's {@code webResponse} null is a valid outcome and the way every failure here is
 	 * reported: {@link #replaceIncludePlaceholders} resolves a fallback for any sync include still

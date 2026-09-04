@@ -23,7 +23,7 @@ import java.util.Map;
  * thing - fetch a URL, hand back a {@link WebResponse}. Nothing needed a connection pool, a route
  * planner or an entity. So the SPIs take this instead, and the Apache types stay inside
  * {@link ApacheFcHttpClient} and the resilience commands. See
- * docs/httpclient5-upgrade-proposal.md section 5.1.
+ * docs/archive/httpclient5-upgrade-proposal.md section 5.1.
  *
  * The three methods are not redundant - each corresponds to one of those leaf uses, and they differ
  * in ways a caller cannot paper over (which transport, whether a circuit breaker is involved, and

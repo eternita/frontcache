@@ -33,7 +33,7 @@ import org.junit.Test;
 
 /**
  * Which includes end up in a combined batch, and how a batch is chunked.
- * See docs/combine-reduce-proposal.md sections 8 and 11.
+ * See docs/archive/combine-reduce-proposal.md sections 8 and 11.
  *
  * These sit on the decision, not on the origin call: everything here runs without a cache, a client
  * or a server. The origin round trip is the e2e suite's job.

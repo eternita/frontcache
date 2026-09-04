@@ -21,7 +21,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * The origin's half of the combine contract: build and write the response envelope.
- * See docs/combine-reduce-proposal.md section 6.
+ * See docs/archive/combine-reduce-proposal.md section 6.
  *
  * Parts must be added in the order the members arrived - {@code parts[i]} answers
  * {@code fc-part-i}. {@link #writeTo} is what sets the {@code x-frontcache-combine} header, which

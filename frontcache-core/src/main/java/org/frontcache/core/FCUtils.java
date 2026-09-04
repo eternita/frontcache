@@ -601,7 +601,7 @@ public class FCUtils {
 	 *
 	 * The public door onto {@link #parseWebComponent}, for the one caller that has a fragment and its
 	 * headers but no HTTP response to hand: the include processor unpacking a combined response
-	 * (docs/combine-reduce-proposal.md section 6). Routing it here rather than letting that code
+	 * (docs/archive/combine-reduce-proposal.md section 6). Routing it here rather than letting that code
 	 * assemble a WebResponse itself is what keeps maxAge, tags, refresh type and cache level meaning
 	 * exactly the same for a combined member as for a single include - the invariant in section 4.2,
 	 * which is silent when broken.

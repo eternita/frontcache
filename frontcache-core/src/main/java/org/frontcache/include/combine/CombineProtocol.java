@@ -18,7 +18,7 @@ import java.util.List;
  * The combine-and-reduce wire contract, in one place: parameter names, the encoding of a member's
  * query string, and the small URL arithmetic both ends need.
  *
- * See docs/combine-reduce-proposal.md sections 5 and 6. Both halves of the contract live in this
+ * See docs/archive/combine-reduce-proposal.md sections 5 and 6. Both halves of the contract live in this
  * package so an origin embedding frontcache-core cannot drift from the edge - see
  * {@link CombineRequest} and {@link CombineResponse}, which are the origin's half.
  *

@@ -438,7 +438,7 @@ public class FcMetricsExport {
 
 	/**
 	 * Combine-and-reduce: batches, members and envelope errors.
-	 * See docs/combine-reduce-proposal.md section 12.
+	 * See docs/archive/combine-reduce-proposal.md section 12.
 	 *
 	 * <h3>The number these exist for</h3>
 	 *

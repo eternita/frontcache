@@ -27,7 +27,7 @@ public class IncludeSupport extends BodyTagSupport {
 	protected Object ulr; // tag attribute
 	protected Object includeCallType; // tag attribute
 	protected Object includeClientType; // tag attribute
-	protected Object includeCombine; // tag attribute - see docs/combine-reduce-proposal.md
+	protected Object includeCombine; // tag attribute - see docs/archive/combine-reduce-proposal.md
 
 	// *********************************************************************
 	// Construction and initialization
