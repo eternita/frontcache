@@ -47,7 +47,7 @@
     </servlet-mapping>
 
     <!-- Prometheus scrape. Serves nothing unless front-cache.metrics.export enables it, and requires
-         this node's front-cache.site-key when one is configured. -->
+         this node's front-cache.api-key when one is configured. -->
     <servlet>
         <servlet-name>FcMetricsServlet</servlet-name>
         <servlet-class>org.frontcache.metrics.FcMetricsServlet</servlet-class>

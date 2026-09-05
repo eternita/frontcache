@@ -10,7 +10,7 @@ package org.frontcache.metrics;
 
 import java.io.IOException;
 
-import org.frontcache.core.SiteKey;
+import org.frontcache.core.ApiKey;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -23,7 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * This exposes traffic volumes, error rates, circuit state and command names - and, since the JVM
  * binders were added, this node's heap and CPU.
  *
- * <h2>The site key is what protects it</h2>
+ * <h2>The API key is what protects it</h2>
  *
  * A scrape endpoint is unauthenticated by convention, and this one used to rely on that convention plus
  * a {@code front-cache.management.port} check. That check was never a boundary - it compared
@@ -31,9 +31,9 @@ import jakarta.servlet.http.HttpServletResponse;
  * could ask for {@code Host: host:443} and be served - and it has been removed. Restricting which
  * connector answers management traffic is the reverse proxy's job, not this node's.
  *
- * So when the node has a {@code front-cache.site-key}, a scrape must carry it as
+ * So when the node has a {@code front-cache.api-key}, a scrape must carry it as
  * {@code Authorization: Bearer <key>} - which is also the only form Prometheus can send, a
- * scrape_config having no way to set an arbitrary header. A node with no site key configured is open,
+ * scrape_config having no way to set an arbitrary header. A node with no API key configured is open,
  * which is the historical default.
  *
  * Deliberately not {@code /fc-metrics.stream} - that name is reserved for the SSE stream's eventual
@@ -51,13 +51,13 @@ public class FcMetricsServlet extends HttpServlet {
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 
-		if (!SiteKey.isAuthorized(request))
+		if (!ApiKey.isAuthorized(request))
 		{
 			// The message names the fix, because the symptom - a scrape target that went red on
 			// upgrade - does not. Prometheus sends this as authorization: { credentials: <key> }.
 			response.setHeader("WWW-Authenticate", "Bearer realm=\"frontcache\"");
-			response.sendError(401, "Metrics require this node's front-cache.site-key - send it as "
-					+ "'Authorization: Bearer <site-key>' (in Prometheus: authorization.credentials)");
+			response.sendError(401, "Metrics require this node's front-cache.api-key - send it as "
+					+ "'Authorization: Bearer <api-key>' (in Prometheus: authorization.credentials)");
 			return;
 		}
 

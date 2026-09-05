@@ -48,7 +48,7 @@ public class FrontCacheAgent {
 
 	private String frontCacheURI;
 
-	private String siteKey = "";
+	private String apiKey = "";
 
 	private final static String IO_URI = "frontcache-io";
 	private final static String INVALIDATE = "invalidate";
@@ -133,9 +133,9 @@ public class FrontCacheAgent {
 			this.frontCacheURI = frontcacheURL + "/" + IO_URI;
 	}
 
-	public FrontCacheAgent(String frontcacheURL, String siteKey) {
+	public FrontCacheAgent(String frontcacheURL, String apiKey) {
 		this(frontcacheURL);
-		this.siteKey = siteKey;
+		this.apiKey = apiKey;
 	}
 
 
@@ -174,8 +174,8 @@ public class FrontCacheAgent {
 		// referenced because this module deliberately does not depend on frontcache-core.
 		// A node older than 2.7 will not recognise it - those accept only the pre-2.7
 		// x-frontcache-site-key header, so an agent this new needs a node at least this new.
-		if (null != siteKey)
-			post.addHeader("Authorization", "Bearer " + siteKey);
+		if (null != apiKey)
+			post.addHeader("Authorization", "Bearer " + apiKey);
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 

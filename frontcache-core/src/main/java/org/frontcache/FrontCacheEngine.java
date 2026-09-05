@@ -86,7 +86,7 @@ public class FrontCacheEngine {
 
 	// This node's site. One node serves one site - see docs/archive/multi-domain-retirement-proposal.md.
 	private String domain;          // front-cache.default-domain
-	private String siteKey;         // front-cache.site-key
+	private String apiKey;          // front-cache.api-key
 	private String originHost;      // front-cache.origin-host
 	private String originHttpPort;  // front-cache.origin-http-port
 	private String originHttpsPort; // front-cache.origin-https-port
@@ -302,11 +302,11 @@ public class FrontCacheEngine {
 	}
 
 	/**
-	 * @return true when {@code siteKey} is this node's configured management site key
+	 * @return true when {@code apiKey} is this node's configured management API key
 	 */
-	public boolean isNodeSiteKey(String siteKey)
+	public boolean isNodeApiKey(String apiKey)
 	{
-		return null != siteKey && 0 < siteKey.length() && siteKey.equals(this.siteKey);
+		return null != apiKey && 0 < apiKey.length() && apiKey.equals(this.apiKey);
 	}
 
 	// synchronized on the same monitor as getFrontCache() so a shutdown/reload can't interleave with
@@ -488,7 +488,7 @@ public class FrontCacheEngine {
 		rejectRetiredDomainConfig();
 
 		domain          = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
-		siteKey         = FCConfig.getProperty("front-cache.site-key", "");
+		apiKey          = FCConfig.getProperty("front-cache.api-key", "");
 		originHost      = FCConfig.getProperty("front-cache.origin-host", "localhost");
 		originHttpPort  = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");

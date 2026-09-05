@@ -32,32 +32,32 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * The gate on {@code /fc-metrics}.
  *
- * One check, and it is the only boundary this endpoint ever had: the site key answers "who", and is
+ * One check, and it is the only boundary this endpoint ever had: the API key answers "who", and is
  * what keeps traffic volumes, error rates, circuit state and this node's heap off a public port. The
  * old {@code front-cache.management.port} check answered "which connector" and read a Host header the
  * caller supplies, so it never restricted anybody; it has been removed, and which connector answers
  * management traffic is the reverse proxy's job.
  *
- * The endpoint shipped with only that port check, which is the hole {@code siteKeyIsRequired} pins
+ * The endpoint shipped with only that port check, which is the hole {@code apiKeyIsRequired} pins
  * shut.
  */
 public class FcMetricsServletTest {
 
-	private static final String SITE_KEY_KEY = "front-cache.site-key";
+	private static final String API_KEY_KEY = "front-cache.api-key";
 
 	/**
 	 * Captured, not assumed to be empty. FCConfig is process-wide static state, and other tests in this
-	 * fork read a site key loaded from their own FRONTCACHE_HOME - blanking it here failed two of them
+	 * fork read an API key loaded from their own FRONTCACHE_HOME - blanking it here failed two of them
 	 * depending on test order, which is a nastier bug than the one this class is about.
 	 */
-	private final String originalSiteKey = FCConfig.getProperty(SITE_KEY_KEY, "");
+	private final String originalApiKey = FCConfig.getProperty(API_KEY_KEY, "");
 
 	@After
 	public void tearDown()
 	{
 		FcMetricsExport.stop();
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "none");
-		FCConfig.setProperty(SITE_KEY_KEY, originalSiteKey);
+		FCConfig.setProperty(API_KEY_KEY, originalApiKey);
 		FcTestSupport.resetAll();
 	}
 
@@ -82,7 +82,7 @@ public class FcMetricsServletTest {
 	@Test
 	public void notFoundWhenExportIsDisabled() throws Exception
 	{
-		FCConfig.setProperty(SITE_KEY_KEY, "");   // this test is about the export, so pin the other axis
+		FCConfig.setProperty(API_KEY_KEY, "");   // this test is about the export, so pin the other axis
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "none");
 		FcMetricsExport.start();
 
@@ -92,11 +92,11 @@ public class FcMetricsServletTest {
 		verify(response).sendError(anyInt(), contains("not enabled"));
 	}
 
-	/** No site key configured keeps the historical behaviour: reachable on every connector. */
+	/** No API key configured keeps the historical behaviour: reachable on every connector. */
 	@Test
-	public void unrestrictedWhenNoSiteKeyIsSet() throws Exception
+	public void unrestrictedWhenNoApiKeyIsSet() throws Exception
 	{
-		FCConfig.setProperty(SITE_KEY_KEY, "");
+		FCConfig.setProperty(API_KEY_KEY, "");
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
 		FcMetricsExport.start();
 
@@ -110,7 +110,7 @@ public class FcMetricsServletTest {
 		verify(response, never()).sendError(anyInt(), anyString());
 	}
 
-	// ---- the site key, which is the actual access control ----------------------------------------
+	// ---- the API key, which is the actual access control ----------------------------------------
 
 	/**
 	 * The hole this closes. The removed port check compared {@code getServerPort()}, which the servlet
@@ -119,16 +119,16 @@ public class FcMetricsServletTest {
 	 * key underneath that check; this one did not.
 	 */
 	@Test
-	public void siteKeyIsRequired() throws Exception
+	public void apiKeyIsRequired() throws Exception
 	{
-		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");
+		FCConfig.setProperty(API_KEY_KEY, "s3cret");
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
 		FcMetricsExport.start();
 
 		HttpServletResponse response = mock(HttpServletResponse.class);
 		new FcMetricsServlet().service(request(), response);
 
-		verify(response).sendError(eq(401), contains("site-key"));
+		verify(response).sendError(eq(401), contains("api-key"));
 		verify(response, never()).getWriter();
 	}
 
@@ -137,7 +137,7 @@ public class FcMetricsServletTest {
 	@SuppressWarnings("deprecation")
 	public void theDeprecatedHeaderIsStillAccepted() throws Exception
 	{
-		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");
+		FCConfig.setProperty(API_KEY_KEY, "s3cret");
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
 		FcMetricsExport.start();
 
@@ -152,12 +152,12 @@ public class FcMetricsServletTest {
 	/**
 	 * Prometheus cannot send an arbitrary request header - a scrape_config offers basic_auth,
 	 * authorization and oauth2 and nothing else - so the Bearer form is not a nicety. Without it,
-	 * requiring a site key here would make the endpoint unscrapable by the tool it exists for.
+	 * requiring an API key here would make the endpoint unscrapable by the tool it exists for.
 	 */
 	@Test
 	public void authorizationBearerIsAcceptedBecausePrometheusCannotSendAHeader() throws Exception
 	{
-		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");
+		FCConfig.setProperty(API_KEY_KEY, "s3cret");
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
 		FcMetricsExport.start();
 
@@ -172,7 +172,7 @@ public class FcMetricsServletTest {
 	@Test
 	public void aWrongKeyIsRefused() throws Exception
 	{
-		FCConfig.setProperty(SITE_KEY_KEY, "s3cret");
+		FCConfig.setProperty(API_KEY_KEY, "s3cret");
 		FCConfig.setProperty(FcMetricsExport.EXPORT_KEY, "prometheus");
 		FcMetricsExport.start();
 

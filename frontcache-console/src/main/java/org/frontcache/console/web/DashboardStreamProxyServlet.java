@@ -54,7 +54,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * <h2>The edge allowlist</h2>
  *
  * The Netflix original proxied a GET to <em>whatever URL the caller put in {@code origin}</em>, forwarded
- * every other query parameter to it, and attached the console's {@code front-cache.site-key} on the way -
+ * every other query parameter to it, and attached the console's {@code front-cache.api-key} on the way -
  * so anyone who could reach the console could aim it at an arbitrary internal host and be handed the
  * shared secret in the request headers. That made sense for a dashboard whose whole purpose was pointing
  * at ad-hoc streams; it does not for a console with a configured edge list.
@@ -181,14 +181,14 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 		AsyncContext async = request.startAsync();
 		async.setTimeout(0);
 
-		open(streamUrl, frontcacheService.getSiteKey(), async, response);
+		open(streamUrl, frontcacheService.getApiKey(), async, response);
 	}
 
-	private void open(String streamUrl, String siteKey, AsyncContext async, HttpServletResponse response) {
+	private void open(String streamUrl, String apiKey, AsyncContext async, HttpServletResponse response) {
 
 		HttpRequest.Builder upstream = HttpRequest.newBuilder(URI.create(streamUrl)).GET();
-		if (null != siteKey)
-			upstream.header("Authorization", "Bearer " + siteKey);
+		if (null != apiKey)
+			upstream.header("Authorization", "Bearer " + apiKey);
 
 		HTTP.sendAsync(upstream.build(), HttpResponse.BodyHandlers.ofPublisher())
 				.whenComplete((upstreamResponse, failure) -> {
@@ -203,7 +203,7 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 
 					if (200 != upstreamResponse.statusCode()) {
 						// Propagate the refusal rather than swallowing it. The node answers 401 for a
-						// missing or wrong site key (docs/archive/hystrix-to-resilience4j-proposal.md section
+						// missing or wrong API key (docs/archive/hystrix-to-resilience4j-proposal.md section
 						// 14.6), and an operator looking at a blank dashboard needs to see that.
 						logger.warn("Upstream {} returned {} - propagating to the client", streamUrl,
 								upstreamResponse.statusCode());

@@ -1,13 +1,13 @@
 package org.frontcache.tests.standalone;
 
-import org.frontcache.tests.base.SiteKeyTests;
+import org.frontcache.tests.base.ApiKeyTests;
 
 /**
  *
- * run tests defined in SiteKeyTests through it
+ * run tests defined in ApiKeyTests through it
  *
  */
-public class StandaloneSiteKeyTests extends SiteKeyTests {
+public class StandaloneApiKeyTests extends ApiKeyTests {
 
 	@Override
 	public String getFrontCacheBaseURLLocalhost() {

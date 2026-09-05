@@ -12,7 +12,7 @@ public class AccessDeniedActionResponse extends ActionResponse {
 
 	public AccessDeniedActionResponse() {
 		setResponseStatus(RESPONSE_STATUS_ERROR);
-		setErrorDescription("Access denied to Management URI. Send this node's front-cache.site-key as"
-				+ " 'Authorization: Bearer <site-key>'.");
+		setErrorDescription("Access denied to Management URI. Send this node's front-cache.api-key as"
+				+ " 'Authorization: Bearer <api-key>'.");
 	}
 }

@@ -19,7 +19,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.frontcache.tests.TestConfig;
-import org.frontcache.tests.base.SiteKeys;
+import org.frontcache.tests.base.ApiKeys;
 import org.frontcache.tests.base.TestsBase;
 import org.htmlunit.Page;
 import org.htmlunit.WebResponse;
@@ -177,7 +177,7 @@ public class StandaloneRateLimitTests extends TestsBase {
 	{
 		HttpGet get = new HttpGet(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST
 				+ "frontcache-io?action=" + action);
-		get.addHeader("Authorization", "Bearer " + SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		get.addHeader("Authorization", "Bearer " + ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		CloseableHttpClient client = HttpClients.createDefault();
 		try {

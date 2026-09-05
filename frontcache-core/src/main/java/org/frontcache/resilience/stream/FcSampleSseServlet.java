@@ -87,7 +87,7 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * <h2>Two behavior changes, both from proposal section 14.6</h2>
  *
- * - A wrong or absent site key gets {@code 401}, where it used to get {@code 200}
+ * - A wrong or absent API key gets {@code 401}, where it used to get {@code 200}
  *   and an endless stream of empty frames. The header is this endpoint's only authentication, so an
  *   unauthenticated read should be refused rather than answered with an empty success.
  * - {@code 503} now means only what it says: the service is shutting down, or the connection cap is
@@ -169,12 +169,12 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 	private void handleRequest(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 
-		if (!FCUtils.isAuthorizedSiteKeyHeader(request)) {
+		if (!FCUtils.isAuthorizedApiKeyHeader(request)) {
 			// Refused, not answered with an empty stream - see the class javadoc. Logged at info because
 			// this is either a misconfigured console or someone probing.
-			logger.info("Rejecting " + request.getRequestURI() + ": missing or wrong site key from " + FCUtils.getClientIP(request));
+			logger.info("Rejecting " + request.getRequestURI() + ": missing or wrong API key from " + FCUtils.getClientIP(request));
 			response.setHeader("WWW-Authenticate", "Bearer realm=\"frontcache\"");
-			response.sendError(401, "Missing or invalid site key - send 'Authorization: Bearer <site-key>'");
+			response.sendError(401, "Missing or invalid API key - send 'Authorization: Bearer <api-key>'");
 			return;
 		}
 

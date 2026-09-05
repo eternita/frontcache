@@ -6,7 +6,7 @@
 # FrontcacheJettyServer launcher deploys exactly one webapp at context "/", so the
 # console cannot be hosted alongside it. It listens on 7080 by default and talks to one
 # or more Frontcache nodes over their management API - the node URLs and the shared
-# site-key come from conf/frontcache-console.conf.
+# api-key come from conf/frontcache-console.conf.
 #
 # Layout this script expects (as unpacked from frontcache-console-<version>.zip):
 #   bin/frontcache-console   this script

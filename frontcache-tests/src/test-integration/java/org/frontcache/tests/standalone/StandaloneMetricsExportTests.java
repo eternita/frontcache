@@ -18,7 +18,7 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.frontcache.tests.TestConfig;
-import org.frontcache.tests.base.SiteKeys;
+import org.frontcache.tests.base.ApiKeys;
 import org.frontcache.tests.base.TestsBase;
 import org.junit.Test;
 
@@ -31,7 +31,7 @@ import org.junit.Test;
  * {@code front-cache.metrics.export=prometheus}; the filter node does not, which is what keeps the
  * "off by default" path exercised too.
  *
- * A scrape carries the site key as {@code Authorization: Bearer}, the one form every Frontcache caller
+ * A scrape carries the API key as {@code Authorization: Bearer}, the one form every Frontcache caller
  * uses and the only one Prometheus itself can send. {@code unauthenticatedScrapeIsRefused} is the
  * reason that matters: this endpoint used to answer anyone who could reach the connector.
  */
@@ -43,7 +43,7 @@ public class StandaloneMetricsExportTests extends TestsBase {
 	private static HttpGet authenticatedScrape()
 	{
 		HttpGet get = new HttpGet(METRICS_URL);
-		get.addHeader("Authorization", "Bearer " + SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		get.addHeader("Authorization", "Bearer " + ApiKeys.TEST_API_KEY_LOCALHOST);
 		return get;
 	}
 
@@ -216,7 +216,7 @@ public class StandaloneMetricsExportTests extends TestsBase {
 	 * The endpoint's access control, over real HTTP.
 	 *
 	 * It publishes traffic volumes, error rates, circuit state and this node's heap - and before the
-	 * site key was required here, the only thing in front of it was the since-removed management-port
+	 * API key was required here, the only thing in front of it was the since-removed management-port
 	 * check, which compared a Host header the caller supplies. Anyone who could reach a connector could
 	 * read all of it. The unit tests cover the branch; this covers that the branch is actually in the
 	 * request path of a running node.

@@ -16,15 +16,15 @@ import org.junit.Test;
 
 /**
  *
- * Management API (FrontCacheIOServlet) site-key validation.
+ * Management API (FrontCacheIOServlet) api-key validation.
  *
  * The management endpoint gates every action against the configured
- * front-cache.site-key (test-site-key-localhost in both test FRONTCACHE_HOME dirs).
- * A request carrying the matching site-key header is served; a request with a
- * wrong or blank site key gets an "Access denied" response.
+ * front-cache.api-key (test-api-key-localhost in both test FRONTCACHE_HOME dirs).
+ * A request carrying the matching api-key header is served; a request with a
+ * wrong or blank API key gets an "Access denied" response.
  *
  */
-public abstract class SiteKeyTests extends TestsBase {
+public abstract class ApiKeyTests extends TestsBase {
 
 	@Before
 	public void setUp() throws Exception {
@@ -39,13 +39,13 @@ public abstract class SiteKeyTests extends TestsBase {
 	public abstract String getFrontCacheBaseURLLocalhost();
 
 	@Test
-	public void validSiteKey() throws Exception {
+	public void validApiKey() throws Exception {
 
-		FrontCacheClient client = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		FrontCacheClient client = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		String response = client.removeFromCacheAll();
 
-		// matching site key -> action is executed
+		// matching API key -> action is executed
 		Assert.assertNotEquals("expected invalidate action to run, got: " + response, -1, response.indexOf("invalidate"));
 		Assert.assertNotEquals("expected OK status, got: " + response, -1, response.indexOf("OK"));
 		Assert.assertEquals("unexpected access denied, got: " + response, -1, response.indexOf("Access denied"));
@@ -53,28 +53,28 @@ public abstract class SiteKeyTests extends TestsBase {
 	}
 
 	@Test
-	public void invalidSiteKey() throws Exception {
+	public void invalidApiKey() throws Exception {
 
-		FrontCacheClient client = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), "wrong-site-key");
+		FrontCacheClient client = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), "wrong-api-key");
 
 		String response = client.removeFromCacheAll();
 
-		// site key does not match -> access denied, action not executed
+		// API key does not match -> access denied, action not executed
 		Assert.assertNotEquals("expected access denied, got: " + response, -1, response.indexOf("Access denied"));
-		Assert.assertEquals("action must not run for a wrong site key, got: " + response, -1, response.indexOf("invalidate"));
+		Assert.assertEquals("action must not run for a wrong API key, got: " + response, -1, response.indexOf("invalidate"));
 		return;
 	}
 
 	@Test
-	public void blankSiteKey() throws Exception {
+	public void blankApiKey() throws Exception {
 
 		FrontCacheClient client = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), "");
 
 		String response = client.removeFromCacheAll();
 
-		// blank site key -> access denied, action not executed
+		// blank API key -> access denied, action not executed
 		Assert.assertNotEquals("expected access denied, got: " + response, -1, response.indexOf("Access denied"));
-		Assert.assertEquals("action must not run for a blank site key, got: " + response, -1, response.indexOf("invalidate"));
+		Assert.assertEquals("action must not run for a blank API key, got: " + response, -1, response.indexOf("invalidate"));
 		return;
 	}
 

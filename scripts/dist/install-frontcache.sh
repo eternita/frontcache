@@ -620,8 +620,8 @@ cat <<REPORT
       journalctl -u $SERVICE_NAME -f
       curl -s -o /dev/null -w '%{http_code}\\n' "http://127.0.0.1:$FC_PORT/frontcache-io?action=get-cache-state"
         # 200 means Frontcache is live (the body says "access denied" unless the request
-        # carries front-cache.site-key - that is expected, and is why this works as a
-        # liveness check without a site key)
+        # carries front-cache.api-key - that is expected, and is why this works as a
+        # liveness check without an API key)
 $([ "$WITH_CONSOLE" = 1 ] && printf '      systemctl status %s        # console on http://127.0.0.1:7080/\n' "$CONSOLE_SERVICE_NAME")
     Roll back to a previously installed version:
       ln -sfn $INSTALL_DIR/frontcache-server-<older> $LINK_DIR && systemctl restart $SERVICE_NAME
@@ -631,6 +631,6 @@ $([ "$WITH_CONSOLE" = 1 ] && printf '      systemctl status %s        # console 
     examples/front-door in the public repo for a worked nginx one.
 
     Before serving real traffic, review $LINK_DIR/FRONTCACHE_HOME/conf/frontcache.properties -
-    at minimum front-cache.site-key and front-cache.default-domain, and give this node a
+    at minimum front-cache.api-key and front-cache.default-domain, and give this node a
     distinct front-cache.id in conf/frontcache.id.
 REPORT

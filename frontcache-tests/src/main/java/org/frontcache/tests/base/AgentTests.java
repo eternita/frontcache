@@ -38,7 +38,7 @@ public abstract class AgentTests extends TestsBase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		frontcacheClient = new FrontCacheAgent(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheAgent(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 		frontcacheClient.removeFromCache("*"); // clean up
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
@@ -94,7 +94,7 @@ public abstract class AgentTests extends TestsBase {
 	public void invalidationByFilterTestCluster() throws Exception {
 
 
-		FrontCacheAgentCluster fcCluster = new FrontCacheAgentCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		FrontCacheAgentCluster fcCluster = new FrontCacheAgentCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), ApiKeys.TEST_API_KEY_LOCALHOST);
 		final String TEST_URI = "common/fc-agent/a.jsp";
 
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");

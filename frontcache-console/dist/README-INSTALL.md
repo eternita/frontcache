@@ -8,7 +8,7 @@ exactly one webapp at context `/`), and it talks to each node over that node's m
 bin/frontcache-console   the launcher
 lib/*.jar                launcher classpath (embedded Jetty 12 / Jakarta EE10)
 webapps/ROOT.war         the console webapp (Spring MVC + frontcache-core in WEB-INF/lib)
-conf/frontcache-console.conf   the nodes to monitor + the shared site-key
+conf/frontcache-console.conf   the nodes to monitor + the shared api-key
 conf/fc-logback.xml            logging (stdout, ERROR and above)
 ```
 
@@ -28,14 +28,14 @@ Edit `conf/frontcache-console.conf`. It is a HOCON file:
 frontcache {
     console {
         urls = ["https://fc-edge.example.com:443/", "https://fc-eu.example.com:443/"]
-        siteKey = your-site-key
+        apiKey = your-api-key
     }
 }
 ```
 
 - `urls` — one entry per Frontcache node, including scheme and port. The console polls each
   node's management API for cache state and stats.
-- `siteKey` — must match `front-cache.site-key` in every node's `frontcache.properties`.
+- `apiKey` — must match `front-cache.api-key` in every node's `frontcache.properties`.
   Without it the nodes reject the console's calls.
 
 

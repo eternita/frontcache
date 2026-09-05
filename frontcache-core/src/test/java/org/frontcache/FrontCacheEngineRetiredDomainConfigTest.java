@@ -32,6 +32,9 @@ public class FrontCacheEngineRetiredDomainConfigTest {
 
 	private static final String DOMAINS_KEY = "front-cache.domains";
 	private static final String ORIGIN_HOST_KEY = "front-cache.domain.fc1-test_org.origin-host";
+	// deliberately still "site-key": this is a RETIRED per-domain override, the literal string an
+	// operator's pre-retirement file contains. front-cache.site-key was renamed to front-cache.api-key,
+	// but front-cache.domain.<domain>.site-key never was - it is only ever detected, never read.
 	private static final String SITE_KEY_KEY = "front-cache.domain.fc1-test_org.site-key";
 
 	@After

@@ -60,7 +60,7 @@ public class FrontcacheService {
 
 	private Set<String> frontcacheAgentURLs = new LinkedHashSet<String>();
 
-	private String siteKey = "default-site-key";
+	private String apiKey = "default-api-key";
 
 	private static final int THREAD_AMOUNT = 4;
 
@@ -112,19 +112,19 @@ public class FrontcacheService {
 			logger.info(" -- Loading url {} from console config", url);
 			frontcacheAgentURLs.add(url);
 		}
-		siteKey = fcConsoleConfig.getString("siteKey");
-		logger.info(" -- Loading siteKey {} from console config", siteKey);
+		apiKey = fcConsoleConfig.getString("apiKey");
+		logger.info(" -- Loading apiKey {} from console config", apiKey);
 
 	}
 
-	public String getSiteKey(){
-		return siteKey;
+	public String getApiKey(){
+		return apiKey;
 	}
 
 	public boolean isFrontCacheEdgeAvailable(String frontcacheURL)
 	{
 		boolean available = false;
-		FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, siteKey);
+		FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, apiKey);
 		if (null != fcClient.getCacheState()) // if get state work -> FC is active
 			available = true;
 
@@ -489,7 +489,7 @@ public class FrontcacheService {
 	 * The edges the realtime page subscribes to, as JSON.
 	 *
 	 * Only names and edge URLs - the page hands an edge URL back to
-	 * {@code DashboardStreamProxyServlet}, which is where the stream path and the site key live.
+	 * {@code DashboardStreamProxyServlet}, which is where the stream path and the API key live.
 	 */
 	public String getDashboardStreams()
 	{
@@ -527,7 +527,7 @@ public class FrontcacheService {
 		if (null == key)
 			return null;
 
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
 		WebResponse webResponse = fcClient.getFromCache(key.trim());
 
 		return webResponse;
@@ -544,7 +544,7 @@ public class FrontcacheService {
 		List<FrontCacheClient> fcClients = new ArrayList<FrontCacheClient>();
 		for (String frontcacheURL : frontcacheAgentURLs)
 		{
-			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, siteKey);
+			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, apiKey);
 
 			if (activeOnly)
 			{
@@ -573,7 +573,7 @@ public class FrontcacheService {
 	}
 
 	public void invalidateEdge(String edgeURL, String filter) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
 		fcClient.removeFromCache(filter);
 	}
 
@@ -583,7 +583,7 @@ public class FrontcacheService {
 	 * @param edgeURL
 	 */
 	public void purgeEdge(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
 		fcClient.purge();
 	}
 
@@ -595,7 +595,7 @@ public class FrontcacheService {
 	 * @return status message returned by the edge, or an error message if the edge is not available
 	 */
 	public String dumpKeys(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
 		DumpKeysActionResponse response = fcClient.dumpKeys();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
@@ -611,7 +611,7 @@ public class FrontcacheService {
 	 * @return status message returned by the edge, or an error message if the edge is not available
 	 */
 	public String backupEdge(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, siteKey);
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
 		BackupActionResponse response = fcClient.backup();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
@@ -640,8 +640,8 @@ public class FrontcacheService {
 					+ " to " + activeReplicator.getCurrentResult().getTargetUrl());
 		}
 
-		FrontCacheClient source = new FrontCacheClient(sourceUrl, siteKey);
-		FrontCacheClient target = new FrontCacheClient(targetUrl, siteKey);
+		FrontCacheClient source = new FrontCacheClient(sourceUrl, apiKey);
+		FrontCacheClient target = new FrontCacheClient(targetUrl, apiKey);
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		activeReplicator = replicator;

@@ -49,7 +49,7 @@ public class ResilienceConfigActionFallbackTest {
 	{
 		node.answerWith("{\"responseStatus\":\"OK\",\"resilienceConfig\":\"resilience.command.default.x=1\"}");
 
-		FrontCacheClient client = new FrontCacheClient(node.url(), "test-site-key");
+		FrontCacheClient client = new FrontCacheClient(node.url(), "test-api-key");
 
 		assertEquals("resilience.command.default.x=1", client.getResilienceConfig());
 		assertEquals(Collections.singletonList("get-resilience-configs"), node.actionsSeen());
@@ -66,7 +66,7 @@ public class ResilienceConfigActionFallbackTest {
 				"{\"action\":\"ping\",\"responseStatus\":\"OK\"}",
 				"{\"responseStatus\":\"OK\",\"hystrixConfig\":\"hystrix.command.default.x=1\"}");
 
-		FrontCacheClient client = new FrontCacheClient(node.url(), "test-site-key");
+		FrontCacheClient client = new FrontCacheClient(node.url(), "test-api-key");
 
 		assertEquals("hystrix.command.default.x=1", client.getResilienceConfig());
 		assertEquals("the current action first, then the pre-2.7 one",
@@ -82,7 +82,7 @@ public class ResilienceConfigActionFallbackTest {
 	{
 		node.answerWith("{\"responseStatus\":\"ERROR\",\"errorDescription\":\"resilience.properties not found\"}");
 
-		FrontCacheClient client = new FrontCacheClient(node.url(), "test-site-key");
+		FrontCacheClient client = new FrontCacheClient(node.url(), "test-api-key");
 
 		assertNull(client.getResilienceConfig());
 		assertEquals(Collections.singletonList("get-resilience-configs"), node.actionsSeen());
@@ -95,7 +95,7 @@ public class ResilienceConfigActionFallbackTest {
 		node.answerWith("{\"responseStatus\":\"OK\",\"resilienceConfig\":\"resilience.command.default.x=1\"}");
 
 		@SuppressWarnings("deprecation")
-		String viaLegacyAccessor = new FrontCacheClient(node.url(), "test-site-key").getHystrixConfig();
+		String viaLegacyAccessor = new FrontCacheClient(node.url(), "test-api-key").getHystrixConfig();
 
 		assertEquals("resilience.command.default.x=1", viaLegacyAccessor);
 		assertEquals(Collections.singletonList("get-resilience-configs"), node.actionsSeen());

@@ -39,7 +39,7 @@ Everything lives in `FRONTCACHE_HOME/conf/`. Edit `frontcache.properties` first:
 | `front-cache.origin-host` | the backend Frontcache forwards cache misses to |
 | `front-cache.origin-http-port` / `-https-port` | the backend's ports |
 | `front-cache.default-domain` | your public domain |
-| `front-cache.site-key` | a secret of your own — **this is what guards the management API**, the dashboard stream and `/fc-metrics`. Send it as `Authorization: Bearer <site-key>` — one form for the agent, the console, node-to-node replication and a Prometheus scrape. The pre-2.7 `x-frontcache-site-key` header still works, deprecated |
+| `front-cache.api-key` | a secret of your own — **this is what guards the management API**, the dashboard stream and `/fc-metrics`. Send it as `Authorization: Bearer <api-key>` — one form for the agent, the console, node-to-node replication and a Prometheus scrape. The pre-2.7 `x-frontcache-site-key` header still works, deprecated |
 | `front-cache.http-port` / `front-cache.https-port` | the **client-facing** ports (80/443 when a TLS terminator fronts Frontcache), *not* the 9080 the launcher listens on — these two are what redirect rewriting uses |
 
 Then, as needed:
@@ -75,7 +75,7 @@ report the fragments as coming from cache. Logs are under `FRONTCACHE_HOME/logs/
 
 1. Terminate TLS upstream (nginx, ALB) on 80/443 and proxy to `http://127.0.0.1:9080`.
    Forward `X-Forwarded-*` — the launcher honours them, which is what keeps absolute-URL
-   rewriting correct behind a proxy. Set `front-cache.site-key` and require it, or anything
+   rewriting correct behind a proxy. Set `front-cache.api-key` and require it, or anything
    that can reach a connector can reach the management API; if you want management traffic
    confined to one connector, restrict `/frontcache-io`, `/fc-dashboard.stream` and
    `/fc-metrics` in the proxy (the node no longer has a `front-cache.management.port` of
@@ -131,7 +131,7 @@ of setting headers by hand.
 
 Add `org.frontcache:frontcache-agent` (`https://repo.eternita.co/maven2`) to the app and call
 `FrontCacheAgent` for a single node or `FrontCacheAgentCluster` for a multi-node fleet. Both
-authenticate with `front-cache.site-key`.
+authenticate with `front-cache.api-key`.
 
 ## Upgrading
 

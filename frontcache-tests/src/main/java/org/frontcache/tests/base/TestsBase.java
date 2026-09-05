@@ -43,10 +43,10 @@ public class TestsBase {
 		webClient = new WebClient();
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 
-		frontcacheClientStandalone = new FrontCacheClient(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST, SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClientStandalone = new FrontCacheClient(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST, ApiKeys.TEST_API_KEY_LOCALHOST);
 		frontcacheClientStandalone.removeFromCacheAll(); // clean up
 
-		frontcacheClientFilter = new FrontCacheClient(TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST, SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClientFilter = new FrontCacheClient(TestConfig.FRONTCACHE_FILTER_TEST_BASE_URI_LOCALHOST, ApiKeys.TEST_API_KEY_LOCALHOST);
 		frontcacheClientFilter.removeFromCacheAll(); // clean up
 
 	}

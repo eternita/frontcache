@@ -36,9 +36,9 @@ public class FrontCacheCluster {
 
 	private final static String DEFAULT_CLUSTER_CONFIG_NAME = "frontcache-cluster.conf";
 
-	private final static String SITE_KEY_CONFIG_FILE = "frontcache-site-key.conf";
+	private final static String API_KEY_CONFIG_FILE = "frontcache-api-key.conf";
 
-	private final static String DEFAULT_SITE_KEY = "";
+	private final static String DEFAULT_API_KEY = "";
 
 	private Logger logger = LoggerFactory.getLogger(FrontCacheCluster.class);
 
@@ -49,10 +49,10 @@ public class FrontCacheCluster {
 	private static final long FRONTCACHE_CLIENT_TIMEOUT = 5*1000; // 5 second
 
 
-	public FrontCacheCluster(Collection<String> fcURLSet, String siteKey)
+	public FrontCacheCluster(Collection<String> fcURLSet, String apiKey)
 	{
 		for (String url : fcURLSet)
-			fcCluster.add(new FrontCacheClient(url, siteKey));
+			fcCluster.add(new FrontCacheClient(url, apiKey));
 	}
 
 	public FrontCacheCluster(Collection<FrontCacheClient> fcClients)
@@ -69,10 +69,10 @@ public class FrontCacheCluster {
 	public FrontCacheCluster(String configResourceName)
 	{
 		Set<String> fcURLSet = loadFrontcacheClusterNodes(configResourceName);
-		String siteKey = loadSiteKey();
+		String apiKey = loadApiKey();
 
 		for (String url : fcURLSet)
-			fcCluster.add(new FrontCacheClient(url, siteKey));
+			fcCluster.add(new FrontCacheClient(url, apiKey));
 	}
 
 	public void close()
@@ -80,23 +80,23 @@ public class FrontCacheCluster {
 		executor.shutdown();
 	}
 
-	private String loadSiteKey()
+	private String loadApiKey()
 	{
-		String siteKey = DEFAULT_SITE_KEY;
+		String apiKey = DEFAULT_API_KEY;
 		BufferedReader confReader = null;
 		InputStream is = null;
 		try
 		{
-			is = FrontCacheCluster.class.getClassLoader().getResourceAsStream(SITE_KEY_CONFIG_FILE);
+			is = FrontCacheCluster.class.getClassLoader().getResourceAsStream(API_KEY_CONFIG_FILE);
 			if (null == is)
 			{
-				return siteKey;
+				return apiKey;
 			}
 
 			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			siteKey = confReader.readLine();
-			if (null == siteKey)
-				siteKey = "";
+			apiKey = confReader.readLine();
+			if (null == apiKey)
+				apiKey = "";
 
 		} catch (Exception e) {
 			// TODO: log ...
@@ -116,7 +116,7 @@ public class FrontCacheCluster {
 			}
 		}
 
-		return siteKey;
+		return apiKey;
 	}
 
 
