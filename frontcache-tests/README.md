@@ -162,7 +162,7 @@ includes `b.jsp` and the whole page must render exactly `"ab"`). Fixture familie
 - `common/6ci`, `common/7ci` — include + cache permutations.
 - `common/deep-include`, `deep-include-cache`, `deep-include-async` — `a→b→c→…→f`
   nesting; page must render `"abcdef"`.
-- `common/client-bot-browser`, `include-bot-browser` — `maxage="bot:60"` fixtures that
+- `common/client-bot-guest`, `include-bot-guest` — `maxage="bot:60"` fixtures that
   cache for bots but stay dynamic for browsers.
 - `common/methods` — HTTP-method caching (GET then HEAD).
 - `common/l1-l2-cache-level` — three fragments that distribute across L1/L2.
