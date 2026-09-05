@@ -55,6 +55,19 @@ public class GuardRuleEngine {
 
 	private volatile List<GuardRule> rules = Collections.emptyList();
 
+	// Same set the parser validates against at load time, kept for the runtime check - a placeholder
+	// puts a host into the target that no load-time check can see. Rebuilt by load(), so
+	// reload-guard-rules picks up an edited allowlist.
+	private volatile Set<String> redirectHostAllowlist = Collections.emptySet();
+
+	// "<rule>#<host>" pairs already warned about. The trigger for a bad host is a crawler loop or a
+	// misrouted probe, i.e. thousands of identical requests, so warning per request is how error.log
+	// reaches gigabytes (see docs/input-request-count-fix.md). Capped so a host-rotating client
+	// cannot turn the throttle itself into the leak.
+	private static final int MAX_REMEMBERED_WARNINGS = 256;
+	private final Set<String> warnedRedirectHosts =
+			Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<String, Boolean>());
+
 	public GuardRuleEngine(int maxRequestURILength) {
 		this.maxRequestURILength = maxRequestURILength;
 		load();
@@ -77,6 +90,10 @@ public class GuardRuleEngine {
 		// Before the rules, because a rate: predicate is bound while they parse and the resolver
 		// decides what its counter is keyed on.
 		ClientIpResolver.reload();
+
+		// Before the rules too: loadConfiguredRules() hands this to the parser, and evaluate() reads
+		// it on every redirect whether or not configured rules were loaded at all.
+		this.redirectHostAllowlist = Collections.unmodifiableSet(allowedRedirectHosts());
 
 		List<GuardRule> loaded = new ArrayList<GuardRule>();
 
@@ -208,7 +225,7 @@ public class GuardRuleEngine {
 		if (null == is)
 			return loaded;
 
-		GuardRuleParser parser = new GuardRuleParser(allowedRedirectHosts());
+		GuardRuleParser parser = new GuardRuleParser(this.redirectHostAllowlist);
 
 		BufferedReader reader = null;
 		try {
@@ -242,21 +259,48 @@ public class GuardRuleEngine {
 	}
 
 	/**
-	 * Hosts an absolute redirect target may point at, from
+	 * Hosts an absolute redirect target may point at, from front-cache.default-domain and
 	 * front-cache.guard-rules.allowed-redirect-hosts.
 	 *
 	 * This used to also add front-cache.domains. That key is retired (a node configured with it
-	 * refuses to start - see docs/archive/multi-domain-retirement-proposal.md), so the read is gone. Note
-	 * that front-cache.default-domain has never been added here either, despite what this javadoc
-	 * used to claim: a redirect to your own site must be listed explicitly.
+	 * refuses to start - see docs/archive/multi-domain-retirement-proposal.md), so the read is gone.
+	 *
+	 * front-cache.default-domain IS included, as of docs/guard-redirect-url-host-fix.md - settling
+	 * the follow-up left open by the multi-domain retirement, where the javadoc here claimed it was
+	 * and the code never did it. It has to be now: ${url} and ${host} emit that hostname, so a rule
+	 * redirecting to your own site would otherwise be refused at load time against an allowlist not
+	 * containing the one name the node calls itself. It widens the allowlist by exactly the site the
+	 * node already serves.
 	 */
 	private Set<String> allowedRedirectHosts()
 	{
 		Set<String> hosts = new HashSet<String>();
 
+		addHosts(hosts, publicDomain());
 		addHosts(hosts, FCConfig.getProperty("front-cache.guard-rules.allowed-redirect-hosts", ""));
 
 		return hosts;
+	}
+
+	/**
+	 * This site's public hostname, or null.
+	 *
+	 * Read from config rather than from FrontCacheEngine: the engine builds its GuardRuleEngine from
+	 * its own constructor, so getFrontCache() would recurse or hand back a half-built instance.
+	 * Mirrors FrontCacheEngine.getPublicDomain(), including its refusal to treat the
+	 * FCConfig.DEFAULT_DOMAIN placeholder as a real hostname.
+	 */
+	private static String publicDomain()
+	{
+		String domain = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
+		if (null == domain)
+			return null;
+
+		String trimmed = domain.trim();
+		if (0 == trimmed.length() || FCConfig.DEFAULT_DOMAIN.equals(trimmed))
+			return null;
+
+		return trimmed;
 	}
 
 	private void addHosts(Set<String> hosts, String commaSeparated)
@@ -431,7 +475,13 @@ public class GuardRuleEngine {
 			String resolvedTarget = null;
 			if (GuardAction.Type.REDIRECT == rule.getAction().getType())
 			{
-				resolvedTarget = rule.getAction().resolveTarget(context);
+				String expanded = rule.getAction().resolveTarget(context);
+				resolvedTarget = sanitizeTarget(rule, expanded);
+
+				// sanitizeTarget() refused the target's own host - redirecting there would be an open
+				// redirect, so the rule does not act and the request goes on to cache/origin
+				if (null == resolvedTarget && null != expanded)
+					continue;
 
 				// runtime loop guard: redirecting a URL to itself is a browser-side infinite loop.
 				// Load-time detection catches the static cases; this catches the ones that only
@@ -447,6 +497,224 @@ public class GuardRuleEngine {
 		}
 
 		return GuardOutcome.cont(dryRunMatches);
+	}
+
+	/**
+	 * Last line of defence for the host in a redirect we are about to send, applied AFTER the
+	 * placeholders are expanded.
+	 *
+	 * GuardRuleParser.checkRedirectTarget validates the target as written in the config file, which
+	 * is a load-time check on a static string. It cannot see a host that only appears at runtime -
+	 * and ${url} / ${host} put one there, on every request. With front-cache.default-domain set that
+	 * host is already the site's own (GuardAction.publicHost), so this normally finds nothing; it is
+	 * what protects a node that names no public host, which is what a default FRONTCACHE_HOME does
+	 * and what every example-site edge did when this was written.
+	 *
+	 * Two places a host can appear, handled differently because the consequences differ:
+	 *
+	 * <ul>
+	 * <li>the target's OWN host - a bad one is an open redirect, so the rule is skipped and the
+	 *     request carries on to cache/origin;</li>
+	 * <li>an absolute URL inside a query parameter (return=, next=, from=) - a bad one leaks an
+	 *     internal hostname and sends the visitor there after login. The parameter is rewritten onto
+	 *     the public host when there is one, and dropped when there is not. NOT skipped: dropping
+	 *     the guard means the abusive request reaches origin, which is the thing the rule exists to
+	 *     stop, and losing a return= only costs the visitor their place.</li>
+	 * </ul>
+	 *
+	 * Never throws - a failure here degrades to the unsanitized target, which is what shipped before.
+	 *
+	 * @return the target to send, or null to skip this rule
+	 */
+	String sanitizeTarget(GuardRule rule, String target)
+	{
+		if (null == target || 0 == target.length())
+			return target;
+
+		try {
+			Set<String> allowed = this.redirectHostAllowlist;
+
+			String targetHost = hostOf(target);
+			if (null != targetHost && !allowed.contains(targetHost.toLowerCase()))
+			{
+				warnOnce(rule, targetHost, "redirect target host '" + targetHost + "' is not allowed"
+						+ " - skipping the rule for requests that resolve to it");
+				return null;
+			}
+
+			int queryIdx = target.indexOf('?');
+			if (-1 == queryIdx)
+				return target;
+
+			String query = target.substring(queryIdx + 1);
+			int fragmentIdx = query.indexOf('#');
+			String fragment = "";
+			if (-1 < fragmentIdx)
+			{
+				fragment = query.substring(fragmentIdx);
+				query = query.substring(0, fragmentIdx);
+			}
+
+			String sanitizedQuery = sanitizeQuery(rule, query, allowed);
+			if (sanitizedQuery.equals(query))
+				return target;
+
+			if (0 == sanitizedQuery.length())
+				return target.substring(0, queryIdx) + fragment;
+
+			return target.substring(0, queryIdx + 1) + sanitizedQuery + fragment;
+
+		} catch (Exception e) {
+			logger.error("Guard rule '" + rule.getName() + "': could not check the redirect target - sending it unchanged", e);
+			return target;
+		}
+	}
+
+	/**
+	 * Rewrites or drops query parameters whose value is an absolute URL pointing somewhere we do not
+	 * vouch for. Parameters that are not absolute URLs - the overwhelming majority - are passed
+	 * through byte for byte, so a value this method does not understand is never mangled.
+	 */
+	private String sanitizeQuery(GuardRule rule, String query, Set<String> allowed)
+	{
+		StringBuilder sb = new StringBuilder(query.length());
+		boolean first = true;
+
+		// -1 keeps trailing empty segments, and an empty segment is passed through rather than
+		// dropped: "unchanged" has to mean byte-identical, or the caller's equals() check turns a
+		// no-op into a rewritten URL.
+		for (String pair : query.split("&", -1))
+		{
+			int eq = pair.indexOf('=');
+			String name = (-1 < eq) ? pair.substring(0, eq) : pair;
+			String rawValue = (-1 < eq) ? pair.substring(eq + 1) : null;
+
+			String replacement = pair;
+			if (null != rawValue && 0 < rawValue.length())
+			{
+				String decoded = decode(rawValue);
+				String embeddedHost = hostOf(decoded);
+
+				if (null != embeddedHost && !allowed.contains(embeddedHost.toLowerCase()))
+				{
+					String publicDomain = publicDomain();
+					if (null == publicDomain)
+					{
+						warnOnce(rule, embeddedHost, "redirect parameter '" + name + "' points at '" + embeddedHost
+								+ "', which is not an allowed redirect host, and front-cache.default-domain names no"
+								+ " public host to put there instead - dropping the parameter."
+								+ " See docs/guard-redirect-url-host-fix.md");
+						continue; // drop it
+					}
+
+					warnOnce(rule, embeddedHost, "redirect parameter '" + name + "' points at '" + embeddedHost
+							+ "', which is not an allowed redirect host - rewriting it onto '" + publicDomain + "'."
+							+ " See docs/guard-redirect-url-host-fix.md");
+
+					replacement = name + "=" + encode(replaceHost(decoded, embeddedHost, publicDomain));
+				}
+			}
+
+			if (!first)
+				sb.append('&');
+			sb.append(replacement);
+			first = false;
+		}
+
+		return sb.toString();
+	}
+
+	/**
+	 * @return the host of an absolute http(s) URL, without port or userinfo; null if the text is not
+	 *         one (a relative path, a plain value, a mailto:, anything else)
+	 */
+	static String hostOf(String url)
+	{
+		if (null == url)
+			return null;
+
+		String lower = url.toLowerCase();
+		int schemeEnd;
+		if (lower.startsWith("http://"))
+			schemeEnd = 7;
+		else if (lower.startsWith("https://"))
+			schemeEnd = 8;
+		else
+			return null;
+
+		int hostEnd = url.length();
+		for (int i = schemeEnd; i < url.length(); i++)
+		{
+			char c = url.charAt(i);
+			if ('/' == c || '?' == c || '#' == c)
+			{
+				hostEnd = i;
+				break;
+			}
+		}
+
+		String authority = url.substring(schemeEnd, hostEnd);
+
+		// userinfo - "https://www.example-site.com@evil.example.com/" is a URL whose host is
+		// evil.example.com, and reading the part before the '@' as the host is the classic way to be
+		// fooled by one
+		int at = authority.lastIndexOf('@');
+		if (-1 < at)
+			authority = authority.substring(at + 1);
+
+		int portIdx = authority.lastIndexOf(':');
+		if (-1 < portIdx && -1 == authority.indexOf(']')) // strip :port, keep IPv6 literals intact
+			authority = authority.substring(0, portIdx);
+
+		return (0 < authority.length()) ? authority : null;
+	}
+
+	/**
+	 * Swaps the host of an absolute URL, leaving scheme, port, path, query and fragment alone. The
+	 * host is matched at its exact position rather than by string replacement, so a hostname that
+	 * also occurs in the path or query is untouched.
+	 */
+	private static String replaceHost(String url, String host, String replacement)
+	{
+		int idx = url.toLowerCase().indexOf(host.toLowerCase());
+		if (-1 == idx)
+			return url;
+
+		return url.substring(0, idx) + replacement + url.substring(idx + host.length());
+	}
+
+	private static String decode(String value)
+	{
+		try {
+			return java.net.URLDecoder.decode(value, "UTF-8");
+		} catch (Exception e) {
+			return value; // malformed %-escape: treat it as opaque, which means hostOf() returns null
+		}
+	}
+
+	private static String encode(String value)
+	{
+		try {
+			return java.net.URLEncoder.encode(value, "UTF-8");
+		} catch (Exception e) {
+			return value;
+		}
+	}
+
+	/**
+	 * One WARN per rule/host pair, not per request. See MAX_REMEMBERED_WARNINGS.
+	 */
+	private void warnOnce(GuardRule rule, String host, String message)
+	{
+		String key = rule.getName() + "#" + host.toLowerCase();
+
+		if (!warnedRedirectHosts.add(key))
+			return;
+
+		if (MAX_REMEMBERED_WARNINGS < warnedRedirectHosts.size())
+			warnedRedirectHosts.clear(); // start over rather than grow without bound
+
+		logger.warn("Guard rule '" + rule.getName() + "': " + message);
 	}
 
 	private void close(java.io.Closeable closeable)

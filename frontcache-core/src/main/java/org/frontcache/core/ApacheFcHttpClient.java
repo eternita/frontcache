@@ -54,9 +54,12 @@ public class ApacheFcHttpClient implements FcHttpClient {
 			throws FrontCacheException {
 
 		// In webfilter mode the origin is the app this filter is installed in, so the way to reach it
-		// is its own filter chain, not a socket back to ourselves.
+		// is its own filter chain, not a socket back to ourselves. No forwarding headers there: the
+		// app is looking at the client's real request, not at one we rebuilt.
 		if (context.isFilterMode())
 			return new FC_ThroughCache_WebFilter(context).execute();
+
+		FCUtils.addPublicForwardedHeaders(requestHeaders, context);
 
 		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
 	}
@@ -64,6 +67,8 @@ public class ApacheFcHttpClient implements FcHttpClient {
 	@Override
 	public WebResponse fetchOverHttp(String urlStr, Map<String, List<String>> requestHeaders, RequestContext context)
 			throws FrontCacheException {
+
+		FCUtils.addPublicForwardedHeaders(requestHeaders, context);
 
 		return new FC_ThroughCache_HttpClient(urlStr, requestHeaders, client, context).execute();
 	}

@@ -307,6 +307,51 @@ public class ClientIpResolverTest {
 		assertFalse(a.equals(b));
 	}
 
+	// ---- isTrustedPeer, for X-Forwarded-Proto ----------------------------------------------------
+
+	/**
+	 * The scheme of an emitted URL is read from X-Forwarded-Proto under exactly this rule, and for a
+	 * sharper reason than the client IP: that value goes into a redirect a browser follows, so a
+	 * client able to set it could choose the scheme of a URL Frontcache vouches for.
+	 * See docs/guard-redirect-url-host-fix.md.
+	 */
+	@Test
+	public void aPeerInsideAConfiguredCidrIsTrusted() {
+		ClientIpResolver resolver = new ClientIpResolver(CDN_AND_LOCAL, "X-Forwarded-For");
+
+		assertTrue(resolver.isTrustedPeer(request("127.0.0.1", "X-Forwarded-Proto", "https")));
+		assertTrue(resolver.isTrustedPeer(request("198.51.100.7", "X-Forwarded-Proto", "https")));
+	}
+
+	@Test
+	public void aPeerOutsideEveryConfiguredCidrIsNotTrusted() {
+		ClientIpResolver resolver = new ClientIpResolver(CDN_AND_LOCAL, "X-Forwarded-For");
+
+		assertFalse(resolver.isTrustedPeer(request("203.0.113.7", "X-Forwarded-Proto", "https")));
+	}
+
+	/**
+	 * With no trusted-proxy list, nothing is trusted - the deployment states its scheme with
+	 * front-cache.public-scheme instead. A resolver that trusted everything here would let any
+	 * client pick the scheme.
+	 */
+	@Test
+	public void nothingIsTrustedWithoutAConfiguredList() {
+		ClientIpResolver resolver = new ClientIpResolver("", "X-Forwarded-For");
+
+		assertFalse(resolver.isTrustedPeer(request("127.0.0.1", "X-Forwarded-Proto", "https")));
+	}
+
+	@Test
+	public void anUnusableRequestIsNotTrusted() {
+		ClientIpResolver resolver = new ClientIpResolver(CDN_AND_LOCAL, "X-Forwarded-For");
+
+		assertFalse(resolver.isTrustedPeer(null));
+		assertFalse("a recycled request answers null for its peer",
+				resolver.isTrustedPeer(request(null, "X-Forwarded-Proto", "https")));
+		assertFalse(resolver.isTrustedPeer(request("not-an-address", "X-Forwarded-Proto", "https")));
+	}
+
 	// ---- stand-in request ------------------------------------------------------------------------
 
 	private static HttpServletRequest request(String remoteAddr, String headerName, String headerValue) {

@@ -201,6 +201,52 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return (String) get("frontCacheProtocol");
     }
 
+    /**
+     * The site's public hostname (front-cache.default-domain), or null when the node has none
+     * configured.
+     *
+     * This is NOT {@link #getFrontCacheHost()} and the two must not be confused - that is the whole
+     * of docs/guard-redirect-url-host-fix.md. getFrontCacheHost() is the Host header as it arrived,
+     * which is what predicates match, what the log lines record and what the cache key is built
+     * from; a node is reachable under several of them (the CDN's, an internal alias, its own name,
+     * a bare IP). This one is the single name we are willing to hand to a browser.
+     *
+     * Null means "not configured" - callers fall back to the arriving host. See
+     * FrontCacheEngine.getPublicDomain(), which is what maps the unset/placeholder property values
+     * onto null.
+     */
+    public void setPublicHost(String publicHost) {
+        set("publicHost", publicHost);
+    }
+
+    /**
+     * @return the site's public hostname, or null when none is configured
+     */
+    public String getPublicHost() {
+        return (String) get("publicHost");
+    }
+
+    /**
+     * The scheme the client actually used, recovered from X-Forwarded-Proto (trusted peers only) or
+     * front-cache.public-scheme.
+     *
+     * Separate from {@link #getFrontCacheProtocol()}, which stays the scheme of the connection as
+     * this process saw it. Behind a TLS-terminating proxy the two differ, and the cache key is built
+     * from the latter - so overloading it would silently re-key the whole cache. Only URLs we emit
+     * to a client read this one.
+     */
+    public void setPublicProtocol(String publicProtocol) {
+        set("publicProtocol", publicProtocol);
+    }
+
+    /**
+     * @return the public scheme, or null when it could not be established (fall back to
+     *         {@link #getFrontCacheProtocol()})
+     */
+    public String getPublicProtocol() {
+        return (String) get("publicProtocol");
+    }
+
     public void setOriginURL(URL originURL) {
         set("originURL", originURL);
     }
