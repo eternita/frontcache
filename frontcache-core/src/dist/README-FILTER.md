@@ -97,13 +97,13 @@ Frontcache caches nothing until the origin says so. From a JSP, using the taglib
 <fc:component maxage="1h" tags="catalog|product" refresh="soft" level="L2" />
 
 <fc:include url="/example/header" />
-<fc:include url="/example/user-profile" client="browser" />
+<fc:include url="/example/user-profile" client="guest" />
 ```
 
 Or set the headers directly from a controller:
 
 ```
-x-frontcache-component-maxage: 1h          # 0 = no cache, -1/forever = forever; bot:/browser: prefixes allowed
+x-frontcache-component-maxage: 1h          # 0 = no cache, -1/forever = forever; bot:/guest: prefixes allowed
 x-frontcache-component-tags: catalog|product-42
 x-frontcache-component-refresh: soft       # serve stale while revalidating
 x-frontcache-component-cache-level: L2     # L1 (memory) or L2 (disk, default)

@@ -323,10 +323,10 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 					logger.debug("include client-type - " + FCHeaders.REQUEST_CLIENT_TYPE_BOT);
 					return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
 				}
-				if (FCHeaders.REQUEST_CLIENT_TYPE_BROWSER.equalsIgnoreCase(typeValue))
+				if (FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equalsIgnoreCase(typeValue))
 				{
-					logger.debug("include client-type - " + FCHeaders.REQUEST_CLIENT_TYPE_BROWSER);
-					return FCHeaders.REQUEST_CLIENT_TYPE_BROWSER;
+					logger.debug("include client-type - " + FCHeaders.REQUEST_CLIENT_TYPE_GUEST);
+					return FCHeaders.REQUEST_CLIENT_TYPE_GUEST;
 				}
 
 			} else {
@@ -434,7 +434,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 
 		if (null != webResponse)
 		{
-			String clientType = context.getClientType(); // bot | browser
+			String clientType = context.getClientType(); // bot | guest
 			Map<String, Long> expireTimeMap = webResponse.getExpireTimeMap();
 
 			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);

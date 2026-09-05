@@ -71,7 +71,7 @@ public class L1L2CacheProcessorConcurrentInitTest {
 		WebResponse r = new WebResponse(url, ("content of " + url).getBytes());
 		Map<String, Long> expireTimeMap = new HashMap<String, Long>();
 		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, System.currentTimeMillis() + 600000);
-		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, System.currentTimeMillis() + 600000);
+		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, System.currentTimeMillis() + 600000);
 		r.setExpireTimeMap(expireTimeMap);
 		r.setStatusCode(200);
 		r.setCacheLevel(null); // null -> L2 (Lucene)

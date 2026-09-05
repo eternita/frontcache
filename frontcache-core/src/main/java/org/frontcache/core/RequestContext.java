@@ -705,12 +705,12 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 		return names;
 	}
 
-	// bot | browser
+	// bot | guest
 	public String getClientType() {
 		return (String) get("currentClientType");
 	}
 
-	// bot | browser
+	// bot | guest
 	public void setClientType(String currentClientType) {
         set("currentClientType", currentClientType);
 	}

@@ -132,7 +132,7 @@ public abstract class CommonTests extends TestsBase {
 
 		WebResponse webResponse = page.getWebResponse();
 
-//		x-frontcache-trace-request.0: success toplevel from-cache 1 1 "http://localhost:9080/common/debug/a.jsp" frontcache-localhost-1 browser
+//		x-frontcache-trace-request.0: success toplevel from-cache 1 1 "http://localhost:9080/common/debug/a.jsp" frontcache-localhost-1 guest
 		String logStr = webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
 
 		assertNotEquals(-1, logStr.indexOf("common/debug/a.jsp"));
@@ -261,7 +261,7 @@ public abstract class CommonTests extends TestsBase {
 		assertEquals("ab", page.getPage().asNormalizedText());
 		org.frontcache.core.WebResponse webResponse = frontcacheClient.getFromCache( getFrontCacheBaseURLLocalhost() + "common/client-bot-browser/b1.jsp");
 		// b1.jsp has "bot:60"
-		// request was from browser -> so, page is not cached
+		// request was from guest -> so, page is not cached
 		assertEquals(null, webResponse);
 
 		// call with User-Agent Chrome to include -> it's dynamic
@@ -347,7 +347,7 @@ public abstract class CommonTests extends TestsBase {
 		// so, aster sleep it's expired
 		Thread.sleep(5000);
 
-		// call the same page as browser (data should be dynamic)
+		// call the same page as guest (data should be dynamic)
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/refresh-regular-soft/a1.jsp");
 		long timestamp21 = Long.parseLong(page.getPage().asNormalizedText());

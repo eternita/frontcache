@@ -53,7 +53,7 @@ public class L1L2CacheProcessorRemoveAllTest {
 		WebResponse r = new WebResponse(url, ("content of " + url).getBytes());
 		Map<String, Long> expireTimeMap = new HashMap<String, Long>();
 		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, CacheProcessor.CACHE_FOREVER);
-		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, CacheProcessor.CACHE_FOREVER);
+		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, CacheProcessor.CACHE_FOREVER);
 		r.setExpireTimeMap(expireTimeMap);
 		r.setStatusCode(200);
 		r.setCacheLevel(cacheLevel); // null -> L2 (Lucene), "L1" -> Ehcache

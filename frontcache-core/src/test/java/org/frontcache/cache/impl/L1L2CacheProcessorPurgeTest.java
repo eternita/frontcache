@@ -57,7 +57,7 @@ public class L1L2CacheProcessorPurgeTest {
 		WebResponse r = new WebResponse(url, ("content of " + url).getBytes());
 		Map<String, Long> expireTimeMap = new HashMap<String, Long>();
 		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, expireMillis);
-		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, expireMillis);
+		expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, expireMillis);
 		r.setExpireTimeMap(expireTimeMap);
 		r.setStatusCode(200);
 		r.setCacheLevel(cacheLevel); // null -> L2 (Lucene), "L1" -> Ehcache

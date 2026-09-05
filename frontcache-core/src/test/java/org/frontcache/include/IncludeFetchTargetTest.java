@@ -264,7 +264,7 @@ public class IncludeFetchTargetTest {
 		assertTrue(cache.putKeys.isEmpty());
 	}
 
-	/** {@code maxAge="bot:30d"} is dynamic for a browser - cache it and every visitor gets the bot's page. */
+	/** {@code maxAge="bot:30d"} is dynamic for a guest - cache it and every visitor gets the bot's page. */
 	@Test
 	public void aResponseDynamicForThisClientTypeIsNotCached() throws Exception {
 
@@ -520,7 +520,7 @@ public class IncludeFetchTargetTest {
 		context.setDomain("www.example-site.com");
 		context.setRequestId("test-request-id");
 		context.setClientIP("203.0.113.7");
-		context.setClientType(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER);
+		context.setClientType(FCHeaders.REQUEST_CLIENT_TYPE_GUEST);
 		return context;
 	}
 

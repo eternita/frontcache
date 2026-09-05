@@ -18,7 +18,7 @@ public class FCHeaders {
     public static final String PRAGMA = "Pragma";
 
     public static final String REQUEST_CLIENT_TYPE_BOT = "bot";
-    public static final String REQUEST_CLIENT_TYPE_BROWSER = "browser";
+    public static final String REQUEST_CLIENT_TYPE_GUEST = "guest";
 
     public static final String COMPONENT_REFRESH_TYPE_REGULAR = "regular"; // for X_FRONTCACHE_COMPONENT_REFRESH_TYPE
     public static final String COMPONENT_REFRESH_TYPE_SOFT = "soft";

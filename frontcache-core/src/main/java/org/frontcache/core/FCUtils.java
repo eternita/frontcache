@@ -81,10 +81,10 @@ public class FCUtils {
 		if (null == expireTimeMap)
 			return false;
 
-		if (null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER))
+		if (null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST))
 			return false;
 
-		if (0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && 0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER))
+		if (0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && 0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST))
 			return false;
 
 		return true;
@@ -117,7 +117,7 @@ public class FCUtils {
 	/**
 	 * Check with current time if expired
 	 *
-	 * @param clientType {bot | browser}
+	 * @param clientType {bot | guest}
 	 * @return
 	 */
 	public static boolean isWebComponentExpired(Map<String, Long> expireTimeMap, String clientType)

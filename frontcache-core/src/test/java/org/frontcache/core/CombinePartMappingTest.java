@@ -61,7 +61,7 @@ public class CombinePartMappingTest {
 
 		Map<String, Long> expireTimeMap = webResponse.getExpireTimeMap();
 
-		for (String clientType : new String[]{FCHeaders.REQUEST_CLIENT_TYPE_BOT, FCHeaders.REQUEST_CLIENT_TYPE_BROWSER})
+		for (String clientType : new String[]{FCHeaders.REQUEST_CLIENT_TYPE_BOT, FCHeaders.REQUEST_CLIENT_TYPE_GUEST})
 		{
 			long expireTime = expireTimeMap.get(clientType).longValue();
 			assertTrue(clientType + " expires too early: " + expireTime, expireTime >= before + 10 * 60 * 1000);
@@ -98,7 +98,7 @@ public class CombinePartMappingTest {
 
 		assertTrue("isCacheable() alone does NOT exclude it", webResponse.isCacheable());
 		assertFalse(FCUtils.isWebComponentCacheableForClientType(
-				webResponse.getExpireTimeMap(), FCHeaders.REQUEST_CLIENT_TYPE_BROWSER));
+				webResponse.getExpireTimeMap(), FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
 	}
 
 	@Test
@@ -110,7 +110,7 @@ public class CombinePartMappingTest {
 
 		assertTrue(webResponse.isCacheable());
 		assertTrue(FCUtils.isWebComponentCacheableForClientType(
-				webResponse.getExpireTimeMap(), FCHeaders.REQUEST_CLIENT_TYPE_BROWSER));
+				webResponse.getExpireTimeMap(), FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
 	}
 
 	@Test

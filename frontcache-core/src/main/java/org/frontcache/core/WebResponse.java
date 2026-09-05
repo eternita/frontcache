@@ -236,11 +236,11 @@ public class WebResponse implements Serializable {
 	/**
 	 *
 	 *
-	 * @param expiteTimeStr - maxAge="[bot|browser:]30d"
+	 * @param expiteTimeStr - maxAge="[bot|guest:]30d"
 	 */
 	private void setExpireTime(String maxAgeStr) {
 
-		String maxAgeClientType = null; // bot and browser
+		String maxAgeClientType = null; // bot and guest
 		String maxAgeTime = "0"; // default no cache
 
 		if (null != maxAgeStr)
@@ -279,17 +279,17 @@ public class WebResponse implements Serializable {
 		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType))
 		{
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, CacheProcessor.NO_CACHE);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, CacheProcessor.NO_CACHE);
 
 		} else if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType)) {
 
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, CacheProcessor.NO_CACHE);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, cacheMaxAgeSecLong);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, cacheMaxAgeSecLong);
 		} else {
 			// default
 			// TODO: something wrong - log it
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, cacheMaxAgeSecLong);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, cacheMaxAgeSecLong);
 		}
 
 		return;
@@ -380,7 +380,7 @@ public class WebResponse implements Serializable {
 	 * Effective expiration timestamp (epoch millis) of this response across all
 	 * client types. Used for time-based purging of stale entries.
 	 *
-	 * An entry that is still serveable to bots until T1 and to browsers until T2
+	 * An entry that is still serveable to bots until T1 and to guests until T2
 	 * is fully expired only after max(T1, T2), so the latest expiration wins.
 	 *
 	 * @return CACHE_FOREVER (-1) if the response never expires;

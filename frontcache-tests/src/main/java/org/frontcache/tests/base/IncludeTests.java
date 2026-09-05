@@ -121,7 +121,7 @@ public abstract class IncludeTests extends TestsBase {
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 
-		// request as browser
+		// request as guest
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
@@ -135,7 +135,7 @@ public abstract class IncludeTests extends TestsBase {
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a1.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 
-		// request as browser
+		// request as guest
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a1.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
@@ -149,7 +149,7 @@ public abstract class IncludeTests extends TestsBase {
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a2.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
 
-		// request as browser
+		// request as guest
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a2.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
@@ -163,7 +163,7 @@ public abstract class IncludeTests extends TestsBase {
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a3.jsp");
 		assertEquals(page.getPage().asNormalizedText(), "a");
 
-		// request as browser
+		// request as guest
 		webClient.addRequestHeader("User-Agent", "Chrome");
 		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a3.jsp");
 		assertEquals(page.getPage().asNormalizedText(), "a");

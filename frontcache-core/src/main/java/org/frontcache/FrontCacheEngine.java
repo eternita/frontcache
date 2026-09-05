@@ -987,7 +987,7 @@ public class FrontCacheEngine {
         context.setRequestId(requestId);
         context.setRequestType(requestType);
 
-        context.setClientType(getClientType(servletRequest)); // client type = bot | browser based on User-Agent Header and bots.conf
+        context.setClientType(getClientType(servletRequest)); // client type = bot | guest based on User-Agent Header and bots.conf
 
         // Resolved here, on the request thread, for two reasons: it is a 13-header scan that every log
         // line and the origin call would otherwise repeat, and it is the only point at which the answer
@@ -1013,7 +1013,7 @@ public class FrontCacheEngine {
 			return FCHeaders.REQUEST_CLIENT_TYPE_BOT; // no user-agent -> bot
 		}
 
-		return FCHeaders.REQUEST_CLIENT_TYPE_BROWSER;
+		return FCHeaders.REQUEST_CLIENT_TYPE_GUEST;
 	}
 
     private boolean ignoreCache(String uri)
