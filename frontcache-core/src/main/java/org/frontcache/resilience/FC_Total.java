@@ -28,6 +28,12 @@ import org.slf4j.LoggerFactory;
  */
 public class FC_Total extends FcCommand<Object> {
 
+	/** Requests from a client - what an operator reads as "how much traffic is this node taking". */
+	public static final String COMMAND_KEY_INPUT_REQUESTS = "Input-Requests";
+
+	/** Requests that are a Frontcache include arriving back through the front door. */
+	public static final String COMMAND_KEY_INCLUDE_REQUESTS = "Include-Requests";
+
 	private final FrontCacheEngine frontCacheEngine;
 	private final RequestContext context;
 	private Logger logger = LoggerFactory.getLogger(FC_Total.class);
@@ -36,12 +42,42 @@ public class FC_Total extends FcCommand<Object> {
 
         super(Setter
                 .withGroupKey(context.getDomain())
-                .andCommandKey("Input-Requests")
+                .andCommandKey(commandKeyFor(context))
                 );
         this.frontCacheEngine = frontCacheEngine;
         this.context = context;
 
     }
+
+	/**
+	 * Which circuit this request belongs on: a client request, or an include coming back round.
+	 *
+	 * {@code Input-Requests} is the dashboard's headline number, and it was counting both. An include
+	 * resolved by {@code fetchIncludeFromOrigin} is an HTTP request to the {@code Host} header - back
+	 * through the CDN and in at this node's own front door - so it arrives here as an ordinary request
+	 * and was tallied as client traffic. On fc-edge that read 1200/s against real client traffic of
+	 * ~11/s. Fixing the cache keys removed most of the volume, but not the miscounting: every include
+	 * that misses cache still re-enters, and in **filter mode** or a chained topology (the origin
+	 * itself behind Frontcache) it re-enters regardless of how includes are routed. So the count is
+	 * only correct if the two are separated here, at the point where the request type is already known.
+	 *
+	 * {@code init()} has classified the request before this runs - the same classification the request
+	 * log prints as {@code toplevel} / {@code include} / {@code include-async}, derived from whether
+	 * the caller sent {@code x-frontcache-request-id}. No new header, no new plumbing.
+	 *
+	 * An unset type means the context never went through {@code init()}, which is not something a real
+	 * request can do; it counts as an input request because that is the conservative answer - it keeps
+	 * an unknown request visible in the headline number rather than filing it away as an include.
+	 */
+	static String commandKeyFor(RequestContext context) {
+
+		String requestType = context.getRequestType();
+
+		if (FCHeaders.COMPONENT_INCLUDE.equals(requestType) || FCHeaders.COMPONENT_ASYNC_INCLUDE.equals(requestType))
+			return COMMAND_KEY_INCLUDE_REQUESTS;
+
+		return COMMAND_KEY_INPUT_REQUESTS;
+	}
 
     @Override
     protected Object run() throws Exception {

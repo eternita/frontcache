@@ -709,6 +709,85 @@ public class FCUtils {
 	}
 
 
+	/**
+	 * The URL a request for {@code urlStr} will actually be made with: scheme and host untouched,
+	 * path and query normalised exactly as {@link #buildRequestURI(String)} normalises them for the
+	 * wire.
+	 *
+	 * <b>This is the only correct cache key for a URL that is fetched through buildRequestURI</b>,
+	 * and the two must not be allowed to drift apart. buildRequestURI re-serializes the query and
+	 * silently drops any parameter with no value - {@code splitQueryParameters} maps {@code id=} to
+	 * a null value, because its guard is {@code pair.length() > idx + 1}, which for {@code "id="} is
+	 * {@code 3 > 3}. So a URL keyed raw and fetched normalised is a cache entry that can never be
+	 * read back:
+	 *
+	 * <pre>
+	 *   probe   ?locale=zh&amp;id=   miss - nothing is ever stored under this
+	 *   fetch   ?locale=zh         the empty parameter is gone by the time it reaches the wire
+	 *   store   ?locale=zh         what the serving node receives, and stores
+	 *   probe   ?locale=zh&amp;id=   miss again, for the life of the entry
+	 * </pre>
+	 *
+	 * That loop ran in production: 33 fragment URLs generating 608 origin fetches a second, each
+	 * one re-fetching a fragment that was already cached, unexpired and cacheable - because the key
+	 * being looked up had never existed. See docs/input-request-count-fix.md section 3.
+	 *
+	 * Idempotent: canonicalizing an already-canonical URL returns it unchanged, so it is safe to
+	 * apply on a path that may already have applied it.
+	 */
+	public static String canonicalizeURL(String urlStr) {
+
+		if (null == urlStr)
+			return null;
+
+		String uri = buildRequestURI(urlStr);
+
+		// buildRequestURI returns everything from the first '/' after the '//', so put the
+		// scheme+host back in front of it. When there is no scheme+host it already returned the
+		// whole thing.
+		int schemeIdx = urlStr.indexOf("//");
+		if (-1 < schemeIdx)
+		{
+			int pathIdx = urlStr.indexOf("/", schemeIdx + "//".length());
+			if (-1 < pathIdx)
+				return urlStr.substring(0, pathIdx) + uri;
+		}
+
+		return uri;
+	}
+
+	/**
+	 * The same path and query, addressed at a different {@code scheme://host[:port]}.
+	 *
+	 * This is what splits an include's two jobs apart (docs/include-fetch-fix.md section 5). A
+	 * cache-missing {@code <fc:include>} is keyed on the public URL and fetched from
+	 * {@code front-cache.origin-host}; the two differ only in the base, so the fetch URL is derived
+	 * from the public one rather than re-concatenated from the tag - re-concatenating would give a
+	 * second string to keep in step with {@link #canonicalizeURL}, and that drift is what section 2
+	 * of docs/input-request-count-fix.md was.
+	 *
+	 * The base is expected without a trailing slash, which is what {@code FrontCacheEngine.makeURL}
+	 * and {@code URL.toString()} produce for a host-only URL.
+	 *
+	 * @param urlStr absolute URL, or a path (which is returned appended to the base)
+	 * @param baseURL {@code scheme://host[:port]}
+	 */
+	public static String rebaseURL(String urlStr, String baseURL) {
+
+		if (null == urlStr || null == baseURL)
+			return urlStr;
+
+		int schemeIdx = urlStr.indexOf("//");
+		if (-1 == schemeIdx)
+			return baseURL + urlStr; // already a path
+
+		int pathIdx = urlStr.indexOf("/", schemeIdx + "//".length());
+		if (-1 == pathIdx)
+			return baseURL + "/"; // scheme + host, nothing else
+
+		return baseURL + urlStr.substring(pathIdx);
+	}
+
 	public static Map<String, List<String>> splitQueryParameters(String paramsStr) throws UnsupportedEncodingException {
 		final Map<String, List<String>> queryPairs = new LinkedHashMap<String, List<String>>();
 		final String[] pairs = paramsStr.split("&");

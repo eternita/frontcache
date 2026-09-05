@@ -39,7 +39,7 @@ Everything lives in `FRONTCACHE_HOME/conf/`. Edit `frontcache.properties` first:
 | `front-cache.origin-host` | the backend Frontcache forwards cache misses to |
 | `front-cache.origin-http-port` / `-https-port` | the backend's ports |
 | `front-cache.default-domain` | your public domain |
-| `front-cache.site-key` | a secret of your own — **this is what guards the management API**, the dashboard stream and `/fc-metrics`. Send it as `Authorization: Bearer <site-key>` — one form for the agent, the console, node-to-node replication and a Prometheus scrape. The pre-2.9 `x-frontcache-site-key` header still works, deprecated |
+| `front-cache.site-key` | a secret of your own — **this is what guards the management API**, the dashboard stream and `/fc-metrics`. Send it as `Authorization: Bearer <site-key>` — one form for the agent, the console, node-to-node replication and a Prometheus scrape. The pre-2.7 `x-frontcache-site-key` header still works, deprecated |
 | `front-cache.http-port` / `front-cache.https-port` | the **client-facing** ports (80/443 when a TLS terminator fronts Frontcache), *not* the 9080 the launcher listens on — these two are what redirect rewriting uses |
 | `front-cache.management.port` | which of this node's connectors answers management traffic. A **routing** check, not a second boundary: it compares the port the caller *addressed* (the Host header), so it is the site key above that keeps anyone out |
 

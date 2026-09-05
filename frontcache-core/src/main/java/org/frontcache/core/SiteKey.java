@@ -38,13 +38,13 @@ import jakarta.servlet.http.HttpServletRequest;
  *
  * <h2>The legacy {@code x-frontcache-site-key} header, for one release</h2>
  *
- * That header was the Frontcache convention through 2.8 and is still accepted, deprecated, with a
+ * That header was the Frontcache convention through 2.6 and is still accepted, deprecated, with a
  * warning naming the caller. It cannot simply be dropped: {@code frontcache-agent} is a published
  * artifact embedded in customer applications, the console is deployed separately from the fleet, and
  * nodes replicate to each other - so at any moment some caller is older than the node it is calling,
  * and a node that refused the old header would break all of them on upgrade rather than at a time
  * anyone chose. Same treatment as {@code get-hystrix-configs} and {@code conf/hystrix.properties} in
- * 2.7. Remove once no supported caller predates 2.9.
+ * 2.7. Remove once every supported caller is 2.7 or later.
  *
  * <h2>The SSE stream's check is stricter, on purpose</h2>
  *
@@ -131,7 +131,7 @@ public class SiteKey {
 	}
 
 	/**
-	 * The pre-2.9 header. Warned about once rather than per request - a fleet mid-upgrade would
+	 * The pre-2.7 header. Warned about once rather than per request - a fleet mid-upgrade would
 	 * otherwise fill a log with it - and the message names the caller, because "something still uses
 	 * the old header" is only actionable if you can tell what.
 	 */

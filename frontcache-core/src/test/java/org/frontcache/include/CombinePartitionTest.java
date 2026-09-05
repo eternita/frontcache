@@ -300,8 +300,10 @@ public class CombinePartitionTest {
 		headers.put("Host", Arrays.asList(new String[]{"www.example.com"}));
 
 		@SuppressWarnings("unchecked")
+		// hostURL and fetchBaseURL are the same here - what this test is about is the combine
+		// attribute, not where the include is fetched from (see IncludeFetchTargetTest)
 		List<Object> includes = (List<Object>) parseIncludes.invoke(processor,
-				"<html>" + includeTag + "</html>", HOST, headers, null, new RequestContext());
+				"<html>" + includeTag + "</html>", HOST, HOST, headers, null, new RequestContext());
 
 		return includes.get(0);
 	}

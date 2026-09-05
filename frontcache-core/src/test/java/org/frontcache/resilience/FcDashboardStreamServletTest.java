@@ -110,7 +110,7 @@ public class FcDashboardStreamServletTest {
 	}
 
 	/**
-	 * The stream accepts the pre-2.9 header too, through the same {@code SiteKey.presented} the rest of
+	 * The stream accepts the pre-2.7 header too, through the same {@code SiteKey.presented} the rest of
 	 * the management surface uses - so an older console relaying this stream keeps working.
 	 */
 	@Test

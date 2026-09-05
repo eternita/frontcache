@@ -11,7 +11,10 @@ package org.frontcache.resilience;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -52,6 +55,22 @@ public class FcResilienceConfig {
 	private static final String LEGACY_THREADPOOL_PREFIX = "hystrix.threadpool.";
 	private static final String LEGACY_STREAM_MAX_CONNECTIONS_KEY = "hystrix.config.stream.maxConcurrentConnections";
 	private static final String DEFAULT_SCOPE = "default";
+
+	/**
+	 * Command key -> the key it inherits from when the file says nothing about it.
+	 *
+	 * {@code Include-Requests} was split out of {@code Input-Requests} in 2.9, so that the dashboard's
+	 * headline figure counts client traffic rather than the node's own includes coming back through
+	 * the front door. Inheriting means the split is a metrics change by default: a node whose
+	 * resilience.properties predates it keeps running includes on exactly the tuning they already had.
+	 * Setting {@code resilience.command.Include-Requests.*} explicitly overrides this, per property.
+	 */
+	private static final Map<String, String> COMMAND_KEY_INHERITANCE;
+	static {
+		Map<String, String> m = new HashMap<String, String>();
+		m.put(FC_Total.COMMAND_KEY_INCLUDE_REQUESTS, FC_Total.COMMAND_KEY_INPUT_REQUESTS);
+		COMMAND_KEY_INHERITANCE = Collections.unmodifiableMap(m);
+	}
 
 	// Hystrix built-in defaults, for keys the file does not set.
 	static final int DEFAULT_TIMEOUT_MS = 1000;
@@ -312,6 +331,21 @@ public class FcResilienceConfig {
 		String value = props.getProperty(COMMAND_PREFIX + commandKey + "." + property);
 		if (null == value)
 			value = props.getProperty(LEGACY_COMMAND_PREFIX + commandKey + "." + property);
+
+		// A command key added after an operator wrote their resilience.properties inherits from the
+		// key it was split out of, before falling back to default scope. Without this step a new key
+		// lands on the built-in defaults - THREAD, maxConcurrentRequests=10, timeout=1000 - because
+		// the shipped file sets `default` only for circuit-breaker properties. That failure is silent:
+		// the command works, then starts shedding into fallback fragments above 10 concurrent calls,
+		// on a node whose config file the operator never touched and has no reason to suspect.
+		String inheritFrom = COMMAND_KEY_INHERITANCE.get(commandKey);
+		if (null == value && null != inheritFrom)
+		{
+			value = props.getProperty(COMMAND_PREFIX + inheritFrom + "." + property);
+			if (null == value)
+				value = props.getProperty(LEGACY_COMMAND_PREFIX + inheritFrom + "." + property);
+		}
+
 		if (null == value)
 			value = props.getProperty(COMMAND_PREFIX + DEFAULT_SCOPE + "." + property);
 		if (null == value)

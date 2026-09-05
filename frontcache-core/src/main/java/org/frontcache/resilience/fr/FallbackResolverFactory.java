@@ -21,21 +21,69 @@ public class FallbackResolverFactory {
 	private static Logger logger = LoggerFactory.getLogger(FallbackResolverFactory.class);
 	private FallbackResolverFactory() {}
 
-	private static FallbackResolver instance;
+	private static volatile FallbackResolver instance;
 
+	/** Whether the origin warm-up leg of {@link #init} has been attempted. */
+	private static volatile boolean originWarmupAttempted;
+
+	/**
+	 * The resolver, creating it if this is the first call.
+	 *
+	 * This used to throw {@code RuntimeException("FallbackResolver is not initialized.")} whenever it
+	 * ran before {@link #init}, and {@link org.frontcache.FrontCacheEngine} calls {@code init} from a
+	 * background thread after a deliberate 3-second sleep - so for the first three seconds of a node's
+	 * life every caller that needed a fallback got an exception instead of one. The callers are
+	 * {@code FC_Total}, {@code FC_BypassCache}, both {@code FC_ThroughCache_*} and the include
+	 * processor: that is, the code whose whole job is to absorb a failure. It therefore turned one
+	 * failed fragment into a failed page, and did it precisely during a restart, when a proxy is at
+	 * its least healthy. On fc-edge it read as 24% of {@code Input-Requests} failing on a node that had
+	 * been up 17 seconds.
+	 *
+	 * Nothing about the sleep required the throw. Creating the resolver reads {@code fallbacks.conf}
+	 * from disk and needs no server - {@code FileBasedFallbackResolver}'s constructor does it. Only
+	 * {@link FallbackResolver#init}'s origin warm-up needs the node to be listening, which is what the
+	 * sleep is for. Splitting the two means the file-based fallbacks are answerable from the first
+	 * request, and the URL-sourced ones fill in when the node is up.
+	 */
 	public static FallbackResolver getInstance(){
-		if (null == instance) {
-			throw new RuntimeException("FallbackResolver is not initialized.");
+
+		FallbackResolver local = instance;
+		if (null != local)
+			return local;
+
+		synchronized (FallbackResolverFactory.class) {
+			if (null == instance)
+				instance = getFallbackResolver(); // published only once fully constructed
+			return instance;
 		}
-		return instance;
 	}
 
+	/**
+	 * Creates the resolver if needed and runs its origin warm-up once.
+	 *
+	 * The warm-up is guarded separately from creation because this is also the console's reload path
+	 * ({@code FrontCacheIOServlet} calls it on every {@code get-fallback-configs}), and re-fetching
+	 * every fallback from the origin on a dashboard poll is not what that endpoint means. The flag is
+	 * set in a {@code finally} so a warm-up that throws is not retried on every subsequent poll, and
+	 * cleared by {@link #destroy}, which is what makes the servlet's destroy-then-init actually reload.
+	 */
 	public static FallbackResolver init(FcHttpClient client){
-		if (null == instance) {
-			instance = getFallbackResolver();
-			instance.init(client);
+
+		FallbackResolver local = getInstance();
+
+		if (originWarmupAttempted)
+			return local;
+
+		synchronized (FallbackResolverFactory.class) {
+			if (originWarmupAttempted)
+				return local;
+			try {
+				local.init(client);
+			} finally {
+				originWarmupAttempted = true;
+			}
 		}
-		return instance;
+		return local;
 	}
 
 	/**
@@ -147,7 +195,10 @@ public class FallbackResolverFactory {
 
 	public static void destroy()
 	{
-		instance = null;
+		synchronized (FallbackResolverFactory.class) {
+			instance = null;
+			originWarmupAttempted = false;
+		}
 		return;
 	}
 }
