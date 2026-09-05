@@ -115,7 +115,7 @@ public class FcMetricsServletTest {
 	/**
 	 * The hole this closes. The removed port check compared {@code getServerPort()}, which the servlet
 	 * spec derives from the Host header - so a caller who could reach ANY connector could ask for the
-	 * management port and be served the whole scrape. Every other management endpoint required a site
+	 * management port and be served the whole scrape. Every other management endpoint required an API
 	 * key underneath that check; this one did not.
 	 */
 	@Test

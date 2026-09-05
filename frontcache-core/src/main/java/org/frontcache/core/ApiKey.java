@@ -31,7 +31,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * needed the same rule, and two implementations of one security check is one too many - the copy is
  * always the one that goes stale.
  *
- * <h2>The property was {@code front-cache.site-key} through 2.9</h2>
+ * <h2>The property was {@code front-cache.site-key} through 2.8</h2>
  *
  * Renamed, with NO fallback to the old name: a node whose {@code frontcache.properties} still says
  * {@code front-cache.site-key} reads no key at all and comes up with its management API, dashboard
