@@ -61,8 +61,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	FrontCacheEngine fcEngine = null;
 
-	private int managementPort = -1; // management port for security
-
 	// guards against concurrent backups - only one index backup may run at a time
 	private final AtomicBoolean backupInProgress = new AtomicBoolean(false);
 
@@ -78,19 +76,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 		super.init(config);
 
 		fcEngine = FrontCacheEngine.getFrontCache();
-
-		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
-		if (null == managementPortStr || managementPortStr.trim().length() == 0)
-			logger.warn("Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
-		else {
-			try
-			{
-				managementPort = Integer.parseInt(managementPortStr);
-			} catch (Exception ex) {
-				ex.printStackTrace();
-				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
-			}
-		}
 
 		return;
 	}
@@ -113,19 +98,13 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private void process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
 	{
 
-		if (-1 < managementPort && managementPort != request.getServerPort())
-		{
-			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
-			return;
-		}
-
 		// Site-key validation is active only when a site key is configured, and is THE access control
-		// here - the port check above compares the Host header, which the caller supplies. Shared with
-		// /fc-metrics via SiteKey rather than reimplemented, and read per request so that reloading a
-		// node's configuration changes the key actually enforced.
+		// here - restricting which connector answers management traffic is the reverse proxy's job.
+		// Shared with /fc-metrics via SiteKey rather than reimplemented, and read per request so that
+		// reloading a node's configuration changes the key actually enforced.
 		if (!SiteKey.isAuthorized(request))
 		{
-			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
+			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse()));
 			return;
 		}
 

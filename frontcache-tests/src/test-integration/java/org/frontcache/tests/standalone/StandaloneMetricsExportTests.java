@@ -216,10 +216,10 @@ public class StandaloneMetricsExportTests extends TestsBase {
 	 * The endpoint's access control, over real HTTP.
 	 *
 	 * It publishes traffic volumes, error rates, circuit state and this node's heap - and before the
-	 * site key was required here, the only thing in front of it was the management-port check, which
-	 * compares a Host header the caller supplies. Anyone who could reach a connector could read all of
-	 * it. The unit tests cover the branch; this covers that the branch is actually in the request path
-	 * of a running node.
+	 * site key was required here, the only thing in front of it was the since-removed management-port
+	 * check, which compared a Host header the caller supplies. Anyone who could reach a connector could
+	 * read all of it. The unit tests cover the branch; this covers that the branch is actually in the
+	 * request path of a running node.
 	 */
 	@Test
 	public void unauthenticatedScrapeIsRefused() throws Exception

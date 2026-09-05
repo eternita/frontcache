@@ -620,8 +620,8 @@ cat <<REPORT
       journalctl -u $SERVICE_NAME -f
       curl -s -o /dev/null -w '%{http_code}\\n' "http://127.0.0.1:$FC_PORT/frontcache-io?action=get-cache-state"
         # 200 means Frontcache is live (the body says "access denied" unless the request
-        # arrives on front-cache.management.port - that is expected, and is why this works
-        # as a liveness check without a site key)
+        # carries front-cache.site-key - that is expected, and is why this works as a
+        # liveness check without a site key)
 $([ "$WITH_CONSOLE" = 1 ] && printf '      systemctl status %s        # console on http://127.0.0.1:7080/\n' "$CONSOLE_SERVICE_NAME")
     Roll back to a previously installed version:
       ln -sfn $INSTALL_DIR/frontcache-server-<older> $LINK_DIR && systemctl restart $SERVICE_NAME

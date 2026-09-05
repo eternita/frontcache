@@ -21,13 +21,15 @@ import jakarta.servlet.http.HttpServletRequest;
 /**
  * The {@code front-cache.site-key} check, in one place.
  *
- * This is the management API's actual access control - the thing that decides whether a caller may
- * invalidate a cache, dump its keys or read its metrics. {@link ManagementPort} is NOT that; it checks
- * the port the caller addressed, which comes from the Host header, and says so itself.
+ * This is the management API's <b>only</b> access control - the thing that decides whether a caller
+ * may invalidate a cache, dump its keys or read its metrics. There used to be a
+ * {@code front-cache.management.port} check in front of it, which was never a boundary: it compared
+ * the port the caller ADDRESSED, taken from the Host header. It is gone; restricting which connector
+ * answers management traffic is the reverse proxy's job.
  *
- * Extracted for the reason ManagementPort was: there was one implementation in
- * {@code FrontCacheIOServlet} and a second endpoint needed the same rule, and two implementations of
- * one security check is one too many - the copy is always the one that goes stale.
+ * Extracted because there was one implementation in {@code FrontCacheIOServlet} and a second endpoint
+ * needed the same rule, and two implementations of one security check is one too many - the copy is
+ * always the one that goes stale.
  *
  * <h2>{@code Authorization: Bearer <site-key>} is the way to send it</h2>
  *
@@ -82,7 +84,7 @@ public class SiteKey {
 
 	/**
 	 * @return true when this node has a site key at all. When it does not, the management API has no
-	 *         access control of its own - see {@link ManagementPort}, which is not one.
+	 *         access control at all.
 	 */
 	public static boolean isConfigured()
 	{

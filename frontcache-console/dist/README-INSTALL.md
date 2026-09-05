@@ -38,7 +38,6 @@ frontcache {
 - `siteKey` — must match `front-cache.site-key` in every node's `frontcache.properties`.
   Without it the nodes reject the console's calls.
 
-Each node must also allow the console's requests through `front-cache.management.port`.
 
 ## 3. Run
 

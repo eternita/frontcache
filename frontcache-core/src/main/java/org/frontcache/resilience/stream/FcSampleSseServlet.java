@@ -171,7 +171,7 @@ public abstract class FcSampleSseServlet extends HttpServlet {
 
 		if (!FCUtils.isAuthorizedSiteKeyHeader(request)) {
 			// Refused, not answered with an empty stream - see the class javadoc. Logged at info because
-			// on a management port this is either a misconfigured console or someone probing.
+			// this is either a misconfigured console or someone probing.
 			logger.info("Rejecting " + request.getRequestURI() + ": missing or wrong site key from " + FCUtils.getClientIP(request));
 			response.setHeader("WWW-Authenticate", "Bearer realm=\"frontcache\"");
 			response.sendError(401, "Missing or invalid site key - send 'Authorization: Bearer <site-key>'");

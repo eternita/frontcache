@@ -127,9 +127,9 @@ docker run -d --name fc-server --restart unless-stopped \
 ```
 
 The image carries a `HEALTHCHECK` that GETs `/frontcache-io?action=get-cache-state` locally.
-That endpoint answers `200` with an "access denied" JSON body when the request does not
-arrive on `front-cache.management.port`, which makes it a liveness probe that needs no site
-key: a `200` proves Jetty, the webapp and the engine are up.
+That endpoint answers `200` with an "access denied" JSON body when the request carries no
+`front-cache.site-key`, which makes it a liveness probe that needs no site key: a `200` proves
+Jetty, the webapp and the engine are up.
 
 Remember `front-cache.http-port` / `front-cache.https-port` in the mounted config: they are
 what redirect rewriting uses, so they must be the ports **clients** see (80/443 behind a front

@@ -38,9 +38,8 @@ public class FrontcacheJettyServer {
 
 		// Honor X-Forwarded-* from the nginx front door so request.getScheme()/
 		// getServerPort() reflect the client-facing values (https/443), not the
-		// plain-HTTP backend hop. Without this the management-port security check
-		// (front-cache.management.port) and absolute-URL/redirect generation see
-		// port 80 and break behind a TLS-terminating proxy.
+		// plain-HTTP backend hop. Without this absolute-URL/redirect generation sees
+		// port 80 and breaks behind a TLS-terminating proxy.
 		Server server = new Server();
 		HttpConfiguration httpConfig = new HttpConfiguration();
 		httpConfig.addCustomizer(new ForwardedRequestCustomizer());

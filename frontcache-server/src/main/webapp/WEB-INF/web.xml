@@ -34,7 +34,7 @@
         <description></description>
         <display-name>FcDashboardStreamServlet</display-name>
         <servlet-name>FcDashboardStreamServlet</servlet-name>
-        <servlet-class>org.frontcache.resilience.FcDashboardStreamSecurityServlet</servlet-class>
+        <servlet-class>org.frontcache.resilience.stream.FcDashboardStreamServlet</servlet-class>
         <!-- Required: the stream runs on Servlet 3.1 async so a dashboard viewer does not hold a
              container thread. Without this the container refuses startAsync() outright. -->
         <async-supported>true</async-supported>
@@ -46,8 +46,8 @@
         <url-pattern>/hystrix.stream</url-pattern>
     </servlet-mapping>
 
-    <!-- Prometheus scrape. Serves nothing unless front-cache.metrics.export enables it, and answers
-         only on front-cache.management.port when that is set. -->
+    <!-- Prometheus scrape. Serves nothing unless front-cache.metrics.export enables it, and requires
+         this node's front-cache.site-key when one is configured. -->
     <servlet>
         <servlet-name>FcMetricsServlet</servlet-name>
         <servlet-class>org.frontcache.metrics.FcMetricsServlet</servlet-class>

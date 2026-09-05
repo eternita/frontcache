@@ -28,8 +28,8 @@ import ch.qos.logback.core.read.ListAppender;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * {@link SiteKey} - the management API's actual access control, now that {@link ManagementPort} says
- * plainly that it is not one.
+ * {@link SiteKey} - the management API's only access control, now that the
+ * {@code front-cache.management.port} check, which never was one, is gone.
  *
  * The rules worth pinning are the ones that decide whether a deployment keeps working: an unconfigured
  * node stays open (refusing on upgrade would take away an operator's dashboards to protect a node that

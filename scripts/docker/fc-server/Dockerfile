@@ -47,8 +47,8 @@ ENV FRONTCACHE_HTTP_PORT=9080
 EXPOSE 9080
 
 # Liveness, not authorization: the IO servlet answers 200 with an "access denied" JSON body
-# when the request does not arrive on front-cache.management.port, so a plain local GET
-# proves Jetty + the webapp + the engine are up without needing a site key.
+# when the request carries no front-cache.site-key, so a plain local GET proves Jetty + the
+# webapp + the engine are up without needing a site key.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
   CMD curl -fsS -o /dev/null "http://127.0.0.1:${FRONTCACHE_HTTP_PORT}/frontcache-io?action=get-cache-state"
 
