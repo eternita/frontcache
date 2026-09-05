@@ -352,6 +352,66 @@ public abstract class CommonTests extends TestsBase {
 	}
 
 
+	/**
+	 * The mirror of {@link #clientTypeSpecificIncludes()}, for an include with maxage="guest:60"
+	 *
+	 * call with User-Agent GoogleBot -> include is NOT in cache
+	 * call with User-Agent GoogleBot to include -> it's dynamic
+	 *
+	 * call with User-Agent Chrome -> include is in cache
+	 * call with User-Agent Chrome to include -> it's from cache
+	 *
+	 * Same split as the top-level page, one level down: the include path makes its own cacheability
+	 * decision (IncludeProcessorBase, off the same expireTimeMap), so a guest: fragment inside a
+	 * dynamic page is worth asserting separately from a guest: page. The crawler half comes first
+	 * here because it is the half the defect got backwards - it cached for both client types, so a
+	 * fragment meant only for signed-in visitors was served to Googlebot from cache.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void clientTypeSpecificIncludesGuestPrefix() throws Exception {
+
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
+
+		// call with User-Agent GoogleBot -> include is NOT in cache
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/c1.jsp");
+		assertEquals("cd", page.getPage().asNormalizedText());
+		org.frontcache.core.WebResponse webResponse = frontcacheClient.getFromCache( getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/d1.jsp");
+		// d1.jsp has "guest:60"
+		// request was from a bot -> so, page is not cached
+		assertEquals(null, webResponse);
+
+		// call with User-Agent GoogleBot to include -> it's dynamic
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/d1.jsp");
+		assertEquals("d", page.getPage().asNormalizedText());
+		org.htmlunit.WebResponse pageWebResponse = page.getWebResponse();
+		String maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("guest:60", maxage);
+		assertEquals(false, TestUtils.isRequestFromCache(pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
+
+
+		webClient.addRequestHeader("User-Agent", "Chrome");
+
+		// call with User-Agent Chrome -> include is in cache
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/c1.jsp");
+		assertEquals("cd", page.getPage().asNormalizedText());
+		webResponse = frontcacheClient.getFromCache( getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/d1.jsp");
+		assertEquals("d", new String(webResponse.getContent()));
+		maxage = webResponse.getHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("guest:60", maxage);
+
+		// call with User-Agent Chrome to include -> it's from cache
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/d1.jsp");
+		assertEquals("d", page.getPage().asNormalizedText());
+		pageWebResponse = page.getWebResponse();
+		maxage = pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		assertEquals("guest:60", maxage);
+		assertEquals(true, TestUtils.isRequestFromCache(pageWebResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
+	}
+
+
 	@Test
 	public void includeSync() throws Exception {
 
