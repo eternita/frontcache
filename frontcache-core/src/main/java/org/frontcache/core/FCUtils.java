@@ -434,20 +434,192 @@ public class FCUtils {
 		return webResponse;
 	}
 
+	/**
+	 * Rewrites a Location the origin sent so it names this site rather than the origin.
+	 *
+	 * The origin's Location is treated as a path and query with a scheme hint: its host is always
+	 * discarded (the origin knows itself by an internal name - the app sees {@code Host:
+	 * origin.example.com} because buildRequestHeaders drops the client's Host) and its port always
+	 * comes from our own config.
+	 *
+	 * Three things changed here in docs/guard-redirect-url-host-fix.md, all of them silent before:
+	 *
+	 * <ul>
+	 * <li>the substituted host is the site's public name, not the Host this request arrived under -
+	 *     same distinction as GuardAction.publicHost, same reason;</li>
+	 * <li>the port is omitted when it is the default for the scheme. It used to be appended
+	 *     unconditionally, so every app redirect on a normal deployment went out as
+	 *     {@code https://www.example.com:443/...};</li>
+	 * <li>an absolute origin-host URL sitting INSIDE the query string (a {@code return=} /
+	 *     {@code next=} parameter) is rebased too. Rewriting only the outer host is what let the
+	 *     origin's name reach browsers through the one part of the Location nobody was looking at.</li>
+	 * </ul>
+	 */
 	public static String transformRedirectURL(String originLocation, RequestContext context)
 	{
-		String fcLocation = null;
 		String protocol = getRequestProtocol(originLocation);
 
 		if ("".equals(protocol)) // originLocation is relative path, so protocol is undefined
-			protocol = context.getFrontCacheProtocol(); // use current protocol from context
+			protocol = publicProtocol(context);
+		else if (null != FCConfig.getProperty("front-cache.public-scheme"))
+			// The operator has stated what scheme this site is served on. The origin's own scheme
+			// describes the internal leg (typically plaintext, behind our own TLS termination), so an
+			// explicit declaration outranks it. Without one, the origin's hint stands - as before.
+			protocol = publicProtocol(context);
 
-		if ("https".equalsIgnoreCase(protocol))
-			fcLocation = "https://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpsPort() + buildRequestURI(originLocation);
-		else // http
-			fcLocation = "http://" + context.getFrontCacheHost() + ":" + context.getFrontCacheHttpPort() + buildRequestURI(originLocation);
+		boolean secure = "https".equalsIgnoreCase(protocol);
 
-		return fcLocation;
+		String host = publicHost(context);
+		String port = secure ? context.getFrontCacheHttpsPort() : context.getFrontCacheHttpPort();
+		String portSuffix = defaultPort(secure, port) ? "" : ":" + port;
+
+		String uri = rebaseOriginURLsInQuery(buildRequestURI(originLocation), context, secure, host, portSuffix);
+
+		return (secure ? "https" : "http") + "://" + host + portSuffix + uri;
+	}
+
+	/**
+	 * The hostname to put in a URL we hand to a client: the site's public name
+	 * (front-cache.default-domain) when the node has one, else the Host this request arrived under.
+	 *
+	 * @see org.frontcache.core.RequestContext#getPublicHost()
+	 */
+	private static String publicHost(RequestContext context)
+	{
+		String publicHost = context.getPublicHost();
+		if (null != publicHost && 0 < publicHost.length())
+			return publicHost;
+
+		String arrivingHost = context.getFrontCacheHost();
+		return (null != arrivingHost) ? arrivingHost : "";
+	}
+
+	/**
+	 * The scheme a client used, falling back to the scheme of the connection this process accepted.
+	 *
+	 * @see org.frontcache.core.RequestContext#getPublicProtocol()
+	 */
+	private static String publicProtocol(RequestContext context)
+	{
+		String publicProtocol = context.getPublicProtocol();
+		if (null != publicProtocol && 0 < publicProtocol.length())
+			return publicProtocol;
+
+		return context.getFrontCacheProtocol();
+	}
+
+	private static boolean defaultPort(boolean secure, String port)
+	{
+		if (null == port || 0 == port.trim().length())
+			return true;
+
+		return secure ? "443".equals(port.trim()) : "80".equals(port.trim());
+	}
+
+	/**
+	 * Rebases absolute URLs pointing at the ORIGIN that appear as query-parameter values, onto this
+	 * site. Deliberately narrow: only the configured origin host is touched, so a parameter
+	 * legitimately carrying a third-party URL (an OAuth callback, an image proxy source) is left
+	 * exactly as it was.
+	 *
+	 * @param uri  path and query, already normalised by buildRequestURI
+	 * @return the same string when nothing matched, which is the overwhelmingly common case
+	 */
+	private static String rebaseOriginURLsInQuery(String uri, RequestContext context, boolean secure,
+			String host, String portSuffix)
+	{
+		if (null == uri)
+			return uri;
+
+		int queryIdx = uri.indexOf('?');
+		if (-1 == queryIdx)
+			return uri;
+
+		URL originURL = context.getOriginURL();
+		if (null == originURL)
+			return uri;
+
+		String originHost = originURL.getHost();
+		if (null == originHost || 0 == originHost.length() || originHost.equalsIgnoreCase(host))
+			return uri;
+
+		String publicBase = (secure ? "https" : "http") + "://" + host + portSuffix;
+
+		StringBuilder sb = new StringBuilder(uri.length());
+		sb.append(uri, 0, queryIdx + 1);
+
+		boolean changed = false;
+		String[] pairs = uri.substring(queryIdx + 1).split("&", -1);
+
+		for (int i = 0; i < pairs.length; i++)
+		{
+			String pair = pairs[i];
+			int eq = pair.indexOf('=');
+
+			if (-1 < eq)
+			{
+				String name = pair.substring(0, eq);
+				String rawValue = pair.substring(eq + 1);
+
+				try {
+					String decoded = URLDecoder.decode(rawValue, "UTF-8");
+					String rebased = rebaseOrigin(decoded, originHost, publicBase);
+
+					if (null != rebased)
+					{
+						pair = name + "=" + URLEncoder.encode(rebased, "UTF-8");
+						changed = true;
+					}
+				} catch (Exception e) {
+					// malformed %-escape - leave the parameter exactly as it arrived
+				}
+			}
+
+			if (0 < i)
+				sb.append('&');
+			sb.append(pair);
+		}
+
+		return changed ? sb.toString() : uri;
+	}
+
+	/**
+	 * @return {@code value} with its origin-host prefix swapped for {@code publicBase}, or null when
+	 *         it is not an absolute URL on the origin host
+	 */
+	private static String rebaseOrigin(String value, String originHost, String publicBase)
+	{
+		if (null == value)
+			return null;
+
+		String lower = value.toLowerCase();
+		int schemeEnd;
+		if (lower.startsWith("http://"))
+			schemeEnd = 7;
+		else if (lower.startsWith("https://"))
+			schemeEnd = 8;
+		else
+			return null;
+
+		int authorityEnd = value.length();
+		for (int i = schemeEnd; i < value.length(); i++)
+		{
+			char c = value.charAt(i);
+			if ('/' == c || '?' == c || '#' == c)
+			{
+				authorityEnd = i;
+				break;
+			}
+		}
+
+		String authority = value.substring(schemeEnd, authorityEnd);
+		int portIdx = authority.lastIndexOf(':');
+		String hostOnly = (-1 < portIdx && -1 == authority.indexOf(']')) ? authority.substring(0, portIdx) : authority;
+
+		if (!originHost.equalsIgnoreCase(hostOnly))
+			return null;
+
+		return publicBase + value.substring(authorityEnd);
 	}
 
 
@@ -899,6 +1071,45 @@ public class FCUtils {
 		}
 
 		return headers;
+	}
+
+	/**
+	 * Adds X-Forwarded-Host / X-Forwarded-Proto naming the public site to an origin call, when
+	 * front-cache.origin.forward-public-host is on.
+	 *
+	 * The origin cannot otherwise know what the visitor typed: {@link #isIncludedHeader} drops the
+	 * client's Host (it has to - the connection is to the origin, not to the site), so the app sees
+	 * {@code Host: origin.example.com} and every absolute URL it builds names the origin. Apps work
+	 * around that one entry point at a time; these two headers let the app's own framework
+	 * (Spring's ForwardedHeaderFilter, Rails' trusted proxies, …) get it right everywhere at once.
+	 *
+	 * Off by default, because switching it on changes every absolute URL an app so configured emits.
+	 * Adds nothing when the node names no public host - a made-up value here would be worse than the
+	 * origin host the app already has.
+	 */
+	public static void addPublicForwardedHeaders(Map<String, List<String>> headers, RequestContext context)
+	{
+		if (null == headers || null == context)
+			return;
+
+		// Read from config rather than from FrontCacheEngine.getFrontCache(): this runs on the origin
+		// path of every request, and reaching for the singleton would boot a whole engine anywhere
+		// the origin path is exercised without one. The engine parses the same key at startup, to log
+		// the decision once.
+		if (!"true".equalsIgnoreCase(FCConfig.getProperty(FrontCacheEngine.FORWARD_PUBLIC_HOST_KEY, "false")))
+			return;
+
+		String publicHost = context.getPublicHost();
+		if (null == publicHost || 0 == publicHost.length())
+			return;
+
+		headers.put(FCHeaders.X_FORWARDED_HOST, Arrays.asList(new String[]{ publicHost }));
+
+		String publicProtocol = publicProtocol(context);
+		if (null != publicProtocol && 0 < publicProtocol.length())
+			headers.put(FCHeaders.X_FORWARDED_PROTO, Arrays.asList(new String[]{ publicProtocol }));
+
+		return;
 	}
 
 	private static boolean isIncludedHeader(String headerName) {

@@ -114,6 +114,31 @@ public class ClientIpResolver {
 	}
 
 	/**
+	 * Whether the socket peer of this request is a configured trusted proxy - i.e. whether the
+	 * forwarding headers it carries were written by something we control.
+	 *
+	 * Exposed for {@code X-Forwarded-Proto}, which is subject to exactly the same rule as
+	 * {@code X-Forwarded-For} and for the same reason: the scheme ends up in a redirect a browser
+	 * follows, so a client must not be able to choose it by sending a header. Kept here rather than
+	 * reimplemented at the call site so there is one definition of "trusted" and one CIDR list.
+	 *
+	 * @param request current request; may be null or container-recycled
+	 * @return true only when the peer address parses and falls inside a configured CIDR
+	 */
+	public boolean isTrustedPeer(HttpServletRequest request)
+	{
+		if (null == request || trustedProxies.isEmpty())
+			return false;
+
+		try {
+			InetAddress peer = parseAddress(request.getRemoteAddr());
+			return (null != peer) && isTrusted(peer);
+		} catch (Exception e) {
+			return false; // recycled request, or an address we cannot parse - not trusted
+		}
+	}
+
+	/**
 	 * @param request current request; may be null or container-recycled
 	 * @return canonical client address, or null when it cannot be established
 	 */

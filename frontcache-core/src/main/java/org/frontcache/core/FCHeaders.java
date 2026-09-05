@@ -76,6 +76,13 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_REQUEST_ID = "x-frontcache-request-id";
     public static final String X_FRONTCACHE_CLIENT_IP = "x-frontcache-client-ip";
 
+    // Standard forwarding headers. X_FORWARDED_PROTO is READ (from a trusted peer only - see
+    // ClientIpResolver.isTrustedPeer) to recover the scheme the client actually used, which a
+    // TLS-terminating proxy in front of us has already stripped. X_FORWARDED_HOST is WRITTEN, to
+    // the origin, so the app can build public absolute URLs instead of origin-host ones.
+    public static final String X_FORWARDED_PROTO = "X-Forwarded-Proto";
+    public static final String X_FORWARDED_HOST = "X-Forwarded-Host";
+
     public static final String COMPONENT_TAGS_SEPARATOR = "\\|"; // to split invalidation tags e.g. apple|banana|orange
 
 }

@@ -59,6 +59,7 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.protocol.HttpContext;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.core.ClientIpResolver;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.guard.GuardAction;
 import org.frontcache.guard.GuardOutcome;
@@ -89,6 +90,10 @@ public class FrontCacheEngine {
 	private String originHost;      // front-cache.origin-host
 	private String originHttpPort;  // front-cache.origin-http-port
 	private String originHttpsPort; // front-cache.origin-https-port
+
+	// The scheme this site is served on publicly, when the node cannot work it out from the request.
+	// null = fall back to X-Forwarded-Proto (trusted peers only), then to the incoming connection.
+	private String publicScheme;    // front-cache.public-scheme
 
 	private String frontcacheHttpPort = null;
 
@@ -175,6 +180,19 @@ public class FrontCacheEngine {
 	private static final String BYPASS_PASSTHROUGH_ENCODING_KEY = "front-cache.bypass.passthrough-encoding";
 	private boolean bypassPassthroughEncoding = false;
 
+	/** Static override for the public scheme, for a deployment with no trusted-proxy list. */
+	private static final String PUBLIC_SCHEME_KEY = "front-cache.public-scheme";
+
+	/**
+	 * Whether origin calls carry X-Forwarded-Host / X-Forwarded-Proto naming the public site.
+	 *
+	 * Off by default and deliberately so: an origin app with Spring's ForwardedHeaderFilter (or any
+	 * equivalent) enabled changes every absolute URL it emits the moment these appear, which is the
+	 * point of the option but is not a thing to do silently underneath a running deployment.
+	 */
+	public static final String FORWARD_PUBLIC_HOST_KEY = "front-cache.origin.forward-public-host";
+	private boolean forwardPublicHostToOrigin = false;
+
 	/** @return true when a bypassed response should keep the origin's Content-Encoding */
 	public boolean isBypassPassthroughEncoding() {
 		return bypassPassthroughEncoding;
@@ -248,6 +266,39 @@ public class FrontCacheEngine {
 	public String getDomain()
 	{
 		return domain;
+	}
+
+	/**
+	 * The site's public hostname, or null when the node has none configured.
+	 *
+	 * Same value as {@link #getDomain()} with the two non-answers mapped onto null. The property
+	 * defaults to {@link FCConfig#DEFAULT_DOMAIN}, whose value is the literal string
+	 * {@code "default-domain"}, and both test FRONTCACHE_HOMEs leave it unset - so this is a live
+	 * path, not a defensive one. Emitting {@code https://default-domain/...} into a browser's
+	 * address bar would be a worse bug than the one this exists to fix, so a node that cannot name
+	 * itself says so and every caller falls back to the Host that arrived.
+	 *
+	 * @return the public hostname, or null
+	 */
+	/**
+	 * @return true when origin calls should carry X-Forwarded-Host / X-Forwarded-Proto naming the
+	 *         public site (front-cache.origin.forward-public-host)
+	 */
+	public boolean isForwardPublicHostToOrigin()
+	{
+		return forwardPublicHostToOrigin;
+	}
+
+	public String getPublicDomain()
+	{
+		if (null == domain)
+			return null;
+
+		String trimmed = domain.trim();
+		if (0 == trimmed.length() || FCConfig.DEFAULT_DOMAIN.equals(trimmed))
+			return null;
+
+		return trimmed;
 	}
 
 	/**
@@ -449,6 +500,49 @@ public class FrontCacheEngine {
 		logger.info("Serving domain " + domain + " from origin " + originHost
 				+ " (http " + originHttpPort + " / https " + originHttpsPort + ")");
 
+		loadPublicIdentityConfig();
+
+		return;
+	}
+
+	/**
+	 * Reads front-cache.public-scheme and says, once, what this node will put in a URL it hands to a
+	 * client. Both halves of that answer have a silent failure mode - a node emitting its own name
+	 * or "http" where the site is "https" produces redirects that look fine in the log and are wrong
+	 * in the browser - so the resolved answer is stated at startup rather than left to be inferred.
+	 */
+	private void loadPublicIdentityConfig()
+	{
+		String configured = FCConfig.getProperty(PUBLIC_SCHEME_KEY, "");
+		if (null != configured)
+			configured = configured.trim().toLowerCase();
+
+		if (null == configured || 0 == configured.length())
+			publicScheme = null;
+		else if ("http".equals(configured) || "https".equals(configured))
+			publicScheme = configured;
+		else
+		{
+			publicScheme = null;
+			logger.error(PUBLIC_SCHEME_KEY + "=" + configured + " is not 'http' or 'https' - ignoring it."
+					+ " The scheme of an emitted URL will come from X-Forwarded-Proto (trusted peers only)"
+					+ " or from the incoming connection.");
+		}
+
+		String publicDomain = getPublicDomain();
+		if (null == publicDomain)
+		{
+			logger.warn("front-cache.default-domain is not set to this site's public hostname"
+					+ " (it is " + ((null == domain) ? "null" : "'" + domain + "'") + ")."
+					+ " Guard-rule ${url} / ${host} and origin-redirect rewriting will echo whatever Host"
+					+ " each request arrives under, which is not always the public one"
+					+ " - see docs/guard-redirect-url-host-fix.md");
+		} else {
+			String scheme = (null != publicScheme) ? publicScheme : "<from X-Forwarded-Proto or the incoming connection>";
+			logger.info("Public identity for emitted URLs (guard-rule ${url} / ${host}, origin-redirect"
+					+ " rewriting): " + scheme + "://" + publicDomain);
+		}
+
 		return;
 	}
 
@@ -468,6 +562,18 @@ public class FrontCacheEngine {
         logToHeadersConfig = "true".equals(FCConfig.getProperty("front-cache.log-to-headers", "false")) ? true : false;
 
         maxRequestURILength = getIntProperty("front-cache.max-request-uri-length", DEFAULT_MAX_REQUEST_URI_LENGTH);
+
+        forwardPublicHostToOrigin = "true".equalsIgnoreCase(
+                FCConfig.getProperty(FORWARD_PUBLIC_HOST_KEY, "false"));
+        if (forwardPublicHostToOrigin)
+        {
+            if (null == getPublicDomain())
+                logger.error(FORWARD_PUBLIC_HOST_KEY + "=true but front-cache.default-domain names no"
+                        + " public host - origin calls will carry no X-Forwarded-Host");
+            else
+                logger.info("Origin calls will carry X-Forwarded-Host: " + getPublicDomain()
+                        + " (" + FORWARD_PUBLIC_HOST_KEY + "=true)");
+        }
 
         bypassPassthroughEncoding = "true".equalsIgnoreCase(
                 FCConfig.getProperty(BYPASS_PASSTHROUGH_ENCODING_KEY, "false"));
@@ -622,6 +728,50 @@ public class FrontCacheEngine {
 
 	private URL getOriginUrl(RequestContext context) {
 		return context.getRequest().isSecure() ? originUrlHttps : originUrlHttp;
+	}
+
+	/**
+	 * The scheme the client used, as opposed to the scheme of the connection this process accepted.
+	 * They differ wherever TLS is terminated in front of us - which on a typical edge is every
+	 * request, since nginx proxies to a plaintext port.
+	 *
+	 * Precedence: the static override, then X-Forwarded-Proto, then the connection.
+	 *
+	 * X-Forwarded-Proto is honoured ONLY from a trusted proxy, the same rule ClientIpResolver applies
+	 * to X-Forwarded-For and for a sharper reason: this value goes into a redirect a browser will
+	 * follow, so a client that could set it could choose the scheme of a URL we vouch for. With no
+	 * trusted-proxy list configured the header is ignored outright - front-cache.public-scheme is the
+	 * way to state the answer in that deployment.
+	 *
+	 * @param fallback scheme of the incoming connection, already normalized to http/https
+	 */
+	private String resolvePublicProtocol(HttpServletRequest servletRequest, String fallback)
+	{
+		if (null != publicScheme)
+			return publicScheme;
+
+		try {
+			if (ClientIpResolver.getInstance().isTrustedPeer(servletRequest))
+			{
+				String forwarded = servletRequest.getHeader(FCHeaders.X_FORWARDED_PROTO);
+				if (null != forwarded)
+				{
+					// "X-Forwarded-Proto: https, http" - the leftmost entry is what the client used
+					int comma = forwarded.indexOf(',');
+					if (-1 < comma)
+						forwarded = forwarded.substring(0, comma);
+
+					forwarded = forwarded.trim();
+					if ("https".equalsIgnoreCase(forwarded) || "http".equalsIgnoreCase(forwarded))
+						return forwarded.toLowerCase();
+				}
+			}
+		} catch (Exception e) {
+			// recycled request, or a resolver that cannot be built - the connection's own scheme is
+			// always available and is never worse than what we have today
+		}
+
+		return fallback;
 	}
 
 	private String makeURL(boolean isSecure, String host, String port)
@@ -788,6 +938,12 @@ public class FrontCacheEngine {
 
 		String protocol = "https".equalsIgnoreCase(servletRequest.getScheme()) ? "https" : "http";
 		context.setFrontCacheProtocol(protocol);
+
+		// The public identity, for URLs we hand to a client. Kept beside the two above rather than
+		// replacing them: frontCacheHost/frontCacheProtocol describe the connection this process
+		// actually got, which is what predicates match and what the cache key is built from.
+		context.setPublicHost(getPublicDomain());
+		context.setPublicProtocol(resolvePublicProtocol(servletRequest, protocol));
 
         context.setOriginURL(getOriginUrl(context));
 

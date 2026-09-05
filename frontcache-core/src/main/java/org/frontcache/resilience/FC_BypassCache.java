@@ -144,6 +144,7 @@ public class FC_BypassCache extends FcCommand<Object> {
 
 			Map<String, List<String>> headers = FCUtils.buildRequestHeaders(request, !passthroughEncoding);
 			headers.put(FCHeaders.X_FRONTCACHE_CLIENT_IP, Arrays.asList(new String[]{context.getClientIP()}));
+			FCUtils.addPublicForwardedHeaders(headers, context);
 
 			String verb = request.getMethod();
 			InputStream requestEntity = getRequestBody(request);

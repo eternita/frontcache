@@ -59,6 +59,12 @@ public class GuardRuleEngineTest {
 		// the one value the fixture rules depend on explicitly.
 		FCConfig.setProperty("front-cache.guard-rules.allowed-redirect-hosts", "www.example-site.com");
 
+		// This node's own site. Deliberately NOT one of the allowed-redirect-hosts above: as of
+		// docs/guard-redirect-url-host-fix.md it is allowed as a redirect target on its own, which
+		// is what the own-site fixture rule exists to prove. It is also what the runtime sanitizer
+		// rewrites a disallowed embedded host onto.
+		FCConfig.setProperty("front-cache.default-domain", "own.example.com");
+
 		// The rate-limit registry is process-scoped (it has to survive a reload), so start from a
 		// known state rather than from whatever another test class left behind.
 		GuardRateLimiterRegistry.reset();
@@ -209,8 +215,163 @@ public class GuardRuleEngineTest {
 			assertFalse("a negated rate predicate must not load", "negated-rate".equals(name));
 		}
 
-		// 2 built-ins + 3 allow + ip-access + anon-analytics + noisy-bots(dry-run) + api-flood
-		assertEquals(9, engine.getRules().size());
+		// 2 built-ins + 3 allow + ip-access + anon-analytics + noisy-bots(dry-run) + own-site + api-flood
+		assertEquals(10, engine.getRules().size());
+	}
+
+	/**
+	 * front-cache.default-domain is an allowed redirect target without being repeated in
+	 * front-cache.guard-rules.allowed-redirect-hosts.
+	 *
+	 * This settles the follow-up left open by the multi-domain retirement (the guard javadoc claimed
+	 * it was allowed; the code never did it). It HAS to be allowed now: ${url} and ${host} emit that
+	 * hostname, so a rule redirecting to your own site would be refused at load time against an
+	 * allowlist that does not contain the one name the node calls itself.
+	 */
+	@Test
+	public void aRedirectToThisNodesOwnSiteIsAllowedWithoutBeingListed() {
+		assertFalse("own.example.com must not be in allowed-redirect-hosts, or this proves nothing",
+				FCConfig.getProperty("front-cache.guard-rules.allowed-redirect-hosts", "").contains("own.example.com"));
+
+		GuardOutcome outcome = engine.evaluate(GuardRuleEngine.probeContext("https://www.example-site.com/own-site.htm"));
+
+		assertTrue(outcome.isTerminal());
+		assertEquals("own-site", outcome.getRule().getName());
+		assertEquals("https://own.example.com/welcome.htm", outcome.getResolvedTarget());
+	}
+
+	/**
+	 * The regression that would quietly disable every host-based rule.
+	 *
+	 * Placeholders now emit the public host, but predicates must keep matching what actually
+	 * arrived - they ask the opposite question, and 'reject requests that arrive under a bare IP' is
+	 * meaningless if the host is normalized before it is matched. Here the node has a perfectly good
+	 * public name and the request still arrived at an IP: host:ip must fire.
+	 */
+	@Test
+	public void hostPredicatesStillMatchTheArrivingHostNotThePublicOne() {
+		RequestContext context = GuardRuleEngine.probeContext("http://160.202.254.65/a.htm");
+		context.setPublicHost("own.example.com");
+
+		GuardOutcome outcome = engine.evaluate(context);
+
+		assertTrue("host:ip must read the Host that arrived", outcome.isTerminal());
+		assertEquals("ip-access", outcome.getRule().getName());
+	}
+
+	// ---- runtime host check on the expanded target -------------------------------------------
+
+	/**
+	 * The load-time check validates the target as WRITTEN in guard-rules.conf. A host that only
+	 * appears once ${...} is expanded - which is every request, since ${url} carries one - is
+	 * invisible to it. These cover what catches those.
+	 */
+	@Test
+	public void anEmbeddedDisallowedHostIsRewrittenOntoTheOwnSite() {
+		GuardRule rule = ruleByName("anon-analytics");
+
+		String sanitized = engine.sanitizeTarget(rule,
+				"https://www.example-site.com/login.htm?return=https%3A%2F%2Forigin.example-site.com%2Fen%2Fx.htm");
+
+		assertFalse("the origin hostname must not survive: " + sanitized, sanitized.contains("origin.example-site.com"));
+		assertTrue(sanitized, sanitized.contains("own.example.com"));
+	}
+
+	@Test
+	public void anEmbeddedAllowedHostIsLeftExactlyAsItWas() {
+		GuardRule rule = ruleByName("anon-analytics");
+		String target = "https://www.example-site.com/login.htm?return=https%3A%2F%2Fwww.example-site.com%2Fen%2Fx.htm&a=1";
+
+		assertEquals(target, engine.sanitizeTarget(rule, target));
+	}
+
+	/**
+	 * A parameter that is not an absolute URL must come back byte for byte - the sanitizer
+	 * re-serializes the query, and a value it does not understand is a value it must not touch.
+	 */
+	@Test
+	public void ordinaryParametersAreNotRewritten() {
+		GuardRule rule = ruleByName("anon-analytics");
+		String target = "https://www.example-site.com/login.htm?q=coins&empty=&flag&path=%2Fen%2Fx.htm";
+
+		assertEquals(target, engine.sanitizeTarget(rule, target));
+	}
+
+	/**
+	 * "https://www.example-site.com@evil.example.com/" is a URL whose host is evil.example.com. Reading
+	 * the part before the '@' as the host is the classic way to be fooled by one.
+	 */
+	@Test
+	public void userinfoDoesNotDisguiseTheRealHost() {
+		assertEquals("evil.example.com", GuardRuleEngine.hostOf("https://www.example-site.com@evil.example.com/x"));
+		assertEquals("evil.example.com", GuardRuleEngine.hostOf("https://evil.example.com:8443/x"));
+		assertEquals("www.example-site.com", GuardRuleEngine.hostOf("https://www.example-site.com/x?u=https://evil.example.com/"));
+
+		// not absolute URLs, so not hosts
+		assertEquals(null, GuardRuleEngine.hostOf("/login.htm"));
+		assertEquals(null, GuardRuleEngine.hostOf("coins"));
+		assertEquals(null, GuardRuleEngine.hostOf("mailto:someone@example.com"));
+	}
+
+	/**
+	 * A disallowed host on the TARGET ITSELF is an open redirect, so the rule does not act at all -
+	 * unlike a bad embedded parameter, which is only rewritten. The request carries on to
+	 * cache/origin, which is Frontcache-as-usual rather than an outage.
+	 */
+	@Test
+	public void aDisallowedTargetHostSkipsTheRule() {
+		GuardRule rule = ruleByName("anon-analytics");
+
+		assertEquals(null, engine.sanitizeTarget(rule, "https://evil.example.com/login.htm"));
+	}
+
+	@Test
+	public void aRelativeTargetIsNeverTouched() {
+		GuardRule rule = ruleByName("anon-analytics");
+
+		assertEquals("/login.htm?return=%2Fen%2Fx.htm",
+				engine.sanitizeTarget(rule, "/login.htm?return=%2Fen%2Fx.htm"));
+	}
+
+	/**
+	 * "Unchanged" has to mean byte-identical: the sanitizer re-serializes the query to do its work,
+	 * and the caller compares the result with the input to decide whether to rebuild the target. An
+	 * empty segment quietly dropped here would turn every redirect into a rewritten one.
+	 */
+	@Test
+	public void anUnusualButHarmlessQueryComesBackByteForByte() {
+		GuardRule rule = ruleByName("anon-analytics");
+		String[] targets = {
+				"https://www.example-site.com/login.htm?a=1&",
+				"https://www.example-site.com/login.htm?&a=1",
+				"https://www.example-site.com/login.htm?a=1&&b=2",
+				"https://www.example-site.com/login.htm?",
+				"https://www.example-site.com/login.htm",
+		};
+
+		for (String target : targets)
+			assertEquals(target, engine.sanitizeTarget(rule, target));
+	}
+
+	/**
+	 * With no public host to put there instead, a disallowed embedded URL is dropped rather than
+	 * left in place - and the rule still acts. Losing a return= costs the visitor their place;
+	 * skipping the guard would let the abusive request through to origin, which is the thing the
+	 * rule exists to stop.
+	 */
+	@Test
+	public void withNoOwnSiteADisallowedEmbeddedHostIsDropped() {
+		GuardRule rule = ruleByName("anon-analytics");
+		String saved = FCConfig.getProperty("front-cache.default-domain", "");
+		try {
+			FCConfig.setProperty("front-cache.default-domain", "");
+
+			assertEquals("https://www.example-site.com/login.htm?a=1",
+					engine.sanitizeTarget(rule,
+							"https://www.example-site.com/login.htm?return=https%3A%2F%2Forigin.example-site.com%2Fx&a=1"));
+		} finally {
+			FCConfig.setProperty("front-cache.default-domain", saved);
+		}
 	}
 
 	@Test
