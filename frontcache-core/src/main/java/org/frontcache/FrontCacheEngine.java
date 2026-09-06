@@ -1020,12 +1020,24 @@ public class FrontCacheEngine {
 	 * Called from init(), BEFORE the guard rules run - their client-type: predicate reads what this
 	 * writes, and that ordering must not drift.
 	 */
+	/** what RequestContext.getClientTypeRule() reports when the decision came from the page's node */
+	static final String CLIENT_TYPE_PROPAGATED = "propagated";
+
 	private void setClientType(RequestContext context)
 	{
+		String propagated = FCUtils.propagatedClientType(context);
+		if (null != propagated)
+		{
+			context.setClientType(propagated);
+			context.setClientTypeRule(CLIENT_TYPE_PROPAGATED);
+			return;
+		}
+
 		BotRule rule = BotClassifier.getInstance().classify(context);
 		context.setClientType(rule.getClientType());
 		context.setClientTypeRule(rule.getName());
 	}
+
 
     private boolean ignoreCache(String uri)
     {
