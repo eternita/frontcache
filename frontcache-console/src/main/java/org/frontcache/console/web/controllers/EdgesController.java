@@ -45,7 +45,7 @@ public class EdgesController {
 	}
 
 	/**
-	 * POST, not GET, since 2.11: this changes console state, and a GET that does so is reachable
+	 * POST, not GET, as of 2.9.0: this changes console state, and a GET that does so is reachable
 	 * from any page the operator has open - the browser attaches the console's Basic credentials to
 	 * a cross-site request on its own, and they are not cookies, so SameSite does not stop it.
 	 * SameOriginFilter checks the origin of the POST; the method change is what brings it under that

@@ -30,7 +30,7 @@
         <div role="tabpanel" class="tab-pane ${status.first ? 'active' : ''}" id="edge-tab-${status.index}">
           <p/>
           <c:choose>
-            <%-- the file is optional, and an edge older than 2.11 does not know the action at all --%>
+            <%-- the file is optional, and an edge older than 2.9.0 does not know the action at all --%>
             <c:when test="${empty edge.value}">
               <p class="text-muted"><i>no bots.conf on this edge &mdash; every request is classified by
               the two built-in rules, so everything with a User-Agent is a guest</i></p>

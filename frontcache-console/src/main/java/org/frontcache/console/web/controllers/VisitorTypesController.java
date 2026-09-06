@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
  * by {@link BotConfigController} under Configs - the same split guard has between /guard-rules and
  * /guard-configs.
  *
- * This lived at /bot-configs until 2.11, which is a URL somebody may have bookmarked, so that path
+ * This lived at /bot-configs before 2.9.0, which is a URL somebody may have bookmarked, so that path
  * is NOT silently repurposed: it now serves the raw file, and this screen answers under its own name.
  */
 @Controller

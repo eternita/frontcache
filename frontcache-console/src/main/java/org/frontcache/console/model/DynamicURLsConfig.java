@@ -11,7 +11,7 @@ package org.frontcache.console.model;
 /**
  * Raw ./conf/dynamic-urls.conf of one edge (comments and empty lines preserved).
  *
- * Through 2.10 this held the flat set of patterns the node had parsed, which is what the screen
+ * Before 2.9.0 this held the flat set of patterns the node had parsed, which is what the screen
  * rendered. It now holds the file, like {@link GuardConfig} and {@link BotConfig} - a pattern list
  * without the comments beside it does not say WHY a URL is never cached, and a commented-out
  * pattern does not show up at all.
