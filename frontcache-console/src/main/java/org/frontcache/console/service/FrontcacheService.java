@@ -63,6 +63,17 @@ public class FrontcacheService {
 
 	private String apiKey = "default-api-key";
 
+	/**
+	 * The console's single login, from conf/frontcache-console.conf. Both null = authentication is
+	 * off, which is what a config file written before this feature existed produces - see
+	 * {@link #readCredentials}.
+	 */
+	private String user = null;
+	private String password = null;
+
+	/** The password the distribution ships with. Present = warn, loudly, on every startup. */
+	private static final String SHIPPED_DEFAULT_PASSWORD = "admin";
+
 	private static final int THREAD_AMOUNT = 4;
 
 	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_AMOUNT);
@@ -73,6 +84,12 @@ public class FrontcacheService {
 
 	public FrontcacheService() {
 		loadConfigs();
+
+		// Deliberately outside loadConfigs(): that method returns early when there is no config path
+		// and again when the file is not there, and a console in either of those states is
+		// unauthenticated - which is exactly the state that has to be reported. Reporting it from
+		// inside would report it on the one path where credentials could have been read.
+		logAuthState();
 	}
 
 	private void loadConfigs() {
@@ -116,6 +133,114 @@ public class FrontcacheService {
 		apiKey = fcConsoleConfig.getString("apiKey");
 		logger.info(" -- Loading apiKey {} from console config", apiKey);
 
+		readCredentials();
+	}
+
+	/**
+	 * Reads the console's single login - see docs/basic-auth-proposal.md.
+	 *
+	 * <b>Every key here is read through hasPath first.</b> {@code Config.getString} throws on a
+	 * missing key, so reading these the way apiKey is read would make every console whose config
+	 * predates this feature fail to start - which is precisely what a config still saying
+	 * {@code siteKey} does after the 2.9.0 api-key rename.
+	 *
+	 * <b>Absent credentials mean authentication is OFF, and say so at WARN.</b> Not info: the
+	 * shipped conf/fc-logback.xml puts a ThresholdFilter at WARN on stdout, so an info line is
+	 * dropped and the operator of an unprotected console would be told nothing. That silence - not
+	 * the permissive default - is what made the api-key rename a hazard rather than a metrics
+	 * change.
+	 *
+	 * Half-configured is the one case that refuses to start. It cannot arise from an un-migrated
+	 * file, only from a typo, and resolving a typo to "unprotected" is the worst of the options.
+	 */
+	private void readCredentials() {
+
+		Credentials credentials = parseCredentials(fcConsoleConfig);
+
+		if (null != credentials)
+		{
+			user = credentials.user();
+			password = credentials.password();
+			return;
+		}
+
+		if (fcConsoleConfig.hasPath("auth-required") && fcConsoleConfig.getBoolean("auth-required"))
+			throw new IllegalStateException("frontcache-console.conf: auth-required = true, but "
+					+ "'user'/'password' are not set");
+	}
+
+	/** The console's single login, or null when the file configures none. */
+	record Credentials(String user, String password) { }
+
+	/**
+	 * The parsing half of {@link #readCredentials}, split out so it can be tested without a config
+	 * file, an environment variable or a thread pool.
+	 *
+	 * @return the credentials, or null when the file has neither key - which is every config written
+	 *         before this feature existed, and is not an error
+	 * @throws IllegalStateException when only one of the two is set, or either is empty
+	 */
+	static Credentials parseCredentials(Config config) {
+
+		boolean hasUser = config.hasPath("user");
+		boolean hasPassword = config.hasPath("password");
+
+		if (hasUser != hasPassword)
+			throw new IllegalStateException("frontcache-console.conf: '"
+					+ (hasUser ? "user' is set but 'password'" : "password' is set but 'user'")
+					+ " is missing (set both to enable authentication, or neither to disable it)");
+
+		if (!hasUser)
+			return null;
+
+		String configuredUser = config.getString("user").trim();
+		String configuredPassword = config.getString("password");
+
+		// An empty string is a half-finished edit, not a credential. Accepting it would let anyone
+		// sending an empty password in.
+		if (configuredUser.isEmpty() || configuredPassword.isEmpty())
+			throw new IllegalStateException("frontcache-console.conf: 'user' and 'password' must not "
+					+ "be empty (remove both to disable authentication)");
+
+		return new Credentials(configuredUser, configuredPassword);
+	}
+
+	/**
+	 * Says, once at startup, whether this console is protected.
+	 *
+	 * The protected-and-changed case logs at info, which the shipped fc-logback.xml does not print:
+	 * a healthy console is silent, and any line about authentication means something needs doing.
+	 * A console that warned on every start would train its operator to ignore the warning.
+	 */
+	private void logAuthState() {
+
+		if (isAuthEnabled())
+		{
+			logger.info(" -- Console authentication is ON for user '{}'", user);
+
+			if (SHIPPED_DEFAULT_PASSWORD.equals(password))
+				logger.warn("Console authentication is ON, but the password is still the shipped "
+						+ "default. Change 'password' in frontcache-console.conf.");
+
+			return;
+		}
+
+		logger.warn("Console authentication is OFF - no 'user'/'password' in frontcache-console.conf."
+				+ " Anyone who can reach this port can invalidate the cache of every configured node."
+				+ " Add:   user = admin / password = <choose one>");
+	}
+
+	/** True when a login is configured. False = every request is served without a check. */
+	public boolean isAuthEnabled() {
+		return null != user && null != password;
+	}
+
+	public String getUser() {
+		return user;
+	}
+
+	public String getPassword() {
+		return password;
 	}
 
 	public String getApiKey(){

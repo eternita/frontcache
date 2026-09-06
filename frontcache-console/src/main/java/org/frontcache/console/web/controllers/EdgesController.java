@@ -44,9 +44,19 @@ public class EdgesController {
 		return "edges";
 	}
 
-	@RequestMapping(value = "/add-edge", method = RequestMethod.GET)
+	/**
+	 * POST, not GET, since 2.11: this changes console state, and a GET that does so is reachable
+	 * from any page the operator has open - the browser attaches the console's Basic credentials to
+	 * a cross-site request on its own, and they are not cookies, so SameSite does not stop it.
+	 * SameOriginFilter checks the origin of the POST; the method change is what brings it under that
+	 * check at all. See docs/basic-auth-proposal.md section 8.1.
+	 */
+	@RequestMapping(value = "/add-edge", method = RequestMethod.POST)
 	public String addEdge(HttpServletRequest request) {
 		String edges = request.getParameter("edges");
+		if (null == edges)
+			return "redirect:edges";
+
 		String[] arr = edges.split(" ");
 		for (String edge : arr)
 		{
@@ -57,7 +67,8 @@ public class EdgesController {
 		return "redirect:edges";
 	}
 
-	@RequestMapping(value = "/remove-edge", method = RequestMethod.GET)
+	/** POST for the same reason as {@link #addEdge} - it removes an edge from the console. */
+	@RequestMapping(value = "/remove-edge", method = RequestMethod.POST)
 	public String removeEdge(HttpServletRequest request) {
 		String edge = request.getParameter("edge");
 		frontcacheService.removeEdge(edge);
