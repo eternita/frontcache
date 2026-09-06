@@ -28,11 +28,16 @@ import org.slf4j.LoggerFactory;
  */
 public class FC_Total extends FcCommand<Object> {
 
-	/** Requests from a client - what an operator reads as "how much traffic is this node taking". */
-	public static final String COMMAND_KEY_INPUT_REQUESTS = "Input-Requests";
+	/**
+	 * Requests from a client - what an operator reads as "how much traffic is this node taking".
+	 *
+	 * Kept as an alias of {@link FcCommandKeys#INPUT_REQUEST} rather than replaced by it: this is
+	 * where the key has always been referenced from, and the indirection costs nothing.
+	 */
+	public static final String COMMAND_KEY_INPUT_REQUEST = FcCommandKeys.INPUT_REQUEST;
 
 	/** Requests that are a Frontcache include arriving back through the front door. */
-	public static final String COMMAND_KEY_INCLUDE_REQUESTS = "Include-Requests";
+	public static final String COMMAND_KEY_INCLUDE_REQUEST = FcCommandKeys.INCLUDE_REQUEST;
 
 	private final FrontCacheEngine frontCacheEngine;
 	private final RequestContext context;
@@ -52,7 +57,7 @@ public class FC_Total extends FcCommand<Object> {
 	/**
 	 * Which circuit this request belongs on: a client request, or an include coming back round.
 	 *
-	 * {@code Input-Requests} is the dashboard's headline number, and it was counting both. An include
+	 * {@code Input-Request} is the dashboard's headline number, and it was counting both. An include
 	 * resolved by {@code fetchIncludeFromOrigin} is an HTTP request to the {@code Host} header - back
 	 * through the CDN and in at this node's own front door - so it arrives here as an ordinary request
 	 * and was tallied as client traffic. On fc-edge that read 1200/s against real client traffic of
@@ -74,9 +79,9 @@ public class FC_Total extends FcCommand<Object> {
 		String requestType = context.getRequestType();
 
 		if (FCHeaders.COMPONENT_INCLUDE.equals(requestType) || FCHeaders.COMPONENT_ASYNC_INCLUDE.equals(requestType))
-			return COMMAND_KEY_INCLUDE_REQUESTS;
+			return COMMAND_KEY_INCLUDE_REQUEST;
 
-		return COMMAND_KEY_INPUT_REQUESTS;
+		return COMMAND_KEY_INPUT_REQUEST;
 	}
 
     @Override

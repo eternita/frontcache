@@ -38,16 +38,16 @@ public class FcResilienceConfigTest {
 		props.setProperty("resilience.command.default.circuitBreaker.errorThresholdPercentage", "50");
 		props.setProperty("resilience.command.default.circuitBreaker.requestVolumeThreshold", "50");
 		props.setProperty("resilience.command.default.circuitBreaker.sleepWindowInMilliseconds", "5000");
-		props.setProperty("resilience.command.Input-Requests.execution.isolation.strategy", "SEMAPHORE");
-		props.setProperty("resilience.command.Input-Requests.execution.isolation.thread.timeoutInMilliseconds", "20000");
-		props.setProperty("resilience.command.Input-Requests.execution.isolation.semaphore.maxConcurrentRequests", "50");
-		props.setProperty("resilience.command.Input-Requests.fallback.isolation.semaphore.maxConcurrentRequests", "50");
+		props.setProperty("resilience.command.Input-Request.execution.isolation.strategy", "SEMAPHORE");
+		props.setProperty("resilience.command.Input-Request.execution.isolation.thread.timeoutInMilliseconds", "20000");
+		props.setProperty("resilience.command.Input-Request.execution.isolation.semaphore.maxConcurrentRequests", "50");
+		props.setProperty("resilience.command.Input-Request.fallback.isolation.semaphore.maxConcurrentRequests", "50");
 		props.setProperty("resilience.command.Cache-Hits.execution.isolation.strategy", "SEMAPHORE");
 		props.setProperty("resilience.command.Cache-Hits.execution.isolation.thread.timeoutInMilliseconds", "1500");
-		props.setProperty("resilience.command.Cache-Origin-http.execution.isolation.strategy", "THREAD");
-		props.setProperty("resilience.command.Cache-Origin-http.execution.isolation.thread.timeoutInMilliseconds", "10000");
+		props.setProperty("resilience.command.Cache-Miss.execution.isolation.strategy", "THREAD");
+		props.setProperty("resilience.command.Cache-Miss.execution.isolation.thread.timeoutInMilliseconds", "10000");
 		props.setProperty("resilience.threadpool.default.coreSize", "100");
-		props.setProperty("resilience.threadpool.OriginHitsPool.coreSize", "100");
+		props.setProperty("resilience.threadpool.OriginPool.coreSize", "100");
 		props.setProperty("resilience.config.stream.maxConcurrentConnections", "15");
 		return props;
 	}
@@ -57,7 +57,7 @@ public class FcResilienceConfigTest {
 	{
 		FcResilienceConfig config = new FcResilienceConfig(shippedProperties());
 
-		FcCommandConfig inputRequests = config.forCommand("Input-Requests", null);
+		FcCommandConfig inputRequests = config.forCommand("Input-Request", null);
 		assertEquals("per-command override", 20000, inputRequests.getTimeoutMs());
 		assertEquals("per-command override", Isolation.SEMAPHORE, inputRequests.getIsolation());
 		assertEquals("falls through to resilience.command.default", 50, inputRequests.getRequestVolumeThreshold());
@@ -65,10 +65,10 @@ public class FcResilienceConfigTest {
 		assertEquals("no key anywhere -> built-in default",
 				FcResilienceConfig.DEFAULT_ROLLING_STATS_MS, inputRequests.getRollingStatsMs());
 
-		FcCommandConfig cacheOrigin = config.forCommand("Cache-Origin-http", "OriginHitsPool");
+		FcCommandConfig cacheOrigin = config.forCommand("Cache-Miss", "OriginPool");
 		assertEquals(10000, cacheOrigin.getTimeoutMs());
 		assertEquals(Isolation.THREAD, cacheOrigin.getIsolation());
-		assertEquals("OriginHitsPool", cacheOrigin.getThreadPoolKey());
+		assertEquals("OriginPool", cacheOrigin.getThreadPoolKey());
 	}
 
 	@Test
@@ -99,7 +99,7 @@ public class FcResilienceConfigTest {
 	public void circuitBreakerConfigMatchesHystrixSemantics()
 	{
 		CircuitBreakerConfig breaker = new FcResilienceConfig(shippedProperties())
-				.forCommand("Input-Requests", null).circuitBreakerConfig();
+				.forCommand("Input-Request", null).circuitBreakerConfig();
 
 		assertEquals(50f, breaker.getFailureRateThreshold(), 0.001);
 		assertEquals(50, breaker.getMinimumNumberOfCalls());
@@ -123,7 +123,7 @@ public class FcResilienceConfigTest {
 	public void rejectionsAndBadRequestsAreExcludedFromTheFailureRate()
 	{
 		CircuitBreakerConfig breaker = new FcResilienceConfig(shippedProperties())
-				.forCommand("Input-Requests", null).circuitBreakerConfig();
+				.forCommand("Input-Request", null).circuitBreakerConfig();
 
 		assertTrue("a bad request says nothing about dependency health",
 				breaker.getIgnoreExceptionPredicate().test(new FcBadRequestException("bad")));
@@ -142,7 +142,7 @@ public class FcResilienceConfigTest {
 	{
 		assertEquals("a non-zero wait would turn Hystrix's immediate rejection into a queued wait",
 				Duration.ZERO,
-				new FcResilienceConfig(shippedProperties()).forCommand("Input-Requests", null)
+				new FcResilienceConfig(shippedProperties()).forCommand("Input-Request", null)
 						.bulkheadConfig().getMaxWaitDuration());
 	}
 
@@ -153,7 +153,7 @@ public class FcResilienceConfigTest {
 	@Test
 	public void fallbackSemaphoreIsParsedButNotTurnedIntoABulkhead()
 	{
-		FcCommandConfig config = new FcResilienceConfig(shippedProperties()).forCommand("Input-Requests", null);
+		FcCommandConfig config = new FcResilienceConfig(shippedProperties()).forCommand("Input-Request", null);
 
 		assertEquals(50, config.getFallbackSemaphoreMaxConcurrentRequests());
 		assertEquals("the enforced semaphore is the execution one, and it is the only one",
@@ -166,9 +166,9 @@ public class FcResilienceConfigTest {
 		FcResilienceConfig config = new FcResilienceConfig(shippedProperties());
 
 		assertEquals(15, config.streamMaxConcurrentConnections());
-		assertEquals(100, config.poolCoreSize("OriginHitsPool"));
+		assertEquals(100, config.poolCoreSize("OriginPool"));
 		assertEquals("no key -> resilience.threadpool.default.coreSize", 100, config.poolCoreSize("SomeOtherPool"));
-		assertEquals("Hystrix's default is -1: no queue at all", -1, config.poolMaxQueueSize("OriginHitsPool"));
+		assertEquals("Hystrix's default is -1: no queue at all", -1, config.poolMaxQueueSize("OriginPool"));
 	}
 
 	// ---- pre-2.7 hystrix.* key prefix ------------------------------------------------------------
@@ -192,18 +192,18 @@ public class FcResilienceConfigTest {
 	{
 		FcResilienceConfig legacy = new FcResilienceConfig(legacyProperties());
 
-		FcCommandConfig inputRequests = legacy.forCommand("Input-Requests", null);
+		FcCommandConfig inputRequests = legacy.forCommand("Input-Request", null);
 		assertEquals("per-command override, legacy prefix", 20000, inputRequests.getTimeoutMs());
 		assertEquals(Isolation.SEMAPHORE, inputRequests.getIsolation());
 		assertEquals("falls through to hystrix.command.default", 50, inputRequests.getRequestVolumeThreshold());
 		assertEquals("falls through to hystrix.command.default", 5000, inputRequests.getSleepWindowMs());
 		assertEquals(50, inputRequests.getSemaphoreMaxConcurrentRequests());
 
-		assertEquals("hystrix.threadpool.*", 100, legacy.poolCoreSize("OriginHitsPool"));
+		assertEquals("hystrix.threadpool.*", 100, legacy.poolCoreSize("OriginPool"));
 		assertEquals("hystrix.threadpool.default.*", 100, legacy.poolCoreSize("SomeOtherPool"));
 		assertEquals("hystrix.config.stream.*", 15, legacy.streamMaxConcurrentConnections());
 		assertTrue("command keys are discovered under either prefix",
-				legacy.configuredCommandKeys().contains("Input-Requests"));
+				legacy.configuredCommandKeys().contains("Input-Request"));
 		assertFalse("\"default\" is a scope, not a command key, under either prefix",
 				legacy.configuredCommandKeys().contains("default"));
 	}

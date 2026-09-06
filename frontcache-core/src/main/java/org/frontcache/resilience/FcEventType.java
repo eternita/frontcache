@@ -34,7 +34,7 @@ public enum FcEventType {
 
 	/**
 	 * Never emitted. The fallback semaphore is parsed and reported but deliberately not enforced -
-	 * every call that reaches a fallback already holds an Input-Requests permit, so this state is
+	 * every call that reaches a fallback already holds an Input-Request permit, so this state is
 	 * unreachable. Kept so {@code rollingCountFallbackRejection} has a counter to read 0 from.
 	 * See proposal section 6.3.
 	 */

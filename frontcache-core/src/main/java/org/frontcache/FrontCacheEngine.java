@@ -106,7 +106,7 @@ public class FrontCacheEngine {
 	public final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
 
 	// Connection pool must be at least as large as the pools that draw from it: the
-	// OriginHitsPool (resilience.threadpool.OriginHitsPool.coreSize) plus the include-processor threads
+	// OriginPool (resilience.threadpool.OriginPool.coreSize) plus the include-processor threads
 	// (front-cache.include-processor.impl.concurrent.thread-amount). Practically all traffic goes to a
 	// single origin, i.e. ONE route - so a per-route cap below that count guarantees the surplus
 	// threads block on the pool lease under load, regardless of how healthy the origin is. Hence

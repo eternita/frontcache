@@ -13,9 +13,11 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -57,18 +59,37 @@ public class FcResilienceConfig {
 	private static final String DEFAULT_SCOPE = "default";
 
 	/**
-	 * Command key -> the key it inherits from when the file says nothing about it.
+	 * Command key -> the key it inherits from when the file says nothing about it. Followed as a
+	 * CHAIN, not a single hop - see {@link #commandRaw}.
 	 *
-	 * {@code Include-Requests} was split out of {@code Input-Requests} in 2.9, so that the dashboard's
-	 * headline figure counts client traffic rather than the node's own includes coming back through
-	 * the front door. Inheriting means the split is a metrics change by default: a node whose
-	 * resilience.properties predates it keeps running includes on exactly the tuning they already had.
-	 * Setting {@code resilience.command.Include-Requests.*} explicitly overrides this, per property.
+	 * Two kinds of entry, and they compose:
+	 *
+	 * <ul>
+	 * <li><b>A split.</b> {@code Include-Request} was split out of {@code Input-Request} in 2.9.0, so
+	 *     the dashboard's headline figure counts client traffic rather than the node's own includes
+	 *     coming back through the front door. Inheriting makes the split a metrics change by default:
+	 *     a node whose file predates it runs includes on exactly the tuning they already had.</li>
+	 * <li><b>A rename.</b> 2.9.0 also renamed four keys ({@link FcCommandKeys#LEGACY_COMMAND_KEYS}).
+	 *     Each new key falls back on its old name, so an un-edited resilience.properties keeps
+	 *     configuring the command it has always configured.</li>
+	 * </ul>
+	 *
+	 * The chain matters because the two stack: on an un-edited file {@code Include-Request} resolves
+	 * through {@code Input-Request} to {@code Input-Requests}, which is the only one of the three such
+	 * a file actually contains. A single hop would stop at {@code Input-Request}, find nothing, and
+	 * drop the command onto the built-in defaults - the exact failure this map exists to prevent.
+	 *
+	 * Setting {@code resilience.command.<new-key>.*} explicitly overrides all of it, per property.
 	 */
 	private static final Map<String, String> COMMAND_KEY_INHERITANCE;
 	static {
 		Map<String, String> m = new HashMap<String, String>();
-		m.put(FC_Total.COMMAND_KEY_INCLUDE_REQUESTS, FC_Total.COMMAND_KEY_INPUT_REQUESTS);
+		// the split: an include's tuning comes from client traffic's unless stated otherwise
+		m.put(FC_Total.COMMAND_KEY_INCLUDE_REQUEST, FC_Total.COMMAND_KEY_INPUT_REQUEST);
+		// the renames: each new key ends its chain at its own pre-2.9.0 name
+		for (Map.Entry<String, String> renamed : FcCommandKeys.LEGACY_COMMAND_KEYS.entrySet())
+			if (!m.containsKey(renamed.getKey()))
+				m.put(renamed.getKey(), renamed.getValue());
 		COMMAND_KEY_INHERITANCE = Collections.unmodifiableMap(m);
 	}
 
@@ -332,18 +353,34 @@ public class FcResilienceConfig {
 		if (null == value)
 			value = props.getProperty(LEGACY_COMMAND_PREFIX + commandKey + "." + property);
 
-		// A command key added after an operator wrote their resilience.properties inherits from the
-		// key it was split out of, before falling back to default scope. Without this step a new key
-		// lands on the built-in defaults - THREAD, maxConcurrentRequests=10, timeout=1000 - because
-		// the shipped file sets `default` only for circuit-breaker properties. That failure is silent:
-		// the command works, then starts shedding into fallback fragments above 10 concurrent calls,
-		// on a node whose config file the operator never touched and has no reason to suspect.
+		// A command key added or renamed after an operator wrote their resilience.properties inherits
+		// from the key it was split out of, or from its own pre-2.9.0 name, before falling back to
+		// default scope. Without this step a new key lands on the built-in defaults - THREAD,
+		// maxConcurrentRequests=10, timeout=1000 - because the shipped file sets `default` only for
+		// circuit-breaker properties. That failure is silent: the command works, then starts shedding
+		// into fallback fragments above 10 concurrent calls, or gives up on an origin call after one
+		// second, on a node whose config file the operator never touched and has no reason to suspect.
+		//
+		// Walked as a chain, because a split and a rename stack: Include-Request -> Input-Request ->
+		// Input-Requests. Bounded by a visited set rather than by trusting the map to be acyclic - a
+		// cycle here would hang startup, which is a worse failure than the one being prevented.
+		Set<String> visited = null;
 		String inheritFrom = COMMAND_KEY_INHERITANCE.get(commandKey);
-		if (null == value && null != inheritFrom)
+		while (null == value && null != inheritFrom)
 		{
+			if (null == visited)
+			{
+				visited = new HashSet<String>();
+				visited.add(commandKey);
+			}
+			if (!visited.add(inheritFrom))
+				break;
+
 			value = props.getProperty(COMMAND_PREFIX + inheritFrom + "." + property);
 			if (null == value)
 				value = props.getProperty(LEGACY_COMMAND_PREFIX + inheritFrom + "." + property);
+
+			inheritFrom = COMMAND_KEY_INHERITANCE.get(inheritFrom);
 		}
 
 		if (null == value)
@@ -369,6 +406,20 @@ public class FcResilienceConfig {
 		String value = props.getProperty(THREADPOOL_PREFIX + poolKey + "." + property);
 		if (null == value)
 			value = props.getProperty(LEGACY_THREADPOOL_PREFIX + poolKey + "." + property);
+
+		// The pool keys were renamed in 2.9.0 too, and fall back on their old names for the reason the
+		// command keys do - except that here the consequence is worse. A command key that resolves to
+		// nothing lands on a different number; a POOL key that resolves to nothing lands on
+		// threadpool.default.coreSize, or on the built-in 10 for a file that never set one, which caps
+		// every origin call on the node at ten threads. See FcCommandKeys.LEGACY_THREAD_POOL_KEYS.
+		String inheritFrom = FcCommandKeys.LEGACY_THREAD_POOL_KEYS.get(poolKey);
+		if (null == value && null != inheritFrom)
+		{
+			value = props.getProperty(THREADPOOL_PREFIX + inheritFrom + "." + property);
+			if (null == value)
+				value = props.getProperty(LEGACY_THREADPOOL_PREFIX + inheritFrom + "." + property);
+		}
+
 		if (null == value)
 			value = props.getProperty(THREADPOOL_PREFIX + DEFAULT_SCOPE + "." + property);
 		if (null == value)

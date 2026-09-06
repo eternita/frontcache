@@ -124,7 +124,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 			if (frame.contains("\"type\":\"HystrixCommand\""))
 			{
 				sawCommand = true;
-				if (frame.contains("\"name\":\"Cache-Origin-http\""))
+				if (frame.contains("\"name\":\"Cache-Miss\""))
 					commandFrame = frame;
 			}
 			if (frame.contains("\"type\":\"HystrixThreadPool\""))
@@ -138,7 +138,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 		// Every field the vendored dashboard's validateData() asserts. A missing one throws in the
 		// browser and blanks the panel with no server-side symptom, so it is worth asserting over the
 		// wire and not only in a unit test.
-		assertTrue("no Cache-Origin-http frame among " + frames.size() + " frames", null != commandFrame);
+		assertTrue("no Cache-Miss frame among " + frames.size() + " frames", null != commandFrame);
 		for (String required : new String[] {
 				"reportingHosts", "type", "name", "group", "isCircuitBreakerOpen", "errorPercentage",
 				"errorCount", "requestCount", "rollingCountCollapsedRequests", "rollingCountExceptionsThrown",

@@ -49,8 +49,8 @@ public class FcDashboardJson {
 	 *
 	 * Thread-pool frames are NOT filtered by anything. A pool is a node-level resource shared by every
 	 * THREAD-isolated command, so there is no per-domain answer to give - the old code compared the pool
-	 * name against the caller's domain ({@code "OriginHitsPool".equals(domain)}), which is false for
-	 * every domain that can exist, which is why the console's thread-pool panel has never rendered.
+	 * name against the caller's domain, which is false for every domain that can exist, which is why
+	 * the console's thread-pool panel has never rendered.
 	 * Proposal section 6.6, defect 1.
 	 */
 	public static List<String> frames()

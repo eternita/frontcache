@@ -67,15 +67,15 @@ public class StandaloneMetricsExportTests extends TestsBase {
 				// The command taxonomy - the part Resilience4j's own metrics do not carry, and the reason
 				// FcCommandMetrics is bridged into Micrometer rather than replaced by it.
 				assertTrue("no command event series:\n" + head(body), body.contains("frontcache_command_events"));
-				assertTrue("Input-Requests not exported", body.contains("command=\"Input-Requests\""));
-				assertTrue("Cache-Origin-http not exported", body.contains("command=\"Cache-Origin-http\""));
+				assertTrue("Input-Request not exported", body.contains("command=\"Input-Request\""));
+				assertTrue("Cache-Miss not exported", body.contains("command=\"Cache-Miss\""));
 				assertTrue("success events not exported", body.contains("event=\"success\""));
 
 				// Resilience4j's binders, under our prefix.
 				assertTrue("circuit breaker series missing", body.contains("frontcache_resilience4j_circuitbreaker"));
 
 				// The pool the console's panel reports on.
-				assertTrue("thread pool series missing", body.contains("pool=\"OriginHitsPool\""));
+				assertTrue("thread pool series missing", body.contains("pool=\"OriginPool\""));
 
 				// Cardinality: nothing may be labelled by request URL.
 				assertFalse("a series is labelled with a URL path - unbounded cardinality on a page cache",

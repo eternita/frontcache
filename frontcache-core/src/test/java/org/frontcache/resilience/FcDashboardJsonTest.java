@@ -72,10 +72,10 @@ public class FcDashboardJsonTest {
 	@Test
 	public void commandFrameCarriesEveryFieldHystrixEmitted() throws Exception
 	{
-		configure("Cache-Origin-http", "OriginHitsPool");
-		new SucceedingCommand("Cache-Origin-http", "OriginHitsPool").execute();
+		configure("Cache-Miss", "OriginPool");
+		new SucceedingCommand("Cache-Miss", "OriginPool").execute();
 
-		Set<String> emitted = fieldNames(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Origin-http")));
+		Set<String> emitted = fieldNames(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Miss")));
 		Set<String> golden = readGolden("HystrixCommand");
 
 		Set<String> missing = new TreeSet<String>(golden);
@@ -92,11 +92,11 @@ public class FcDashboardJsonTest {
 	@Test
 	public void threadPoolFrameCarriesEveryFieldHystrixEmitted() throws Exception
 	{
-		configure("Cache-Origin-http", "OriginHitsPool");
-		new SucceedingCommand("Cache-Origin-http", "OriginHitsPool").execute();
+		configure("Cache-Miss", "OriginPool");
+		new SucceedingCommand("Cache-Miss", "OriginPool").execute();
 
-		Set<String> emitted = fieldNames(FcDashboardJson.threadPoolFrame("OriginHitsPool",
-				FcThreadPools.existing("OriginHitsPool")));
+		Set<String> emitted = fieldNames(FcDashboardJson.threadPoolFrame("OriginPool",
+				FcThreadPools.existing("OriginPool")));
 
 		assertEquals("thread-pool frame field set must match Hystrix's exactly",
 				readGolden("HystrixThreadPool").toString(), new TreeSet<String>(emitted).toString());
@@ -104,15 +104,15 @@ public class FcDashboardJsonTest {
 
 	/**
 	 * The direct regression test for section 6.6 defect 1. A thread pool is a node-level resource, so
-	 * its frames are emitted with no group comparison at all - the old code asked
-	 * {@code "OriginHitsPool".equals(domain)}, which is false for every domain that can exist, and the
-	 * console's thread-pool panel has therefore never rendered.
+	 * its frames are emitted with no group comparison at all - the old code compared the POOL NAME
+	 * against the caller's domain, which is false for every domain that can exist, and the console's
+	 * thread-pool panel has therefore never rendered.
 	 */
 	@Test
 	public void threadPoolFramesAreEmittedAlongsideCommandFrames() throws Exception
 	{
-		configure("Cache-Origin-http", "OriginHitsPool");
-		new SucceedingCommand("Cache-Origin-http", "OriginHitsPool").execute();
+		configure("Cache-Miss", "OriginPool");
+		new SucceedingCommand("Cache-Miss", "OriginPool").execute();
 
 		List<String> frames = FcDashboardJson.frames();
 
@@ -135,25 +135,25 @@ public class FcDashboardJsonTest {
 	@Test
 	public void typeAndIdentityFieldsAreExactlyWhatTheDashboardDispatchesOn() throws Exception
 	{
-		configure("Cache-Hits", "OriginHitsPool");
-		new SucceedingCommand("Cache-Hits", "OriginHitsPool").execute();
+		configure("Cache-Hits", "OriginPool");
+		new SucceedingCommand("Cache-Hits", "OriginPool").execute();
 
 		JsonNode command = MAPPER.readTree(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Hits")));
 		assertEquals("HystrixCommand", command.get("type").asText());
 		assertEquals("Cache-Hits", command.get("name").asText());
 		assertEquals("test.example.com", command.get("group").asText());
 
-		JsonNode pool = MAPPER.readTree(FcDashboardJson.threadPoolFrame("OriginHitsPool",
-				FcThreadPools.existing("OriginHitsPool")));
+		JsonNode pool = MAPPER.readTree(FcDashboardJson.threadPoolFrame("OriginPool",
+				FcThreadPools.existing("OriginPool")));
 		assertEquals("HystrixThreadPool", pool.get("type").asText());
-		assertEquals("OriginHitsPool", pool.get("name").asText());
+		assertEquals("OriginPool", pool.get("name").asText());
 	}
 
 	@Test
 	public void latencyMapsKeepTheirShapeAndOrder() throws Exception
 	{
-		configure("Cache-Hits", "OriginHitsPool");
-		new SucceedingCommand("Cache-Hits", "OriginHitsPool").execute();
+		configure("Cache-Hits", "OriginPool");
+		new SucceedingCommand("Cache-Hits", "OriginPool").execute();
 
 		JsonNode command = MAPPER.readTree(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Hits")));
 		for (String field : new String[] { "latencyExecute", "latencyTotal" })
@@ -172,11 +172,11 @@ public class FcDashboardJsonTest {
 	@Test
 	public void countersAndPropertiesReflectRealValues() throws Exception
 	{
-		configure("Cache-Origin-http", "OriginHitsPool");
-		new SucceedingCommand("Cache-Origin-http", "OriginHitsPool").execute();
-		new FailingCommand("Cache-Origin-http", "OriginHitsPool").execute();
+		configure("Cache-Miss", "OriginPool");
+		new SucceedingCommand("Cache-Miss", "OriginPool").execute();
+		new FailingCommand("Cache-Miss", "OriginPool").execute();
 
-		JsonNode frame = MAPPER.readTree(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Origin-http")));
+		JsonNode frame = MAPPER.readTree(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Miss")));
 
 		assertEquals(1, frame.get("rollingCountSuccess").asLong());
 		assertEquals(1, frame.get("rollingCountFailure").asLong());
@@ -194,14 +194,14 @@ public class FcDashboardJsonTest {
 		assertEquals("structurally always zero", 0, frame.get("rollingCountFallbackRejection").asLong());
 		assertEquals("the real window, because the dashboard divides by it",
 				10000, frame.get("propertyValue_metricsRollingStatisticalWindowInMilliseconds").asInt());
-		assertEquals("OriginHitsPool", frame.get("threadPool").asText());
+		assertEquals("OriginPool", frame.get("threadPool").asText());
 	}
 
 	/** A configured domain reaches the JSON, so it is escaped rather than trusted. */
 	@Test
 	public void groupIsEscaped() throws Exception
 	{
-		configure("Quoted", "OriginHitsPool");
+		configure("Quoted", "OriginPool");
 		FcCommandMetrics metrics = FcCommandMetrics.getInstance("Quoted", "we\"ird\\domain", 10000);
 
 		assertEquals("we\"ird\\domain", MAPPER.readTree(FcDashboardJson.commandFrame(metrics)).get("group").asText());

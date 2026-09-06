@@ -37,8 +37,8 @@ public class FC_ThroughCache_WebFilter extends FcCommand<WebResponse> {
 
         super(Setter
                 .withGroupKey(context.getDomain())
-                .andCommandKey("Cache-Origin-filter")
-				.andThreadPoolKey("OriginHitsPool")
+                .andCommandKey(FcCommandKeys.CACHE_MISS)
+				.andThreadPoolKey(FcCommandKeys.ORIGIN_POOL)
         		);
 
         this.context = context;
