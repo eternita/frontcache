@@ -25,6 +25,6 @@ public class FallbackConfigsCaller implements Callable<FallbackConfig> {
     @Override
     public FallbackConfig call() throws Exception {
 
-		 return new FallbackConfig(fcClient.getName(), fcClient.getFallbackEntries());
+		 return new FallbackConfig(fcClient.getName(), fcClient.getFallbacksConfig());
     }
 }

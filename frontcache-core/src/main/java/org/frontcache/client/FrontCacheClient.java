@@ -60,7 +60,9 @@ import org.frontcache.io.FrontcacheAction;
 import org.frontcache.io.GetBotsActionResponse;
 import org.frontcache.io.GetBotsConfigActionResponse;
 import org.frontcache.io.GetDynamicURLsActionResponse;
+import org.frontcache.io.GetDynamicURLsConfigActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
+import org.frontcache.io.GetFallbacksConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.GetGuardRulesActionResponse;
 import org.frontcache.io.GetGuardConfigActionResponse;
@@ -579,6 +581,75 @@ public class FrontCacheClient {
 			return null;
 
 		return actionResponse.getDynamicURLs();
+	}
+
+	/**
+	 * The raw conf/fallbacks.conf of this edge - what the console's Fallback Config screen renders.
+	 * The parsed counterpart is {@link #getFallbackEntries()}; note the two action names are one
+	 * letter apart, see {@code FrontcacheAction.GET_FALLBACKS_CONFIG}.
+	 *
+	 * @return the response, which carries either the file or a "not found" error; null if the edge
+	 *         could not be reached at all
+	 */
+	public GetFallbacksConfigActionResponse getFallbacksConfigActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_FALLBACKS_CONFIG));
+
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			GetFallbacksConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetFallbacksConfigActionResponse.class);
+			return actionResponse;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	public String getFallbacksConfig()
+	{
+		GetFallbacksConfigActionResponse actionResponse = getFallbacksConfigActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getFallbacksConfig();
+	}
+
+	/**
+	 * The raw conf/dynamic-urls.conf of this edge - what the console's Dynamic URLs screen renders.
+	 * The parsed counterpart is {@link #getDynamicURLsActionResponse()}.
+	 *
+	 * @return the response, which carries either the file or a "not found" error; null if the edge
+	 *         could not be reached at all
+	 */
+	public GetDynamicURLsConfigActionResponse getDynamicURLsConfigActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_DYNAMIC_URLS_CONFIG));
+
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			GetDynamicURLsConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetDynamicURLsConfigActionResponse.class);
+			return actionResponse;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	public String getDynamicURLsConfig()
+	{
+		GetDynamicURLsConfigActionResponse actionResponse = getDynamicURLsConfigActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getDynamicURLsConfig();
 	}
 
 	/**

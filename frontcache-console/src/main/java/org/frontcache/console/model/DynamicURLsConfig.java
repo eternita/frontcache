@@ -8,17 +8,20 @@
  */
 package org.frontcache.console.model;
 
-import java.util.Set;
-
 /**
- * One edge's never-cached URL patterns. A flat set as of 2.7 - see {@link VisitorTypesConfig}.
+ * Raw ./conf/dynamic-urls.conf of one edge (comments and empty lines preserved).
+ *
+ * Through 2.10 this held the flat set of patterns the node had parsed, which is what the screen
+ * rendered. It now holds the file, like {@link GuardConfig} and {@link BotConfig} - a pattern list
+ * without the comments beside it does not say WHY a URL is never cached, and a commented-out
+ * pattern does not show up at all.
  */
 public class DynamicURLsConfig {
 
 	private String name;
-	private Set<String> config;
+	private String config;
 
-	public DynamicURLsConfig(String name, Set<String> config) {
+	public DynamicURLsConfig(String name, String config) {
 		super();
 		this.name = name;
 		this.config = config;
@@ -28,7 +31,7 @@ public class DynamicURLsConfig {
 		return name;
 	}
 
-	public Set<String> getConfig() {
+	public String getConfig() {
 		return config;
 	}
 

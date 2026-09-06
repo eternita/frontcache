@@ -9,11 +9,9 @@
 package org.frontcache.console.web.controllers;
 
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.frontcache.console.service.FrontcacheService;
-import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -22,6 +20,10 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 
 
+/**
+ * Configs / Fallback Config: the raw conf/fallbacks.conf of each edge, shown as it sits on disk -
+ * the same treatment as the resilience, guard, bots and dynamic-urls files.
+ */
 @Controller
 public class FallbackConfigController {
 
@@ -33,7 +35,7 @@ public class FallbackConfigController {
     @RequestMapping(value = "/fallbacks", method = RequestMethod.GET)
     public String fallbacks(ModelMap model) {
 
-    	Map<String, Set<FallbackConfigEntry>> fallbackConfigs = frontcacheService.getFallbackConfigs();
+    	Map<String, String> fallbackConfigs = frontcacheService.getFallbackConfigs();
 		model.put("fallbackConfigs", fallbackConfigs);
 
 

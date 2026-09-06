@@ -475,6 +475,46 @@ public abstract class ClientTests extends TestsBase {
 	}
 
 	/**
+	 * The Fallback Config screen renders the file rather than the parsed entry set it used to show as a
+	 * table. Same reasoning as the two above: the table had a column per field of an entry, so the
+	 * comments saying what a fallback is for - and any entry commented out - were not on the screen at
+	 * all. The parsed shape stays on the wire; it is asserted above.
+	 */
+	@Test
+	public void fallbacksConfigActionReturnsTheRawFileAndNotTheParsedEntries() throws Exception {
+		org.frontcache.io.GetFallbacksConfigActionResponse response = frontcacheClient.getFallbacksConfigActionResponse();
+
+		Assert.assertNotNull("the action must answer", response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+
+		String raw = response.getFallbacksConfig();
+		Assert.assertNotNull("the raw file is what the console's Fallback Config screen renders", raw);
+		Assert.assertTrue("comments must survive - the parsed entries had dropped them, got: " + raw,
+				raw.contains("# record description"));
+		Assert.assertTrue("expected the entries too, got: " + raw, raw.contains("fallback1.txt"));
+	}
+
+	/**
+	 * The Dynamic URLs screen renders the file rather than the parsed pattern set it used to show:
+	 * the comments explaining why a URL is never cached, and any pattern commented out, exist only in
+	 * the raw text. The parsed shape stays on the wire - it is asserted above - because it is what
+	 * anything other than that one screen reads.
+	 */
+	@Test
+	public void dynamicURLsConfigActionReturnsTheRawFileAndNotTheParsedPatterns() throws Exception {
+		org.frontcache.io.GetDynamicURLsConfigActionResponse response = frontcacheClient.getDynamicURLsConfigActionResponse();
+
+		Assert.assertNotNull("the action must answer", response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+
+		String raw = response.getDynamicURLsConfig();
+		Assert.assertNotNull("the raw file is what the console's Dynamic URLs screen renders", raw);
+		Assert.assertTrue("comments must survive - the parsed set had dropped them, got: " + raw,
+				raw.contains("# Configs for ignore patterns"));
+		Assert.assertTrue("expected the patterns too, got: " + raw, raw.contains("^/admin/.*"));
+	}
+
+	/**
 	 * A line unique to this node's conf/bots.conf - the standalone node is on the 2.10 rule format,
 	 * the filter node deliberately on bare keywords only.
 	 */

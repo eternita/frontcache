@@ -9,7 +9,6 @@
 package org.frontcache.console.web.controllers;
 
 import java.util.Map;
-import java.util.Set;
 
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +18,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 
+/**
+ * Configs / Dynamic URLs Config: the raw conf/dynamic-urls.conf of each edge, shown as it sits on
+ * disk - the same treatment as the resilience, guard and bots files.
+ */
 @Controller
 public class DynamicURLConfigController {
 
@@ -28,7 +31,7 @@ public class DynamicURLConfigController {
     @RequestMapping(value = "/dynamic-urls-configs", method = RequestMethod.GET)
     public String getDynamicURLConfigs(ModelMap model) {
 
-    	Map<String, Set<String>> dynamicURLsConfigs = frontcacheService.getDynamicURLsConfigs();
+    	Map<String, String> dynamicURLsConfigs = frontcacheService.getDynamicURLsConfigs();
 		model.put("dynamicURLsConfigs", dynamicURLsConfigs);
 
         return "dynamic_urls_configs";

@@ -265,13 +265,19 @@ public class FrontcacheService {
 	 * @param domain
 	 * @return
 	 */
-	public Map<String, Set<FallbackConfigEntry>> getFallbackConfigs() {
+	/**
+	 * The raw conf/fallbacks.conf per edge, for the Configs / Fallback Config screen.
+	 *
+	 * An edge that has no such file, or that predates the action, contributes a null value rather than
+	 * dropping out of the map: the tab still appears, saying the file is not there.
+	 */
+	public Map<String, String> getFallbackConfigs() {
 		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Set<FallbackConfigEntry>> clusterStatus = new LinkedHashMap<String, Set<FallbackConfigEntry>>();
+		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
 
         List<Future<FallbackConfig>> futureList = new ArrayList<Future<FallbackConfig>>();
 
@@ -429,14 +435,20 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, Set<String>> getDynamicURLsConfigs() {
+	/**
+	 * The raw conf/dynamic-urls.conf per edge, for the Configs / Dynamic URLs screen.
+	 *
+	 * An edge that has no such file, or that predates the action, contributes a null value rather than
+	 * dropping out of the map: the tab still appears, saying the file is not there.
+	 */
+	public Map<String, String> getDynamicURLsConfigs() {
 
         List<Future<DynamicURLsConfig>> futureList = new ArrayList<Future<DynamicURLsConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Set<String>> clusterStatus = new LinkedHashMap<String, Set<String>>();
+		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new DynamicURLsConfigsCaller(fcClient)));
