@@ -21,4 +21,10 @@ public class FilterClientTests extends ClientTests {
 		return false;
 	}
 
+	/** this node's bots.conf is deliberately left bare-keyword-only */
+	@Override
+	protected String expectedBotsConfigMarker() {
+		return "bare-keyword-only format";
+	}
+
 }

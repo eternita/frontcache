@@ -11,7 +11,7 @@ package org.frontcache.console.model;
 import java.util.Set;
 
 /**
- * One edge's never-cached URL patterns. A flat set as of 2.7 - see {@link BotConfig}.
+ * One edge's never-cached URL patterns. A flat set as of 2.7 - see {@link VisitorTypesConfig}.
  */
 public class DynamicURLsConfig {
 

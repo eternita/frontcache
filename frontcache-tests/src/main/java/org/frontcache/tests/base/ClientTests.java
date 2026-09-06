@@ -453,6 +453,34 @@ public abstract class ClientTests extends TestsBase {
 	}
 
 	/**
+	 * The Bot Configs screen renders the file, not the parse of it, which is the whole reason the
+	 * action exists beside get-bots: a commented-out rule or a line the parser skipped is visible
+	 * only in the raw text. Both e2e nodes ship a conf/bots.conf, and the two files are deliberately
+	 * in different formats, so asserting each node's own header also proves the response comes from
+	 * that node's disk rather than from anywhere shared.
+	 */
+	@Test
+	public void botsConfigActionReturnsTheRawFileAndNotTheParsedRules() throws Exception {
+		org.frontcache.io.GetBotsConfigActionResponse response = frontcacheClient.getBotsConfigActionResponse();
+
+		Assert.assertNotNull("the action must answer", response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+
+		String raw = response.getBotsConfig();
+		Assert.assertNotNull("the raw file is what the console's Bot Configs screen renders", raw);
+		Assert.assertTrue("comments must survive - a parsed view would have dropped them, got: " + raw,
+				raw.contains("# Conf for bots"));
+		Assert.assertTrue("expected this node's own bots.conf, got: " + raw,
+				raw.contains(expectedBotsConfigMarker()));
+	}
+
+	/**
+	 * A line unique to this node's conf/bots.conf - the standalone node is on the 2.10 rule format,
+	 * the filter node deliberately on bare keywords only.
+	 */
+	protected abstract String expectedBotsConfigMarker();
+
+	/**
 	 * Whether this node's FRONTCACHE_HOME ships conf/guard-rules.conf. The two e2e nodes differ on
 	 * purpose - the standalone one carries the rate-limit rule the guard tests exercise, the filter
 	 * one carries nothing - so both branches of the get-guard-config action stay covered.

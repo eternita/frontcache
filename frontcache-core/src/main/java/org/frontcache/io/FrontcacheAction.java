@@ -39,6 +39,12 @@ public abstract class FrontcacheAction {
 
 	public static final String GET_BOTS = "get-bots";
 
+	/**
+	 * The raw conf/bots.conf, as {@link #GET_GUARD_CONFIG} is to {@link #GET_GUARD_RULES}: this one
+	 * returns the file, {@link #GET_BOTS} returns what the node parsed out of it.
+	 */
+	public static final String GET_BOTS_CONFIG = "get-bots-config";
+
 	public static final String RELOAD_BOTS = "reload-bots";
 
 	public static final String GET_DYNAMIC_URLS = "get-dynamic-urls";
@@ -85,6 +91,7 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.GET_FROM_CACHE, "get content from cache, accept 'key' parameter");
 		actionsDescriptionMap.put(FrontcacheAction.PUT_TO_CACHE, "store a WebResponse entry into the local cache (used for replication); accepts 'key', 'domain', and 'webResponse' (JSON) parameters");
 		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get bot classification rules (in evaluation order, with hit counts) and bare User-Agent keywords from ./conf/bots.conf");
+		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS_CONFIG, "get raw bot classification configuration from ./conf/bots.conf");
 		actionsDescriptionMap.put(FrontcacheAction.RELOAD_BOTS, "reload bot classification rules from ./conf/bots.conf (resets hit counters)");
 		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_RESILIENCE_CONFIGS, "get raw resilience configuration from ./conf/resilience.properties");

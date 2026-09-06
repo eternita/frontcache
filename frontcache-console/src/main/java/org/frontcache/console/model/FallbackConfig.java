@@ -13,7 +13,7 @@ import java.util.Set;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 
 /**
- * One edge's fallback entries. A flat set as of 2.7 - see {@link BotConfig}.
+ * One edge's fallback entries. A flat set as of 2.7 - see {@link VisitorTypesConfig}.
  */
 public class FallbackConfig {
 

@@ -135,12 +135,12 @@ public class FcDashboardJsonTest {
 	@Test
 	public void typeAndIdentityFieldsAreExactlyWhatTheDashboardDispatchesOn() throws Exception
 	{
-		configure("Cache-Hits", "OriginPool");
-		new SucceedingCommand("Cache-Hits", "OriginPool").execute();
+		configure("Cache-Hit", "OriginPool");
+		new SucceedingCommand("Cache-Hit", "OriginPool").execute();
 
-		JsonNode command = MAPPER.readTree(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Hits")));
+		JsonNode command = MAPPER.readTree(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Hit")));
 		assertEquals("HystrixCommand", command.get("type").asText());
-		assertEquals("Cache-Hits", command.get("name").asText());
+		assertEquals("Cache-Hit", command.get("name").asText());
 		assertEquals("test.example.com", command.get("group").asText());
 
 		JsonNode pool = MAPPER.readTree(FcDashboardJson.threadPoolFrame("OriginPool",
@@ -152,10 +152,10 @@ public class FcDashboardJsonTest {
 	@Test
 	public void latencyMapsKeepTheirShapeAndOrder() throws Exception
 	{
-		configure("Cache-Hits", "OriginPool");
-		new SucceedingCommand("Cache-Hits", "OriginPool").execute();
+		configure("Cache-Hit", "OriginPool");
+		new SucceedingCommand("Cache-Hit", "OriginPool").execute();
 
-		JsonNode command = MAPPER.readTree(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Hits")));
+		JsonNode command = MAPPER.readTree(FcDashboardJson.commandFrame(FcCommandMetrics.existing("Cache-Hit")));
 		for (String field : new String[] { "latencyExecute", "latencyTotal" })
 		{
 			assertNotNull(field + " is missing", command.get(field));

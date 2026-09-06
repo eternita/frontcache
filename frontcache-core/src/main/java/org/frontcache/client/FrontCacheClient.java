@@ -58,6 +58,7 @@ import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.io.FrontcacheAction;
 import org.frontcache.io.GetBotsActionResponse;
+import org.frontcache.io.GetBotsConfigActionResponse;
 import org.frontcache.io.GetDynamicURLsActionResponse;
 import org.frontcache.io.GetFallbackConfigActionResponse;
 import org.frontcache.io.GetFromCacheActionResponse;
@@ -578,6 +579,40 @@ public class FrontCacheClient {
 			return null;
 
 		return actionResponse.getDynamicURLs();
+	}
+
+	/**
+	 * The raw conf/bots.conf of this edge - what the console's Bot Configs screen renders. The parsed
+	 * counterpart is {@link #getBotsActionResponse()}.
+	 *
+	 * @return the response, which carries either the file or a "not found" error; null if the edge
+	 *         could not be reached at all
+	 */
+	public GetBotsConfigActionResponse getBotsConfigActionResponse()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_BOTS_CONFIG));
+
+		try {
+			String responseStr = requestFrontCache(urlParameters);
+			GetBotsConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), GetBotsConfigActionResponse.class);
+			return actionResponse;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	public String getBotsConfig()
+	{
+		GetBotsConfigActionResponse actionResponse = getBotsConfigActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getBotsConfig();
 	}
 
 	/**

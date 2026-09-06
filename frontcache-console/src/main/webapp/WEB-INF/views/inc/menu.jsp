@@ -10,6 +10,7 @@
 	<c:when test="${fn:contains(uri, 'fallbacks') or fn:contains(uri, 'bot-configs') or fn:contains(uri, 'dynamic-urls') or fn:contains(uri, 'resilience') or fn:contains(uri, 'hystrix') or fn:contains(uri, 'guard-configs')}"><c:set var="topActive" value="configs"/></c:when>
 	<c:when test="${fn:contains(uri, 'cache-')}"><c:set var="topActive" value="cache"/></c:when>
 	<c:when test="${fn:contains(uri, 'guard')}"><c:set var="topActive" value="guard"/></c:when>
+	<c:when test="${fn:contains(uri, 'visitor-types')}"><c:set var="topActive" value="visitor"/></c:when>
 	<c:when test="${fn:contains(uri, 'edges')}"><c:set var="topActive" value="edges"/></c:when>
 </c:choose>
 
@@ -37,6 +38,7 @@
                 <li><a href="fallbacks" class="${topActive == 'configs' ? 'active-top' : ''}">Configs </a></li>
                 <li><a href="cache-view" class="${topActive == 'cache' ? 'active-top' : ''}">Cache </a></li>
                 <li><a href="guard-rules" class="${topActive == 'guard' ? 'active-top' : ''}">Guard </a></li>
+                <li><a href="visitor-types" class="${topActive == 'visitor' ? 'active-top' : ''}">Visitor Types </a></li>
 				<li><a href="edges" class="${topActive == 'edges' ? 'active-top' : ''}">Edges </a></li>
 			</ul>
 		</nav>

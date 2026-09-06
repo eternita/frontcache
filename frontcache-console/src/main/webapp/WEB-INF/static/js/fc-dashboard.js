@@ -371,7 +371,7 @@ var FcDashboard = (function () {
 		self.root = el("div", "fc-dashboard");
 
 		var legend = el("div", "fc-legend");
-		legend.appendChild(el("span", "fc-legend-title", "Circuit"));
+		legend.appendChild(el("span", "fc-legend-title", "Circuits"));
 		[["fc-success", "Success"], ["fc-short-circuited", "Short-Circuited"], ["fc-bad-request", "Bad Request"],
 		 ["fc-timeout", "Timeout"], ["fc-rejected", "Rejected"], ["fc-failure", "Failure"]]
 			.forEach(function (entry, index) {

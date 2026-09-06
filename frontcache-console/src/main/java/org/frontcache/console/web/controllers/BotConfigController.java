@@ -10,7 +10,6 @@ package org.frontcache.console.web.controllers;
 
 import java.util.Map;
 
-import org.frontcache.console.model.BotConfig;
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -19,6 +18,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 
+/**
+ * Configs / Bot Configs: the raw conf/bots.conf of each edge, shown as it sits on disk.
+ *
+ * The parsed view - the rules in evaluation order, with hit counts - is the Visitor Types screen
+ * ({@link VisitorTypesController}), which is what this URL served through 2.10.
+ */
 @Controller
 public class BotConfigController {
 
@@ -28,7 +33,7 @@ public class BotConfigController {
     @RequestMapping(value = "/bot-configs", method = RequestMethod.GET)
     public String getBotConfigs(ModelMap model) {
 
-    	Map<String, BotConfig> botConfigs = frontcacheService.getBotConfigs();
+    	Map<String, String> botConfigs = frontcacheService.getBotConfigs();
 		model.put("botConfigs", botConfigs);
 
         return "bot_configs";

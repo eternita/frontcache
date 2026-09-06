@@ -24,6 +24,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.BotConfig;
+import org.frontcache.console.model.VisitorTypesConfig;
 import org.frontcache.console.model.DynamicURLsConfig;
 import org.frontcache.console.model.FallbackConfig;
 import org.frontcache.console.model.FrontCacheStatus;
@@ -302,17 +303,64 @@ public class FrontcacheService {
 	}
 
 	/**
+	 * How each edge classifies a visitor - the ordered rules and the bare keywords - for the Visitor
+	 * Types screen.
+	 *
 	 * One entry per reachable edge. The value carries both shapes - rules (2.10+) and bare keywords -
 	 * because the console reads a mixed fleet and the JSP renders whichever the edge answered with.
+	 * The raw file behind this is {@link #getBotConfigs()}.
 	 */
-	public Map<String, BotConfig> getBotConfigs() {
+	public Map<String, VisitorTypesConfig> getVisitorTypes() {
+
+        List<Future<VisitorTypesConfig>> futureList = new ArrayList<Future<VisitorTypesConfig>>();
+
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures below are submitted/consumed in that same order) so the UI
+		// tabs appear in the configured order.
+		Map<String, VisitorTypesConfig> clusterStatus = new LinkedHashMap<String, VisitorTypesConfig>();
+
+		for (FrontCacheClient fcClient : getFrontCacheAgents())
+            futureList.add(executor.submit(new VisitorTypesCaller(fcClient)));
+
+		// processing timeouts
+        boolean timeoutReached = false;
+        for (Future<VisitorTypesConfig> f : futureList)
+        {
+            try {
+            	VisitorTypesConfig result = null;
+            	if (timeoutReached)
+            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
+            	else
+            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+
+            	if (null != result)
+            		clusterStatus.put(result.getName(), result);
+
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                f.cancel(true);
+                timeoutReached =  true;
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
+            }
+        }
+
+		return clusterStatus;
+	}
+
+	/**
+	 * The raw conf/bots.conf per edge, for the Configs / Bot Configs screen - what the operator wrote,
+	 * as opposed to what the node parsed out of it ({@link #getVisitorTypes()}).
+	 *
+	 * An edge that has no such file, or that predates the action, contributes a null value rather than
+	 * dropping out of the map: the tab still appears, saying the file is not there.
+	 */
+	public Map<String, String> getBotConfigs() {
 
         List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, BotConfig> clusterStatus = new LinkedHashMap<String, BotConfig>();
+		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
@@ -329,7 +377,7 @@ public class FrontcacheService {
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 
             	if (null != result)
-            		clusterStatus.put(result.getName(), result);
+            		clusterStatus.put(result.getName(), result.getConfig());
 
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);

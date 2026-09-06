@@ -38,7 +38,7 @@ public class FC_ThroughCache extends FcCommand<WebResponse> {
                 .withGroupKey(null != context
                                 ? context.getDomain()
                                 : FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN))
-                .andCommandKey(FcCommandKeys.CACHE_HITS)
+                .andCommandKey(FcCommandKeys.CACHE_HIT)
         		);
 
         this.originUrlStr = originUrlStr;

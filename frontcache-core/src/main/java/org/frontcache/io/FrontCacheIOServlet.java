@@ -60,6 +60,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	private static final String RESILIENCE_CONFIG_FILE = "resilience.properties";
 	private static final String GUARD_RULES_CONFIG_FILE = "guard-rules.conf";
+	private static final String BOTS_CONFIG_FILE = "bots.conf";
 
 	FrontCacheEngine fcEngine = null;
 
@@ -159,6 +160,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.GET_BOTS:
 			aResponse = getBots(request);
+			break;
+
+		case FrontcacheAction.GET_BOTS_CONFIG:
+			aResponse = getBotsConfig(request);
 			break;
 
 		case FrontcacheAction.RELOAD_BOTS:
@@ -484,6 +489,38 @@ public class FrontCacheIOServlet extends HttpServlet {
 		// the rules renders that one and must not suddenly see rule names in it.
 		aResponse.setBotKeywords(classifier.getKeywords());
 		aResponse.setBotRules(botRules);
+
+		return aResponse;
+	}
+
+	/**
+	 * Reads the raw ./conf/bots.conf file (comments and empty lines preserved) so it can be displayed
+	 * as-is in the console, next to the parsed view {@link #getBots} serves.
+	 *
+	 * Worth having both: the parsed view shows what is deciding, this one shows what the operator
+	 * wrote. A line the parser skipped - a commented-out rule, a typo that made it a bare keyword -
+	 * is visible here and nowhere else.
+	 *
+	 * The tolerant read matters as much as it does for guard-rules.conf: conf/bots.conf is optional
+	 * and {@code FCConfig.getConfigInputStream} signals a missing file by throwing, so a node without
+	 * one has to produce the "not found" response rather than a failed action.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getBotsConfig(HttpServletRequest req)
+	{
+		GetBotsConfigActionResponse aResponse = new GetBotsConfigActionResponse();
+
+		String raw = readConfigFile(BOTS_CONFIG_FILE);
+
+		if (null == raw)
+		{
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription(BOTS_CONFIG_FILE + " not found");
+		} else {
+			aResponse.setBotsConfig(raw);
+		}
 
 		return aResponse;
 	}
