@@ -28,11 +28,21 @@
 
 # legacy_conf_name <current-name> -> echoes that file's pre-rename name, or nothing.
 #
-# One line per renamed config file. Drop a line once the release that still reads the old
-# name is out of support.
+# A renamed file used to be handled by NOT seeding the new name and letting the operator's
+# pre-rename file stay authoritative, because Frontcache read the old name as a fallback. 2.9.0
+# removed that fallback, so the file is renamed in the mount instead: leaving it alone would mean
+# a container that starts cleanly and runs every circuit breaker, timeout and bulkhead at its
+# BUILT-IN default while the operator's tuned file sits unread beside it.
+#
+# Renaming a file in a mount the operator owns is more than this script otherwise does, and it is
+# the lesser of the two - the content is untouched, and the alternative is a silent production
+# change. Nothing else here rewrites a mounted file's contents.
+#
+# One line per renamed config file. Drop a line once nobody could still be upgrading from a
+# release that shipped the old name.
 legacy_conf_name() {
   case "$1" in
-    resilience.properties) echo hystrix.properties ;;   # renamed in 2.7
+    resilience.properties) echo hystrix.properties ;;   # renamed in 2.7, old name unread since 2.9.0
   esac
 }
 
@@ -57,9 +67,10 @@ seed_conf() {
 
     legacy="$(legacy_conf_name "$name")"
     if [ -n "$legacy" ] && [ -e "$target/$legacy" ]; then
-      echo "    ~ NOT seeding $name - your $legacy is still there and stays authoritative."
-      echo "      $legacy was renamed to $name. Frontcache reads it for one more release and"
-      echo "      warns; rename it when convenient - the keys inside it need no change."
+      mv "$target/$legacy" "$target/$name"
+      echo "    > RENAMED $legacy to $name - the old name is no longer read as of 2.9.0, so your"
+      echo "      settings would have stopped applying. The file's contents are untouched; the"
+      echo "      hystrix.* keys inside it are still supported."
       skipped=$((skipped + 1))
       continue
     fi
@@ -69,7 +80,7 @@ seed_conf() {
     seeded=$((seeded + 1))
   done
 
-  echo ">>> Config in $target: $kept kept, $seeded seeded from image defaults, $skipped skipped (renamed, legacy file present)"
+  echo ">>> Config in $target: $kept kept, $seeded seeded from image defaults, $skipped moved onto their current name"
 }
 
 # resolve_origin_host <frontcache.properties path>

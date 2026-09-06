@@ -57,7 +57,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	private static final String RESILIENCE_CONFIG_FILE = "resilience.properties";
 	private static final String GUARD_RULES_CONFIG_FILE = "guard-rules.conf";
-	private static final String LEGACY_RESILIENCE_CONFIG_FILE = "hystrix.properties";
 
 	FrontCacheEngine fcEngine = null;
 
@@ -524,11 +523,12 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	/**
 	 * Reads the raw ./conf/resilience.properties file (comments and empty lines preserved) so it can be
-	 * displayed as-is in the console, falling back to the pre-2.7 ./conf/hystrix.properties.
+	 * displayed as-is in the console.
 	 *
-	 * The fallback has to be here as well as in {@code FcResilienceConfig}: this action shows the operator
-	 * the file the node is actually using, so reading a different one than the engine reads would make the
-	 * console lie in exactly the situation - a half-finished upgrade - where it is being consulted.
+	 * The pre-2.7 ./conf/hystrix.properties fallback that used to be here is gone, in step with
+	 * {@code FcResilienceConfig}, and the two must stay in step: this action shows the operator the file
+	 * the node is actually using, so reading a different one than the engine reads would make the console
+	 * lie in exactly the situation - a half-finished upgrade - where it is being consulted.
 	 *
 	 * Answers both {@code get-resilience-configs} and the pre-2.7 {@code get-hystrix-configs}, and the
 	 * response carries the value under both field names - the console is a separate deployment, so both
@@ -542,8 +542,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 		GetResilienceConfigActionResponse aResponse = new GetResilienceConfigActionResponse();
 
 		String raw = readConfigFile(RESILIENCE_CONFIG_FILE);
-		if (null == raw)
-			raw = readConfigFile(LEGACY_RESILIENCE_CONFIG_FILE);
 
 		if (null == raw)
 		{

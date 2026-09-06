@@ -415,7 +415,7 @@ public abstract class ClientTests extends TestsBase {
 	/**
 	 * The resilience config panel, and its pre-2.7 action name. Both must return the file the node is
 	 * actually running on - which is conf/resilience.properties in standalone mode and the legacy
-	 * conf/hystrix.properties in filter mode, so this runs against both spellings of the file too.
+	 * the legacy hystrix.* key prefix in filter mode, so this runs against both spellings of the keys.
 	 */
 	@Test
 	public void resilienceConfigIsServedUnderBothActionNames() throws Exception {

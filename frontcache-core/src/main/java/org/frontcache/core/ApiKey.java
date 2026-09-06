@@ -53,8 +53,8 @@ import jakarta.servlet.http.HttpServletRequest;
  * artifact embedded in customer applications, the console is deployed separately from the fleet, and
  * nodes replicate to each other - so at any moment some caller is older than the node it is calling,
  * and a node that refused the old header would break all of them on upgrade rather than at a time
- * anyone chose. Same treatment as {@code get-hystrix-configs} and {@code conf/hystrix.properties} in
- * 2.7. Remove once every supported caller is 2.7 or later.
+ * anyone chose. Same treatment {@code get-hystrix-configs} got in 2.7. Remove once every supported
+ * caller is 2.7 or later.
  *
  * <h2>The SSE stream's check is stricter, on purpose</h2>
  *

@@ -41,14 +41,24 @@ import org.slf4j.LoggerFactory;
  * Key resolution: {@code resilience.command.<key>.<prop>}, then {@code hystrix.command.<key>.<prop>},
  * then the same two at {@code default} scope, then the built-in default. The {@code hystrix.*} prefix is
  * the pre-2.7 spelling and stays accepted indefinitely - it costs one lookup and it is the difference
- * between an upgrade that silently reverts every tuning key to its default and one that does not. The
- * legacy FILE NAME ({@code conf/hystrix.properties}) is read as a fallback too, but only for one
- * release, and it warns.
+ * between an upgrade that silently reverts every tuning key to its default and one that does not.
+ *
+ * <b>The legacy FILE NAME is not.</b> {@code conf/hystrix.properties} was read as a fallback for one
+ * release, warning as it went, and 2.9.0 removed it: a node that still has only that file now runs on
+ * built-in defaults and says so. The KEY PREFIX and the FILE NAME were always separate contracts on
+ * separate schedules, which is why one outlived the other - renaming the file was always enough, and
+ * was what the warning asked for.
  */
 public class FcResilienceConfig {
 
 	private static final String PROPERTIES_FILE = "resilience.properties";
-	private static final String LEGACY_PROPERTIES_FILE = "hystrix.properties";
+
+	/**
+	 * Read only to tell an operator their file is being ignored. The pre-2.7 name stopped being a
+	 * fallback in 2.9.0; without this the symptom is a node silently running on built-in defaults -
+	 * a 1-second origin timeout and 10 permits - which looks like nothing at all until load arrives.
+	 */
+	private static final String RETIRED_PROPERTIES_FILE = "hystrix.properties";
 
 	private static final String COMMAND_PREFIX = "resilience.command.";
 	private static final String THREADPOOL_PREFIX = "resilience.threadpool.";
@@ -157,42 +167,41 @@ public class FcResilienceConfig {
 	}
 
 	/**
-	 * Reads conf/resilience.properties, falling back to the pre-2.7 conf/hystrix.properties.
+	 * Reads conf/resilience.properties. The pre-2.7 conf/hystrix.properties is NOT read.
 	 *
-	 * The fallback is loud on purpose. A silent fallback would be indistinguishable from "the file was
-	 * found", so nobody would ever rename it; a hard failure would turn an upgrade into an outage over a
-	 * file name. It is scheduled for removal one release after the rename - the warning says so.
+	 * It was read as a fallback for one release, warning each time, and 2.9.0 removed it as that
+	 * warning promised. What is kept is the ERROR: a leftover hystrix.properties is still looked for,
+	 * purely so an operator who never renamed it is told why their tuning stopped applying. Losing
+	 * every circuit-breaker, timeout and bulkhead setting at once is not a failure anyone should have
+	 * to infer from behaviour under load.
 	 *
-	 * If BOTH files exist the new one wins outright, without merging: two half-populated files with the
-	 * same keys resolving to a union is exactly the kind of config nobody can reason about during an
-	 * incident. The warning names the file that is being ignored.
+	 * Missing config is defaults, not an exception: this singleton is first touched on the first
+	 * request, so throwing would turn an un-renamed file into a node answering 500s.
 	 */
 	private static FcResilienceConfig load()
 	{
 		Properties loaded = read(PROPERTIES_FILE);
 		if (null != loaded)
 		{
-			if (null != read(LEGACY_PROPERTIES_FILE))
-				logger.warn("Both conf/" + PROPERTIES_FILE + " and conf/" + LEGACY_PROPERTIES_FILE + " exist."
-						+ " Using conf/" + PROPERTIES_FILE + " and IGNORING conf/" + LEGACY_PROPERTIES_FILE
-						+ " entirely - the two are not merged. Delete the legacy file.");
+			if (null != read(RETIRED_PROPERTIES_FILE))
+				logger.warn("conf/" + RETIRED_PROPERTIES_FILE + " is present and is NOT read - the legacy file"
+						+ " name was removed in 2.9.0. conf/" + PROPERTIES_FILE + " is the file in use;"
+						+ " delete the other one so it cannot be mistaken for live config.");
 
 			return new FcResilienceConfig(loaded, PROPERTIES_FILE);
 		}
 
-		loaded = read(LEGACY_PROPERTIES_FILE);
-		if (null != loaded)
-		{
-			logger.warn("conf/" + PROPERTIES_FILE + " not found - reading the legacy conf/" + LEGACY_PROPERTIES_FILE
-					+ " instead. Rename the file; the legacy name is read for one release only. The"
-					+ " hystrix.command.* / hystrix.threadpool.* KEY prefixes inside it stay supported"
-					+ " regardless of the file name, so renaming the file is enough.");
-			return new FcResilienceConfig(loaded, LEGACY_PROPERTIES_FILE);
-		}
+		if (null != read(RETIRED_PROPERTIES_FILE))
+			logger.error("conf/" + PROPERTIES_FILE + " not found, but conf/" + RETIRED_PROPERTIES_FILE
+					+ " is - and the legacy file name is NO LONGER READ as of 2.9.0. Every circuit-breaker,"
+					+ " timeout, bulkhead and thread-pool setting is now at its built-in default"
+					+ " (timeout=1000ms, maxConcurrentRequests=10). RENAME the file to conf/" + PROPERTIES_FILE
+					+ " - the hystrix.command.* / hystrix.threadpool.* KEY prefixes inside it are still"
+					+ " supported, so renaming the file is all that is needed.");
+		else
+			logger.warn("conf/" + PROPERTIES_FILE + " could not be read - every circuit-breaker, timeout,"
+					+ " bulkhead and thread-pool setting falls back to its built-in default.");
 
-		logger.warn("Neither conf/" + PROPERTIES_FILE + " nor conf/" + LEGACY_PROPERTIES_FILE
-				+ " could be read - every circuit-breaker, timeout, bulkhead and thread-pool setting"
-				+ " falls back to its built-in default.");
 		return new FcResilienceConfig(new Properties(), PROPERTIES_FILE);
 	}
 

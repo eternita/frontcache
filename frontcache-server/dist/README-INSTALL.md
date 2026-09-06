@@ -52,7 +52,7 @@ Then, as needed:
 - `guard-rules.conf` — checks applied before cache and origin (reject / redirect / dry-run).
 - `fc-l1-ehcache-config.xml` — L1 in-memory cache sizing.
 - `resilience.properties` — circuit-breaker thresholds and thread pools. (Pre-2.7 installs called
-  this `hystrix.properties`; that name is still read for one release, with a warning, and the
+  this `hystrix.properties`; **that name is no longer read** — rename the file, and the
   `hystrix.*` keys inside it are accepted indefinitely.)
 
 ## 3. Run
