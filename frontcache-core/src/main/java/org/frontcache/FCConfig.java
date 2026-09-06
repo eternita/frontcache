@@ -16,7 +16,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Enumeration;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -43,10 +42,6 @@ public class FCConfig {
     private static Properties config;
 
     public static final String DEFAULT_DOMAIN = "default-domain";
-
-	private static final String BOT_CONIF_FILE = "bots.conf";
-
-	private static Set<String> botUserAgentKeywords = new HashSet<String>();
 
 	private static final String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "dynamic-urls.conf";
 
@@ -83,7 +78,6 @@ public class FCConfig {
 		// FcResilienceConfig, as an ordinary Properties object at first use, so both workarounds are
 		// gone and the startup-ordering bug they guarded against is no longer possible.
 
-		loadBotConfigs();
 		loadCacheIgnoreURIPatterns();
 
     	if (null == config)
@@ -91,17 +85,21 @@ public class FCConfig {
     }
 
 	/**
-	 * Bot user-agent keywords from conf/bots.conf. One node serves one site, so there is one set.
+	 * Bare bot user-agent keywords from conf/bots.conf. One node serves one site, so there is one set.
+	 *
+	 * conf/bots.conf holds classification RULES as well as bare keywords as of 2.10, and
+	 * {@link org.frontcache.bots.BotClassifier} is its only reader - this delegates rather than
+	 * parsing the file a second time, because two readers of one config file is how a console ends up
+	 * reporting something the engine is not doing.
 	 */
 	public static Set<String> getBotUserAgentKeywords()
 	{
-		return botUserAgentKeywords;
+		return org.frontcache.bots.BotClassifier.getInstance().getKeywords();
 	}
 
     public static void destroy()
     {
     	config = null;
-    	botUserAgentKeywords.clear();
     	dynamicURLPatterns.clear();
     }
 
@@ -280,79 +278,6 @@ public class FCConfig {
 
 		return is;
 	}
-
-	/**
-	 *
-	 */
-	private static void loadBotConfigs() {
-		botUserAgentKeywords.clear();
-
-		logger.info("Starting bot configs loading ...");
-		Set<String> botConfigs = loadBotConfigs(BOT_CONIF_FILE);
-		if (null != botConfigs)
-		{
-			botUserAgentKeywords.addAll(botConfigs);
-			logger.info("   loaded " + botConfigs.size() + " bots from " + BOT_CONIF_FILE);
-		} else {
-			logger.info("   no bot configs found in " + BOT_CONIF_FILE + " - no user agent is treated as a bot");
-		}
-		logger.info("Bot configs loading is completed ...");
-		return;
-	}
-
-	/**
-	 *
-	 * @param file
-	 * @return
-	 */
-	private static Set<String> loadBotConfigs(String file) {
-		BufferedReader confReader = null;
-		InputStream is = null;
-
-		Set<String> botUserAgentKeywords = new LinkedHashSet<String>();
-
-		try
-		{
-			is = FCConfig.getConfigInputStream(file);
-			if (null == is)
-			{
-				logger.info("List of bots is not loaded from " + file);
-				return null;
-			}
-
-			confReader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-			String botStr;
-			while ((botStr = confReader.readLine()) != null) {
-				if (botStr.trim().startsWith("#")) // handle comments
-					continue;
-
-				if (0 == botStr.trim().length()) // skip empty
-					continue;
-
-				botUserAgentKeywords.add(botStr);
-			}
-
-		} catch (Throwable e) {
-			logger.info("List of bots is not loaded from " + file);
-			return null;
-		} finally {
-			if (null != confReader)
-			{
-				try {
-					confReader.close();
-				} catch (IOException e) { }
-			}
-			if (null != is)
-			{
-				try {
-					is.close();
-				} catch (IOException e) { }
-			}
-		}
-
-		return botUserAgentKeywords;
-	}
-
 
 	private static void loadCacheIgnoreURIPatterns() {
 		dynamicURLPatterns.clear();

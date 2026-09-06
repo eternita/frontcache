@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.frontcache.bots.BotRuleEntry;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.client.FrontCacheCluster;
@@ -397,6 +398,27 @@ public abstract class ClientTests extends TestsBase {
 		Set<String> botKeywords = frontcacheClient.getBotKeywords();
 		Assert.assertNotNull("get-bots returned nothing", botKeywords);
 		Assert.assertFalse("conf/bots.conf is not empty, so neither should this be", botKeywords.isEmpty());
+
+		// The rules are additive (2.10) and must arrive BESIDE the keywords, not instead of them: the
+		// console is deployed separately from the fleet and upgrades in either order. Every node has
+		// rules, because two of them are built in.
+		List<BotRuleEntry> botRules = frontcacheClient.getBotRules();
+		Assert.assertNotNull("get-bots returned no rules", botRules);
+		Assert.assertFalse("the built-in rules alone make this non-empty", botRules.isEmpty());
+		Assert.assertEquals("the built-in no-user-agent rule is evaluated first",
+				"no-user-agent", botRules.get(0).getName());
+		Assert.assertEquals("the built-in default rule is evaluated last, and always matches",
+				"default", botRules.get(botRules.size() - 1).getName());
+		Set<String> ruleNames = new HashSet<String>();
+		for (BotRuleEntry rule : botRules)
+			ruleNames.add(rule.getName());
+
+		// A bare keyword becomes a rule named after itself, so it is visible (and countable) on the
+		// console's screen - while botKeywords keeps meaning exactly what it did before 2.10.
+		Assert.assertTrue("every bare keyword should also appear as a rule: " + botKeywords + " vs " + ruleNames,
+				ruleNames.containsAll(botKeywords));
+		Assert.assertTrue("rules = 2 built-ins + the keywords + whatever else the file holds",
+				botRules.size() >= botKeywords.size() + 2);
 
 		Assert.assertNotNull("get-dynamic-urls returned nothing", frontcacheClient.getDynamicUrlPatterns());
 		Assert.assertNotNull("get-fallback-configs returned nothing", frontcacheClient.getFallbackEntries());

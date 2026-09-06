@@ -12,6 +12,7 @@ import java.util.concurrent.Callable;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.BotConfig;
+import org.frontcache.io.GetBotsActionResponse;
 
 public class BotConfigsCaller implements Callable<BotConfig> {
 
@@ -25,6 +26,11 @@ public class BotConfigsCaller implements Callable<BotConfig> {
     @Override
     public BotConfig call() throws Exception {
 
-		 return new BotConfig(fcClient.getName(), fcClient.getBotKeywords());
+		// One call, both shapes: an edge older than 2.10 answers with keywords and no rules.
+		GetBotsActionResponse response = fcClient.getBotsActionResponse();
+		if (null == response)
+			return new BotConfig(fcClient.getName(), null, null);
+
+		return new BotConfig(fcClient.getName(), response.getBotKeywords(), response.getBotRules());
     }
 }

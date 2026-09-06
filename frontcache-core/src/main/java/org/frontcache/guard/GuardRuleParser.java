@@ -83,6 +83,10 @@ public class GuardRuleParser {
 	/**
 	 * Splits a rule line into its {@code name | condition | action [| flag]} fields.
 	 *
+	 * Public because bots.conf uses the same line format and must split it the same way - see
+	 * {@link org.frontcache.bots.BotRuleParser}. One splitter, so the alternation bug below cannot
+	 * be re-introduced in the second file.
+	 *
 	 * The obvious {@code line.split("\\|")} is wrong, and was: {@code |} is also regex alternation, so
 	 * a perfectly ordinary predicate like {@code uri~^/(recent|user)-contributions\.htm} got shredded
 	 * at the alternation and the rule was refused at load time as "invalid regex ... Unclosed group".
@@ -95,7 +99,7 @@ public class GuardRuleParser {
 	 * byte-identical - nothing is unescaped - so {@code \|} still reads as a literal pipe to the regex
 	 * engine, and a top-level alternation is written the way it already was, in parentheses.
 	 */
-	static List<String> splitFields(String line)
+	public static List<String> splitFields(String line)
 	{
 		List<String> fields = new ArrayList<String>();
 		StringBuilder field = new StringBuilder();

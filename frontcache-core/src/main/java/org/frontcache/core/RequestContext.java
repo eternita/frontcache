@@ -746,18 +746,21 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
     private static final String RATE_LIMIT_KEY_NONE = ""; // sentinel: resolved, and there is no answer
 
     /**
-     * The client address rate limiting counts against, resolved once per request.
+     * The trustworthy client address, resolved once per request.
      *
      * Deliberately NOT {@link #getClientIP()}. That one walks thirteen client-supplied headers and
      * returns the first non-empty value, which is right for a log column and would let any client
-     * mint itself a fresh counter per request by sending its own X-Forwarded-For. This goes through
-     * {@link ClientIpResolver}, which reads a forwarding header only from a configured trusted proxy
-     * and walks it right to left. The two can legitimately disagree, which is why the guard log line
-     * carries this one explicitly.
+     * mint itself a fresh counter per request - or claim a crawler's address - by sending its own
+     * X-Forwarded-For. This goes through {@link ClientIpResolver}, which reads a forwarding header
+     * only from a configured trusted proxy and walks it right to left. The two can legitimately
+     * disagree, which is why the guard log line carries this one explicitly.
+     *
+     * Two callers, both of which must never see a spoofable value: the rate limiter's counter key,
+     * and the {@code client-ip:} predicate used by guard rules and by bots.conf classification.
      *
      * @return canonical client address, or null when it cannot be established
      */
-    public String getRateLimitKey() {
+    public String getResolvedClientIP() {
         String key = (String) get(RATE_LIMIT_KEY);
         if (null == key) {
             key = ClientIpResolver.getInstance().resolve(getRequest());
@@ -766,6 +769,58 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
             set(RATE_LIMIT_KEY, (null != key) ? key : RATE_LIMIT_KEY_NONE);
         }
         return RATE_LIMIT_KEY_NONE.equals(key) ? null : key;
+    }
+
+    /**
+     * @return {@link #getResolvedClientIP()} - the name the rate limiter knows it by
+     */
+    public String getRateLimitKey() {
+        return getResolvedClientIP();
+    }
+
+    private static final String USER_AGENT = "userAgent";
+    private static final String USER_AGENT_NONE = ""; // sentinel: read, and there was none
+
+    /**
+     * The User-Agent header, read once per request.
+     *
+     * Memoized for the same reason the cookie names are: bot classification asks several rules for
+     * it on every request, and an async include's servlet request may be recycled by the time one
+     * of them asks - in which case the answer is "no user agent", not an exception.
+     *
+     * @return the header value, or null when there is none (or it is no longer readable)
+     */
+    public String getUserAgent() {
+        String userAgent = (String) get(USER_AGENT);
+        if (null == userAgent) {
+            String value = null;
+            HttpServletRequest request = getRequest();
+            if (null != request) {
+                try {
+                    value = request.getHeader("User-Agent");
+                } catch (Exception e) {
+                    // recycled request - undecidable, treat as absent
+                }
+            }
+            userAgent = (null != value) ? value : USER_AGENT_NONE;
+            set(USER_AGENT, userAgent);
+        }
+        return USER_AGENT_NONE.equals(userAgent) ? null : userAgent;
+    }
+
+    private static final String CLIENT_TYPE_RULE = "clientTypeRule";
+
+    /**
+     * Name of the bots.conf rule that decided {@link #getClientType()}. Kept for diagnostics; the
+     * client type itself is what everything downstream reads.
+     */
+    public String getClientTypeRule() {
+        return (String) get(CLIENT_TYPE_RULE);
+    }
+
+    public void setClientTypeRule(String ruleName) {
+        if (null != ruleName)
+            set(CLIENT_TYPE_RULE, ruleName);
     }
 
     private static final String GUARD_PROBE = "guardProbe";

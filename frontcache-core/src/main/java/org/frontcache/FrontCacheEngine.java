@@ -57,6 +57,8 @@ import org.apache.hc.core5.http.message.MessageSupport;
 import org.apache.hc.core5.pool.PoolStats;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.protocol.HttpContext;
+import org.frontcache.bots.BotClassifier;
+import org.frontcache.bots.BotRule;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.ClientIpResolver;
@@ -326,6 +328,11 @@ public class FrontCacheEngine {
 	public static void reload() {
 
 		destroy();
+
+		// The guard rules and the fallback resolver are rebuilt with the engine that owns them; the
+		// bot classifier is a process-wide singleton (like ClientIpResolver, and for the same reason -
+		// FCConfig and the management API read it without an engine), so it has to be told.
+		BotClassifier.reload();
 
 		getFrontCache(); // recreate
 
@@ -987,12 +994,14 @@ public class FrontCacheEngine {
         context.setRequestId(requestId);
         context.setRequestType(requestType);
 
-        context.setClientType(getClientType(servletRequest)); // client type = bot | guest based on User-Agent Header and bots.conf
-
         // Resolved here, on the request thread, for two reasons: it is a 13-header scan that every log
         // line and the origin call would otherwise repeat, and it is the only point at which the answer
         // is still knowable - an async include reads it after the container has recycled the request.
         context.setClientIP(FCUtils.getClientIP(servletRequest));
+
+        // client type = bot | guest, from conf/bots.conf. After setRequest/setRequestURI above and
+        // after the client IP: a rule may read any of them, and the servlet request is still live here.
+        setClientType(context);
 
         if (null != filterChain)
             context.setFilterChain(filterChain);
@@ -1000,20 +1009,22 @@ public class FrontCacheEngine {
 		return context;
     }
 
-	private String getClientType(HttpServletRequest request)
+	/**
+	 * Client type - bot | guest - from conf/bots.conf.
+	 *
+	 * Until 2.10 this was a case-sensitive substring scan of the User-Agent and nothing else;
+	 * {@link BotClassifier} now evaluates an ordered rule list that can also read the client IP,
+	 * cookies, headers and the request shape. The output vocabulary is unchanged and must stay that
+	 * way: it keys the expireTimeMap of every entry in the L2 index.
+	 *
+	 * Called from init(), BEFORE the guard rules run - their client-type: predicate reads what this
+	 * writes, and that ordering must not drift.
+	 */
+	private void setClientType(RequestContext context)
 	{
-
-		String userAgent = request.getHeader("User-Agent");
-		if (null != userAgent)
-		{
-			for (String botKeyword : FCConfig.getBotUserAgentKeywords())
-				if (userAgent.contains(botKeyword))
-					return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
-		} else {
-			return FCHeaders.REQUEST_CLIENT_TYPE_BOT; // no user-agent -> bot
-		}
-
-		return FCHeaders.REQUEST_CLIENT_TYPE_GUEST;
+		BotRule rule = BotClassifier.getInstance().classify(context);
+		context.setClientType(rule.getClientType());
+		context.setClientTypeRule(rule.getName());
 	}
 
     private boolean ignoreCache(String uri)
