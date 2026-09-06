@@ -11,7 +11,7 @@ package org.frontcache.console.model;
 /**
  * Raw ./conf/bots.conf of one edge (comments and empty lines preserved).
  *
- * The parsed counterpart is {@link VisitorTypesConfig}, on the Visitor Types screen. Through 2.10
+ * The parsed counterpart is {@link VisitorTypesConfig}, on the Visitor Types screen. Before 2.9.0
  * this class name meant that one; it now means the file, matching {@link GuardConfig} against
  * {@link GuardRulesConfig}.
  */

@@ -214,7 +214,7 @@ public class GuardPredicateFactory {
 
 		case "ua-contains":
 		{
-			// The bare-keyword form of bots.conf. Case-INSENSITIVE as of 2.10: the pre-2.10
+			// The bare-keyword form of bots.conf. Case-INSENSITIVE as of 2.9.0: the pre-2.9.0
 			// String.contains() meant a file listing 'Googlebot' did not match 'googlebot/2.1',
 			// which was a latent bug rather than a contract (see
 			// docs/dynamic-bots-classification-proposal.md section 4.2).

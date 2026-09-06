@@ -495,7 +495,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 			botRules.add(rule.toEntry());
 
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
-		// The bare keywords keep their own field and their pre-2.10 meaning - a console older than
+		// The bare keywords keep their own field and their pre-2.9.0 meaning - a console older than
 		// the rules renders that one and must not suddenly see rule names in it.
 		aResponse.setBotKeywords(classifier.getKeywords());
 		aResponse.setBotRules(botRules);

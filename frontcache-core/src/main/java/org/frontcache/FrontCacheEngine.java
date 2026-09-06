@@ -1012,7 +1012,7 @@ public class FrontCacheEngine {
 	/**
 	 * Client type - bot | guest - from conf/bots.conf.
 	 *
-	 * Until 2.10 this was a case-sensitive substring scan of the User-Agent and nothing else;
+	 * Until 2.9.0 this was a case-sensitive substring scan of the User-Agent and nothing else;
 	 * {@link BotClassifier} now evaluates an ordered rule list that can also read the client IP,
 	 * cookies, headers and the request shape. The output vocabulary is unchanged and must stay that
 	 * way: it keys the expireTimeMap of every entry in the L2 index.

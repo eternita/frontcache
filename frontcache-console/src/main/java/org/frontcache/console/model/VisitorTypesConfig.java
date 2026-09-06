@@ -22,10 +22,10 @@ import org.frontcache.bots.BotRuleEntry;
  *
  * The keywords were a flat set as of 2.7 (the management API used to return them keyed by domain,
  * which always held a single entry once one node served one site - see
- * docs/archive/multi-domain-retirement-proposal.md section 8), and the rules were added in 2.10.
+ * docs/archive/multi-domain-retirement-proposal.md section 8), and the rules were added in 2.9.0.
  *
  * <b>Rules can be null</b>, and the JSP has to cope: the console reads a mixed fleet and is upgraded
- * independently of the nodes, so an edge older than 2.10 answers with keywords only.
+ * independently of the nodes, so an edge older than 2.9.0 answers with keywords only.
  */
 public class VisitorTypesConfig {
 
@@ -48,7 +48,7 @@ public class VisitorTypesConfig {
 		return config;
 	}
 
-	/** null from an edge older than 2.10 - render {@link #getConfig()} instead */
+	/** null from an edge older than 2.9.0 - render {@link #getConfig()} instead */
 	public List<BotRuleEntry> getRules() {
 		return rules;
 	}

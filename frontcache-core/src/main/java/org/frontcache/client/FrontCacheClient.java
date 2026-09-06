@@ -507,7 +507,7 @@ public class FrontCacheClient {
 
 	/**
 	 * @return the bot classification rules this edge is running, in evaluation order and with their
-	 *         hit counts, or null when the edge could not be reached OR is older than 2.10 (which
+	 *         hit counts, or null when the edge could not be reached OR is older than 2.9.0 (which
 	 *         knows only {@link #getBotKeywords()})
 	 */
 	public List<BotRuleEntry> getBotRules()

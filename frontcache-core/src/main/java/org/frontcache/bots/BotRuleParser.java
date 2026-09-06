@@ -23,7 +23,7 @@ import org.frontcache.guard.GuardRuleParser;
  * Two line shapes, and the absence of a top-level {@code |} is what tells them apart:
  *
  * <pre>
- *   Googlebot                                          bare User-Agent keyword (pre-2.10 format)
+ *   Googlebot                                          bare User-Agent keyword (pre-2.9.0 format)
  *   fake-googlebot | ua~(?i)googlebot ; !client-ip:@googlebot-ips.txt | bot | dry-run
  * </pre>
  *
@@ -77,7 +77,7 @@ public class BotRuleParser {
 	}
 
 	/**
-	 * A bare line: the pre-2.10 format, one User-Agent substring per line, still supported and still
+	 * A bare line: the pre-2.9.0 format, one User-Agent substring per line, still supported and still
 	 * how most of a bots.conf is written.
 	 *
 	 * The keyword becomes the rule name, so the console shows which keyword matched and its hit

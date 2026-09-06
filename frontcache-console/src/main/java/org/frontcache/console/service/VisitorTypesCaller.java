@@ -26,7 +26,7 @@ public class VisitorTypesCaller implements Callable<VisitorTypesConfig> {
     @Override
     public VisitorTypesConfig call() throws Exception {
 
-		// One call, both shapes: an edge older than 2.10 answers with keywords and no rules.
+		// One call, both shapes: an edge older than 2.9.0 answers with keywords and no rules.
 		GetBotsActionResponse response = fcClient.getBotsActionResponse();
 		if (null == response)
 			return new VisitorTypesConfig(fcClient.getName(), null, null);

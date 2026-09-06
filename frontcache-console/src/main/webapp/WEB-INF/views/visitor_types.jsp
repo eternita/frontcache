@@ -32,7 +32,7 @@
 
           <c:choose>
 
-            <%-- 2.10+ edge: the ordered rules, with hit counts --%>
+            <%-- 2.9.0+ edge: the ordered rules, with hit counts --%>
             <c:when test="${not empty edge.value.rules}">
               <table class="table table-striped">
                 <thead>
@@ -67,7 +67,7 @@
               </table>
             </c:when>
 
-            <%-- edge older than 2.10: it answers with bare keywords and no rules --%>
+            <%-- edge older than 2.9.0: it answers with bare keywords and no rules --%>
             <c:otherwise>
               <p class="text-muted">
                 <i>This edge predates bot classification rules &mdash; it reports User-Agent keywords only.</i>

@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
  * Configs / Bot Configs: the raw conf/bots.conf of each edge, shown as it sits on disk.
  *
  * The parsed view - the rules in evaluation order, with hit counts - is the Visitor Types screen
- * ({@link VisitorTypesController}), which is what this URL served through 2.10.
+ * ({@link VisitorTypesController}), which is what this URL served before 2.9.0.
  */
 @Controller
 public class BotConfigController {

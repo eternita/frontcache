@@ -87,7 +87,7 @@ public class FCConfig {
 	/**
 	 * Bare bot user-agent keywords from conf/bots.conf. One node serves one site, so there is one set.
 	 *
-	 * conf/bots.conf holds classification RULES as well as bare keywords as of 2.10, and
+	 * conf/bots.conf holds classification RULES as well as bare keywords as of 2.9.0, and
 	 * {@link org.frontcache.bots.BotClassifier} is its only reader - this delegates rather than
 	 * parsing the file a second time, because two readers of one config file is how a console ends up
 	 * reporting something the engine is not doing.

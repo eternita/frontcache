@@ -96,9 +96,9 @@ public class FcCommandKeys {
 	 * cannot carry over, and it has to set {@code resilience.command.Cache-Miss.*} explicitly.
 	 *
 	 * {@code Cache-Hit} is the one entry here that is only a spelling change: it was {@code Cache-Hits}
-	 * through 2.10, the last key left in the plural after the 2.9.0 renames put the rest in the
-	 * singular. Nothing about the command moved - it is still every cache lookup - but the key is a
-	 * config contract all the same, so an un-edited file keeps configuring it through the old name.
+	 * before 2.9.0, and it was the last key left in the plural once the other renames put the rest in
+	 * the singular. Nothing about the command moved - it is still every cache lookup - but the key is
+	 * a config contract all the same, so an un-edited file keeps configuring it through the old name.
 	 */
 	public static final Map<String, String> LEGACY_COMMAND_KEYS;
 	static {

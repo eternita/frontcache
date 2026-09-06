@@ -140,7 +140,7 @@ public class BotClassifier {
 
 	/**
 	 * Bare User-Agent keywords from the file, in file order. Reported separately from the rules
-	 * because a console older than 2.10 knows only this shape.
+	 * because a console older than 2.9.0 knows only this shape.
 	 */
 	public Set<String> getKeywords() {
 		return keywords;

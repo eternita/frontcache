@@ -196,7 +196,7 @@ public class LuceneIndexManager {
 	 */
 	public static final class Tuning {
 
-		/** Commit cadence. {@code <= 0} restores the pre-2.10 commit-after-every-write behaviour. */
+		/** Commit cadence. {@code <= 0} restores the pre-2.9.0 commit-after-every-write behaviour. */
 		static final long DEFAULT_COMMIT_INTERVAL_MS = 10_000;
 
 		/** Safety-net refresh cadence. {@code <= 0} disables the background refresher. */

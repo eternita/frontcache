@@ -399,7 +399,7 @@ public abstract class ClientTests extends TestsBase {
 		Assert.assertNotNull("get-bots returned nothing", botKeywords);
 		Assert.assertFalse("conf/bots.conf is not empty, so neither should this be", botKeywords.isEmpty());
 
-		// The rules are additive (2.10) and must arrive BESIDE the keywords, not instead of them: the
+		// The rules are additive (2.9.0) and must arrive BESIDE the keywords, not instead of them: the
 		// console is deployed separately from the fleet and upgrades in either order. Every node has
 		// rules, because two of them are built in.
 		List<BotRuleEntry> botRules = frontcacheClient.getBotRules();
@@ -414,7 +414,7 @@ public abstract class ClientTests extends TestsBase {
 			ruleNames.add(rule.getName());
 
 		// A bare keyword becomes a rule named after itself, so it is visible (and countable) on the
-		// console's screen - while botKeywords keeps meaning exactly what it did before 2.10.
+		// console's screen - while botKeywords keeps meaning exactly what it did before 2.9.0.
 		Assert.assertTrue("every bare keyword should also appear as a rule: " + botKeywords + " vs " + ruleNames,
 				ruleNames.containsAll(botKeywords));
 		Assert.assertTrue("rules = 2 built-ins + the keywords + whatever else the file holds",
@@ -515,7 +515,7 @@ public abstract class ClientTests extends TestsBase {
 	}
 
 	/**
-	 * A line unique to this node's conf/bots.conf - the standalone node is on the 2.10 rule format,
+	 * A line unique to this node's conf/bots.conf - the standalone node is on the 2.9.0 rule format,
 	 * the filter node deliberately on bare keywords only.
 	 */
 	protected abstract String expectedBotsConfigMarker();

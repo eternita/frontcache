@@ -437,7 +437,7 @@ public class FrontcacheService {
 	 * How each edge classifies a visitor - the ordered rules and the bare keywords - for the Visitor
 	 * Types screen.
 	 *
-	 * One entry per reachable edge. The value carries both shapes - rules (2.10+) and bare keywords -
+	 * One entry per reachable edge. The value carries both shapes - rules (2.9.0+) and bare keywords -
 	 * because the console reads a mixed fleet and the JSP renders whichever the edge answered with.
 	 * The raw file behind this is {@link #getBotConfigs()}.
 	 */
