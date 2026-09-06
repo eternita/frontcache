@@ -76,7 +76,7 @@ public class FrontCacheClient {
 
 	private String frontCacheURI;
 
-	private String siteKey = "";
+	private String apiKey = "";
 
 	private final static String IO_URI = "frontcache-io";
 
@@ -149,11 +149,11 @@ public class FrontCacheClient {
 	/**
 	 *
 	 * @param frontcacheURL
-	 * @param siteKey
+	 * @param apiKey
 	 */
-	public FrontCacheClient(String frontcacheURL, String siteKey) {
+	public FrontCacheClient(String frontcacheURL, String apiKey) {
 		this(frontcacheURL);
-		this.siteKey = siteKey;
+		this.apiKey = apiKey;
 	}
 
 	/**
@@ -359,8 +359,8 @@ public class FrontCacheClient {
 
 //    	post.addHeader("Accept-Encoding", "gzip");
 
-		if (null != siteKey)
-			post.addHeader("Authorization", "Bearer " + siteKey);
+		if (null != apiKey)
+			post.addHeader("Authorization", "Bearer " + apiKey);
 
 		InputStream is = null;
 		ClassicHttpResponse response = null;
@@ -795,8 +795,8 @@ public class FrontCacheClient {
 
 //    	post.addHeader("Accept-Encoding", "gzip");
 
-		if (null != siteKey)
-			post.addHeader("Authorization", "Bearer " + siteKey);
+		if (null != apiKey)
+			post.addHeader("Authorization", "Bearer " + apiKey);
 
 		post.setEntity(new UrlEncodedFormEntity(urlParameters));
 

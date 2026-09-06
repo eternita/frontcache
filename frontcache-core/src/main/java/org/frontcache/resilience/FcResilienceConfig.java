@@ -13,9 +13,11 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,14 +41,24 @@ import org.slf4j.LoggerFactory;
  * Key resolution: {@code resilience.command.<key>.<prop>}, then {@code hystrix.command.<key>.<prop>},
  * then the same two at {@code default} scope, then the built-in default. The {@code hystrix.*} prefix is
  * the pre-2.7 spelling and stays accepted indefinitely - it costs one lookup and it is the difference
- * between an upgrade that silently reverts every tuning key to its default and one that does not. The
- * legacy FILE NAME ({@code conf/hystrix.properties}) is read as a fallback too, but only for one
- * release, and it warns.
+ * between an upgrade that silently reverts every tuning key to its default and one that does not.
+ *
+ * <b>The legacy FILE NAME is not.</b> {@code conf/hystrix.properties} was read as a fallback for one
+ * release, warning as it went, and 2.9.0 removed it: a node that still has only that file now runs on
+ * built-in defaults and says so. The KEY PREFIX and the FILE NAME were always separate contracts on
+ * separate schedules, which is why one outlived the other - renaming the file was always enough, and
+ * was what the warning asked for.
  */
 public class FcResilienceConfig {
 
 	private static final String PROPERTIES_FILE = "resilience.properties";
-	private static final String LEGACY_PROPERTIES_FILE = "hystrix.properties";
+
+	/**
+	 * Read only to tell an operator their file is being ignored. The pre-2.7 name stopped being a
+	 * fallback in 2.9.0; without this the symptom is a node silently running on built-in defaults -
+	 * a 1-second origin timeout and 10 permits - which looks like nothing at all until load arrives.
+	 */
+	private static final String RETIRED_PROPERTIES_FILE = "hystrix.properties";
 
 	private static final String COMMAND_PREFIX = "resilience.command.";
 	private static final String THREADPOOL_PREFIX = "resilience.threadpool.";
@@ -57,18 +69,37 @@ public class FcResilienceConfig {
 	private static final String DEFAULT_SCOPE = "default";
 
 	/**
-	 * Command key -> the key it inherits from when the file says nothing about it.
+	 * Command key -> the key it inherits from when the file says nothing about it. Followed as a
+	 * CHAIN, not a single hop - see {@link #commandRaw}.
 	 *
-	 * {@code Include-Requests} was split out of {@code Input-Requests} in 2.9, so that the dashboard's
-	 * headline figure counts client traffic rather than the node's own includes coming back through
-	 * the front door. Inheriting means the split is a metrics change by default: a node whose
-	 * resilience.properties predates it keeps running includes on exactly the tuning they already had.
-	 * Setting {@code resilience.command.Include-Requests.*} explicitly overrides this, per property.
+	 * Two kinds of entry, and they compose:
+	 *
+	 * <ul>
+	 * <li><b>A split.</b> {@code Include-Request} was split out of {@code Input-Request} in 2.9.0, so
+	 *     the dashboard's headline figure counts client traffic rather than the node's own includes
+	 *     coming back through the front door. Inheriting makes the split a metrics change by default:
+	 *     a node whose file predates it runs includes on exactly the tuning they already had.</li>
+	 * <li><b>A rename.</b> 2.9.0 also renamed four keys ({@link FcCommandKeys#LEGACY_COMMAND_KEYS}).
+	 *     Each new key falls back on its old name, so an un-edited resilience.properties keeps
+	 *     configuring the command it has always configured.</li>
+	 * </ul>
+	 *
+	 * The chain matters because the two stack: on an un-edited file {@code Include-Request} resolves
+	 * through {@code Input-Request} to {@code Input-Requests}, which is the only one of the three such
+	 * a file actually contains. A single hop would stop at {@code Input-Request}, find nothing, and
+	 * drop the command onto the built-in defaults - the exact failure this map exists to prevent.
+	 *
+	 * Setting {@code resilience.command.<new-key>.*} explicitly overrides all of it, per property.
 	 */
 	private static final Map<String, String> COMMAND_KEY_INHERITANCE;
 	static {
 		Map<String, String> m = new HashMap<String, String>();
-		m.put(FC_Total.COMMAND_KEY_INCLUDE_REQUESTS, FC_Total.COMMAND_KEY_INPUT_REQUESTS);
+		// the split: an include's tuning comes from client traffic's unless stated otherwise
+		m.put(FC_Total.COMMAND_KEY_INCLUDE_REQUEST, FC_Total.COMMAND_KEY_INPUT_REQUEST);
+		// the renames: each new key ends its chain at its own pre-2.9.0 name
+		for (Map.Entry<String, String> renamed : FcCommandKeys.LEGACY_COMMAND_KEYS.entrySet())
+			if (!m.containsKey(renamed.getKey()))
+				m.put(renamed.getKey(), renamed.getValue());
 		COMMAND_KEY_INHERITANCE = Collections.unmodifiableMap(m);
 	}
 
@@ -136,42 +167,41 @@ public class FcResilienceConfig {
 	}
 
 	/**
-	 * Reads conf/resilience.properties, falling back to the pre-2.7 conf/hystrix.properties.
+	 * Reads conf/resilience.properties. The pre-2.7 conf/hystrix.properties is NOT read.
 	 *
-	 * The fallback is loud on purpose. A silent fallback would be indistinguishable from "the file was
-	 * found", so nobody would ever rename it; a hard failure would turn an upgrade into an outage over a
-	 * file name. It is scheduled for removal one release after the rename - the warning says so.
+	 * It was read as a fallback for one release, warning each time, and 2.9.0 removed it as that
+	 * warning promised. What is kept is the ERROR: a leftover hystrix.properties is still looked for,
+	 * purely so an operator who never renamed it is told why their tuning stopped applying. Losing
+	 * every circuit-breaker, timeout and bulkhead setting at once is not a failure anyone should have
+	 * to infer from behaviour under load.
 	 *
-	 * If BOTH files exist the new one wins outright, without merging: two half-populated files with the
-	 * same keys resolving to a union is exactly the kind of config nobody can reason about during an
-	 * incident. The warning names the file that is being ignored.
+	 * Missing config is defaults, not an exception: this singleton is first touched on the first
+	 * request, so throwing would turn an un-renamed file into a node answering 500s.
 	 */
 	private static FcResilienceConfig load()
 	{
 		Properties loaded = read(PROPERTIES_FILE);
 		if (null != loaded)
 		{
-			if (null != read(LEGACY_PROPERTIES_FILE))
-				logger.warn("Both conf/" + PROPERTIES_FILE + " and conf/" + LEGACY_PROPERTIES_FILE + " exist."
-						+ " Using conf/" + PROPERTIES_FILE + " and IGNORING conf/" + LEGACY_PROPERTIES_FILE
-						+ " entirely - the two are not merged. Delete the legacy file.");
+			if (null != read(RETIRED_PROPERTIES_FILE))
+				logger.warn("conf/" + RETIRED_PROPERTIES_FILE + " is present and is NOT read - the legacy file"
+						+ " name was removed in 2.9.0. conf/" + PROPERTIES_FILE + " is the file in use;"
+						+ " delete the other one so it cannot be mistaken for live config.");
 
 			return new FcResilienceConfig(loaded, PROPERTIES_FILE);
 		}
 
-		loaded = read(LEGACY_PROPERTIES_FILE);
-		if (null != loaded)
-		{
-			logger.warn("conf/" + PROPERTIES_FILE + " not found - reading the legacy conf/" + LEGACY_PROPERTIES_FILE
-					+ " instead. Rename the file; the legacy name is read for one release only. The"
-					+ " hystrix.command.* / hystrix.threadpool.* KEY prefixes inside it stay supported"
-					+ " regardless of the file name, so renaming the file is enough.");
-			return new FcResilienceConfig(loaded, LEGACY_PROPERTIES_FILE);
-		}
+		if (null != read(RETIRED_PROPERTIES_FILE))
+			logger.error("conf/" + PROPERTIES_FILE + " not found, but conf/" + RETIRED_PROPERTIES_FILE
+					+ " is - and the legacy file name is NO LONGER READ as of 2.9.0. Every circuit-breaker,"
+					+ " timeout, bulkhead and thread-pool setting is now at its built-in default"
+					+ " (timeout=1000ms, maxConcurrentRequests=10). RENAME the file to conf/" + PROPERTIES_FILE
+					+ " - the hystrix.command.* / hystrix.threadpool.* KEY prefixes inside it are still"
+					+ " supported, so renaming the file is all that is needed.");
+		else
+			logger.warn("conf/" + PROPERTIES_FILE + " could not be read - every circuit-breaker, timeout,"
+					+ " bulkhead and thread-pool setting falls back to its built-in default.");
 
-		logger.warn("Neither conf/" + PROPERTIES_FILE + " nor conf/" + LEGACY_PROPERTIES_FILE
-				+ " could be read - every circuit-breaker, timeout, bulkhead and thread-pool setting"
-				+ " falls back to its built-in default.");
 		return new FcResilienceConfig(new Properties(), PROPERTIES_FILE);
 	}
 
@@ -332,18 +362,34 @@ public class FcResilienceConfig {
 		if (null == value)
 			value = props.getProperty(LEGACY_COMMAND_PREFIX + commandKey + "." + property);
 
-		// A command key added after an operator wrote their resilience.properties inherits from the
-		// key it was split out of, before falling back to default scope. Without this step a new key
-		// lands on the built-in defaults - THREAD, maxConcurrentRequests=10, timeout=1000 - because
-		// the shipped file sets `default` only for circuit-breaker properties. That failure is silent:
-		// the command works, then starts shedding into fallback fragments above 10 concurrent calls,
-		// on a node whose config file the operator never touched and has no reason to suspect.
+		// A command key added or renamed after an operator wrote their resilience.properties inherits
+		// from the key it was split out of, or from its own pre-2.9.0 name, before falling back to
+		// default scope. Without this step a new key lands on the built-in defaults - THREAD,
+		// maxConcurrentRequests=10, timeout=1000 - because the shipped file sets `default` only for
+		// circuit-breaker properties. That failure is silent: the command works, then starts shedding
+		// into fallback fragments above 10 concurrent calls, or gives up on an origin call after one
+		// second, on a node whose config file the operator never touched and has no reason to suspect.
+		//
+		// Walked as a chain, because a split and a rename stack: Include-Request -> Input-Request ->
+		// Input-Requests. Bounded by a visited set rather than by trusting the map to be acyclic - a
+		// cycle here would hang startup, which is a worse failure than the one being prevented.
+		Set<String> visited = null;
 		String inheritFrom = COMMAND_KEY_INHERITANCE.get(commandKey);
-		if (null == value && null != inheritFrom)
+		while (null == value && null != inheritFrom)
 		{
+			if (null == visited)
+			{
+				visited = new HashSet<String>();
+				visited.add(commandKey);
+			}
+			if (!visited.add(inheritFrom))
+				break;
+
 			value = props.getProperty(COMMAND_PREFIX + inheritFrom + "." + property);
 			if (null == value)
 				value = props.getProperty(LEGACY_COMMAND_PREFIX + inheritFrom + "." + property);
+
+			inheritFrom = COMMAND_KEY_INHERITANCE.get(inheritFrom);
 		}
 
 		if (null == value)
@@ -369,6 +415,20 @@ public class FcResilienceConfig {
 		String value = props.getProperty(THREADPOOL_PREFIX + poolKey + "." + property);
 		if (null == value)
 			value = props.getProperty(LEGACY_THREADPOOL_PREFIX + poolKey + "." + property);
+
+		// The pool keys were renamed in 2.9.0 too, and fall back on their old names for the reason the
+		// command keys do - except that here the consequence is worse. A command key that resolves to
+		// nothing lands on a different number; a POOL key that resolves to nothing lands on
+		// threadpool.default.coreSize, or on the built-in 10 for a file that never set one, which caps
+		// every origin call on the node at ten threads. See FcCommandKeys.LEGACY_THREAD_POOL_KEYS.
+		String inheritFrom = FcCommandKeys.LEGACY_THREAD_POOL_KEYS.get(poolKey);
+		if (null == value && null != inheritFrom)
+		{
+			value = props.getProperty(THREADPOOL_PREFIX + inheritFrom + "." + property);
+			if (null == value)
+				value = props.getProperty(LEGACY_THREADPOOL_PREFIX + inheritFrom + "." + property);
+		}
+
 		if (null == value)
 			value = props.getProperty(THREADPOOL_PREFIX + DEFAULT_SCOPE + "." + property);
 		if (null == value)

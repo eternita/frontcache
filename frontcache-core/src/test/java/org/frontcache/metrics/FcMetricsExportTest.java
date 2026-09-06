@@ -61,12 +61,12 @@ public class FcMetricsExportTest {
 	private static void executeSomeTraffic()
 	{
 		Properties props = new Properties();
-		props.setProperty("hystrix.command.Cache-Origin-http.execution.isolation.strategy", "THREAD");
-		props.setProperty("hystrix.threadpool.OriginHitsPool.coreSize", "2");
+		props.setProperty("hystrix.command.Cache-Miss.execution.isolation.strategy", "THREAD");
+		props.setProperty("hystrix.threadpool.OriginPool.coreSize", "2");
 		FcTestSupport.installConfig(props);
 
-		new Ok("Cache-Origin-http").execute();
-		new Boom("Cache-Origin-http").execute();
+		new Ok("Cache-Miss").execute();
+		new Boom("Cache-Miss").execute();
 	}
 
 	/** The upgrade-safety property: nothing starts unless someone asked for it. */
@@ -116,7 +116,7 @@ public class FcMetricsExportTest {
 		assertTrue("success not exported", scrape.contains("event=\"success\""));
 		assertTrue("failure not exported", scrape.contains("event=\"failure\""));
 		assertTrue("fallback-success not exported", scrape.contains("event=\"fallback-success\""));
-		assertTrue("command key must be the label", scrape.contains("command=\"Cache-Origin-http\""));
+		assertTrue("command key must be the label", scrape.contains("command=\"Cache-Miss\""));
 
 		assertTrue("latency percentiles not exported", scrape.contains("frontcache_command_latency_seconds"));
 		assertTrue("p99 not exported", scrape.contains("quantile=\"99\""));
@@ -130,7 +130,7 @@ public class FcMetricsExportTest {
 		// Thread pools - including the rejection count, which ExecutorServiceMetrics does not provide and
 		// which is what an operator alerts on.
 		assertTrue("thread pool rejections not exported", scrape.contains("frontcache_threadpool_rejections"));
-		assertTrue("pool label missing", scrape.contains("pool=\"OriginHitsPool\""));
+		assertTrue("pool label missing", scrape.contains("pool=\"OriginPool\""));
 	}
 
 	/**
@@ -270,7 +270,7 @@ public class FcMetricsExportTest {
 		executeSomeTraffic();
 		FcMetricsExport.refresh();
 
-		FcCommandMetrics metrics = FcCommandMetrics.existing("Cache-Origin-http");
+		FcCommandMetrics metrics = FcCommandMetrics.existing("Cache-Miss");
 		assertEquals(1, metrics.getTotalCount(org.frontcache.resilience.FcEventType.SUCCESS));
 
 		// Rotate the whole rolling window out: the dashboard's number goes to zero, the exported one
@@ -377,12 +377,12 @@ public class FcMetricsExportTest {
 	// ---- fixtures -----------------------------------------------------------
 
 	private static class Ok extends FcCommand<String> {
-		Ok(String key) { super(Setter.withGroupKey("test.example.com").andCommandKey(key).andThreadPoolKey("OriginHitsPool")); }
+		Ok(String key) { super(Setter.withGroupKey("test.example.com").andCommandKey(key).andThreadPoolKey("OriginPool")); }
 		@Override protected String run() { return "ok"; }
 	}
 
 	private static class Boom extends FcCommand<String> {
-		Boom(String key) { super(Setter.withGroupKey("test.example.com").andCommandKey(key).andThreadPoolKey("OriginHitsPool")); }
+		Boom(String key) { super(Setter.withGroupKey("test.example.com").andCommandKey(key).andThreadPoolKey("OriginPool")); }
 		@Override protected String run() { throw new RuntimeException("origin down"); }
 		@Override protected String getFallback() { return "fallback"; }
 	}

@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
  * The named thread pools Frontcache owns, replacing {@code HystrixThreadPool}.
  *
  * Resilience4j ships a ThreadPoolBulkhead and it is deliberately not used here. It requires
- * queueCapacity >= 1, and Hystrix's maxQueueSize=-1 - what OriginHitsPool runs with - means "no
+ * queueCapacity >= 1, and Hystrix's maxQueueSize=-1 - what OriginPool runs with - means "no
  * queue", i.e. a SynchronousQueue that rejects rather than buffers. That difference is not cosmetic:
  * a queue in front of a slow origin converts fast rejection (and a fallback) into latency, which is
  * the opposite of what the isolation is for. Owning a plain ThreadPoolExecutor also means the
@@ -97,8 +97,8 @@ public class FcThreadPools {
 	/**
 	 * Every pool, unfiltered. The dashboard's thread-pool frames are emitted from this to every
 	 * authorized subscriber: a thread pool belongs to the node, so there is no per-domain answer to
-	 * give - which is precisely why the old {@code isOwnerGroup} comparison ("OriginHitsPool".equals(
-	 * domain)) could never be true and the panel was always empty.
+	 * give - which is precisely why the old {@code isOwnerGroup} comparison (the POOL NAME against the
+	 * caller's domain) could never be true and the panel was always empty.
 	 */
 	public static Collection<String> all()
 	{

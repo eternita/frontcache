@@ -81,10 +81,10 @@ public class FCUtils {
 		if (null == expireTimeMap)
 			return false;
 
-		if (null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER))
+		if (null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST))
 			return false;
 
-		if (0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && 0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER))
+		if (0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && 0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST))
 			return false;
 
 		return true;
@@ -117,7 +117,7 @@ public class FCUtils {
 	/**
 	 * Check with current time if expired
 	 *
-	 * @param clientType {bot | browser}
+	 * @param clientType {bot | guest}
 	 * @return
 	 */
 	public static boolean isWebComponentExpired(Map<String, Long> expireTimeMap, String clientType)
@@ -1165,13 +1165,13 @@ public class FCUtils {
 	}
 
 	/**
-	 * The domain a metrics-stream subscriber is allowed to see, from its site-key header.
+	 * The domain a metrics-stream subscriber is allowed to see, from its api-key header.
 	 *
-	 * A matching site key resolves to this node's domain; anything else resolves to DEFAULT_DOMAIN,
+	 * A matching API key resolves to this node's domain; anything else resolves to DEFAULT_DOMAIN,
 	 * which matches no command group - so an unauthenticated subscriber sees an empty stream.
 	 */
 	/**
-	 * True when the request carries this node's management site key.
+	 * True when the request carries this node's management API key.
 	 *
 	 * Replaces {@code getDomainFromSiteKeyHeader()}, which answered a different question than its one
 	 * caller asked. It returned the literal {@code "default-domain"} for an unauthorized request, and
@@ -1181,18 +1181,18 @@ public class FCUtils {
 	 * field of each frame comes from the metrics object that owns it.
 	 */
 	/**
-	 * Reads the credential through {@link SiteKey#presented} - so the stream accepts
-	 * {@code Authorization: Bearer <site-key>} like everything else, and the deprecated
+	 * Reads the credential through {@link ApiKey#presented} - so the stream accepts
+	 * {@code Authorization: Bearer <api-key>} like everything else, and the deprecated
 	 * {@code x-frontcache-site-key} for as long as that is accepted anywhere.
 	 *
-	 * The DECISION stays here and stays stricter than {@link SiteKey#isAuthorized}: a node with no site
+	 * The DECISION stays here and stays stricter than {@link ApiKey#isAuthorized}: a node with no API
 	 * key configured refuses the stream, where it would allow a management call. That difference is
-	 * long-standing and deliberate - see the SiteKey javadoc - so unifying the header did not unify it.
+	 * long-standing and deliberate - see the ApiKey javadoc - so unifying the header did not unify it.
 	 */
-	public static boolean isAuthorizedSiteKeyHeader(HttpServletRequest request) {
-		String siteKey = SiteKey.presented(request);
+	public static boolean isAuthorizedApiKeyHeader(HttpServletRequest request) {
+		String apiKey = ApiKey.presented(request);
 
-		return FrontCacheEngine.getFrontCache().isNodeSiteKey(siteKey);
+		return FrontCacheEngine.getFrontCache().isNodeApiKey(apiKey);
 	}
 
 	/**

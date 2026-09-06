@@ -1,8 +1,8 @@
 package org.frontcache.tests.filter;
 
-import org.frontcache.tests.base.SiteKeyTests;
+import org.frontcache.tests.base.ApiKeyTests;
 
-public class FilterSiteKeyTests extends SiteKeyTests {
+public class FilterApiKeyTests extends ApiKeyTests {
 
 	@Override
 	public String getFrontCacheBaseURLLocalhost() {

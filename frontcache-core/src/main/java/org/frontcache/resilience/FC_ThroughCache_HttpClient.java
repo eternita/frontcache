@@ -43,8 +43,8 @@ public class FC_ThroughCache_HttpClient extends FcCommand<WebResponse> {
 
         super(Setter
                 .withGroupKey(context.getDomain())
-                .andCommandKey("Cache-Origin-http")
-                .andThreadPoolKey("OriginHitsPool"));
+                .andCommandKey(FcCommandKeys.CACHE_MISS)
+                .andThreadPoolKey(FcCommandKeys.ORIGIN_POOL));
 
         this.originRequestURL = urlStr;
         this.currentRequestURL = context.getCurrentRequestURL();

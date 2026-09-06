@@ -51,9 +51,9 @@ services:
       - "${FC_CONSOLE_BIND:-127.0.0.1}:${FC_CONSOLE_PORT:-7080}:7080"
     environment:
       # Nodes to monitor, comma-separated. The default reaches the server in this stack over
-      # the compose network. FC_SITE_KEY must match each node's front-cache.site-key.
+      # the compose network. FC_API_KEY must match each node's front-cache.api-key.
       FC_NODES: "${FC_NODES:-http://fc-server:9080/}"
-      FC_SITE_KEY: "${FC_SITE_KEY:-}"
+      FC_API_KEY: "${FC_API_KEY:-}"
     volumes:
       - "${FC_CONSOLE_CONF_DIR:-fc-console-conf}:/opt/frontcache-console/conf"
     depends_on:

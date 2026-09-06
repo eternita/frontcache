@@ -27,7 +27,7 @@ public abstract class IncludeTests extends TestsBase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 		frontcacheClient.removeFromCacheAll(); // clean up
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
@@ -118,12 +118,12 @@ public abstract class IncludeTests extends TestsBase {
 		HtmlPage page = null;
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-guest/a.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 
-		// request as browser
+		// request as guest
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-guest/a.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 	}
 
@@ -132,12 +132,12 @@ public abstract class IncludeTests extends TestsBase {
 		HtmlPage page = null;
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a1.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-guest/a1.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 
-		// request as browser
+		// request as guest
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a1.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-guest/a1.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
 	}
 
@@ -146,12 +146,12 @@ public abstract class IncludeTests extends TestsBase {
 		HtmlPage page = null;
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a2.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-guest/a2.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
 
-		// request as browser
+		// request as guest
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a2.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-guest/a2.jsp");
 		assertEquals("ab", page.getPage().asNormalizedText());
 	}
 
@@ -160,12 +160,12 @@ public abstract class IncludeTests extends TestsBase {
 		HtmlPage page = null;
 		// request as bot
 		webClient.addRequestHeader("User-Agent", "Googlebot");
-		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a3.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-guest/a3.jsp");
 		assertEquals(page.getPage().asNormalizedText(), "a");
 
-		// request as browser
+		// request as guest
 		webClient.addRequestHeader("User-Agent", "Chrome");
-		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-browser/a3.jsp");
+		page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/include-bot-guest/a3.jsp");
 		assertEquals(page.getPage().asNormalizedText(), "a");
 	}
 

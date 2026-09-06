@@ -9,7 +9,7 @@
 #
 # Config resolution, in order:
 #   1. a frontcache-console.conf mounted over /opt/frontcache-console/conf - used as-is
-#   2. FC_NODES (+ FC_SITE_KEY) set  - the file is rendered from them at startup
+#   2. FC_NODES (+ FC_API_KEY) set  - the file is rendered from them at startup
 #   3. neither - the image's placeholder default is seeded and the console starts with no
 #      usable nodes, which is enough to prove the container works but not to monitor anything
 set -euo pipefail
@@ -45,12 +45,12 @@ if [ -n "${FC_NODES:-}" ]; then
       urls="${urls}${urls:+, }\"${node}\""
     done
     cat > "$CONF_FILE" <<CONF
-# Managed by the fc-console entrypoint (rendered from FC_NODES / FC_SITE_KEY).
+# Managed by the fc-console entrypoint (rendered from FC_NODES / FC_API_KEY).
 # Mount your own file over /opt/frontcache-console/conf to take ownership of it.
 frontcache {
     console {
         urls = [${urls}]
-        siteKey = ${FC_SITE_KEY:-default-site-key}
+        apiKey = ${FC_API_KEY:-default-api-key}
     }
 }
 CONF

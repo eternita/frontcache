@@ -28,8 +28,8 @@ import ch.qos.logback.core.read.ListAppender;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * {@link SiteKey} - the management API's actual access control, now that {@link ManagementPort} says
- * plainly that it is not one.
+ * {@link ApiKey} - the management API's only access control, now that the
+ * {@code front-cache.management.port} check, which never was one, is gone.
  *
  * The rules worth pinning are the ones that decide whether a deployment keeps working: an unconfigured
  * node stays open (refusing on upgrade would take away an operator's dashboards to protect a node that
@@ -37,15 +37,15 @@ import jakarta.servlet.http.HttpServletRequest;
  * is still ACCEPTED - because an embedded agent, a separately deployed console or an older peer node
  * can be older than the node it calls, and none of them upgrade on our schedule.
  */
-public class SiteKeyTest {
+public class ApiKeyTest {
 
 	/** Restored rather than blanked: FCConfig is process-wide, and other tests in this fork have one. */
-	private final String original = FCConfig.getProperty(SiteKey.SITE_KEY_PROPERTY, "");
+	private final String original = FCConfig.getProperty(ApiKey.API_KEY_PROPERTY, "");
 
 	@After
 	public void tearDown()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, original);
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, original);
 	}
 
 	private static HttpServletRequest with(String header, String value)
@@ -63,22 +63,22 @@ public class SiteKeyTest {
 	// ---- unconfigured: open, exactly as before -------------------------------------------------
 
 	@Test
-	public void aNodeWithNoSiteKeyAuthorizesEveryone()
+	public void aNodeWithNoApiKeyAuthorizesEveryone()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "");
 
-		assertFalse(SiteKey.isConfigured());
+		assertFalse(ApiKey.isConfigured());
 		assertTrue("an unconfigured node must not start refusing traffic on upgrade",
-				SiteKey.isAuthorized(bare()));
+				ApiKey.isAuthorized(bare()));
 	}
 
 	@Test
-	public void whitespaceIsNotASiteKey()
+	public void whitespaceIsNotAApiKey()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "   ");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "   ");
 
-		assertFalse("a blank value is not a secret somebody meant to set", SiteKey.isConfigured());
-		assertTrue(SiteKey.isAuthorized(bare()));
+		assertFalse("a blank value is not a secret somebody meant to set", ApiKey.isConfigured());
+		assertTrue(ApiKey.isAuthorized(bare()));
 	}
 
 	// ---- configured: the secret is required ----------------------------------------------------
@@ -86,10 +86,10 @@ public class SiteKeyTest {
 	@Test
 	public void aConfiguredNodeRefusesARequestWithoutTheKey()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
 
-		assertTrue(SiteKey.isConfigured());
-		assertFalse(SiteKey.isAuthorized(bare()));
+		assertTrue(ApiKey.isConfigured());
+		assertFalse(ApiKey.isAuthorized(bare()));
 	}
 
 	/**
@@ -101,12 +101,12 @@ public class SiteKeyTest {
 	@SuppressWarnings("deprecation")
 	public void theDeprecatedHeaderIsStillAccepted()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
 
 		assertTrue("a pre-2.7 agent must keep working against a 2.7-or-later node",
-				SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret")));
-		assertFalse(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "wrong")));
-		assertFalse(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "")));
+				ApiKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret")));
+		assertFalse(ApiKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "wrong")));
+		assertFalse(ApiKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "")));
 	}
 
 	/** Bearer wins when a caller mid-migration sends both, so the current form is the one that counts. */
@@ -114,73 +114,73 @@ public class SiteKeyTest {
 	@SuppressWarnings("deprecation")
 	public void bearerTakesPrecedenceOverTheDeprecatedHeader()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
 
 		HttpServletRequest both = mock(HttpServletRequest.class);
 		when(both.getHeader("Authorization")).thenReturn("Bearer s3cret");
 		when(both.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn("stale");
 
-		assertTrue(SiteKey.isAuthorized(both));
+		assertTrue(ApiKey.isAuthorized(both));
 	}
 
 	/** The one form everything sends now - and the only one Prometheus can send at all. */
 	@Test
 	public void authorizationBearerCarriesIt()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
 
-		assertTrue(SiteKey.isAuthorized(with("Authorization", "Bearer s3cret")));
-		assertFalse(SiteKey.isAuthorized(with("Authorization", "Bearer wrong")));
+		assertTrue(ApiKey.isAuthorized(with("Authorization", "Bearer s3cret")));
+		assertFalse(ApiKey.isAuthorized(with("Authorization", "Bearer wrong")));
 	}
 
 	/** RFC 7235 makes the scheme token case-insensitive, and clients differ on how they spell it. */
 	@Test
 	public void theBearerSchemeIsCaseInsensitive()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
 
-		assertTrue(SiteKey.isAuthorized(with("Authorization", "bearer s3cret")));
-		assertTrue(SiteKey.isAuthorized(with("Authorization", "BEARER s3cret")));
+		assertTrue(ApiKey.isAuthorized(with("Authorization", "bearer s3cret")));
+		assertTrue(ApiKey.isAuthorized(with("Authorization", "BEARER s3cret")));
 	}
 
 	@Test
 	public void anotherAuthorizationSchemeIsNotMistakenForTheKey()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
 
-		assertFalse(SiteKey.isAuthorized(with("Authorization", "Basic czNjcmV0")));
-		assertFalse("the scheme is not the credential", SiteKey.isAuthorized(with("Authorization", "s3cret")));
+		assertFalse(ApiKey.isAuthorized(with("Authorization", "Basic czNjcmV0")));
+		assertFalse("the scheme is not the credential", ApiKey.isAuthorized(with("Authorization", "s3cret")));
 	}
 
 	/** A prefix of the key is not the key - the comparison is constant-time, not lenient. */
 	@Test
 	public void aPartialKeyIsRefused()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
 
-		assertFalse(SiteKey.isAuthorized(with("Authorization", "Bearer s3cr")));
-		assertFalse(SiteKey.isAuthorized(with("Authorization", "Bearer s3cretIsLonger")));
+		assertFalse(ApiKey.isAuthorized(with("Authorization", "Bearer s3cr")));
+		assertFalse(ApiKey.isAuthorized(with("Authorization", "Bearer s3cretIsLonger")));
 	}
 
 	/** Read per request, so reloading a node's configuration changes the key actually enforced. */
 	@Test
 	public void theKeyIsReReadRatherThanCached()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "first");
-		assertTrue(SiteKey.isAuthorized(with("Authorization", "Bearer first")));
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "first");
+		assertTrue(ApiKey.isAuthorized(with("Authorization", "Bearer first")));
 
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "second");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "second");
 
-		assertFalse("the old key must stop working", SiteKey.isAuthorized(with("Authorization", "Bearer first")));
-		assertTrue(SiteKey.isAuthorized(with("Authorization", "Bearer second")));
+		assertFalse("the old key must stop working", ApiKey.isAuthorized(with("Authorization", "Bearer first")));
+		assertTrue(ApiKey.isAuthorized(with("Authorization", "Bearer second")));
 	}
 
 	@Test
 	public void aNullRequestIsNotAuthorized()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
 
-		assertFalse(SiteKey.isAuthorized(null));
+		assertFalse(ApiKey.isAuthorized(null));
 	}
 
 	// ---- the deprecation warning ---------------------------------------------------------------
@@ -197,17 +197,17 @@ public class SiteKeyTest {
 	@SuppressWarnings("deprecation")
 	public void theLegacyHeaderIsWarnedAboutExactlyOnce()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
-		SiteKey.legacyHeaderLogged.set(false);   // another test in this fork may have tripped it
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
+		ApiKey.legacyHeaderLogged.set(false);   // another test in this fork may have tripped it
 
-		Logger logger = (Logger) LoggerFactory.getLogger(SiteKey.class);
+		Logger logger = (Logger) LoggerFactory.getLogger(ApiKey.class);
 		ListAppender<ILoggingEvent> captured = new ListAppender<ILoggingEvent>();
 		captured.start();
 		logger.addAppender(captured);
 
 		try {
 			for (int i = 0; i < 5; i++)
-				assertTrue(SiteKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret")));
+				assertTrue(ApiKey.isAuthorized(with(FCHeaders.X_FRONTCACHE_SITE_KEY, "s3cret")));
 
 			List<ILoggingEvent> warnings = captured.list;
 			assertEquals("five legacy calls, one warning", 1, warnings.size());
@@ -226,16 +226,16 @@ public class SiteKeyTest {
 	@Test
 	public void theCurrentFormWarnsAboutNothing()
 	{
-		FCConfig.setProperty(SiteKey.SITE_KEY_PROPERTY, "s3cret");
-		SiteKey.legacyHeaderLogged.set(false);
+		FCConfig.setProperty(ApiKey.API_KEY_PROPERTY, "s3cret");
+		ApiKey.legacyHeaderLogged.set(false);
 
-		Logger logger = (Logger) LoggerFactory.getLogger(SiteKey.class);
+		Logger logger = (Logger) LoggerFactory.getLogger(ApiKey.class);
 		ListAppender<ILoggingEvent> captured = new ListAppender<ILoggingEvent>();
 		captured.start();
 		logger.addAppender(captured);
 
 		try {
-			assertTrue(SiteKey.isAuthorized(with("Authorization", "Bearer s3cret")));
+			assertTrue(ApiKey.isAuthorized(with("Authorization", "Bearer s3cret")));
 			assertTrue("Bearer is not deprecated", captured.list.isEmpty());
 
 		} finally {

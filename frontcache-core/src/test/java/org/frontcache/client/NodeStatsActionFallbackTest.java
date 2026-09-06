@@ -52,7 +52,7 @@ public class NodeStatsActionFallbackTest {
 
 	private FrontCacheClient client()
 	{
-		return new FrontCacheClient(node.url(), "test-site-key");
+		return new FrontCacheClient(node.url(), "test-api-key");
 	}
 
 	/** A 2.8 node answers the current action, so there must be exactly one request. */
@@ -162,7 +162,7 @@ public class NodeStatsActionFallbackTest {
 	{
 		node.stop();
 
-		assertNull(new FrontCacheClient(node.url(), "test-site-key").getNodeStatsActionResponse());
+		assertNull(new FrontCacheClient(node.url(), "test-api-key").getNodeStatsActionResponse());
 	}
 
 	/** The fallback costs one extra round trip and no more, however many times it is called. */

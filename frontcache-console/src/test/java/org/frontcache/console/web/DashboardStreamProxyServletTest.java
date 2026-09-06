@@ -34,7 +34,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * The dashboard stream relay, and specifically its edge allowlist.
  *
  * The Netflix {@code ProxyStreamServlet} this replaced would fetch whatever URL the caller named in
- * {@code origin} <em>and attach the console's site key to it</em>, which made anyone who could load the
+ * {@code origin} <em>and attach the console's API key to it</em>, which made anyone who could load the
  * console page able to point it at an internal host and be handed the shared secret. The replacement
  * only contacts edges the console already knows, and these tests are what pins that.
  */
@@ -107,7 +107,7 @@ public class DashboardStreamProxyServletTest {
 
 	/**
 	 * The path is the servlet's, not the caller's. An allowlist that matched on host alone and then used
-	 * the caller's path would be a formality: the same known edge also serves /fc-admin, and the site key
+	 * the caller's path would be a formality: the same known edge also serves /fc-admin, and the API key
 	 * rides along on every proxied request.
 	 */
 	@Test
@@ -139,17 +139,17 @@ public class DashboardStreamProxyServletTest {
 
 	/**
 	 * The one that matters: an unknown origin is refused, and - the actual defect being closed - the
-	 * site key is never even read, so it cannot travel to a host the console does not know.
+	 * API key is never even read, so it cannot travel to a host the console does not know.
 	 */
 	@Test
-	public void anUnknownOriginIsRefusedAndNeverSeesTheSiteKey() throws Exception
+	public void anUnknownOriginIsRefusedAndNeverSeesTheApiKey() throws Exception
 	{
 		when(frontcacheService.getFrontCacheAgentURLs()).thenReturn(edges("http://edge-1.example.com:8080/"));
 
 		MockHttpServletResponse response = get("http://169.254.169.254/latest/meta-data/");
 
 		assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
-		verify(frontcacheService, never()).getSiteKey();
+		verify(frontcacheService, never()).getApiKey();
 	}
 
 	private MockHttpServletResponse get(String origin) throws Exception

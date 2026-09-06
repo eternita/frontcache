@@ -36,7 +36,7 @@ public class FallbackResolverFactory {
 	 * {@code FC_Total}, {@code FC_BypassCache}, both {@code FC_ThroughCache_*} and the include
 	 * processor: that is, the code whose whole job is to absorb a failure. It therefore turned one
 	 * failed fragment into a failed page, and did it precisely during a restart, when a proxy is at
-	 * its least healthy. On fc-edge it read as 24% of {@code Input-Requests} failing on a node that had
+	 * its least healthy. On fc-edge it read as 24% of {@code Input-Request} failing on a node that had
 	 * been up 17 seconds.
 	 *
 	 * Nothing about the sleep required the throw. Creating the resolver reads {@code fallbacks.conf}

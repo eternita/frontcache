@@ -37,7 +37,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * The metrics stream's refusal paths, and - since 2.7 - that an accepted connection does not keep the
  * container thread it arrived on.
  *
- * {@code testOnGetNoSiteKeyHeader} was {@code @Ignore}d because there was nothing to assert: the old
+ * {@code testOnGetNoApiKeyHeader} was {@code @Ignore}d because there was nothing to assert: the old
  * servlet's 503 branch was unreachable - {@code getDomainFromSiteKeyHeader()} returned the literal
  * "default-domain" for an unauthorized caller rather than nothing, so the request got a 200 and a stream
  * of empty frames. It now asserts the 401 from proposal section 14.6, and the two refusal reasons are
@@ -45,8 +45,8 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 public class FcDashboardStreamServletTest {
 
-	/** front-cache.site-key in src/test/resources/fallback-home/conf/frontcache.properties */
-	private static final String NODE_SITE_KEY = "test-site-key-fallback";
+	/** front-cache.api-key in src/test/resources/fallback-home/conf/frontcache.properties */
+	private static final String NODE_API_KEY = "test-api-key-fallback";
 
 	@Mock HttpServletRequest mockReq;
 	@Mock HttpServletResponse mockResp;
@@ -81,7 +81,7 @@ public class FcDashboardStreamServletTest {
 	}
 
 	@Test
-	public void testOnGetNoSiteKeyHeader() throws ServletException, IOException {
+	public void testOnGetNoApiKeyHeader() throws ServletException, IOException {
 		servlet = new FcDashboardStreamServlet();
 		try {
 			servlet.init();
@@ -91,11 +91,11 @@ public class FcDashboardStreamServletTest {
 		// no credential on the request at all
 		servlet.service(mockReq, mockResp);
 
-		verify(mockResp).sendError(401, "Missing or invalid site key - send 'Authorization: Bearer <site-key>'");
+		verify(mockResp).sendError(401, "Missing or invalid API key - send 'Authorization: Bearer <api-key>'");
 	}
 
 	@Test
-	public void testOnGetWrongSiteKeyHeader() throws ServletException, IOException {
+	public void testOnGetWrongApiKeyHeader() throws ServletException, IOException {
 		servlet = new FcDashboardStreamServlet();
 		try {
 			servlet.init();
@@ -106,11 +106,11 @@ public class FcDashboardStreamServletTest {
 
 		servlet.service(mockReq, mockResp);
 
-		verify(mockResp).sendError(401, "Missing or invalid site key - send 'Authorization: Bearer <site-key>'");
+		verify(mockResp).sendError(401, "Missing or invalid API key - send 'Authorization: Bearer <api-key>'");
 	}
 
 	/**
-	 * The stream accepts the pre-2.7 header too, through the same {@code SiteKey.presented} the rest of
+	 * The stream accepts the pre-2.7 header too, through the same {@code ApiKey.presented} the rest of
 	 * the management surface uses - so an older console relaying this stream keeps working.
 	 */
 	@Test
@@ -122,7 +122,7 @@ public class FcDashboardStreamServletTest {
 		} catch (ServletException ex) {
 		}
 
-		when(mockReq.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn(NODE_SITE_KEY);
+		when(mockReq.getHeader(FCHeaders.X_FRONTCACHE_SITE_KEY)).thenReturn(NODE_API_KEY);
 		when(mockReq.startAsync()).thenReturn(mock(AsyncContext.class));
 		when(mockResp.getOutputStream()).thenReturn(mock(ServletOutputStream.class));
 
@@ -190,7 +190,7 @@ public class FcDashboardStreamServletTest {
 		AsyncContext async = mock(AsyncContext.class);
 		ServletOutputStream out = mock(ServletOutputStream.class);
 
-		when(mockReq.getHeader("Authorization")).thenReturn("Bearer " + NODE_SITE_KEY);
+		when(mockReq.getHeader("Authorization")).thenReturn("Bearer " + NODE_API_KEY);
 		when(mockReq.startAsync()).thenReturn(async);
 		when(mockResp.getOutputStream()).thenReturn(out);
 
@@ -204,7 +204,7 @@ public class FcDashboardStreamServletTest {
 	private HttpServletRequest freshRequest() {
 		HttpServletRequest request = mock(HttpServletRequest.class);
 		when(request.getMethod()).thenReturn("GET");
-		when(request.getHeader("Authorization")).thenReturn("Bearer " + NODE_SITE_KEY);
+		when(request.getHeader("Authorization")).thenReturn("Bearer " + NODE_API_KEY);
 		when(request.startAsync()).thenReturn(mock(AsyncContext.class));
 		return request;
 	}

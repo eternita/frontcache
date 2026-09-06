@@ -86,7 +86,7 @@ public class FrontCacheEngine {
 
 	// This node's site. One node serves one site - see docs/archive/multi-domain-retirement-proposal.md.
 	private String domain;          // front-cache.default-domain
-	private String siteKey;         // front-cache.site-key
+	private String apiKey;          // front-cache.api-key
 	private String originHost;      // front-cache.origin-host
 	private String originHttpPort;  // front-cache.origin-http-port
 	private String originHttpsPort; // front-cache.origin-https-port
@@ -106,7 +106,7 @@ public class FrontCacheEngine {
 	public final static String DEFAULT_FRONTCACHE_HOST_NAME_VALUE = "undefined-front-cache-host";
 
 	// Connection pool must be at least as large as the pools that draw from it: the
-	// OriginHitsPool (resilience.threadpool.OriginHitsPool.coreSize) plus the include-processor threads
+	// OriginPool (resilience.threadpool.OriginPool.coreSize) plus the include-processor threads
 	// (front-cache.include-processor.impl.concurrent.thread-amount). Practically all traffic goes to a
 	// single origin, i.e. ONE route - so a per-route cap below that count guarantees the surplus
 	// threads block on the pool lease under load, regardless of how healthy the origin is. Hence
@@ -302,11 +302,11 @@ public class FrontCacheEngine {
 	}
 
 	/**
-	 * @return true when {@code siteKey} is this node's configured management site key
+	 * @return true when {@code apiKey} is this node's configured management API key
 	 */
-	public boolean isNodeSiteKey(String siteKey)
+	public boolean isNodeApiKey(String apiKey)
 	{
-		return null != siteKey && 0 < siteKey.length() && siteKey.equals(this.siteKey);
+		return null != apiKey && 0 < apiKey.length() && apiKey.equals(this.apiKey);
 	}
 
 	// synchronized on the same monitor as getFrontCache() so a shutdown/reload can't interleave with
@@ -488,7 +488,7 @@ public class FrontCacheEngine {
 		rejectRetiredDomainConfig();
 
 		domain          = FCConfig.getProperty("front-cache.default-domain", FCConfig.DEFAULT_DOMAIN);
-		siteKey         = FCConfig.getProperty("front-cache.site-key", "");
+		apiKey          = FCConfig.getProperty("front-cache.api-key", "");
 		originHost      = FCConfig.getProperty("front-cache.origin-host", "localhost");
 		originHttpPort  = FCConfig.getProperty("front-cache.origin-http-port", "80");
 		originHttpsPort = FCConfig.getProperty("front-cache.origin-https-port", "443");
@@ -987,7 +987,7 @@ public class FrontCacheEngine {
         context.setRequestId(requestId);
         context.setRequestType(requestType);
 
-        context.setClientType(getClientType(servletRequest)); // client type = bot | browser based on User-Agent Header and bots.conf
+        context.setClientType(getClientType(servletRequest)); // client type = bot | guest based on User-Agent Header and bots.conf
 
         // Resolved here, on the request thread, for two reasons: it is a 13-header scan that every log
         // line and the origin call would otherwise repeat, and it is the only point at which the answer
@@ -1013,7 +1013,7 @@ public class FrontCacheEngine {
 			return FCHeaders.REQUEST_CLIENT_TYPE_BOT; // no user-agent -> bot
 		}
 
-		return FCHeaders.REQUEST_CLIENT_TYPE_BROWSER;
+		return FCHeaders.REQUEST_CLIENT_TYPE_GUEST;
 	}
 
     private boolean ignoreCache(String uri)

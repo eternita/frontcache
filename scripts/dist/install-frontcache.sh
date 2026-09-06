@@ -390,16 +390,20 @@ WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/frontcache-install.XXXXXX")"
 #
 # legacy_conf_name is what keeps that rule true across a RENAMED config file. The loop below
 # sees the old name as "a file this release dropped" and carries it over, which is right - but
-# the new bundle also ships the renamed file full of DEFAULTS, and Frontcache resolves the new
-# name first. Left alone, the operator's carried-over tuning would sit next to a shipped default
-# that silently outranks it. So the shipped default is demoted to <file>.new, the same treatment
-# every other changed default gets here, and the carried-over file stays authoritative.
+# the operator's tuning is now under a name Frontcache does not read, so it is RENAMED into
+# place and the bundle's shipped default is demoted to <file>.new.
 #
-# One line per renamed config file. Drop a line once the release that still reads the old name
-# is out of support.
+# It used to be demoted the other way round: the carried-over legacy file stayed where it was and
+# stayed authoritative, because Frontcache read the old name as a fallback. 2.9.0 removed that
+# fallback, so leaving the file under its old name would hand the operator a node running every
+# circuit breaker, timeout and bulkhead at its BUILT-IN default while their tuned file sat in the
+# same directory being ignored. Renaming it here is the whole migration for them.
+#
+# One line per renamed config file. Drop a line once nobody could still be upgrading from a
+# release that shipped the old name.
 legacy_conf_name() {
   case "$1" in
-    resilience.properties) echo hystrix.properties ;;   # renamed in 2.7
+    resilience.properties) echo hystrix.properties ;;   # renamed in 2.7, old name unread since 2.9.0
   esac
 }
 
@@ -429,8 +433,9 @@ carry_over_conf() {
     fi
   done
 
-  # Renamed files: the operator's pre-rename file was carried over by the loop above, so the
-  # new bundle's default for the new name must not be left in place to outrank it.
+  # Renamed files: the operator's pre-rename file was carried over by the loop above, under a name
+  # this release no longer reads. Move it onto the current name and demote the shipped default,
+  # so their tuning is what actually takes effect.
   for new in "$new_conf"/*; do
     [ -f "$new" ] || continue
     name="$(basename "$new")"
@@ -439,16 +444,26 @@ carry_over_conf() {
     [ -f "$new_conf/$legacy" ] || continue
     [ -f "$old_conf/$legacy" ] || continue
 
+    # Only when the operator has NOT already migrated. If both names exist in the old install,
+    # the current one is the one they meant and the legacy file is a leftover - leave both alone.
+    if [ -f "$old_conf/$name" ]; then
+      log "    $new_conf/$legacy is a leftover from before the $legacy -> $name rename and is NOT"
+      log "      read; your $name is in charge. Delete $legacy when convenient."
+      continue
+    fi
+
     run mv "$new_conf/$name" "$new_conf/$name.new"
-    log "    $legacy was renamed to $name in this release - your $legacy is kept and stays"
-    log "      authoritative; the shipped $name is beside it as $name.new. Frontcache reads"
-    log "      $legacy for one more release and warns; rename it when convenient."
+    run mv "$new_conf/$legacy" "$new_conf/$name"
+    log "    $legacy was renamed to $name and the old name is no longer read - your settings have"
+    log "      been MOVED to $name so they still apply; the shipped default is beside them as"
+    log "      $name.new. The hystrix.* keys inside the file are still supported, so nothing"
+    log "      inside it needed to change."
     renamed=$((renamed + 1))
   done
 
   log "    your config is in place; $differs file(s) whose shipped default changed have a .new beside them"
   [ "$added" -gt 0 ] && log "    $added file(s) not in this release were kept"
-  [ "$renamed" -gt 0 ] && log "    $renamed renamed file(s) left your pre-rename copy in charge"
+  [ "$renamed" -gt 0 ] && log "    $renamed renamed file(s) had your settings moved onto the current name"
   if [ "$differs" -gt 0 ]; then
     log "    review them with:  for f in $new_conf/*.new; do diff -u \"\${f%.new}\" \"\$f\"; done"
   fi
@@ -620,8 +635,8 @@ cat <<REPORT
       journalctl -u $SERVICE_NAME -f
       curl -s -o /dev/null -w '%{http_code}\\n' "http://127.0.0.1:$FC_PORT/frontcache-io?action=get-cache-state"
         # 200 means Frontcache is live (the body says "access denied" unless the request
-        # arrives on front-cache.management.port - that is expected, and is why this works
-        # as a liveness check without a site key)
+        # carries front-cache.api-key - that is expected, and is why this works as a
+        # liveness check without an API key)
 $([ "$WITH_CONSOLE" = 1 ] && printf '      systemctl status %s        # console on http://127.0.0.1:7080/\n' "$CONSOLE_SERVICE_NAME")
     Roll back to a previously installed version:
       ln -sfn $INSTALL_DIR/frontcache-server-<older> $LINK_DIR && systemctl restart $SERVICE_NAME
@@ -631,6 +646,6 @@ $([ "$WITH_CONSOLE" = 1 ] && printf '      systemctl status %s        # console 
     examples/front-door in the public repo for a worked nginx one.
 
     Before serving real traffic, review $LINK_DIR/FRONTCACHE_HOME/conf/frontcache.properties -
-    at minimum front-cache.site-key and front-cache.default-domain, and give this node a
+    at minimum front-cache.api-key and front-cache.default-domain, and give this node a
     distinct front-cache.id in conf/frontcache.id.
 REPORT

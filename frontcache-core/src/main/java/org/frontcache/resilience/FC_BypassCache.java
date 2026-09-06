@@ -58,8 +58,8 @@ public class FC_BypassCache extends FcCommand<Object> {
 
         super(Setter
                 .withGroupKey(context.getDomain())
-                .andCommandKey("Origin-Hits")
-				.andThreadPoolKey("OriginHitsPool")
+                .andCommandKey(FcCommandKeys.CACHE_BYPASS)
+				.andThreadPoolKey(FcCommandKeys.ORIGIN_POOL)
         		);
 
         this.client = client;

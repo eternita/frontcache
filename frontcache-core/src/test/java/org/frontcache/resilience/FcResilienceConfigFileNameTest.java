@@ -9,10 +9,12 @@
 package org.frontcache.resilience;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.List;
 
 import org.frontcache.FCConfig;
 import org.junit.After;
@@ -20,14 +22,32 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 /**
- * The config FILE was renamed in 2.7 (conf/hystrix.properties -> conf/resilience.properties) and the old
- * name is read for one more release. These tests drive that off a real FRONTCACHE_HOME on disk, because
- * the interesting part is not the parser - {@link FcResilienceConfigTest} covers that - but the file
- * lookup, and the lookup has a trap in it: {@code FCConfig.getConfigInputStream} reports "not found" by
- * THROWING, so a missing new file has to be caught rather than propagated or the legacy name is never
- * reached and the upgrade fails to start.
+ * The config FILE was renamed in 2.7 (conf/hystrix.properties -> conf/resilience.properties), read under
+ * the old name for one more release, and **2.9.0 stopped reading it**.
+ *
+ * These tests drive that off a real FRONTCACHE_HOME on disk, because the interesting part is not the
+ * parser - {@link FcResilienceConfigTest} covers that - but the file lookup, and the lookup has a trap
+ * in it: {@code FCConfig.getConfigInputStream} reports "not found" by THROWING, so a missing file has
+ * to be caught rather than propagated or the node fails to start instead of falling back to defaults.
+ *
+ * <h2>What replaced the fallback is a message, and it is the point of these tests</h2>
+ *
+ * Losing the legacy name silently would mean a node that starts fine and runs every command on
+ * built-in defaults - a 1-second origin timeout and 10 concurrent permits - which is invisible until
+ * load arrives and then looks like an origin problem. So a leftover hystrix.properties is still looked
+ * FOR, never read, purely to say so: an error when it is the only file present, a warning when it sits
+ * beside a live one. {@code aLeftoverLegacyFileIsReportedNotRead} is the case that matters.
+ *
+ * The KEY PREFIX is a separate contract and did not change: {@code hystrix.command.*} inside a
+ * correctly-named file is still read, indefinitely. Renaming the file was always the whole ask.
  */
 public class FcResilienceConfigFileNameTest {
 
@@ -71,13 +91,49 @@ public class FcResilienceConfigFileNameTest {
 		assertEquals(1234, FcResilienceConfig.getInstance().forCommand("A", null).getTimeoutMs());
 	}
 
-	/** The upgrade path: the operator has not renamed the file yet, so their tuning must still apply. */
+	/**
+	 * The removal. A node with only the legacy file runs on built-in defaults - it does NOT pick the
+	 * old name up, and it does not throw either.
+	 */
 	@Test
-	public void fallsBackToTheLegacyFileName() throws IOException
+	public void theLegacyFileNameIsNotRead() throws IOException
 	{
 		write("hystrix.properties", "hystrix.command.A.execution.isolation.thread.timeoutInMilliseconds=2345");
 
-		assertEquals(2345, FcResilienceConfig.getInstance().forCommand("A", null).getTimeoutMs());
+		assertEquals("the pre-2.7 file name must not be read as of 2.9.0",
+				FcResilienceConfig.DEFAULT_TIMEOUT_MS,
+				FcResilienceConfig.getInstance().forCommand("A", null).getTimeoutMs());
+	}
+
+	/**
+	 * ...but it is not silent about it, which is the whole reason the file name is still looked for.
+	 * A node quietly running every command at timeout=1000 and 10 permits looks like an origin problem,
+	 * not a config problem, and the operator has no reason to suspect a file they never touched.
+	 */
+	@Test
+	public void aLeftoverLegacyFileIsReportedNotRead() throws IOException
+	{
+		write("hystrix.properties", "hystrix.command.A.execution.isolation.thread.timeoutInMilliseconds=2345");
+
+		Logger configLogger = (Logger) LoggerFactory.getLogger(FcResilienceConfig.class);
+		ListAppender<ILoggingEvent> appender = new ListAppender<ILoggingEvent>();
+		appender.start();
+		configLogger.addAppender(appender);
+
+		try {
+			FcResilienceConfig.getInstance();
+
+			List<ILoggingEvent> errors = appender.list.stream()
+					.filter(event -> Level.ERROR == event.getLevel())
+					.toList();
+
+			assertEquals("one error expected, got " + errors, 1, errors.size());
+			String message = errors.get(0).getFormattedMessage();
+			assertTrue(message, message.contains("hystrix.properties"));
+			assertTrue("must name the fix, not just the symptom", message.contains("resilience.properties"));
+		} finally {
+			configLogger.detachAppender(appender);
+		}
 	}
 
 	/** Renaming the file without touching the keys inside it is enough - that is the documented advice. */
@@ -90,9 +146,10 @@ public class FcResilienceConfigFileNameTest {
 	}
 
 	/**
-	 * Both present: the new file wins outright and the legacy one is ignored, not merged. Asserted
-	 * because a union of the two would be a config nobody could reason about, and because "I renamed it
-	 * but my old value is still winning" is the bug report that would follow the other choice.
+	 * Both present: the live file is used and the legacy one contributes nothing - not even the keys
+	 * only it sets. Kept from when the old name was a fallback, because "I renamed it but my old value
+	 * is still winning" and "half my keys came from the file I deleted" are both bug reports this
+	 * forecloses.
 	 */
 	@Test
 	public void newFileNameWinsOverTheLegacyOneAndTheyAreNotMerged() throws IOException
@@ -109,7 +166,7 @@ public class FcResilienceConfigFileNameTest {
 	}
 
 	/**
-	 * Neither file present. This must be built-in defaults rather than a thrown exception: the config
+	 * No file present. This must be built-in defaults rather than a thrown exception: the config
 	 * singleton is first touched on the first request, so throwing here would turn a missing tuning file
 	 * into a node that answers 500s instead of one that runs with defaults.
 	 */

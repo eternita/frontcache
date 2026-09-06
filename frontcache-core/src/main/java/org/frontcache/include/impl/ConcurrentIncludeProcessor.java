@@ -606,7 +606,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		/** What goes on the wire. Same as includeURL unless includes are fetched from the origin. */
 		String fetchURL;
 		String includeType; // sync|async
-		String includeClientType; // bot|browser
+		String includeClientType; // bot|guest
 		String combineGroup; // null unless the markup says combine="..."
 		WebResponse webResponse;
 		Map<String, List<String>> requestHeaders;

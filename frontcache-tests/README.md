@@ -92,7 +92,7 @@ frontcache-tests/
     │   │   ├── FrontcacheStandaloneServer.java ← embedded-Jetty launcher for :9080
     │   │   └── base/                           ← ABSTRACT test catalog (mode-agnostic)
     │   │       ├── TestsBase.java              ← shared setup/teardown, HtmlUnit client
-    │   │       ├── SiteKeys.java               ← the node's management-API site key
+    │   │       ├── ApiKeys.java               ← the node's management-API API key
     │   │       ├── TestUtils.java              ← trace-header helpers
     │   │       ├── CommonTests.java
     │   │       ├── IncludeTests.java
@@ -162,7 +162,7 @@ includes `b.jsp` and the whole page must render exactly `"ab"`). Fixture familie
 - `common/6ci`, `common/7ci` — include + cache permutations.
 - `common/deep-include`, `deep-include-cache`, `deep-include-async` — `a→b→c→…→f`
   nesting; page must render `"abcdef"`.
-- `common/client-bot-browser`, `include-bot-browser` — `maxage="bot:60"` fixtures that
+- `common/client-bot-guest`, `include-bot-guest` — `maxage="bot:60"` fixtures that
   cache for bots but stay dynamic for browsers.
 - `common/methods` — HTTP-method caching (GET then HEAD).
 - `common/l1-l2-cache-level` — three fragments that distribute across L1/L2.
@@ -195,8 +195,8 @@ The `..._LOOPBACK` constants are a second **spelling of the same node**, not a s
 cluster fan-out test needs two distinct member URLs; `localhost` and `127.0.0.1` provide that
 without any name resolution.
 
-`SiteKeys` holds one key, `test-site-key-localhost`. It matches `front-cache.site-key` in the
-`frontcache.properties` of both FRONTCACHE_HOME dirs and gates the management API. The site key
+`ApiKeys` holds one key, `test-api-key-localhost`. It matches `front-cache.api-key` in the
+`frontcache.properties` of both FRONTCACHE_HOME dirs and gates the management API. The API key
 is **per node**, not per domain — every management-API call in the suite uses this one key.
 
 ### Multi-domain is retired

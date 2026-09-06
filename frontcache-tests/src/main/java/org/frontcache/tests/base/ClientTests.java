@@ -48,15 +48,15 @@ public abstract class ClientTests extends TestsBase {
 		super.setUp();
 		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(
 				new FrontCacheClient[]{
-						new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST),
-						new FrontCacheClient(getFrontCacheBaseURLLoopback(), SiteKeys.TEST_SITE_KEY_LOCALHOST)}
+						new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST),
+						new FrontCacheClient(getFrontCacheBaseURLLoopback(), ApiKeys.TEST_API_KEY_LOCALHOST)}
 			));
 
 		// clean up
 		fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
 
 
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		webClient.addRequestHeader(FCHeaders.ACCEPT, "text/html");
 	}
@@ -76,7 +76,7 @@ public abstract class ClientTests extends TestsBase {
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		// clean up
 		String response = frontcacheClient.removeFromCacheAll();
@@ -123,7 +123,7 @@ public abstract class ClientTests extends TestsBase {
 
 		final String TEST_URI_A = "common/fc-client/a.jsp";
 
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		// clean up
 		String response = frontcacheClient.removeFromCacheAll();
@@ -139,7 +139,7 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void getCacheStatusClient() throws Exception {
 
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		Map<String, String> response = frontcacheClient.getCacheState();
 		Assert.assertNotNull(response);
@@ -151,7 +151,7 @@ public abstract class ClientTests extends TestsBase {
 
 		final String TEST_URI = "common/fc-client/a.jsp";
 
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 		frontcacheClient.removeFromCacheAll(); // clean up
 
 		// the request - response should be cached
@@ -162,9 +162,9 @@ public abstract class ClientTests extends TestsBase {
 		boolean success = frontcacheClient.getCachedKeys(baos);
 		String keys = baos.toString();
 
-		// getCachedKeys must pass the site-key gate (Authorization: Bearer <site-key>)
+		// getCachedKeys must pass the api-key gate (Authorization: Bearer <api-key>)
 		Assert.assertTrue(success);
-		Assert.assertEquals("getCachedKeys was denied - site key not sent: " + keys, -1, keys.indexOf("Access denied"));
+		Assert.assertEquals("getCachedKeys was denied - API key not sent: " + keys, -1, keys.indexOf("Access denied"));
 		Assert.assertNotEquals("cached key not listed: " + keys, -1, keys.indexOf(TEST_URI));
 		return;
 	}
@@ -172,8 +172,8 @@ public abstract class ClientTests extends TestsBase {
 //	@Test
 //	public void getCacheStatusCluster() throws Exception {
 //
-//		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1, SiteKeys.TEST_SITE_KEY_LOCALHOST);
-//		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2, SiteKeys.TEST_SITE_KEY_LOCALHOST);
+//		FrontCacheClient frontCacheClient1 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE1, ApiKeys.TEST_API_KEY_LOCALHOST);
+//		FrontCacheClient frontCacheClient2 = new FrontCacheClient(FRONTCACHE_CLUSTER_NODE2, ApiKeys.TEST_API_KEY_LOCALHOST);
 //		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(new FrontCacheClient[]{frontCacheClient1, frontCacheClient2}));
 //
 //		Map<String, String> response = fcCluster.getCacheState().get(frontCacheClient1);
@@ -243,7 +243,7 @@ public abstract class ClientTests extends TestsBase {
 	@Test
 	public void invalidationByFilterTestCluster() throws Exception {
 
-		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), ApiKeys.TEST_API_KEY_LOCALHOST);
 		final String TEST_URI = "common/fc-client/a.jsp";
 
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
@@ -283,13 +283,13 @@ public abstract class ClientTests extends TestsBase {
 
 		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(
 				new FrontCacheClient[]{
-						new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST),
-						new FrontCacheClient(getFrontCacheBaseURLLoopback(), SiteKeys.TEST_SITE_KEY_LOCALHOST)}
+						new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST),
+						new FrontCacheClient(getFrontCacheBaseURLLoopback(), ApiKeys.TEST_API_KEY_LOCALHOST)}
 			));
 
 		fcCluster.removeFromCacheAll(); // clean up
 
-		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		// the first request a - response should be cached
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + TEST_URI_A);
@@ -324,15 +324,15 @@ public abstract class ClientTests extends TestsBase {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 		FrontCacheCluster fcCluster = new FrontCacheCluster(Arrays.asList(
 					new FrontCacheClient[]{
-							new FrontCacheClient(getFrontCacheBaseURLLocalhost(), SiteKeys.TEST_SITE_KEY_LOCALHOST),
-							new FrontCacheClient(getFrontCacheBaseURLLoopback(), SiteKeys.TEST_SITE_KEY_LOCALHOST)}
+							new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST),
+							new FrontCacheClient(getFrontCacheBaseURLLoopback(), ApiKeys.TEST_API_KEY_LOCALHOST)}
 				));
 
 		// clean up
 		String response = fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
 		Assert.assertNotEquals(-1, response.indexOf("invalidate"));
 
-//		fcCluster = new FrontCacheCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), SiteKeys.TEST_SITE_KEY_LOCALHOST);
+//		fcCluster = new FrontCacheCluster(Arrays.asList(new String[]{FRONTCACHE_CLUSTER_NODE1, FRONTCACHE_CLUSTER_NODE2}), ApiKeys.TEST_API_KEY_LOCALHOST);
 //
 //		// clean up
 //		response = fcCluster.removeFromCacheAll().get(FRONTCACHE_CLUSTER_NODE1);
@@ -415,7 +415,7 @@ public abstract class ClientTests extends TestsBase {
 	/**
 	 * The resilience config panel, and its pre-2.7 action name. Both must return the file the node is
 	 * actually running on - which is conf/resilience.properties in standalone mode and the legacy
-	 * conf/hystrix.properties in filter mode, so this runs against both spellings of the file too.
+	 * the legacy hystrix.* key prefix in filter mode, so this runs against both spellings of the keys.
 	 */
 	@Test
 	public void resilienceConfigIsServedUnderBothActionNames() throws Exception {

@@ -71,7 +71,7 @@ that matter most:
 | `ORIGIN_HOST` | the backend. **Leave it empty** to let the mounted `frontcache.properties` own `front-cache.origin-host` — the entrypoint then reads the value and never rewrites the file. Set it, and it is authoritative and gets written into the file on every start. |
 | `FC_HTTP_PORT` / `FC_BIND` | the published port and bind address. Keep it on `127.0.0.1` when the front door is on the same host |
 | `FC_CONF_DIR` | where the config lives. Default is the `fc-conf` named volume; point it at a host directory (`./conf`) to own the config on the host — recommended for production |
-| `FC_NODES` / `FC_SITE_KEY` | the nodes the console monitors, and the shared site-key |
+| `FC_NODES` / `FC_API_KEY` | the nodes the console monitors, and the shared api-key |
 | `FC_CONSOLE_BIND` | console bind address, **loopback by default** |
 
 **Config is upgrade-safe.** The image keeps a read-only copy of the shipped config outside
@@ -127,9 +127,9 @@ docker run -d --name fc-server --restart unless-stopped \
 ```
 
 The image carries a `HEALTHCHECK` that GETs `/frontcache-io?action=get-cache-state` locally.
-That endpoint answers `200` with an "access denied" JSON body when the request does not
-arrive on `front-cache.management.port`, which makes it a liveness probe that needs no site
-key: a `200` proves Jetty, the webapp and the engine are up.
+That endpoint answers `200` with an "access denied" JSON body when the request carries no
+`front-cache.api-key`, which makes it a liveness probe that needs no API key: a `200` proves
+Jetty, the webapp and the engine are up.
 
 Remember `front-cache.http-port` / `front-cache.https-port` in the mounted config: they are
 what redirect rewriting uses, so they must be the ports **clients** see (80/443 behind a front

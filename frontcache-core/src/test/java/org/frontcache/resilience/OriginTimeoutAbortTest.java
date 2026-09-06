@@ -61,7 +61,7 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 public class OriginTimeoutAbortTest {
 
-	private static final String COMMAND_KEY = "Cache-Origin-http";
+	private static final String COMMAND_KEY = "Cache-Miss";
 	private static final int TIMEOUT_MS = 400;
 
 	/** A socket that accepts connections and never writes a byte back: the slowest possible origin. */
@@ -127,7 +127,7 @@ public class OriginTimeoutAbortTest {
 		props.setProperty("hystrix.command." + COMMAND_KEY + ".execution.isolation.thread.timeoutInMilliseconds",
 				String.valueOf(TIMEOUT_MS));
 		props.setProperty("hystrix.command." + COMMAND_KEY + ".execution.isolation.thread.interruptOnTimeout", "true");
-		props.setProperty("hystrix.threadpool.OriginHitsPool.coreSize", "2");
+		props.setProperty("hystrix.threadpool.OriginPool.coreSize", "2");
 		FcResilienceConfig.install(props);
 	}
 

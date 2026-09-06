@@ -37,7 +37,7 @@ import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheStats;
 import org.frontcache.core.FcNodeStats;
-import org.frontcache.core.SiteKey;
+import org.frontcache.core.ApiKey;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
@@ -57,11 +57,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	private static final String RESILIENCE_CONFIG_FILE = "resilience.properties";
 	private static final String GUARD_RULES_CONFIG_FILE = "guard-rules.conf";
-	private static final String LEGACY_RESILIENCE_CONFIG_FILE = "hystrix.properties";
 
 	FrontCacheEngine fcEngine = null;
-
-	private int managementPort = -1; // management port for security
 
 	// guards against concurrent backups - only one index backup may run at a time
 	private final AtomicBoolean backupInProgress = new AtomicBoolean(false);
@@ -78,19 +75,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 		super.init(config);
 
 		fcEngine = FrontCacheEngine.getFrontCache();
-
-		String managementPortStr = FCConfig.getProperty("front-cache.management.port");
-		if (null == managementPortStr || managementPortStr.trim().length() == 0)
-			logger.warn("Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
-		else {
-			try
-			{
-				managementPort = Integer.parseInt(managementPortStr);
-			} catch (Exception ex) {
-				ex.printStackTrace();
-				logger.error("Can't read managementPort=" + managementPortStr + ". Frontcache dashboard stream is not restricted to specific port. The dashboard stream is accessible for all connectors");
-			}
-		}
 
 		return;
 	}
@@ -113,19 +97,13 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private void process(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
 	{
 
-		if (-1 < managementPort && managementPort != request.getServerPort())
+		// API-key validation is active only when an API key is configured, and is THE access control
+		// here - restricting which connector answers management traffic is the reverse proxy's job.
+		// Shared with /fc-metrics via ApiKey rather than reimplemented, and read per request so that
+		// reloading a node's configuration changes the key actually enforced.
+		if (!ApiKey.isAuthorized(request))
 		{
-			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
-			return;
-		}
-
-		// Site-key validation is active only when a site key is configured, and is THE access control
-		// here - the port check above compares the Host header, which the caller supplies. Shared with
-		// /fc-metrics via SiteKey rather than reimplemented, and read per request so that reloading a
-		// node's configuration changes the key actually enforced.
-		if (!SiteKey.isAuthorized(request))
-		{
-			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse(managementPort)));
+			response.getOutputStream().write(jsonMapper.writeValueAsBytes(new AccessDeniedActionResponse()));
 			return;
 		}
 
@@ -545,11 +523,12 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	/**
 	 * Reads the raw ./conf/resilience.properties file (comments and empty lines preserved) so it can be
-	 * displayed as-is in the console, falling back to the pre-2.7 ./conf/hystrix.properties.
+	 * displayed as-is in the console.
 	 *
-	 * The fallback has to be here as well as in {@code FcResilienceConfig}: this action shows the operator
-	 * the file the node is actually using, so reading a different one than the engine reads would make the
-	 * console lie in exactly the situation - a half-finished upgrade - where it is being consulted.
+	 * The pre-2.7 ./conf/hystrix.properties fallback that used to be here is gone, in step with
+	 * {@code FcResilienceConfig}, and the two must stay in step: this action shows the operator the file
+	 * the node is actually using, so reading a different one than the engine reads would make the console
+	 * lie in exactly the situation - a half-finished upgrade - where it is being consulted.
 	 *
 	 * Answers both {@code get-resilience-configs} and the pre-2.7 {@code get-hystrix-configs}, and the
 	 * response carries the value under both field names - the console is a separate deployment, so both
@@ -563,8 +542,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 		GetResilienceConfigActionResponse aResponse = new GetResilienceConfigActionResponse();
 
 		String raw = readConfigFile(RESILIENCE_CONFIG_FILE);
-		if (null == raw)
-			raw = readConfigFile(LEGACY_RESILIENCE_CONFIG_FILE);
 
 		if (null == raw)
 		{

@@ -76,7 +76,7 @@ FilterRegistrationBean<FrontCacheFilter> frontcacheFilter() {
 
 ## 3. Edit `conf/frontcache.properties`
 
-At minimum `front-cache.default-domain` and `front-cache.site-key`; both ship as `CHANGE_ME`.
+At minimum `front-cache.default-domain` and `front-cache.api-key`; both ship as `CHANGE_ME`.
 Note there is no `front-cache.origin-host` in filter mode — see the comments in the file.
 
 ## 4. Launch the container with
@@ -97,13 +97,13 @@ Frontcache caches nothing until the origin says so. From a JSP, using the taglib
 <fc:component maxage="1h" tags="catalog|product" refresh="soft" level="L2" />
 
 <fc:include url="/example/header" />
-<fc:include url="/example/user-profile" client="browser" />
+<fc:include url="/example/user-profile" client="guest" />
 ```
 
 Or set the headers directly from a controller:
 
 ```
-x-frontcache-component-maxage: 1h          # 0 = no cache, -1/forever = forever; bot:/browser: prefixes allowed
+x-frontcache-component-maxage: 1h          # 0 = no cache, -1/forever = forever; bot:/guest: prefixes allowed
 x-frontcache-component-tags: catalog|product-42
 x-frontcache-component-refresh: soft       # serve stale while revalidating
 x-frontcache-component-cache-level: L2     # L1 (memory) or L2 (disk, default)
@@ -113,7 +113,7 @@ x-frontcache-component-cache-level: L2     # L1 (memory) or L2 (disk, default)
 
 ```java
 FrontCacheAgent agent = new FrontCacheAgent("http://localhost:8080");
-agent.removeFromCache(siteKey, "/example/product-42.*");   // regexp
+agent.removeFromCache(apiKey, "/example/product-42.*");   // regexp
 ```
 
 `org.frontcache:frontcache-agent` is a thin httpclient-only jar for app code; in-process you can

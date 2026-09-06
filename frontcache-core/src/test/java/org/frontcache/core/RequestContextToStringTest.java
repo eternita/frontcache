@@ -39,7 +39,7 @@ public class RequestContextToStringTest {
 		context.setRequestId("req-123");
 		context.setRequestType(FCHeaders.COMPONENT_TOPLEVEL);
 		context.setIncludeLevel("0");
-		context.setClientType(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER);
+		context.setClientType(FCHeaders.REQUEST_CLIENT_TYPE_GUEST);
 		context.setRequestURI("/en/page.htm");
 		context.setRequestQueryString("?a=1&b=2");
 		return context;
@@ -51,7 +51,7 @@ public class RequestContextToStringTest {
 
 		assertTrue(rendered, rendered.startsWith("RequestContext: "));
 		for (String expected : new String[] {
-				"req-123", FCHeaders.COMPONENT_TOPLEVEL, FCHeaders.REQUEST_CLIENT_TYPE_BROWSER,
+				"req-123", FCHeaders.COMPONENT_TOPLEVEL, FCHeaders.REQUEST_CLIENT_TYPE_GUEST,
 				"/en/page.htm", "?a=1&b=2" })
 			assertTrue("missing " + expected + " in: " + rendered, rendered.contains(expected));
 	}

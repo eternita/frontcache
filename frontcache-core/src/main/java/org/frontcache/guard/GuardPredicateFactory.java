@@ -29,7 +29,7 @@ import org.frontcache.guard.ratelimit.RateLimitSpec;
  *   [!] query~&lt;regex&gt;
  *   [!] url~&lt;regex&gt;
  *   [!] method:&lt;GET|POST|...&gt;
- *   [!] client-type:&lt;bot|browser&gt;
+ *   [!] client-type:&lt;bot|guest&gt;
  *   [!] cookie:&lt;name&gt;
  *   [!] header:&lt;name&gt;[~&lt;regex&gt;]
  *   [!] request-type:&lt;toplevel|include|include-async&gt;

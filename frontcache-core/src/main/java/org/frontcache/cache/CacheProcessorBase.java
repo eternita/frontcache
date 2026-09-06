@@ -111,14 +111,14 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 		WebResponse cachedWebResponse = new FC_ThroughCache(this, currentRequestURL, context).execute();
 
-		// isDynamicForClientType depends on clientType (bot|browser) - maxAge="[bot|browser:]30d"
-		// content is cached for bots and dynamic for browsers
+		// isDynamicForClientType depends on clientType (bot|guest) - maxAge="[bot|guest:]30d"
+		// content is cached for bots and dynamic for guests
 		// when dynamic - don't update cache
 		boolean isCacheableForClientType = true; // true - save/update to cache (default value is incorrect when include is pure dynamic);  false - don't save/update to cache
 
 		if (null != cachedWebResponse)
 		{
-			String clientType = context.getClientType(); // bot | browser
+			String clientType = context.getClientType(); // bot | guest
 			Map<String, Long> expireTimeMap = cachedWebResponse.getExpireTimeMap();
 
 			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);
@@ -141,14 +141,14 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			}
 		}
 
-		if (!isCacheableForClientType || // call origin if request is dynamic for client type [bot|browser] or component is null
+		if (!isCacheableForClientType || // call origin if request is dynamic for client type [bot|guest] or component is null
 				null == cachedWebResponse || 0 >= cachedWebResponse.getContentLenth())
 		{
 			try
 			{
 				cachedWebResponse = FCUtils.dynamicCall(originUrlStr, requestHeaders, client, context); // it can be pure dynamic include -> check if we need to save to cache
 
-				String clientType = context.getClientType(); // bot | browser
+				String clientType = context.getClientType(); // bot | guest
 				Map<String, Long> expireTimeMap = cachedWebResponse.getExpireTimeMap();
 
 				boolean isFreshDataCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);

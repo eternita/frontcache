@@ -30,7 +30,7 @@ import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.frontcache.tests.TestConfig;
-import org.frontcache.tests.base.SiteKeys;
+import org.frontcache.tests.base.ApiKeys;
 import org.frontcache.tests.base.TestsBase;
 import org.junit.Test;
 
@@ -112,7 +112,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 	{
 		generateTraffic();
 
-		List<String> frames = readFrames(STREAM_URL, SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		List<String> frames = readFrames(STREAM_URL, ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		assertFalse("no SSE frames arrived at all", frames.isEmpty());
 
@@ -124,7 +124,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 			if (frame.contains("\"type\":\"HystrixCommand\""))
 			{
 				sawCommand = true;
-				if (frame.contains("\"name\":\"Cache-Origin-http\""))
+				if (frame.contains("\"name\":\"Cache-Miss\""))
 					commandFrame = frame;
 			}
 			if (frame.contains("\"type\":\"HystrixThreadPool\""))
@@ -138,7 +138,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 		// Every field the vendored dashboard's validateData() asserts. A missing one throws in the
 		// browser and blanks the panel with no server-side symptom, so it is worth asserting over the
 		// wire and not only in a unit test.
-		assertTrue("no Cache-Origin-http frame among " + frames.size() + " frames", null != commandFrame);
+		assertTrue("no Cache-Miss frame among " + frames.size() + " frames", null != commandFrame);
 		for (String required : new String[] {
 				"reportingHosts", "type", "name", "group", "isCircuitBreakerOpen", "errorPercentage",
 				"errorCount", "requestCount", "rollingCountCollapsedRequests", "rollingCountExceptionsThrown",
@@ -161,16 +161,16 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 	}
 
 	@Test
-	public void streamRefusesAMissingSiteKey() throws Exception
+	public void streamRefusesAMissingApiKey() throws Exception
 	{
 		assertEquals("an unauthenticated read must be refused, not answered with an empty stream",
 				401, statusFor(STREAM_URL, null));
 	}
 
 	@Test
-	public void streamRefusesAWrongSiteKey() throws Exception
+	public void streamRefusesAWrongApiKey() throws Exception
 	{
-		assertEquals(401, statusFor(STREAM_URL, "wrong-site-key"));
+		assertEquals(401, statusFor(STREAM_URL, "wrong-api-key"));
 	}
 
 	/**
@@ -184,7 +184,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 	{
 		generateTraffic();
 
-		List<String> frames = readFrames(LEGACY_STREAM_URL, SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		List<String> frames = readFrames(LEGACY_STREAM_URL, ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		assertFalse("no SSE frames arrived on the pre-2.7 path", frames.isEmpty());
 
@@ -198,9 +198,9 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 	@Test
 	public void legacyPathIsGatedTheSameWay() throws Exception
 	{
-		assertEquals("the pre-2.7 path must not be a way around the site-key check",
+		assertEquals("the pre-2.7 path must not be a way around the api-key check",
 				401, statusFor(LEGACY_STREAM_URL, null));
-		assertEquals(401, statusFor(LEGACY_STREAM_URL, "wrong-site-key"));
+		assertEquals(401, statusFor(LEGACY_STREAM_URL, "wrong-api-key"));
 	}
 
 	/**
@@ -218,7 +218,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 		generateTraffic();
 
 		HttpGet get = new HttpGet(STREAM_URL);
-		get.addHeader("Authorization", "Bearer " + SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		get.addHeader("Authorization", "Bearer " + ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		CloseableHttpClient httpClient = client();
 		try {
@@ -289,7 +289,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 
 	/**
 	 * The refusal is a 503 and not a 401: the two mean different things since section 14.6, and an
-	 * operator seeing "MaxConcurrentConnections" knows to raise the cap rather than fix a site key.
+	 * operator seeing "MaxConcurrentConnections" knows to raise the cap rather than fix an API key.
 	 */
 	@Test
 	public void theCapRefusalIsDistinguishableFromAnAuthorizationRefusal() throws Exception
@@ -319,11 +319,11 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 
 	// ---- helpers ------------------------------------------------------------
 
-	private static int statusFor(String url, String siteKey) throws Exception
+	private static int statusFor(String url, String apiKey) throws Exception
 	{
 		HttpGet get = new HttpGet(url);
-		if (null != siteKey)
-			get.addHeader("Authorization", "Bearer " + siteKey);
+		if (null != apiKey)
+			get.addHeader("Authorization", "Bearer " + apiKey);
 
 		CloseableHttpClient httpClient = client();
 		try {
@@ -339,18 +339,18 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 		}
 	}
 
-	private static List<String> readFrames(String url, String siteKey) throws Exception
+	private static List<String> readFrames(String url, String apiKey) throws Exception
 	{
 		List<String> frames = new ArrayList<String>();
 
 		HttpGet get = new HttpGet(url);
-		get.addHeader("Authorization", "Bearer " + siteKey);
+		get.addHeader("Authorization", "Bearer " + apiKey);
 
 		CloseableHttpClient httpClient = client();
 		try {
 			ClassicHttpResponse response = httpClient.execute(get);
 			try {
-				assertEquals("stream should be served for a valid site key",
+				assertEquals("stream should be served for a valid API key",
 						200, response.getCode());
 
 				BufferedReader reader = new BufferedReader(new InputStreamReader(
@@ -417,7 +417,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 	private static OpenStream openStream() throws Exception
 	{
 		HttpGet get = new HttpGet(STREAM_URL);
-		get.addHeader("Authorization", "Bearer " + SiteKeys.TEST_SITE_KEY_LOCALHOST);
+		get.addHeader("Authorization", "Bearer " + ApiKeys.TEST_API_KEY_LOCALHOST);
 
 		CloseableHttpClient httpClient = client();
 		try {

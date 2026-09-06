@@ -21,6 +21,8 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.frontcache.cache.CacheProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -39,6 +41,9 @@ public class WebResponse implements Serializable {
 	 *
 	 */
 	private static final long serialVersionUID = 7L;
+
+	// static, so neither Java serialization nor the Gson/Jackson mapping of this class sees it
+	private static final Logger logger = LoggerFactory.getLogger(WebResponse.class);
 
 	private int statusCode = -1; // for redirects
 
@@ -234,13 +239,23 @@ public class WebResponse implements Serializable {
 	}
 
 	/**
+	 * Parses {@code maxAge="[bot|guest:]30d"} into the per-client-type expireTimeMap.
 	 *
+	 * A prefix means "this long for that client type, and NOT cacheable for the other one" - the
+	 * split the feature exists for: a page worth caching for a crawler is often exactly the page you
+	 * must not serve a signed-in visitor from cache. No prefix means the same TTL for both.
 	 *
-	 * @param expiteTimeStr - maxAge="[bot|browser:]30d"
+	 * The {@code guest:} branch used to test {@code REQUEST_CLIENT_TYPE_BOT} - the same constant as
+	 * the branch above it - so it was unreachable and a {@code guest:} prefix silently fell through
+	 * to the no-prefix default, caching for BOTH client types. Nothing caught it because every test
+	 * fixture in the repo uses {@code bot:}. An unrecognized prefix now warns rather than being
+	 * treated as no prefix at all, which is what made this shape of mistake invisible.
+	 *
+	 * @param maxAgeStr the raw x-frontcache-component-maxage value, or null
 	 */
 	private void setExpireTime(String maxAgeStr) {
 
-		String maxAgeClientType = null; // bot and browser
+		String maxAgeClientType = null; // bot and guest
 		String maxAgeTime = "0"; // default no cache
 
 		if (null != maxAgeStr)
@@ -279,17 +294,23 @@ public class WebResponse implements Serializable {
 		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType))
 		{
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, CacheProcessor.NO_CACHE);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, CacheProcessor.NO_CACHE);
 
-		} else if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType)) {
+		} else if (FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equals(maxAgeClientType)) {
 
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, CacheProcessor.NO_CACHE);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, cacheMaxAgeSecLong);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, cacheMaxAgeSecLong);
 		} else {
-			// default
-			// TODO: something wrong - log it
+			// No prefix - the common case, same TTL for both. A prefix we do not recognize lands here
+			// too, and that is a config error worth naming: the caller asked for a split and is
+			// getting the opposite of one. 'browser:' is the likely spelling, renamed to 'guest:'.
+			if (null != maxAgeClientType)
+				logger.warn("Unknown client type '" + maxAgeClientType + "' in maxAge=\"" + maxAgeStr
+						+ "\" for " + url + " - expected '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '"
+						+ FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'. Caching for BOTH client types.");
+
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BROWSER, cacheMaxAgeSecLong);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, cacheMaxAgeSecLong);
 		}
 
 		return;
@@ -380,7 +401,7 @@ public class WebResponse implements Serializable {
 	 * Effective expiration timestamp (epoch millis) of this response across all
 	 * client types. Used for time-based purging of stale entries.
 	 *
-	 * An entry that is still serveable to bots until T1 and to browsers until T2
+	 * An entry that is still serveable to bots until T1 and to guests until T2
 	 * is fully expired only after max(T1, T2), so the latest expiration wins.
 	 *
 	 * @return CACHE_FOREVER (-1) if the response never expires;

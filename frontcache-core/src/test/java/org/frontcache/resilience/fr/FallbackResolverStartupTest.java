@@ -36,7 +36,7 @@ import org.junit.Test;
  * callers are {@code FC_Total}, {@code FC_BypassCache}, both {@code FC_ThroughCache_*} and the include
  * processor, i.e. only ever code already handling a failure. So a fragment that failed in the first
  * three seconds failed the entire page instead of degrading, during a restart, which is exactly when a
- * cache is least able to absorb it. Measured on a production edge: 24% of {@code Input-Requests}
+ * cache is least able to absorb it. Measured on a production edge: 24% of {@code Input-Request}
  * failing on a node that had been up 17 seconds, every one of them this exception.
  *
  * Creation never needed the server - {@code FileBasedFallbackResolver} reads {@code fallbacks.conf} in

@@ -19,17 +19,27 @@ import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * The {@code front-cache.site-key} check, in one place.
+ * The {@code front-cache.api-key} check, in one place.
  *
- * This is the management API's actual access control - the thing that decides whether a caller may
- * invalidate a cache, dump its keys or read its metrics. {@link ManagementPort} is NOT that; it checks
- * the port the caller addressed, which comes from the Host header, and says so itself.
+ * This is the management API's <b>only</b> access control - the thing that decides whether a caller
+ * may invalidate a cache, dump its keys or read its metrics. There used to be a
+ * {@code front-cache.management.port} check in front of it, which was never a boundary: it compared
+ * the port the caller ADDRESSED, taken from the Host header. It is gone; restricting which connector
+ * answers management traffic is the reverse proxy's job.
  *
- * Extracted for the reason ManagementPort was: there was one implementation in
- * {@code FrontCacheIOServlet} and a second endpoint needed the same rule, and two implementations of
- * one security check is one too many - the copy is always the one that goes stale.
+ * Extracted because there was one implementation in {@code FrontCacheIOServlet} and a second endpoint
+ * needed the same rule, and two implementations of one security check is one too many - the copy is
+ * always the one that goes stale.
  *
- * <h2>{@code Authorization: Bearer <site-key>} is the way to send it</h2>
+ * <h2>The property was {@code front-cache.site-key} through 2.8</h2>
+ *
+ * Renamed, with NO fallback to the old name: a node whose {@code frontcache.properties} still says
+ * {@code front-cache.site-key} reads no key at all and comes up with its management API, dashboard
+ * stream and {@code /fc-metrics} OPEN. Rename the property when you upgrade. The credential on the
+ * wire did not change, so callers - agent, console, peer nodes, Prometheus - need no coordination
+ * with this; only the node's own config file does.
+ *
+ * <h2>{@code Authorization: Bearer <api-key>} is the way to send it</h2>
  *
  * One form, everywhere: the agent, the console, {@code FrontCacheClient}, node-to-node replication and
  * a Prometheus scrape all use it. It is a standard scheme with standard tooling, and it is the only
@@ -43,14 +53,14 @@ import jakarta.servlet.http.HttpServletRequest;
  * artifact embedded in customer applications, the console is deployed separately from the fleet, and
  * nodes replicate to each other - so at any moment some caller is older than the node it is calling,
  * and a node that refused the old header would break all of them on upgrade rather than at a time
- * anyone chose. Same treatment as {@code get-hystrix-configs} and {@code conf/hystrix.properties} in
- * 2.7. Remove once every supported caller is 2.7 or later.
+ * anyone chose. Same treatment {@code get-hystrix-configs} got in 2.7. Remove once every supported
+ * caller is 2.7 or later.
  *
  * <h2>The SSE stream's check is stricter, on purpose</h2>
  *
- * {@code FCUtils.isAuthorizedSiteKeyHeader} - used by {@code FcSampleSseServlet} - is a third spelling
- * of this, and it is NOT the same rule: it goes through {@code FrontCacheEngine.isNodeSiteKey}, which
- * refuses a request when the node has no site key at all, where this returns true. Folding them
+ * {@code FCUtils.isAuthorizedApiKeyHeader} - used by {@code FcSampleSseServlet} - is a third spelling
+ * of this, and it is NOT the same rule: it goes through {@code FrontCacheEngine.isNodeApiKey}, which
+ * refuses a request when the node has no API key at all, where this returns true. Folding them
  * together would have to pick one of those, and both directions are a behaviour change on somebody's
  * node - the stream would open where it is closed today, or the management API would close where it is
  * open. Left as it is, and written down here, because the difference is invisible at both call sites.
@@ -60,29 +70,29 @@ import jakarta.servlet.http.HttpServletRequest;
  * Rather than cached at servlet init, so that reloading a node's configuration changes the key that is
  * actually enforced. A property read per management request costs nothing measurable.
  */
-public class SiteKey {
+public class ApiKey {
 
-	static final String SITE_KEY_PROPERTY = "front-cache.site-key";
+	static final String API_KEY_PROPERTY = "front-cache.api-key";
 
 	private static final String BEARER = "Bearer ";
 
-	private static final Logger logger = LoggerFactory.getLogger(SiteKey.class);
+	private static final Logger logger = LoggerFactory.getLogger(ApiKey.class);
 
 	/** Package-private so a test can assert the warning fires, and fires once. */
 	static final AtomicBoolean legacyHeaderLogged = new AtomicBoolean(false);
 
-	private SiteKey() { }
+	private ApiKey() { }
 
-	/** @return the configured site key, or "" when the node has none */
+	/** @return the configured API key, or "" when the node has none */
 	public static String configured()
 	{
-		String key = FCConfig.getProperty(SITE_KEY_PROPERTY, "");
+		String key = FCConfig.getProperty(API_KEY_PROPERTY, "");
 		return (null == key) ? "" : key.trim();
 	}
 
 	/**
-	 * @return true when this node has a site key at all. When it does not, the management API has no
-	 *         access control of its own - see {@link ManagementPort}, which is not one.
+	 * @return true when this node has an API key at all. When it does not, the management API has no
+	 *         access control at all.
 	 */
 	public static boolean isConfigured()
 	{
@@ -91,7 +101,7 @@ public class SiteKey {
 
 	/**
 	 * @param request the inbound request
-	 * @return true when the request carries this node's site key, or when the node has no site key
+	 * @return true when the request carries this node's API key, or when the node has no API key
 	 *         configured (the historical default - an unconfigured node is open, and says so at
 	 *         startup rather than refusing traffic on upgrade)
 	 */
@@ -112,7 +122,7 @@ public class SiteKey {
 	 * about what it means.
 	 *
 	 * @param request the inbound request
-	 * @return the site key the caller sent, by the current or the legacy route, or null
+	 * @return the API key the caller sent, by the current or the legacy route, or null
 	 */
 	public static String presented(HttpServletRequest request)
 	{
@@ -145,7 +155,7 @@ public class SiteKey {
 		if (legacyHeaderLogged.compareAndSet(false, true))
 			logger.warn("A caller is authenticating with the deprecated " + FCHeaders.X_FRONTCACHE_SITE_KEY
 					+ " header (User-Agent: " + request.getHeader("User-Agent") + ", from "
-					+ request.getRemoteAddr() + "). Send 'Authorization: Bearer <site-key>' instead;"
+					+ request.getRemoteAddr() + "). Send 'Authorization: Bearer <api-key>' instead;"
 					+ " the old header is accepted for one more release.");
 
 		return header.trim();
