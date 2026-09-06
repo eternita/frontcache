@@ -32,10 +32,10 @@
                      hiding the rows instead would leave nothing for the poll to write into, so a node
                      that recovered would look dead until someone reloaded the page. --%>
                 <dl class="fc-edge-stats">
-                    <dt>items cached</dt>
+                    <dt>Items cached</dt>
                     <dd data-field="cachedEntries">&mdash;</dd>
 
-                    <dt title="the on-disk (L2) index">cache size</dt>
+                    <dt title="the on-disk (L2) index">Cache size</dt>
                     <dd data-field="cacheSize">&mdash;</dd>
 
                     <dt>L1 (memory)</dt>
@@ -47,7 +47,7 @@
                     <dt>JVM heap</dt>
                     <dd data-field="heap">&mdash;</dd>
 
-                    <dt title="this JVM, across all cores">JVM cpu</dt>
+                    <dt title="this JVM, across all cores">JVM CPU</dt>
                     <dd data-field="cpu">&mdash;</dd>
                 </dl>
                 <div class="fc-edge-offline" data-field="offline" style="display: none">not reachable</div>

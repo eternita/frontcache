@@ -48,7 +48,14 @@
                         <span class="fc-edge-offline" data-field="offline" style="display: none">not reachable</span>
                      </td>
                      <td align="left" style="padding: 5px;">
-                      <a class="btn btn-warning" href="remove-edge?edge=${edge.url}">remove</a>
+                      <%-- a POST, not a link: removing an edge changes console state, and a GET that
+                           does so can be triggered from any page the operator has open - the browser
+                           attaches the console's Basic credentials by itself. Styled as the button it
+                           already looked like. --%>
+                      <form action="remove-edge" method="post" style="margin: 0;">
+                        <input type="hidden" name="edge" value="<c:out value='${edge.url}'/>"/>
+                        <button type="submit" class="btn btn-warning">remove</button>
+                      </form>
                      </td>
                  </tr>
                 </c:forEach>
@@ -61,7 +68,7 @@
 		        
 		        </div>
 
-                <form class="form-inline" action="add-edge">
+                <form class="form-inline" action="add-edge" method="post">
                   <div class="form-group" style="padding-top: 25px;">
                      <label for="edges"> Add new edge(s) to console: </label> multiple space separated edges are acceptable<br/>
                      <input type="text" name="edges" class="form-control"  size="100"/>

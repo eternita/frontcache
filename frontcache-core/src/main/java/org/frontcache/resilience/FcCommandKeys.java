@@ -26,7 +26,7 @@ import java.util.Map;
  * <ul>
  * <li>{@code Input-Request} - a request from a client. The dashboard's headline traffic figure.</li>
  * <li>{@code Include-Request} - an include arriving back through this node's own front door.</li>
- * <li>{@code Cache-Hits} - a cache lookup. Every lookup, hit or miss, hence the surrounding command.</li>
+ * <li>{@code Cache-Hit} - a cache lookup. Every lookup, hit or miss, hence the surrounding command.</li>
  * <li>{@code Cache-Miss} - the origin call a cache miss makes.</li>
  * <li>{@code Cache-Bypass} - the origin call a request that never consults the cache makes.</li>
  * </ul>
@@ -64,7 +64,7 @@ public class FcCommandKeys {
 	public static final String INCLUDE_REQUEST = "Include-Request";
 
 	/** A cache lookup - every lookup, whether it hits or misses. */
-	public static final String CACHE_HITS = "Cache-Hits";
+	public static final String CACHE_HIT = "Cache-Hit";
 
 	/** The origin call behind a cache miss, whichever transport reaches the origin. */
 	public static final String CACHE_MISS = "Cache-Miss";
@@ -94,12 +94,18 @@ public class FcCommandKeys {
 	 * because the http one is the key every deployment mode used - a filter-mode node fetches its
 	 * includes over HTTP. A node that deliberately tuned the two differently is the one case this
 	 * cannot carry over, and it has to set {@code resilience.command.Cache-Miss.*} explicitly.
+	 *
+	 * {@code Cache-Hit} is the one entry here that is only a spelling change: it was {@code Cache-Hits}
+	 * before 2.9.0, and it was the last key left in the plural once the other renames put the rest in
+	 * the singular. Nothing about the command moved - it is still every cache lookup - but the key is
+	 * a config contract all the same, so an un-edited file keeps configuring it through the old name.
 	 */
 	public static final Map<String, String> LEGACY_COMMAND_KEYS;
 	static {
 		Map<String, String> m = new LinkedHashMap<String, String>();
 		m.put(INPUT_REQUEST, "Input-Requests");
 		m.put(INCLUDE_REQUEST, "Include-Requests");
+		m.put(CACHE_HIT, "Cache-Hits");
 		m.put(CACHE_MISS, "Cache-Origin-http");
 		m.put(CACHE_BYPASS, "Origin-Hits");
 		LEGACY_COMMAND_KEYS = Collections.unmodifiableMap(m);

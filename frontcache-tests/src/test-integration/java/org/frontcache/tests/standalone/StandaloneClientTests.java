@@ -26,4 +26,10 @@ public class StandaloneClientTests extends ClientTests {
 		return true;
 	}
 
+	/** this node's bots.conf is on the 2.9.0 rule format */
+	@Override
+	protected String expectedBotsConfigMarker() {
+		return "headless-e2e";
+	}
+
 }

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.LongAdder;
  * <h2>Why these are counted here and not derived</h2>
  *
  * Hit ratio is the number an operator alerts on, and nothing in the process could produce it before
- * this class. The dashboard's {@code Cache-Hits} command counts cache <i>lookups</i> - every one of
+ * this class. The dashboard's {@code Cache-Hit} command counts cache <i>lookups</i> - every one of
  * them, hit or miss - because it measures the call, not the answer. The request log has the per-request
  * verdict but is a log, not a metric. So the counters are taken where the answer is actually known:
  * inside each {@code getFromCacheImpl}, which is the single read path every cache processor goes

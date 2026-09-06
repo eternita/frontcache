@@ -4,6 +4,32 @@
          metadata-complete="false" version="6.0">
   <display-name>Frontcache Console</display-name>
 
+	<!-- Authentication, then the cross-origin check, in that order: an unauthenticated caller gets a
+	     401 and learns nothing about the second filter. See docs/basic-auth-proposal.md.
+
+	     <async-supported> on BOTH is load-bearing and silent when missing. DashboardStreamProxyServlet
+	     calls startAsync(), and the container refuses that if ANY filter in the chain for that request
+	     is not async-supported - so the realtime page, and only the realtime page, would break. -->
+	<filter>
+		<filter-name>BasicAuthFilter</filter-name>
+		<filter-class>org.frontcache.console.web.BasicAuthFilter</filter-class>
+		<async-supported>true</async-supported>
+	</filter>
+	<filter-mapping>
+		<filter-name>BasicAuthFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+
+	<filter>
+		<filter-name>SameOriginFilter</filter-name>
+		<filter-class>org.frontcache.console.web.SameOriginFilter</filter-class>
+		<async-supported>true</async-supported>
+	</filter>
+	<filter-mapping>
+		<filter-name>SameOriginFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+
 	<!-- Relays an edge's dashboard SSE stream to the browser (the console is a different origin
 	     than the node). Replaced the vendored Netflix ProxyStreamServlet in 2.7. -->
 	<servlet>
@@ -50,29 +76,6 @@
 	</context-param>
 
 
-<!-- Security Constraint 
 
-	<security-constraint>
-		<web-resource-collection>
-			<web-resource-name>Frontcache Console</web-resource-name>
-			<url-pattern>/*</url-pattern>
-		</web-resource-collection>
-		<auth-constraint>
-			<role-name>frontcache-console</role-name>
-		</auth-constraint>
-	</security-constraint>
-
-	<login-config>
-		<auth-method>BASIC</auth-method>
-		<realm-name>Frontcache Console Application</realm-name>
-	</login-config>
-
-	<security-role>
-		<description>
-            The role that is required to access Frontcache Console
-        </description>
-		<role-name>frontcache-console</role-name>
-	</security-role>
- -->
  		
 </web-app>

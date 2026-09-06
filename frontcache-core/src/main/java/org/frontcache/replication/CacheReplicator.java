@@ -81,7 +81,7 @@ public class CacheReplicator {
 
 	/**
 	 * Overrides how many entries are transferred concurrently. Values below 1 are clamped to 1, which
-	 * restores the pre-2.10 strictly-sequential behaviour.
+	 * restores the pre-2.9.0 strictly-sequential behaviour.
 	 */
 	public void setWorkerCount(int workerCount) {
 		this.workerCount = Math.max(1, workerCount);

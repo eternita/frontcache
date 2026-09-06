@@ -509,6 +509,9 @@ project(':frontcache-console') {
 		classpath = sourceSets.main.runtimeClasspath + configurations.provided
 		systemProperty 'frontcache.jetty.port', '7080'
 		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+		// Without this the console comes up with no edge list at all - every screen empty - because
+		// FrontcacheService reads it from FRONTCACHE_CONFIG or this property and nowhere else.
+		systemProperty 'org.frontcache.console.config', "${projectDir}/config/frontcache-console.conf"
 		systemProperty 'logback.configurationFile', "${projectDir}/config/fc-logback.xml"
 	}
 }

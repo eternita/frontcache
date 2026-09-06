@@ -399,7 +399,7 @@ public abstract class ClientTests extends TestsBase {
 		Assert.assertNotNull("get-bots returned nothing", botKeywords);
 		Assert.assertFalse("conf/bots.conf is not empty, so neither should this be", botKeywords.isEmpty());
 
-		// The rules are additive (2.10) and must arrive BESIDE the keywords, not instead of them: the
+		// The rules are additive (2.9.0) and must arrive BESIDE the keywords, not instead of them: the
 		// console is deployed separately from the fleet and upgrades in either order. Every node has
 		// rules, because two of them are built in.
 		List<BotRuleEntry> botRules = frontcacheClient.getBotRules();
@@ -414,7 +414,7 @@ public abstract class ClientTests extends TestsBase {
 			ruleNames.add(rule.getName());
 
 		// A bare keyword becomes a rule named after itself, so it is visible (and countable) on the
-		// console's screen - while botKeywords keeps meaning exactly what it did before 2.10.
+		// console's screen - while botKeywords keeps meaning exactly what it did before 2.9.0.
 		Assert.assertTrue("every bare keyword should also appear as a rule: " + botKeywords + " vs " + ruleNames,
 				ruleNames.containsAll(botKeywords));
 		Assert.assertTrue("rules = 2 built-ins + the keywords + whatever else the file holds",
@@ -451,6 +451,74 @@ public abstract class ClientTests extends TestsBase {
 		String viaLegacyAccessor = frontcacheClient.getHystrixConfig();
 		Assert.assertEquals("the pre-2.7 path must return the same file", config, viaLegacyAccessor);
 	}
+
+	/**
+	 * The Bot Configs screen renders the file, not the parse of it, which is the whole reason the
+	 * action exists beside get-bots: a commented-out rule or a line the parser skipped is visible
+	 * only in the raw text. Both e2e nodes ship a conf/bots.conf, and the two files are deliberately
+	 * in different formats, so asserting each node's own header also proves the response comes from
+	 * that node's disk rather than from anywhere shared.
+	 */
+	@Test
+	public void botsConfigActionReturnsTheRawFileAndNotTheParsedRules() throws Exception {
+		org.frontcache.io.GetBotsConfigActionResponse response = frontcacheClient.getBotsConfigActionResponse();
+
+		Assert.assertNotNull("the action must answer", response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+
+		String raw = response.getBotsConfig();
+		Assert.assertNotNull("the raw file is what the console's Bot Configs screen renders", raw);
+		Assert.assertTrue("comments must survive - a parsed view would have dropped them, got: " + raw,
+				raw.contains("# Conf for bots"));
+		Assert.assertTrue("expected this node's own bots.conf, got: " + raw,
+				raw.contains(expectedBotsConfigMarker()));
+	}
+
+	/**
+	 * The Fallback Config screen renders the file rather than the parsed entry set it used to show as a
+	 * table. Same reasoning as the two above: the table had a column per field of an entry, so the
+	 * comments saying what a fallback is for - and any entry commented out - were not on the screen at
+	 * all. The parsed shape stays on the wire; it is asserted above.
+	 */
+	@Test
+	public void fallbacksConfigActionReturnsTheRawFileAndNotTheParsedEntries() throws Exception {
+		org.frontcache.io.GetFallbacksConfigActionResponse response = frontcacheClient.getFallbacksConfigActionResponse();
+
+		Assert.assertNotNull("the action must answer", response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+
+		String raw = response.getFallbacksConfig();
+		Assert.assertNotNull("the raw file is what the console's Fallback Config screen renders", raw);
+		Assert.assertTrue("comments must survive - the parsed entries had dropped them, got: " + raw,
+				raw.contains("# record description"));
+		Assert.assertTrue("expected the entries too, got: " + raw, raw.contains("fallback1.txt"));
+	}
+
+	/**
+	 * The Dynamic URLs screen renders the file rather than the parsed pattern set it used to show:
+	 * the comments explaining why a URL is never cached, and any pattern commented out, exist only in
+	 * the raw text. The parsed shape stays on the wire - it is asserted above - because it is what
+	 * anything other than that one screen reads.
+	 */
+	@Test
+	public void dynamicURLsConfigActionReturnsTheRawFileAndNotTheParsedPatterns() throws Exception {
+		org.frontcache.io.GetDynamicURLsConfigActionResponse response = frontcacheClient.getDynamicURLsConfigActionResponse();
+
+		Assert.assertNotNull("the action must answer", response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+
+		String raw = response.getDynamicURLsConfig();
+		Assert.assertNotNull("the raw file is what the console's Dynamic URLs screen renders", raw);
+		Assert.assertTrue("comments must survive - the parsed set had dropped them, got: " + raw,
+				raw.contains("# Configs for ignore patterns"));
+		Assert.assertTrue("expected the patterns too, got: " + raw, raw.contains("^/admin/.*"));
+	}
+
+	/**
+	 * A line unique to this node's conf/bots.conf - the standalone node is on the 2.9.0 rule format,
+	 * the filter node deliberately on bare keywords only.
+	 */
+	protected abstract String expectedBotsConfigMarker();
 
 	/**
 	 * Whether this node's FRONTCACHE_HOME ships conf/guard-rules.conf. The two e2e nodes differ on

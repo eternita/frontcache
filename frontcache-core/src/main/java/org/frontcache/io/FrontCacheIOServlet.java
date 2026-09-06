@@ -60,6 +60,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	private static final String RESILIENCE_CONFIG_FILE = "resilience.properties";
 	private static final String GUARD_RULES_CONFIG_FILE = "guard-rules.conf";
+	private static final String BOTS_CONFIG_FILE = "bots.conf";
+	private static final String DYNAMIC_URLS_CONFIG_FILE = "dynamic-urls.conf";
+	private static final String FALLBACKS_CONFIG_FILE = "fallbacks.conf";
 
 	FrontCacheEngine fcEngine = null;
 
@@ -157,8 +160,16 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = getFallbackConfigs(request);
 			break;
 
+		case FrontcacheAction.GET_FALLBACKS_CONFIG:
+			aResponse = getFallbacksConfig(request);
+			break;
+
 		case FrontcacheAction.GET_BOTS:
 			aResponse = getBots(request);
+			break;
+
+		case FrontcacheAction.GET_BOTS_CONFIG:
+			aResponse = getBotsConfig(request);
 			break;
 
 		case FrontcacheAction.RELOAD_BOTS:
@@ -167,6 +178,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.GET_DYNAMIC_URLS:
 			aResponse = getDynamicURLs(request);
+			break;
+
+		case FrontcacheAction.GET_DYNAMIC_URLS_CONFIG:
+			aResponse = getDynamicURLsConfig(request);
 			break;
 
 		case FrontcacheAction.GET_RESILIENCE_CONFIGS:
@@ -480,10 +495,42 @@ public class FrontCacheIOServlet extends HttpServlet {
 			botRules.add(rule.toEntry());
 
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
-		// The bare keywords keep their own field and their pre-2.10 meaning - a console older than
+		// The bare keywords keep their own field and their pre-2.9.0 meaning - a console older than
 		// the rules renders that one and must not suddenly see rule names in it.
 		aResponse.setBotKeywords(classifier.getKeywords());
 		aResponse.setBotRules(botRules);
+
+		return aResponse;
+	}
+
+	/**
+	 * Reads the raw ./conf/bots.conf file (comments and empty lines preserved) so it can be displayed
+	 * as-is in the console, next to the parsed view {@link #getBots} serves.
+	 *
+	 * Worth having both: the parsed view shows what is deciding, this one shows what the operator
+	 * wrote. A line the parser skipped - a commented-out rule, a typo that made it a bare keyword -
+	 * is visible here and nowhere else.
+	 *
+	 * The tolerant read matters as much as it does for guard-rules.conf: conf/bots.conf is optional
+	 * and {@code FCConfig.getConfigInputStream} signals a missing file by throwing, so a node without
+	 * one has to produce the "not found" response rather than a failed action.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getBotsConfig(HttpServletRequest req)
+	{
+		GetBotsConfigActionResponse aResponse = new GetBotsConfigActionResponse();
+
+		String raw = readConfigFile(BOTS_CONFIG_FILE);
+
+		if (null == raw)
+		{
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription(BOTS_CONFIG_FILE + " not found");
+		} else {
+			aResponse.setBotsConfig(raw);
+		}
 
 		return aResponse;
 	}
@@ -547,6 +594,62 @@ public class FrontCacheIOServlet extends HttpServlet {
 	{
 		GetDynamicURLsActionResponse aResponse = new GetDynamicURLsActionResponse();
 		aResponse.setDynamicUrlPatterns(FCConfig.getDynamicURLs());
+
+		return aResponse;
+	}
+
+	/**
+	 * Reads the raw ./conf/fallbacks.conf file (comments and empty lines preserved) so it can be
+	 * displayed as-is in the console, where {@link #getFallbackConfigs} used to supply the parsed
+	 * entries.
+	 *
+	 * Same tolerant read as the other raw-file actions: the file is optional and
+	 * {@code FCConfig.getConfigInputStream} signals a missing one by throwing.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getFallbacksConfig(HttpServletRequest req)
+	{
+		GetFallbacksConfigActionResponse aResponse = new GetFallbacksConfigActionResponse();
+
+		String raw = readConfigFile(FALLBACKS_CONFIG_FILE);
+
+		if (null == raw)
+		{
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription(FALLBACKS_CONFIG_FILE + " not found");
+		} else {
+			aResponse.setFallbacksConfig(raw);
+		}
+
+		return aResponse;
+	}
+
+	/**
+	 * Reads the raw ./conf/dynamic-urls.conf file (comments and empty lines preserved) so it can be
+	 * displayed as-is in the console, where {@link #getDynamicURLs} used to supply a bare list of the
+	 * patterns parsed out of it.
+	 *
+	 * Same tolerant read as the other two raw-file actions: the file is optional and
+	 * {@code FCConfig.getConfigInputStream} signals a missing one by throwing.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse getDynamicURLsConfig(HttpServletRequest req)
+	{
+		GetDynamicURLsConfigActionResponse aResponse = new GetDynamicURLsConfigActionResponse();
+
+		String raw = readConfigFile(DYNAMIC_URLS_CONFIG_FILE);
+
+		if (null == raw)
+		{
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription(DYNAMIC_URLS_CONFIG_FILE + " not found");
+		} else {
+			aResponse.setDynamicURLsConfig(raw);
+		}
 
 		return aResponse;
 	}

@@ -40,7 +40,7 @@ public class FCConfigSingleSiteConfigTest {
 	/**
 	 * Re-pin frontcache.home and reload the classifier.
 	 *
-	 * The bot keywords come from BotClassifier as of 2.10 (one reader per config file), and that is a
+	 * The bot keywords come from BotClassifier as of 2.9.0 (one reader per config file), and that is a
 	 * lazily-built process-wide singleton - so without this it would hold whatever home the FIRST test
 	 * class to touch it had set. GuardRuleEngineTest points the property at its own fixture and does
 	 * not restore it, which would make this class pass or fail on test-execution order.

@@ -42,8 +42,8 @@ public class FcResilienceConfigTest {
 		props.setProperty("resilience.command.Input-Request.execution.isolation.thread.timeoutInMilliseconds", "20000");
 		props.setProperty("resilience.command.Input-Request.execution.isolation.semaphore.maxConcurrentRequests", "50");
 		props.setProperty("resilience.command.Input-Request.fallback.isolation.semaphore.maxConcurrentRequests", "50");
-		props.setProperty("resilience.command.Cache-Hits.execution.isolation.strategy", "SEMAPHORE");
-		props.setProperty("resilience.command.Cache-Hits.execution.isolation.thread.timeoutInMilliseconds", "1500");
+		props.setProperty("resilience.command.Cache-Hit.execution.isolation.strategy", "SEMAPHORE");
+		props.setProperty("resilience.command.Cache-Hit.execution.isolation.thread.timeoutInMilliseconds", "1500");
 		props.setProperty("resilience.command.Cache-Miss.execution.isolation.strategy", "THREAD");
 		props.setProperty("resilience.command.Cache-Miss.execution.isolation.thread.timeoutInMilliseconds", "10000");
 		props.setProperty("resilience.threadpool.default.coreSize", "100");

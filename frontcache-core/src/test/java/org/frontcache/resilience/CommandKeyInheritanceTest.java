@@ -163,7 +163,7 @@ public class CommandKeyInheritanceTest {
 		FcResilienceConfig config = new FcResilienceConfig(props);
 
 		assertEquals("an unrelated key still takes default scope", 3000,
-				config.forCommand("Cache-Hits", null).getTimeoutMs());
+				config.forCommand(FcCommandKeys.CACHE_HIT, null).getTimeoutMs());
 		assertEquals("Input-Request keeps its own value", 20000,
 				config.forCommand(FC_Total.COMMAND_KEY_INPUT_REQUEST, null).getTimeoutMs());
 	}
@@ -183,12 +183,14 @@ public class CommandKeyInheritanceTest {
 		props.setProperty("resilience.command.Input-Requests.execution.isolation.thread.timeoutInMilliseconds", "20000");
 		props.setProperty("resilience.command.Origin-Hits.execution.isolation.thread.timeoutInMilliseconds", "21000");
 		props.setProperty("resilience.command.Cache-Origin-http.execution.isolation.thread.timeoutInMilliseconds", "22000");
+		props.setProperty("resilience.command.Cache-Hits.execution.isolation.thread.timeoutInMilliseconds", "1500");
 
 		FcResilienceConfig config = new FcResilienceConfig(props);
 
 		assertEquals(20000, config.forCommand(FcCommandKeys.INPUT_REQUEST, null).getTimeoutMs());
 		assertEquals(21000, config.forCommand(FcCommandKeys.CACHE_BYPASS, null).getTimeoutMs());
 		assertEquals(22000, config.forCommand(FcCommandKeys.CACHE_MISS, null).getTimeoutMs());
+		assertEquals(1500, config.forCommand(FcCommandKeys.CACHE_HIT, null).getTimeoutMs());
 	}
 
 	/**

@@ -8,19 +8,20 @@
  */
 package org.frontcache.console.model;
 
-import java.util.Set;
-
-import org.frontcache.resilience.fr.FallbackConfigEntry;
-
 /**
- * One edge's fallback entries. A flat set as of 2.7 - see {@link BotConfig}.
+ * Raw ./conf/fallbacks.conf of one edge (comments and empty lines preserved).
+ *
+ * Before 2.9.0 this held the flat set of parsed entries the screen rendered as a table. It now holds
+ * the file, like {@link GuardConfig}, {@link BotConfig} and {@link DynamicURLsConfig} - the table
+ * showed the three fields of an entry and nothing else, so the notes explaining what each fallback
+ * is for, and any entry commented out, were invisible.
  */
 public class FallbackConfig {
 
 	private String name;
-	private Set<FallbackConfigEntry> config;
+	private String config;
 
-	public FallbackConfig(String name, Set<FallbackConfigEntry> config) {
+	public FallbackConfig(String name, String config) {
 		super();
 		this.name = name;
 		this.config = config;
@@ -30,7 +31,7 @@ public class FallbackConfig {
 		return name;
 	}
 
-	public Set<FallbackConfigEntry> getConfig() {
+	public String getConfig() {
 		return config;
 	}
 

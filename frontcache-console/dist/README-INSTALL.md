@@ -8,8 +8,8 @@ exactly one webapp at context `/`), and it talks to each node over that node's m
 bin/frontcache-console   the launcher
 lib/*.jar                launcher classpath (embedded Jetty 12 / Jakarta EE10)
 webapps/ROOT.war         the console webapp (Spring MVC + frontcache-core in WEB-INF/lib)
-conf/frontcache-console.conf   the nodes to monitor + the shared api-key
-conf/fc-logback.xml            logging (stdout, ERROR and above)
+conf/frontcache-console.conf   the nodes to monitor, the shared api-key, the console login
+conf/fc-logback.xml            logging (stdout, WARN and above)
 ```
 
 ## 1. Prerequisites
@@ -29,6 +29,9 @@ frontcache {
     console {
         urls = ["https://fc-edge.example.com:443/", "https://fc-eu.example.com:443/"]
         apiKey = your-api-key
+
+        user = admin
+        password = admin
     }
 }
 ```
@@ -37,6 +40,13 @@ frontcache {
   node's management API for cache state and stats.
 - `apiKey` — must match `front-cache.api-key` in every node's `frontcache.properties`.
   Without it the nodes reject the console's calls.
+- `user` / `password` — the console's single login (one user, no roles), asked for by the browser
+  as HTTP Basic. **Change the password**: `admin`/`admin` is what the bundle ships with, and the
+  console warns on every startup until it is something else.
+
+  Remove **both** lines to run without authentication — the console then warns about *that* on
+  every startup instead. Setting one without the other is a startup failure, not a guess. Add
+  `auth-required = true` to refuse to start rather than run unauthenticated.
 
 
 ## 3. Run
@@ -54,8 +64,19 @@ Then open `http://localhost:7080/`.
 ## 4. Secure it
 
 The console can invalidate cache across the whole fleet, so **do not expose it publicly**.
-Keep it on an internal network, or put it behind an authenticating reverse proxy. It has no
-authentication of its own.
+
+1. **Change the password** in `conf/frontcache-console.conf` (§2). The shipped `admin`/`admin` is
+   a published default, and the console says so at startup until you change it.
+2. **Terminate TLS in front of it, or keep it on an internal network.** HTTP Basic sends
+   `user:password` base64-encoded — that is encoding, not encryption — on *every* request,
+   including the long-lived dashboard stream. Authentication makes the console safe to leave
+   running; it does not make it safe to publish.
+3. **For more than one operator, put it behind an authenticating reverse proxy** (nginx,
+   oauth2-proxy, your SSO). One shared password has no accountability — nothing in a log can say
+   *who* flushed the cache — and no revocation short of changing it for everybody.
+
+There is no logout: HTTP Basic has none. Browsers cache the credentials for the origin until they
+are closed.
 
 ## Upgrading
 

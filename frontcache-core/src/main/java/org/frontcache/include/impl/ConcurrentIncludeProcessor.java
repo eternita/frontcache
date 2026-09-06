@@ -374,7 +374,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	 * Resolve every combinable include against the cache, in parallel, before deciding what to batch.
 	 *
 	 * On the include pool rather than inline on the request thread: cache lookups run under the
-	 * Cache-Hits command, which is SEMAPHORE-isolated and therefore executes on whichever thread
+	 * Cache-Hit command, which is SEMAPHORE-isolated and therefore executes on whichever thread
 	 * calls it - so doing fifteen of them here would serialise fifteen L2 Lucene reads that today run
 	 * concurrently. {@code invokeAll} returns when the last member reports, which is the same instant
 	 * a per-member coordinator would have fired the batch, for a fraction of the machinery.

@@ -84,7 +84,7 @@ public class BotClassifierTest {
 	}
 
 	/**
-	 * The 2.10 behaviour change: before it, a file listing 'Googlebot' did not match 'googlebot/2.1'
+	 * The 2.9.0 behaviour change: before it, a file listing 'Googlebot' did not match 'googlebot/2.1'
 	 * and nobody noticed, because the failure mode is a page rendered fresh from origin rather than
 	 * an error.
 	 */

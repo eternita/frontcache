@@ -40,7 +40,7 @@
 /* The circuit boxes: a wrapping row of cards.
    Grid rather than flex, because the number of cards per row has to follow the width
    of the column. A flex row wraps on the cards' base size, so a 4-command circuit
-   (Input-Request / Cache-Hits / Cache-Miss / Cache-Bypass) dropped the last card
+   (Input-Request / Cache-Hit / Cache-Miss / Cache-Bypass) dropped the last card
    onto a second row as soon as the column was under 4x250px - flex-shrink does not
    help, since wrapping is decided before shrinking. auto-fill + minmax lets the tracks
    give up width so the whole circuit stays on one row; the 200px floor is where the
@@ -74,24 +74,33 @@
 	position: relative;
 	height: 250px;
 	font-size: 10pt;
+
+	/* Anything the block below does not pin sorts AFTER the known commands, not before them.
+	   The initial value is 0, which put an unrecognised key - a custom command, or one from a
+	   Frontcache newer than this console - at the head of the row, ahead of Input-Request. */
+	order: 9;
 }
 
-/* custom left-to-right order of the circuit cards (lower number = further left).
-   Commands not listed keep the default order (0) and so appear before order:1.
+/* custom left-to-right order of the circuit cards (lower number = further left):
 
-   The order is the path a request takes: in at the front door, look in cache, go to the
-   origin. Include-Request sits beside Input-Request because they are the two front-door
-   circuits and an operator reads them together.
+     Input-Request, Include-Request, Cache-Hit, Cache-Miss, Cache-Bypass
 
-   Both spellings are listed. The console is deployed separately from the fleet and reads
-   a MIXED one, so a node that has not upgraded past 2.9.0 still emits the old key names -
-   an unlisted command falls back to order:0 and jumps to the front of the row, which reads
-   as the dashboard rearranging itself depending on which node you picked. The pre-2.9.0
-   names share the order of whatever replaced them. */
+   which is the path a request takes - in at the front door, look in cache, go to the origin.
+   Include-Request sits beside Input-Request because they are the two front-door circuits and
+   an operator reads them together. Commands not listed here keep .fc-circuit's order:9 and
+   follow the five, in the alphabetical order fc-dashboard.js inserts them in.
+
+   Every superseded spelling is listed beside the name that replaced it. The console is
+   deployed separately from the fleet and reads a MIXED one, so a node that has not upgraded
+   still emits the old key names, and a command that falls through to order:9 would drift to
+   the end of the row - which reads as the dashboard rearranging itself depending on which
+   node you picked. A superseded name takes the position of whatever replaced it, so the row
+   holds still while the fleet upgrades. */
 .fc-dashboard .fc-circuit[data-command="Input-Request"]       { order: 1; }
 .fc-dashboard .fc-circuit[data-command="Input-Requests"]      { order: 1; }
 .fc-dashboard .fc-circuit[data-command="Include-Request"]     { order: 2; }
 .fc-dashboard .fc-circuit[data-command="Include-Requests"]    { order: 2; }
+.fc-dashboard .fc-circuit[data-command="Cache-Hit"]           { order: 3; }
 .fc-dashboard .fc-circuit[data-command="Cache-Hits"]          { order: 3; }
 .fc-dashboard .fc-circuit[data-command="Cache-Miss"]          { order: 4; }
 .fc-dashboard .fc-circuit[data-command="Cache-Origin-filter"] { order: 4; }
