@@ -188,8 +188,93 @@ public class FCUtils {
 		if (!requestHeaders.containsKey(FCHeaders.X_FRONTCACHE_CLIENT_IP))
 			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, context.getClientIP());
 
+		// The client type the PAGE was classified as, so a fragment is not re-classified on its own
+		// evidence - which for a client-ip: or cookie: rule in bots.conf is different evidence. Read
+		// back by propagatedClientType() below, from a trusted peer only. Always set here
+		// (rather than only when absent): buildRequestHeaders drops any inbound value, so anything
+		// still in the map at this point is one WE put there for an earlier hop.
+		String clientType = context.getClientType();
+		if (null != clientType)
+		{
+			requestHeaders.remove(FCHeaders.X_FRONTCACHE_CLIENT_TYPE);
+			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_TYPE, clientType);
+		}
+
 		return client.fetchOverHttp(urlStr, requestHeaders, context);
     }
+
+	/**
+	 * The client type decided for the PAGE this request is a fragment of, when it can be believed.
+	 *
+	 * An {@code <fc:include>} re-entering a Frontcache is classified independently of the page that
+	 * holds it. With a User-Agent-only bots.conf the two agree by accident - the UA survives the hop.
+	 * They stop agreeing the moment a rule reads anything else: a {@code client-ip:} rule sees the
+	 * sibling node's address rather than the visitor's, and a {@code cookie:} rule sees no cookies at
+	 * all once the servlet request behind an async include has been recycled. Page and fragments then
+	 * read different branches of the same WebResponse's expireTimeMap, and the fragments quietly stop
+	 * being cached - with nothing in the log but a client-type column that disagrees between the two
+	 * lines.
+	 *
+	 * Three conditions, all required, none of them optional:
+	 *
+	 * <ul>
+	 * <li><b>the peer is trusted</b> ({@code front-cache.client-ip.trusted-proxies}). FCUtils
+	 *     forwards every header it does not blacklist, so without this a client could simply send
+	 *     the header and choose its own cache behaviour. Unset by default, which means propagation
+	 *     is OFF by default and classification falls back to the rules - the safe direction;</li>
+	 * <li><b>the request arrived as an include</b> (it carried a Frontcache request id). A top-level
+	 *     request is a client's, and a client's claim about this is worth nothing;</li>
+	 * <li><b>the value is a client type this node knows.</b> Anything else is ignored rather than
+	 *     stored - an unknown client type would key nothing in expireTimeMap.</li>
+	 * </ul>
+	 *
+	 * Note for whoever configures the proxy: a trusted proxy that passes client headers through
+	 * verbatim (nginx does, by default) should strip {@code X-Frontcache-Client-Type} - exactly as it
+	 * should already be stripping {@code X-Frontcache-Client-IP}.
+	 *
+	 * These requests are decided BEFORE the rules run, so no bots.conf rule counts a hit for them.
+	 * That is the intended accounting, and the same reason the rate limiter's {@code scope=toplevel}
+	 * exists: the visitor was already classified once, when their page was requested, and counting
+	 * their fragments would count them again once per fragment.
+	 *
+	 * @return the propagated client type, or null when this request must be classified on its own
+	 */
+	public static String propagatedClientType(RequestContext context)
+	{
+		if (!context.getRequestFromFrontcache())
+			return null;
+
+		HttpServletRequest request = context.getRequest();
+		if (null == request)
+			return null;
+
+		String value;
+		try {
+			value = request.getHeader(FCHeaders.X_FRONTCACHE_CLIENT_TYPE);
+		} catch (Exception e) {
+			return null; // recycled request - undecidable
+		}
+
+		if (null == value)
+			return null;
+
+		if (!ClientIpResolver.getInstance().isTrustedPeer(request))
+		{
+			if (logger.isDebugEnabled())
+				logger.debug("Ignoring " + FCHeaders.X_FRONTCACHE_CLIENT_TYPE + " from an untrusted peer - classifying"
+						+ " this request on its own. Set " + ClientIpResolver.TRUSTED_PROXIES_PROPERTY
+						+ " if the peer really is a Frontcache node or a proxy you control.");
+			return null;
+		}
+
+		String clientType = value.trim();
+		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(clientType) || FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equals(clientType))
+			return clientType;
+
+		logger.warn("Ignoring unknown client type '" + clientType + "' in " + FCHeaders.X_FRONTCACHE_CLIENT_TYPE
+				+ " - expected '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '" + FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'");
+		return null;
+	}
 
 	public static String getClientIP(HttpServletRequest request) {
 		// request may be null or a container-recycled servlet request: async includes are resolved in
@@ -1123,6 +1208,15 @@ public class FCUtils {
 			case "server":
 			case "transfer-encoding":
 				return false;
+
+			// Dropped, not forwarded: this one is Frontcache telling Frontcache how a request was
+			// already classified (FCHeaders.X_FRONTCACHE_CLIENT_TYPE), and it is honoured from a
+			// trusted peer. A client that sent it would otherwise have it relayed onwards BY us, with
+			// our address as the peer - i.e. it would pick its own client type. The include path puts
+			// the real value back in FCUtils.includeDynamicCallHttpClient, after this filter has run.
+			case "x-frontcache-client-type":
+				return false;
+
 			default:
 				return true;
 		}

@@ -33,6 +33,9 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
+import org.frontcache.bots.BotClassifier;
+import org.frontcache.bots.BotRule;
+import org.frontcache.bots.BotRuleEntry;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheStats;
@@ -156,6 +159,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.GET_BOTS:
 			aResponse = getBots(request);
+			break;
+
+		case FrontcacheAction.RELOAD_BOTS:
+			aResponse = reloadBots(request);
 			break;
 
 		case FrontcacheAction.GET_DYNAMIC_URLS:
@@ -466,10 +473,33 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 */
 	private ActionResponse getBots(HttpServletRequest req)
 	{
+		BotClassifier classifier = BotClassifier.getInstance();
+
+		List<BotRuleEntry> botRules = new ArrayList<BotRuleEntry>();
+		for (BotRule rule : classifier.getRules())
+			botRules.add(rule.toEntry());
+
 		GetBotsActionResponse aResponse = new GetBotsActionResponse();
-		aResponse.setBotKeywords(FCConfig.getBotUserAgentKeywords());
+		// The bare keywords keep their own field and their pre-2.10 meaning - a console older than
+		// the rules renders that one and must not suddenly see rule names in it.
+		aResponse.setBotKeywords(classifier.getKeywords());
+		aResponse.setBotRules(botRules);
 
 		return aResponse;
+	}
+
+	/**
+	 * Re-reads conf/bots.conf without restarting the node. Rules are rebuilt, so hit counters start
+	 * from zero again - the same contract as reload-guard-rules.
+	 *
+	 * @param req
+	 * @return
+	 */
+	private ActionResponse reloadBots(HttpServletRequest req)
+	{
+		BotClassifier.reload();
+
+		return new ReloadBotsActionResponse();
 	}
 
 	/**

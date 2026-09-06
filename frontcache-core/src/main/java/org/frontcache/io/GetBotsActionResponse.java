@@ -8,11 +8,15 @@
  */
 package org.frontcache.io;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.frontcache.bots.BotRuleEntry;
+
 /**
- * Bot user-agent keywords from ./conf/bots.conf.
+ * Bot classification config from ./conf/bots.conf: the ordered rules, and the bare User-Agent
+ * keywords.
  *
  * A flat set as of 2.7. Before that it was a {@code Map<domain, Set<String>>} - a shape that outlived
  * its reason: one node serves one site, so the map always held exactly one entry, and the console's
@@ -20,10 +24,17 @@ import java.util.Set;
  *
  * Both shapes go out on the wire, and both are accepted coming in. See
  * {@link LegacyDomainKeyedField} for why.
+ *
+ * {@code botRules} is additive, as of 2.10. {@code botKeywords} keeps meaning exactly what it did -
+ * the BARE keyword lines, nothing else - so a console older than the rules still renders the list it
+ * knows; a newer console reading an older node finds botRules absent and falls back to the same
+ * list. The console is deployed separately from the fleet and upgrades in either order.
  */
 public class GetBotsActionResponse extends ActionResponse {
 
 	private Set<String> botKeywords;
+
+	private List<BotRuleEntry> botRules;
 
 	public GetBotsActionResponse() { // for JSON mapper
 		setResponseStatus(RESPONSE_STATUS_OK);
@@ -35,6 +46,18 @@ public class GetBotsActionResponse extends ActionResponse {
 
 	public void setBotKeywords(Set<String> botKeywords) {
 		this.botKeywords = botKeywords;
+	}
+
+	/**
+	 * The rules in evaluation order (built-ins included), each with its hit count since load. Null
+	 * from a node older than 2.10.
+	 */
+	public List<BotRuleEntry> getBotRules() {
+		return botRules;
+	}
+
+	public void setBotRules(List<BotRuleEntry> botRules) {
+		this.botRules = botRules;
 	}
 
 	/**

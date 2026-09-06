@@ -230,47 +230,11 @@ public class ClientIpResolver {
 	}
 
 	/**
-	 * Parses an address literal only - never a host name, so this can never trigger a DNS lookup on
-	 * the request thread from attacker-controlled input. Tolerates the forms that turn up in
-	 * remoteAddr and forwarding headers: bracketed IPv6, a trailing port, an IPv6 zone id.
-	 *
-	 * @return the address, or null if the text is not an IP literal
+	 * @see Cidr#parseAddress(String) - one parser for address literals, shared with the CIDR matcher
 	 */
 	static InetAddress parseAddress(String text)
 	{
-		if (null == text)
-			return null;
-
-		String value = text.trim();
-		if (0 == value.length())
-			return null;
-
-		if (value.startsWith("["))
-		{
-			int close = value.indexOf(']');
-			if (-1 == close)
-				return null;
-			value = value.substring(1, close);           // [2001:db8::1]:443 -> 2001:db8::1
-		}
-		else
-		{
-			int colon = value.indexOf(':');
-			if (-1 < colon && colon == value.lastIndexOf(':'))
-				value = value.substring(0, colon);       // 203.0.113.7:1234 -> 203.0.113.7 (one colon = IPv4:port)
-		}
-
-		int zone = value.indexOf('%');
-		if (-1 < zone)
-			value = value.substring(0, zone);            // fe80::1%eth0 -> fe80::1
-
-		if (0 == value.length())
-			return null;
-
-		try {
-			return InetAddress.ofLiteral(value);
-		} catch (IllegalArgumentException e) {
-			return null;
-		}
+		return Cidr.parseAddress(text);
 	}
 
 	private static List<Cidr> parseCidrs(String commaSeparated)
@@ -301,74 +265,4 @@ public class ClientIpResolver {
 		return cidrs;
 	}
 
-	/**
-	 * An address block, compared on raw address bytes so v4 and v6 never match each other.
-	 */
-	static final class Cidr {
-
-		private final byte[] network;
-		private final int prefixBits;
-
-		private Cidr(byte[] network, int prefixBits) {
-			this.network = network;
-			this.prefixBits = prefixBits;
-		}
-
-		static Cidr parse(String text)
-		{
-			String value = text;
-			int prefixBits = -1;
-
-			int slash = value.lastIndexOf('/');
-			if (-1 < slash)
-			{
-				try {
-					prefixBits = Integer.parseInt(value.substring(slash + 1).trim());
-				} catch (NumberFormatException e) {
-					return null;
-				}
-				value = value.substring(0, slash).trim();
-			}
-
-			InetAddress address = parseAddress(value);
-			if (null == address)
-				return null;
-
-			byte[] bytes = address.getAddress();
-			int maxBits = bytes.length * 8;
-
-			if (-1 == prefixBits)
-				prefixBits = maxBits;   // a bare address is a single-host block
-
-			if (0 > prefixBits || prefixBits > maxBits)
-				return null;
-
-			return new Cidr(bytes, prefixBits);
-		}
-
-		boolean contains(InetAddress address)
-		{
-			byte[] bytes;
-			try {
-				bytes = address.getAddress();
-			} catch (Exception e) {
-				return false;
-			}
-
-			if (bytes.length != network.length)
-				return false; // different family - never a match, which is what keeps a v4 block from covering v6
-
-			int fullBytes = prefixBits / 8;
-			for (int i = 0; i < fullBytes; i++)
-				if (bytes[i] != network[i])
-					return false;
-
-			int remainingBits = prefixBits % 8;
-			if (0 == remainingBits)
-				return true;
-
-			int mask = 0xFF << (8 - remainingBits);
-			return (bytes[fullBytes] & mask) == (network[fullBytes] & mask);
-		}
-	}
 }

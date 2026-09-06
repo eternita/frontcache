@@ -79,6 +79,25 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_REQUEST_ID = "x-frontcache-request-id";
     public static final String X_FRONTCACHE_CLIENT_IP = "x-frontcache-client-ip";
 
+    /**
+     * The client type ({@link #REQUEST_CLIENT_TYPE_BOT} / {@link #REQUEST_CLIENT_TYPE_GUEST}) the
+     * node serving the PAGE decided, carried to an {@code <fc:include>} fetch so the fragment is
+     * classified the same way as the page holding it.
+     *
+     * Without it, a re-entering include is classified on its own: the User-Agent survives the hop, so
+     * a UA-only bots.conf agrees by accident, but a client-ip: rule sees the sibling node's address
+     * and a cookie: rule may see no cookies at all (an async include is resolved after the servlet
+     * request is recycled). The page then reads one branch of a WebResponse's expireTimeMap and its
+     * fragments read the other, which shows up as fragments quietly no longer being cached.
+     *
+     * <b>Honoured ONLY from a peer in {@code front-cache.client-ip.trusted-proxies}, and only on a
+     * request that arrived as an include.</b> Same rule as {@link #X_FRONTCACHE_CLIENT_IP}, and the
+     * same reason: {@code FCUtils.isIncludedHeader} forwards everything it does not blacklist, so
+     * without the check this would be a classify-yourself header. It is blacklisted there too, so a
+     * value a client sent is dropped rather than passed on.
+     */
+    public static final String X_FRONTCACHE_CLIENT_TYPE = "x-frontcache-client-type";
+
     // Standard forwarding headers. X_FORWARDED_PROTO is READ (from a trusted peer only - see
     // ClientIpResolver.isTrustedPeer) to recover the scheme the client actually used, which a
     // TLS-terminating proxy in front of us has already stripped. X_FORWARDED_HOST is WRITTEN, to

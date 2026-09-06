@@ -50,6 +50,7 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
+import org.frontcache.bots.BotRuleEntry;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.BackupActionResponse;
@@ -499,6 +500,21 @@ public class FrontCacheClient {
 			return null;
 
 		return actionResponse.getBotKeywords();
+	}
+
+	/**
+	 * @return the bot classification rules this edge is running, in evaluation order and with their
+	 *         hit counts, or null when the edge could not be reached OR is older than 2.10 (which
+	 *         knows only {@link #getBotKeywords()})
+	 */
+	public List<BotRuleEntry> getBotRules()
+	{
+		GetBotsActionResponse actionResponse = getBotsActionResponse();
+
+		if (null == actionResponse)
+			return null;
+
+		return actionResponse.getBotRules();
 	}
 
 	/**

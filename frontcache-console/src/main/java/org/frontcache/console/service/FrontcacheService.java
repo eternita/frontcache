@@ -301,14 +301,18 @@ public class FrontcacheService {
 		return clusterStatus;
 	}
 
-	public Map<String, Set<String>> getBotConfigs() {
+	/**
+	 * One entry per reachable edge. The value carries both shapes - rules (2.10+) and bare keywords -
+	 * because the console reads a mixed fleet and the JSP renders whichever the edge answered with.
+	 */
+	public Map<String, BotConfig> getBotConfigs() {
 
         List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
 
 		// LinkedHashMap preserves the edge order defined in the console config
 		// (futures below are submitted/consumed in that same order) so the UI
 		// tabs appear in the configured order.
-		Map<String, Set<String>> clusterStatus = new LinkedHashMap<String, Set<String>>();
+		Map<String, BotConfig> clusterStatus = new LinkedHashMap<String, BotConfig>();
 
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
             futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
@@ -325,7 +329,7 @@ public class FrontcacheService {
             		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 
             	if (null != result)
-            		clusterStatus.put(result.getName(), result.getConfig());
+            		clusterStatus.put(result.getName(), result);
 
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);

@@ -39,6 +39,8 @@ public abstract class FrontcacheAction {
 
 	public static final String GET_BOTS = "get-bots";
 
+	public static final String RELOAD_BOTS = "reload-bots";
+
 	public static final String GET_DYNAMIC_URLS = "get-dynamic-urls";
 
 	public static final String GET_RESILIENCE_CONFIGS = "get-resilience-configs";
@@ -82,7 +84,8 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.GET_CACHED_KEYS, "get cached keys");
 		actionsDescriptionMap.put(FrontcacheAction.GET_FROM_CACHE, "get content from cache, accept 'key' parameter");
 		actionsDescriptionMap.put(FrontcacheAction.PUT_TO_CACHE, "store a WebResponse entry into the local cache (used for replication); accepts 'key', 'domain', and 'webResponse' (JSON) parameters");
-		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get substring to determine bots based on User-Agent HTTP header from ./conf/bots.conf");
+		actionsDescriptionMap.put(FrontcacheAction.GET_BOTS, "get bot classification rules (in evaluation order, with hit counts) and bare User-Agent keywords from ./conf/bots.conf");
+		actionsDescriptionMap.put(FrontcacheAction.RELOAD_BOTS, "reload bot classification rules from ./conf/bots.conf (resets hit counters)");
 		actionsDescriptionMap.put(FrontcacheAction.GET_DYNAMIC_URLS, "get dynamic URL patterns (patterns are not processed by FrontCache)  fromt ./conf/dynamic-urls.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_RESILIENCE_CONFIGS, "get raw resilience configuration from ./conf/resilience.properties");
 		actionsDescriptionMap.put(FrontcacheAction.GET_HYSTRIX_CONFIGS, "deprecated alias of " + FrontcacheAction.GET_RESILIENCE_CONFIGS);

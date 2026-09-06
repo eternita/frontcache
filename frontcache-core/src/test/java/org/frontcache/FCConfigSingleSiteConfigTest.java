@@ -10,11 +10,16 @@ package org.frontcache;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
+import java.net.URL;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.frontcache.bots.BotClassifier;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
@@ -31,6 +36,25 @@ import org.junit.Test;
  *
  */
 public class FCConfigSingleSiteConfigTest {
+
+	/**
+	 * Re-pin frontcache.home and reload the classifier.
+	 *
+	 * The bot keywords come from BotClassifier as of 2.10 (one reader per config file), and that is a
+	 * lazily-built process-wide singleton - so without this it would hold whatever home the FIRST test
+	 * class to touch it had set. GuardRuleEngineTest points the property at its own fixture and does
+	 * not restore it, which would make this class pass or fail on test-execution order.
+	 */
+	@BeforeClass
+	public static void pinTheFixtureHome() throws Exception {
+		URL confMarker = FCConfigSingleSiteConfigTest.class.getClassLoader().getResource("fallback-home/conf/bots.conf");
+		assertNotNull("fixture fallback-home/conf/bots.conf not found on test classpath", confMarker);
+
+		File home = new File(confMarker.toURI()).getParentFile().getParentFile();
+		System.setProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY, home.getAbsolutePath());
+
+		BotClassifier.reload();
+	}
 
 	@Test
 	public void botKeywordsComeFromTheTopLevelBotsConf() {
