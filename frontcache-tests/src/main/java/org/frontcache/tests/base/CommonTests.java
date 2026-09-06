@@ -424,6 +424,132 @@ public abstract class CommonTests extends TestsBase {
 
 	}
 
+	/**
+	 * maxage="bot:60, guest:3" - two live TTLs on one entry, the case that could not be expressed
+	 * before: naming a prefix forced the OTHER client type to NO_CACHE, so an author had to choose
+	 * between caching for humans and caching long for crawlers.
+	 *
+	 * Three things are asserted here and each fails differently:
+	 *
+	 * <ol>
+	 * <li>the raw directive round-trips byte for byte, on the live response header AND on the stored
+	 *     entry. It is a wire contract - one opaque string that a node, an intermediary and the
+	 *     console all pass through untouched. If anything splits it on the comma, the reader takes
+	 *     collStr.iterator().next() and silently gets "bot:60" - guests stop being cached with
+	 *     nothing in a log to say why;</li>
+	 * <li>after the guest TTL lapses a crawler is STILL served from cache, with 57 seconds of its
+	 *     own TTL left. This is the feature;</li>
+	 * <li>once a guest does re-render it, the crawler rides along on the copy the guest paid for.
+	 *     One entry, two stamps, both reset by whoever renders it - so the shortest TTL sets how
+	 *     often the origin renders and the longest says who never has to trigger one.</li>
+	 * </ol>
+	 */
+	@Test
+	public void clientTypeSplitTtl() throws Exception {
+
+		String url = getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/e.jsp";
+
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
+
+		// guest, first call -> dynamic
+		HtmlPage page = webClient.getPage(url);
+		long renderedForGuest = Long.parseLong(page.getPage().asNormalizedText());
+		WebResponse webResponse = page.getWebResponse();
+		assertEquals("the directive must reach the client exactly as written",
+				"bot:60, guest:3", webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE));
+		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
+
+		// guest, second call -> from cache. Guests being cached AT ALL is what bot:60 alone could not do.
+		page = webClient.getPage(url);
+		assertEquals(renderedForGuest, Long.parseLong(page.getPage().asNormalizedText()));
+		webResponse = page.getWebResponse();
+		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
+
+		// and the stored entry carries the same untouched string
+		org.frontcache.core.WebResponse cached = frontcacheClient.getFromCache(url);
+		assertEquals("bot:60, guest:3", cached.getHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE));
+
+		Thread.sleep(4000); // past guest:3, nowhere near bot:60
+
+		// bot -> still served from cache. The guest TTL lapsed; the bot TTL did not, and the entry
+		// must still be there to serve.
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		page = webClient.getPage(url);
+		assertEquals("a crawler must still be served the copy that is valid for it",
+				renderedForGuest, Long.parseLong(page.getPage().asNormalizedText()));
+		webResponse = page.getWebResponse();
+		assertEquals(true, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
+
+		// guest -> expired for guests, so this one pays for the render
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		page = webClient.getPage(url);
+		long reRendered = Long.parseLong(page.getPage().asNormalizedText());
+		assertNotEquals("the guest TTL lapsed - this request must go to the origin",
+				renderedForGuest, reRendered);
+		webResponse = page.getWebResponse();
+		assertEquals(false, TestUtils.isRequestFromCache(webResponse.getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0")));
+
+		// bot -> rides along on the copy the guest just paid for: one entry, both stamps reset
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		page = webClient.getPage(url);
+		assertEquals("both stamps are reset by whoever re-renders the entry",
+				reRendered, Long.parseLong(page.getPage().asNormalizedText()));
+	}
+
+	/**
+	 * The same split one level down, on an {@code <fc:include>}.
+	 *
+	 * Worth its own test rather than trusting the top-level one, because the include path carries
+	 * its own copy of the expiry-and-cacheability block ({@code IncludeProcessorBase.getIncludeFromCache}
+	 * vs {@code CacheProcessorBase.processRequest}), and the symptom of the two drifting - a fragment
+	 * quietly refetched on every crawler request - is invisible in the rendered page.
+	 *
+	 * What this does NOT cover is the eviction predicate in that block: here the origin is up, so
+	 * even an entry wrongly deleted by the guest's expiry is put straight back by the refetch, and
+	 * the test cannot tell. That needs a failing origin -
+	 * {@code org.frontcache.include.IncludeTwoLiveTtlEvictionTest} and
+	 * {@code org.frontcache.cache.TwoLiveTtlEvictionTest} are where it is pinned.
+	 */
+	@Test
+	public void clientTypeSplitTtlInclude() throws Exception {
+
+		String pageUrl = getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/e1.jsp";
+		String includeUrl = getFrontCacheBaseURLLocalhost() + "common/client-bot-guest/f1.jsp";
+
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
+
+		// e1.jsp is maxage="0", so only the include is ever cached
+		HtmlPage page = webClient.getPage(pageUrl);
+		long renderedForGuest = Long.parseLong(page.getPage().asNormalizedText());
+
+		org.frontcache.core.WebResponse cachedInclude = frontcacheClient.getFromCache(includeUrl);
+		assertEquals("bot:60, guest:3", cachedInclude.getHeader(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE));
+
+		// guest again -> the include comes from cache
+		page = webClient.getPage(pageUrl);
+		assertEquals(renderedForGuest, Long.parseLong(page.getPage().asNormalizedText()));
+
+		Thread.sleep(4000); // past guest:3, nowhere near bot:60
+
+		// bot -> the include is expired for guests but not for bots. It must be served from cache,
+		// and - the eviction half - it must still BE in the cache afterwards.
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		page = webClient.getPage(pageUrl);
+		assertEquals("a crawler must still be served the cached fragment",
+				renderedForGuest, Long.parseLong(page.getPage().asNormalizedText()));
+
+		assertEquals("the fragment is still valid for bots - a guest's expiry must not have evicted it",
+				String.valueOf(renderedForGuest),
+				new String(frontcacheClient.getFromCache(includeUrl).getContent()));
+
+		// guest -> expired for guests, so the fragment is re-rendered
+		webClient.addRequestHeader("User-Agent", "Chrome");
+		page = webClient.getPage(pageUrl);
+		assertNotEquals(renderedForGuest, Long.parseLong(page.getPage().asNormalizedText()));
+	}
+
 	@Test // it doesn't work in jetty test container (for standalone mode) however it works in tomcat prod env
 	@Ignore
 	public void cacheRefreshSoft1() throws Exception {

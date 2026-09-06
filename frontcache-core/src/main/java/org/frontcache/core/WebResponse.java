@@ -239,67 +239,110 @@ public class WebResponse implements Serializable {
 	}
 
 	/**
-	 * Parses {@code maxAge="[bot|guest:]30d"} into the per-client-type expireTimeMap.
+	 * Parses {@code maxAge="[bot|guest:]30d"} - or a comma-separated list of them,
+	 * {@code maxAge="bot:30d, guest:1d"} - into the per-client-type expireTimeMap.
 	 *
-	 * A prefix means "this long for that client type, and NOT cacheable for the other one" - the
-	 * split the feature exists for: a page worth caching for a crawler is often exactly the page you
-	 * must not serve a signed-in visitor from cache. No prefix means the same TTL for both.
+	 * <h2>The rule</h2>
+	 *
+	 * There is one rule and the old single-value forms fall out of it: <b>a client type absent from
+	 * the value is NO_CACHE for that type.</b> {@code bot:30d} is not a special form, it is a
+	 * one-entry list; the map starts as NO_CACHE for both types and each entry overwrites its own
+	 * key. So the "a prefix means NOT cacheable for the other one" behaviour that predates the list
+	 * needs no branch of its own - and cannot diverge between the {@code bot:} and {@code guest:}
+	 * directions the way it once did (see below).
+	 *
+	 * A value with no prefix at all is the exception, and stays the common case: one TTL, both types.
+	 *
+	 * <h2>Two live TTLs share ONE entry</h2>
+	 *
+	 * The cache key has no client-type dimension, so {@code bot:30d, guest:1d} is one cached copy
+	 * carrying two expiration stamps, and whichever client type re-renders it resets both. The
+	 * shortest TTL therefore sets how often the origin renders; the longer ones say which client
+	 * types are allowed never to trigger a render. On a page with steady human traffic crawlers ride
+	 * along on the copy the humans paid for; on a long-tail page with no human traffic - the SEO case
+	 * the split exists for - nothing resets the entry and it genuinely ages to the full bot TTL.
+	 *
+	 * The eviction predicate in {@code CacheProcessorBase} / {@code IncludeProcessorBase} is the
+	 * other half of that: with two live TTLs, one type's expiry must not delete the copy still valid
+	 * for the other.
+	 *
+	 * <h2>Malformed input - three cases, three behaviours</h2>
+	 *
+	 * <ul>
+	 * <li><b>Duplicate client type</b> ({@code bot:30d, bot:1h}) - warn, first wins, the idiom
+	 *     {@code guard-rules.conf} and {@code bots.conf} already use.</li>
+	 * <li><b>Unknown client type inside a list</b> ({@code bot:30d, browser:1d}) - warn and ignore
+	 *     that entry, leaving the type it meant at NO_CACHE. Deliberately NOT the single-value
+	 *     behaviour: in a list the author has unambiguously asked for a split, so falling through to
+	 *     "cache for both" would be the one outcome they certainly did not want.</li>
+	 * <li><b>Unknown prefix as the whole value</b> ({@code browser:30d}) - warn, cache for both.
+	 *     Unchanged, and it must stay unchanged: it is what an un-updated pre-2.9.0 page produces,
+	 *     and narrowing it would take pages out of cache on upgrade.</li>
+	 * </ul>
+	 *
+	 * <h2>The defect this shape of code once hid</h2>
 	 *
 	 * The {@code guest:} branch used to test {@code REQUEST_CLIENT_TYPE_BOT} - the same constant as
 	 * the branch above it - so it was unreachable and a {@code guest:} prefix silently fell through
 	 * to the no-prefix default, caching for BOTH client types. Nothing caught it because every test
-	 * fixture in the repo uses {@code bot:}. An unrecognized prefix now warns rather than being
-	 * treated as no prefix at all, which is what made this shape of mistake invisible.
+	 * fixture in the repo uses {@code bot:}. An unrecognized prefix warns rather than being treated
+	 * as no prefix at all, which is what made this shape of mistake invisible.
 	 *
 	 * @param maxAgeStr the raw x-frontcache-component-maxage value, or null
 	 */
 	private void setExpireTime(String maxAgeStr) {
 
-		String maxAgeClientType = null; // bot and guest
-		String maxAgeTime = "0"; // default no cache
+		// Not cacheable for either type until an entry says otherwise. This default IS the
+		// "absent client type is not cached" rule.
+		this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, CacheProcessor.NO_CACHE);
+		this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, CacheProcessor.NO_CACHE);
 
-		if (null != maxAgeStr)
-		{
-			if (-1 < maxAgeStr.indexOf(":"))
-			{
-				maxAgeClientType = maxAgeStr.substring(0, maxAgeStr.indexOf(":"));
-				maxAgeTime = maxAgeStr.substring(maxAgeStr.indexOf(":") + 1);
+		if (null == maxAgeStr)
+			return; // no header - not subject to cache
 
-				if ("".equals(maxAgeTime))
-					maxAgeTime = "0";
+		String value = maxAgeStr.trim();
 
-			} else {
-				maxAgeTime = maxAgeStr;
-			}
-		}
-
-
-
-		long cacheMaxAgeSecLong = 0; // default - no cache
-		try
-		{
-			cacheMaxAgeSecLong = FCUtils.maxAgeStr2Int(maxAgeTime);
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-
-
-		if (CacheProcessor.CACHE_FOREVER == cacheMaxAgeSecLong)
-			cacheMaxAgeSecLong = CacheProcessor.CACHE_FOREVER;
-		else if (CacheProcessor.NO_CACHE == cacheMaxAgeSecLong)
-			cacheMaxAgeSecLong = CacheProcessor.NO_CACHE;
+		if (-1 == value.indexOf(","))
+			setSingleValueExpireTime(maxAgeStr, value);
 		else
-			cacheMaxAgeSecLong = System.currentTimeMillis() + 1000 * cacheMaxAgeSecLong;
+			setListExpireTime(maxAgeStr, value);
+
+		return;
+	}
+
+	/**
+	 * The pre-list form: a bare TTL, or one {@code clientType:ttl} pair.
+	 *
+	 * @param maxAgeStr the raw value, for messages
+	 * @param value     the same, trimmed
+	 */
+	private void setSingleValueExpireTime(String maxAgeStr, String value) {
+
+		String maxAgeClientType = null; // bot | guest
+		String maxAgeTime = value;
+
+		int idx = value.indexOf(":");
+		if (-1 < idx)
+		{
+			maxAgeClientType = value.substring(0, idx).trim();
+			maxAgeTime = value.substring(idx + 1).trim();
+
+			if ("".equals(maxAgeTime))
+				maxAgeTime = "0";
+		}
+
+		long expireTime = toExpireTimeMillis(maxAgeTime);
 
 		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType))
 		{
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, CacheProcessor.NO_CACHE);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, expireTime);
+			// guest stays NO_CACHE - the default set by setExpireTime()
 
 		} else if (FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equals(maxAgeClientType)) {
 
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, CacheProcessor.NO_CACHE);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, cacheMaxAgeSecLong);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, expireTime);
+			// bot stays NO_CACHE
+
 		} else {
 			// No prefix - the common case, same TTL for both. A prefix we do not recognize lands here
 			// too, and that is a config error worth naming: the caller asked for a split and is
@@ -309,11 +352,81 @@ public class WebResponse implements Serializable {
 						+ "\" for " + url + " - expected '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '"
 						+ FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'. Caching for BOTH client types.");
 
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, cacheMaxAgeSecLong);
-			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, cacheMaxAgeSecLong);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, expireTime);
+			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, expireTime);
 		}
+	}
 
-		return;
+	/**
+	 * {@code bot:30d, guest:1d} - one TTL per client type, both live.
+	 *
+	 * @param maxAgeStr the raw value, for messages
+	 * @param value     the same, trimmed
+	 */
+	private void setListExpireTime(String maxAgeStr, String value) {
+
+		Set<String> seenClientTypes = new HashSet<String>();
+
+		for (String rawEntry : value.split(","))
+		{
+			String entry = rawEntry.trim();
+
+			int idx = entry.indexOf(":");
+			if (-1 == idx)
+			{
+				// includes the empty segment of 'bot:30d,,guest:1d'
+				logger.warn("Malformed entry '" + entry + "' in maxAge=\"" + maxAgeStr + "\" for " + url
+						+ " - a list entry must be '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + ":<ttl>' or '"
+						+ FCHeaders.REQUEST_CLIENT_TYPE_GUEST + ":<ttl>'. Entry ignored.");
+				continue;
+			}
+
+			String clientType = entry.substring(0, idx).trim();
+			String maxAgeTime = entry.substring(idx + 1).trim();
+
+			if ("".equals(maxAgeTime))
+				maxAgeTime = "0";
+
+			if (!FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(clientType)
+					&& !FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equals(clientType))
+			{
+				// NOT the single-value behaviour of caching for both: a list is an explicit request
+				// for a split, so 'cache for everyone' is the one outcome the author did not ask for.
+				logger.warn("Unknown client type '" + clientType + "' in maxAge=\"" + maxAgeStr + "\" for "
+						+ url + " - expected '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '"
+						+ FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'. Entry ignored, that client type is NOT cached.");
+				continue;
+			}
+
+			if (!seenClientTypes.add(clientType))
+			{
+				// first wins - as in guard-rules.conf and bots.conf, so the intuition transfers
+				logger.warn("Duplicate client type '" + clientType + "' in maxAge=\"" + maxAgeStr + "\" for "
+						+ url + " - the first entry wins, '" + entry + "' ignored.");
+				continue;
+			}
+
+			this.expireTimeMap.put(clientType, toExpireTimeMillis(maxAgeTime));
+		}
+	}
+
+	/**
+	 * A TTL string ({@code 30d}, {@code forever}, {@code 0}) as an absolute expiration timestamp.
+	 *
+	 * An unparseable TTL is NO_CACHE for that client type - {@link FCUtils#maxAgeStr2Int} warns and
+	 * returns it - so {@code bot:30d, guest:banana} caches for bots and not for guests.
+	 */
+	private static long toExpireTimeMillis(String maxAgeTime) {
+
+		long cacheMaxAgeSecLong = FCUtils.maxAgeStr2Int(maxAgeTime);
+
+		if (CacheProcessor.CACHE_FOREVER == cacheMaxAgeSecLong)
+			return CacheProcessor.CACHE_FOREVER;
+
+		if (CacheProcessor.NO_CACHE == cacheMaxAgeSecLong)
+			return CacheProcessor.NO_CACHE;
+
+		return System.currentTimeMillis() + 1000 * cacheMaxAgeSecLong;
 	}
 
 

@@ -112,7 +112,10 @@ report the fragments as coming from cache. Logs are under `FRONTCACHE_HOME/logs/
 Frontcache caches nothing by default. The origin opts each fragment in with response headers:
 
 ```
-x-frontcache-component-maxage: 1h          # 0 = no cache, -1/forever = forever; bot:/guest: prefixes allowed
+x-frontcache-component-maxage: 1h          # 0 = no cache, -1/forever = forever
+                                           # per visitor type: "bot:30d", "guest:5m", or both:
+                                           # "bot:30d, guest:1d". A type the value does not name
+                                           # is not cached.
 x-frontcache-component-tags: catalog|product-42
 x-frontcache-component-refresh: soft       # serve stale while revalidating
 x-frontcache-component-cache-level: L2     # L1 (memory) or L2 (disk, default)

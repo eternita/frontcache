@@ -900,7 +900,12 @@ public class FCUtils {
 
 			return multiplyPrefix * Integer.parseInt(maxAgeStr); // time to live in cache in seconds
 		} catch (Exception e) {
-			logger.info("can't parse component maxage - " + maxAgeStr + " defalut is used (NO_CACHE)");
+			// WARN, not INFO: every path into here defaults an absent value to "0", so an unparseable
+			// TTL is always a config error, and it fails by taking the page OUT of cache. That is
+			// also what a maxage="bot:30d, guest:1d" page hitting a pre-list node looks like - the
+			// node splits on the first colon and tries to parse "30d, guest:1d" - and at INFO it
+			// showed up only as an origin-load spike on the very pages the split was meant to help.
+			logger.warn("can't parse component maxage - '" + maxAgeStr + "' - NOT cached (NO_CACHE)");
 			return CacheProcessor.NO_CACHE;
 		}
 	}

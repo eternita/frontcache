@@ -39,6 +39,14 @@ import ch.qos.logback.core.read.ListAppender;
  * asked for, and the failure mode the feature exists to prevent. Nothing caught it because every
  * fixture in the repo, unit and e2e, uses {@code bot:}; {@code guestPrefixIsNotCacheableForBots} is
  * the case that had no coverage at all.
+ *
+ * <h2>The list form</h2>
+ *
+ * {@code maxAge="bot:30d, guest:1d"} - two live TTLs, one per client type. The four tests above are
+ * the compatibility contract for it: the list is not a second syntax bolted on beside the prefixes,
+ * it is the general form the prefixes are a one-entry case of, so they must all stay green
+ * untouched. The rule the list generalizes is {@code guestPrefixCachesForGuestsOnly}'s: a client
+ * type absent from the value is NOT cached.
  */
 public class WebResponseMaxAgeClientTypeTest {
 
@@ -134,5 +142,161 @@ public class WebResponseMaxAgeClientTypeTest {
 		String message = warnings.get(0).getFormattedMessage();
 		assertTrue(message, message.contains("browser"));
 		assertTrue(message, message.contains(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+	}
+
+
+	// ---------------------------------------------------------------------------------------------
+	// The list form: maxage="bot:30d, guest:1d"
+	// ---------------------------------------------------------------------------------------------
+
+	/**
+	 * The assertion the feature exists for. Two live TTLs at once, which nothing could express
+	 * before: naming a prefix forced the other client type to NO_CACHE.
+	 */
+	@Test
+	public void aListGivesEachClientTypeItsOwnLiveTtl() {
+		Map<String, Long> expireTimes = expireTimes("bot:30d, guest:1d");
+
+		assertCacheable("bot", expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+		assertCacheable("guest", expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+
+		assertTrue("the bot TTL must be the longer of the two",
+				expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT)
+						> expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+	}
+
+	/**
+	 * The general rule, stated on its own so a refactor cannot make the two directions diverge again
+	 * - which is exactly how the guest: branch came to be unreachable. A one-entry list is not a
+	 * special case of anything: it is the same parse as bot:30d, and must land on the same map.
+	 */
+	@Test
+	public void aClientTypeAbsentFromAListIsNotCached() {
+		Map<String, Long> guestOnly = expireTimes("guest:1d");
+
+		assertCacheable("guest", guestOnly.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+		assertEquals("a value naming only guest must leave bots uncached",
+				Long.valueOf(CacheProcessor.NO_CACHE), guestOnly.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+
+		Map<String, Long> botOnly = expireTimes("bot:1d");
+
+		assertCacheable("bot", botOnly.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+		assertEquals("a value naming only bot must leave guests uncached",
+				Long.valueOf(CacheProcessor.NO_CACHE), botOnly.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+	}
+
+	/** An explicit zero is the spelling of "and not for the other one" - same map as bot:30d. */
+	@Test
+	public void anExplicitZeroIsTheSameAsOmittingTheClientType() {
+		Map<String, Long> explicit = expireTimes("bot:30d, guest:0");
+
+		assertCacheable("bot", explicit.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+		assertEquals("guest:0 must be NO_CACHE",
+				Long.valueOf(CacheProcessor.NO_CACHE), explicit.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+	}
+
+	/** forever is a TTL like any other, and must be usable on one side of a split. */
+	@Test
+	public void foreverIsUsableInsideAList() {
+		Map<String, Long> expireTimes = expireTimes("bot:forever, guest:1h");
+
+		assertEquals("bot must be CACHE_FOREVER",
+				Long.valueOf(CacheProcessor.CACHE_FOREVER), expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+		assertCacheable("guest", expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+	}
+
+	/** Whitespace around the commas and the colons is the author's, not the parser's. */
+	@Test
+	public void whitespaceAroundSeparatorsIsIgnored() {
+		assertSameSplit(expireTimes("bot:30d,guest:1d"));
+		assertSameSplit(expireTimes("bot : 30d , guest : 1d"));
+		assertSameSplit(expireTimes("  bot:30d,   guest:1d  "));
+	}
+
+	private static void assertSameSplit(Map<String, Long> expireTimes) {
+		assertCacheable("bot", expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+		assertCacheable("guest", expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+		assertTrue("bot must still be the longer TTL",
+				expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT)
+						> expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+	}
+
+	/** First match wins, as in guard-rules.conf and bots.conf - so the intuition transfers. */
+	@Test
+	public void aDuplicateClientTypeWarnsAndTheFirstWins() {
+		captureWarnings();
+
+		Map<String, Long> expireTimes = expireTimes("bot:30d, bot:1h");
+
+		long oneHourish = System.currentTimeMillis() + 2 * 3600 * 1000L;
+		assertTrue("the FIRST bot entry (30d) must win, was " + expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT),
+				expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) > oneHourish);
+
+		String message = theOneWarning();
+		assertTrue(message, message.contains("Duplicate"));
+		assertTrue(message, message.contains(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+	}
+
+	/**
+	 * The one case where a list behaves differently from the single value it looks like: an unknown
+	 * client type inside a list leaves the type it meant at NO_CACHE rather than caching for both.
+	 * In a list the author has unambiguously asked for a split, so "cache for everyone" is the one
+	 * outcome they certainly did not want - whereas as a WHOLE value (browser:30d, pinned by
+	 * anUnknownPrefixWarnsAndNamesTheValidOnes) it must keep caching for both, or an un-updated
+	 * pre-2.9.0 page drops out of cache on upgrade.
+	 */
+	@Test
+	public void anUnknownClientTypeInAListIsIgnoredRatherThanCachedForBoth() {
+		captureWarnings();
+
+		Map<String, Long> expireTimes = expireTimes("bot:30d, browser:1d");
+
+		assertCacheable("bot", expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+		assertEquals("an unknown client type in a list must NOT fall through to caching for both",
+				Long.valueOf(CacheProcessor.NO_CACHE), expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+
+		String message = theOneWarning();
+		assertTrue(message, message.contains("browser"));
+		assertTrue(message, message.contains(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+	}
+
+	/** An unparseable TTL is NO_CACHE for its own client type only - the rest of the list stands. */
+	@Test
+	public void anUnparseableTtlOnlyCostsItsOwnClientType() {
+		Map<String, Long> expireTimes = expireTimes("bot:30d, guest:banana");
+
+		assertCacheable("bot", expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+		assertEquals("an unparseable TTL must be NO_CACHE for that client type",
+				Long.valueOf(CacheProcessor.NO_CACHE), expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+	}
+
+	/** A list entry with no client type at all is a typo, not a bare TTL - warn and ignore it. */
+	@Test
+	public void aListEntryWithoutAClientTypeIsIgnored() {
+		captureWarnings();
+
+		Map<String, Long> expireTimes = expireTimes("bot:30d, 1d");
+
+		assertCacheable("bot", expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT));
+		assertEquals("a bare TTL inside a list must not cache anything extra",
+				Long.valueOf(CacheProcessor.NO_CACHE), expireTimes.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST));
+
+		assertTrue(theOneWarning(), theOneWarning().contains("Malformed"));
+	}
+
+	private void captureWarnings() {
+		webResponseLogger = (Logger) LoggerFactory.getLogger(WebResponse.class);
+		appender = new ListAppender<ILoggingEvent>();
+		appender.start();
+		webResponseLogger.addAppender(appender);
+	}
+
+	private String theOneWarning() {
+		List<ILoggingEvent> warnings = appender.list.stream()
+				.filter(event -> Level.WARN == event.getLevel())
+				.toList();
+
+		assertEquals("one warning expected, got " + warnings, 1, warnings.size());
+		return warnings.get(0).getFormattedMessage();
 	}
 }
