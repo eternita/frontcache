@@ -88,10 +88,6 @@ public class ConfigFileController {
 		model.put("configEdges", frontcacheService.getConfigFiles(configFile));
 		model.put("configEditingEnabled", frontcacheService.isConfigEditingEnabled());
 
-		// The "Edges status" block at the bottom of the page - names and URLs only, no network calls;
-		// its dot and item count are filled by the same poller every other page uses.
-		model.put("edges", frontcacheService.getEdgeList());
-
 		return "config_file";
 	}
 

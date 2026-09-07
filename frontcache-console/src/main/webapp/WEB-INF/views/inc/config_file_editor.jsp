@@ -145,11 +145,9 @@
   </c:forEach>
 </div>
 
-<hr>
-<div style="padding-left: 20px;">
-  <p style="height: 10px">&nbsp;</p>
-  <%@ include file="/WEB-INF/views/inc/edges_status.jsp"%>
-</div>
+<%-- No "Edges status" block here, unlike the cache screens. There it is context for a page whose
+     subject is the fleet; here the edge tab strip above IS the edge list, so the block repeats it -
+     and it does so BELOW a 30-row text area, where nothing that matters should live. --%>
 
 <c:if test="${configEditingEnabled}">
   <script src="<c:url value='/static/js/fc-config-editor.js' />"></script>
