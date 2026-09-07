@@ -40,8 +40,20 @@ RUN chmod +x /opt/fc-console/entrypoint.sh /opt/frontcache-console/bin/frontcach
 ENV FRONTCACHE_CONSOLE_PORT=7080
 EXPOSE 7080
 
-# /realtime is the console's landing view; / redirects to it.
+# /login is the one path the console serves without a credential, which is what makes it the probe:
+# it answers 200 when the console has a login configured and 302 (to the landing view) when it does
+# not, and `curl -f` treats both as success. So a 200-or-302 proves Jetty, the webapp, the Spring
+# context and a mapped controller are all up in EITHER mode.
+#
+# It used to GET /realtime, which predates console authentication: an un-authenticated request to
+# any other path is a 401 by design, so `curl -f` failed and the container reported unhealthy on
+# every console that had user/password set. It only ever passed because the config the entrypoint
+# renders sets no login. Do not "fix" that by accepting 401 as healthy - a 401 comes from the
+# filter and proves nothing behind it.
+#
+# The probe allocates nothing: the filter reads the session with getSession(false) and login.jsp
+# declares session="false", so 2880 probes a day leave no state behind.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD curl -fsS -o /dev/null "http://127.0.0.1:${FRONTCACHE_CONSOLE_PORT}/realtime"
+  CMD curl -fsS -o /dev/null "http://127.0.0.1:${FRONTCACHE_CONSOLE_PORT}/login"
 
 ENTRYPOINT ["/opt/fc-console/entrypoint.sh"]

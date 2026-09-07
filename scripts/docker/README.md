@@ -86,10 +86,12 @@ upgrades would silently keep running on old config. Files you have edited are ne
 > `frontcache-console.conf` that sets them. It is published on `127.0.0.1` by default; reach it over
 > an ssh tunnel, or put an authenticating proxy in front of it. Do not bind it to a public
 > interface.
->
-> Note that this image's `HEALTHCHECK` (`curl -f .../realtime`) predates console authentication and
-> **reports unhealthy on a console that has credentials**, since an un-authenticated request is a
-> `401` by design. It only passes today because the rendered config sets no login.
+
+The console image's `HEALTHCHECK` GETs `/login`. That is the one path the console serves without a
+credential, so it answers `200` with a login configured and `302` without one, and `curl -f` treats
+both as success — a probe that works in either mode and needs no credential, the same idea as the
+server's unkeyed `get-cache-state` probe above. It allocates no session, so probing every 30 seconds
+leaves nothing behind.
 
 ## Building and publishing images
 

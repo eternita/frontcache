@@ -1,4 +1,4 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core"%>
 <%--
 	The console's login page - see docs/console-login-ui.md section 7.
@@ -15,6 +15,14 @@
 	It also discloses nothing: no version, no edge list, no node names, no default user, and no word
 	about whether the shipped default password is still in place. It is served to anyone who can
 	reach the port. The default-password warning belongs after a successful login.
+
+	session="false" is load-bearing and was measured, not guessed. A JSP touches the session by
+	default, so rendering this page called getSession(true) - and this is the ONE page served
+	without a credential (ConsoleAuthFilter.ANONYMOUS_PATHS), reached by every scanner and by the
+	container's healthcheck every 30 seconds. That allocated a session object with an eight-hour
+	timeout per anonymous hit, which is exactly what the filter's getSession(false) exists to
+	prevent. Nothing here needs a session: "next", "error" and "submittedUser" are request
+	attributes, and the sign-in itself happens in LoginController.
 --%>
 <%
 	response.setHeader("Cache-Control", "no-store");

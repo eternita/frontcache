@@ -71,6 +71,9 @@ authenticate (a login page, one user), but **the config this image renders sets 
 container runs unauthenticated unless you mount a `frontcache-console.conf` with `user`/`password`.
 It can invalidate cache across a fleet; keep it on loopback either way.
 
+A `HEALTHCHECK` GETs `/login` — the one path served without a credential, so it works whether or not
+a login is configured.
+
 ## Licence
 
 https://www.eternita.co/frontcache-license.html
