@@ -1,7 +1,7 @@
 # Frontcache — Console and Dashboards
 
 Notes on the console, and on the four ways to get Frontcache's numbers into software
-you already run. Current as of **2.8.0**.
+you already run. Current as of **2.9.0**.
 
 ![Frontcache console](images/fc-console-screen.png "Frontcache console")
 
@@ -15,8 +15,8 @@ is not deployed into the server — it talks to one or more nodes over the manag
 ```sh
 docker run -d --name frontcache-console --restart unless-stopped \
   -p 127.0.0.1:7080:7080 \
-  -e FC_NODES=http://fc-server:9080/ -e FC_SITE_KEY=YOUR_SITE_KEY \
-  pavlikovskiy/frontcache-console:2.8.0
+  -e FC_NODES=http://fc-server:9080/ -e FC_API_KEY=YOUR_API_KEY \
+  pavlikovskiy/frontcache-console:2.9.0
 ```
 
 Archive install and the `conf/frontcache-console.conf` form are in
@@ -24,7 +24,7 @@ Archive install and the `conf/frontcache-console.conf` form are in
 
 Two things have to line up or every page is empty:
 
-- `siteKey` must match each node's `front-cache.site-key`.
+- `apiKey` must match each node's `front-cache.api-key`.
 
 > **The console has no authentication of its own**, and it can invalidate cache across the
 > whole fleet. Loopback, internal network, ssh tunnel, or an authenticating proxy in front.
@@ -75,8 +75,9 @@ cannot — page sizes vary by orders of magnitude.
 
 Before wiring a scraper:
 
-- **`/fc-metrics` answers only on `front-cache.management.port`** when that is set — the same
-  rule as the dashboard stream. Point the scrape job at that connector.
+- **`/fc-metrics` requires the api key** — the same rule as the dashboard stream. Prometheus
+  cannot set an arbitrary header, so give the scrape job `authorization: Bearer <api-key>` via
+  its `authorization` block.
 - **If you use guard rules, allow it.** Frontcache warns at startup when a rule would block
   it, the same way it does for `/frontcache-io` and the stream.
 - **A tier that is not tracked emits no series, not a zero** — the in-memory cache processor
@@ -110,7 +111,7 @@ The node streams the same resilience numbers as Server-Sent Events at
 indefinitely. The JSON is unchanged and pinned — including the `"type":"HystrixCommand"`
 literal — precisely so an external Hystrix Dashboard or Turbine can keep reading it.
 
-- Requires the node's site key; a missing or wrong one is a `401`.
+- Requires the node's api key; a missing or wrong one is a `401`.
 - Management-port rule applies, as above.
 - **Do not buffer it** through a reverse proxy — see the nginx recipe in
   [examples/front-door](../examples/front-door).

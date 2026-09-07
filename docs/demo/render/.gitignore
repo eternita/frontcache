@@ -1,0 +1,11 @@
+node_modules/
+frames/
+frames-cap/
+audio/
+*.wav
+beats.json
+plan.json
+cues.json
+captions.srt
+captions.ass
+out/

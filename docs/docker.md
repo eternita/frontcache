@@ -1,7 +1,7 @@
 # Frontcache — Docker Options
 
 Notes on the four things you can run in containers, and what each is for. Current as of
-**2.8.0**.
+**2.9.0**.
 
 Everything here uses **published images** — there is nothing to build in this repository.
 
@@ -22,7 +22,7 @@ docker run -d --name frontcache --restart unless-stopped \
   -e ORIGIN_HOST=origin.example.com \
   -v /srv/frontcache/conf:/opt/frontcache-server/FRONTCACHE_HOME/conf \
   -v fc-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache \
-  pavlikovskiy/frontcache-server:2.8.0
+  pavlikovskiy/frontcache-server:2.9.0
 ```
 
 Multi-arch (amd64 + arm64), carries a `HEALTHCHECK`.
@@ -49,7 +49,7 @@ your mounted file is the source of truth and is never rewritten. Pick one; do no
 ### With compose
 
 ```sh
-V=2.8.0
+V=2.9.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 curl -fLO $BASE/frontcache-server-$V-compose.yml
 curl -fL  $BASE/frontcache-server-$V-env.example -o .env
@@ -67,11 +67,11 @@ A **separate container** from the node — it talks to nodes over the management
 ```sh
 docker run -d --name frontcache-console --restart unless-stopped \
   -p 127.0.0.1:7080:7080 \
-  -e FC_NODES=http://fc-server:9080/ -e FC_SITE_KEY=YOUR_SITE_KEY \
-  pavlikovskiy/frontcache-console:2.8.0
+  -e FC_NODES=http://fc-server:9080/ -e FC_API_KEY=YOUR_API_KEY \
+  pavlikovskiy/frontcache-console:2.9.0
 ```
 
-- `FC_SITE_KEY` must match each node's `front-cache.site-key`.
+- `FC_API_KEY` must match each node's `front-cache.api-key`.
 - **Publish it on loopback, as above.** The console has no authentication of its own and can
   invalidate cache across the whole fleet.
 - Console and nodes **upgrade independently, in either order** — they are separate deployments
@@ -99,7 +99,7 @@ client ──▶ nginx :80  │                     (cached)
 ```
 
 - Both images are **stock**; the customization is three bind mounts and some env vars. No
-  Dockerfile, nothing to build. `docker/.env.example` pins `FC_IMAGE` at 2.8.0 — set it to
+  Dockerfile, nothing to build. `docker/.env.example` pins `FC_IMAGE` at 2.9.0 — set it to
   the release you want.
 - It ships a **stand-in origin** so the stack runs with nothing else installed. Point
   `ORIGIN_HOST` at your app and delete the `origin` service.

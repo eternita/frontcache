@@ -20,13 +20,13 @@
   <rect x="235" y="415" width="270" height="52" rx="6" fill="#fee2e2" stroke="#dc2626"/><text x="370" y="436" text-anchor="middle">Java web app + FrontCacheFilter</text><text x="370" y="452" text-anchor="middle" fill="#64748b">(in-JVM tier-2 cache)</text>
   <path d="M310,500 v22 a60,10 0 0 0 120,0 v-22 a60,10 0 0 0 -120,0 z" fill="#dcfce7" stroke="#16a34a"/><ellipse cx="370" cy="500" rx="60" ry="10" fill="#dcfce7" stroke="#16a34a"/><text x="370" y="520" text-anchor="middle">DB / services</text>
   <!-- INV -->
-  <rect x="630" y="360" width="230" height="64" rx="6" fill="#fff7ed" stroke="#ca8a04"/><text x="745" y="384" text-anchor="middle">Content change →</text><text x="745" y="400" text-anchor="middle">FrontCacheAgentCluster</text><text x="745" y="416" text-anchor="middle" fill="#ca8a04">invalidate all nodes</text>
+  <rect x="630" y="356" width="230" height="68" rx="6" fill="#fff7ed" stroke="#ca8a04"/><text x="745" y="380" text-anchor="middle">Content change →</text><text x="745" y="398" text-anchor="middle">FrontCacheAgentCluster</text><text x="745" y="416" text-anchor="middle" font-size="11" fill="#ca8a04">invalidate every node, one call</text>
   <!-- edges: users -> gslb -->
   <line x1="150" y1="62" x2="312" y2="142" stroke="#475569" marker-end="url(#a)"/>
   <line x1="370" y1="66" x2="370" y2="118" stroke="#475569" marker-end="url(#a)"/>
   <line x1="590" y1="62" x2="428" y2="142" stroke="#475569" marker-end="url(#a)"/>
   <!-- gslb -> edges -->
-  <line x1="320" y1="172" x2="150" y2="238" stroke="#475569" marker-end="url(#a)"/><text x="200" y="205">nearest</text>
+  <line x1="320" y1="172" x2="150" y2="238" stroke="#475569" marker-end="url(#a)"/><text x="212" y="196" font-size="11">nearest</text>
   <line x1="370" y1="182" x2="370" y2="238" stroke="#475569" marker-end="url(#a)"/>
   <line x1="420" y1="172" x2="590" y2="238" stroke="#475569" marker-end="url(#a)"/>
   <!-- edges -> origin -->
@@ -34,8 +34,12 @@
   <line x1="370" y1="296" x2="370" y2="413" stroke="#475569" marker-end="url(#a)"/>
   <line x1="610" y1="296" x2="445" y2="414" stroke="#475569" marker-end="url(#a)"/>
   <line x1="370" y1="467" x2="370" y2="490" stroke="#475569" marker-end="url(#a)"/>
-  <!-- invalidation -->
-  <line x1="660" y1="360" x2="630" y2="296" stroke="#ca8a04" stroke-dasharray="4 3" marker-end="url(#am)"/>
-  <line x1="700" y1="424" x2="530" y2="445" stroke="#ca8a04" stroke-dasharray="4 3" marker-end="url(#am)"/>
-  <line x1="640" y1="380" x2="458" y2="262" stroke="#ca8a04" stroke-dasharray="4 3" marker-end="url(#am)"/>
+  <!-- invalidation: one call, every node -->
+  <path d="M745,356 V214 H130" fill="none" stroke="#ca8a04" stroke-dasharray="4 3"/>
+  <line x1="130" y1="214" x2="130" y2="236" stroke="#ca8a04" stroke-dasharray="4 3" marker-end="url(#am)"/>
+  <line x1="370" y1="214" x2="370" y2="236" stroke="#ca8a04" stroke-dasharray="4 3" marker-end="url(#am)"/>
+  <line x1="610" y1="214" x2="610" y2="236" stroke="#ca8a04" stroke-dasharray="4 3" marker-end="url(#am)"/>
+  <line x1="700" y1="424" x2="509" y2="447" stroke="#ca8a04" stroke-dasharray="4 3" marker-end="url(#am)"/>
+  <text x="700" y="208" text-anchor="end" font-size="11" fill="#ca8a04">every edge …</text>
+  <text x="640" y="470" font-size="11" fill="#ca8a04">… and the origin filter</text>
 </svg>

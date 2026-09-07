@@ -9,6 +9,7 @@ HTTP Header | Set by | Where | Description
 `x-frontcache-component-maxage` | Origin | response | set time to live in cache
 `x-frontcache-component-cache-level` | Origin  | response  | set cache level - L1 / L2, optional, default - L2 
 `x-frontcache-component-refresh` | Origin | response | set refresh type for cached entry - regular / soft, optional, default - regular
+`x-frontcache-combine` | Origin | response | set to 1 by an origin answering a combined include request, see [include-combining.md](include-combining.md)
 `x-frontcache-id` | Frontcache | response | frontcache server id (useful in case of geo balancing e.g. R53)
 `x-frontcache-request-id` | Frontcache | response | request UUID - the same value for top level request and all includes
 `x-frontcache-client-ip` | Frontcache | request | set in frontcache server for origin application

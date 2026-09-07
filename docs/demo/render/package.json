@@ -1,0 +1,17 @@
+{
+  "name": "frontcache-demo-render",
+  "private": true,
+  "type": "module",
+  "description": "Renders docs/demo/index.html to the narrated MP4 (output B). See README.md.",
+  "scripts": {
+    "beats": "node beats.mjs",
+    "tts": "node tts.mjs",
+    "audio": "node build-audio-captions.mjs",
+    "frames": "node grab-frames.mjs ../index.html frames",
+    "frames:captioned": "CUES=cues.json node grab-frames.mjs ../index.html frames-cap"
+  },
+  "dependencies": {
+    "hyperframes": "^0.8.27",
+    "puppeteer-core": "^24.43.1"
+  }
+}

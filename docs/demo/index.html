@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frontcache — interactive walkthrough</title>
+<meta name="description" content="Seven schematic scenes: what Frontcache does to a request, why the second hit is different from the first, what it costs the origin, and where it goes in your infrastructure.">
+<style>
+:root{
+  color-scheme: light;
+  --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8;
+  --paper:#f8fafc; --paper-2:#ffffff; --line:#cbd5e1; --line-2:#e2e8f0;
+  --chrome:#0f172a; --chrome-2:#1e293b; --chrome-ink:#e2e8f0;
+  /* disposition palette - the words Frontcache logs (see the legend in scene 1) */
+  --green:#16a34a; --green-bg:#dcfce7;
+  --amber:#ca8a04; --amber-bg:#fef9c3;
+  --red:#dc2626;   --red-bg:#fee2e2;
+  --grey:#64748b;  --grey-bg:#e2e8f0;
+  --indigo:#4338ca; --indigo-bg:#e0e7ff;
+  --teal:#0f766e;  --teal-bg:#ccfbf1;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--sans); color:var(--ink); background:var(--chrome);
+  -webkit-font-smoothing:antialiased;
+}
+.app{max-width:1500px;margin:0 auto;padding:18px 18px 40px}
+
+/* ---------- header ---------- */
+header.top{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px;padding:4px 2px 14px}
+header.top h1{font-size:17px;margin:0;color:#fff;letter-spacing:.2px}
+header.top h1 b{color:#fff}
+header.top .tag{font-size:12.5px;color:#94a3b8;margin:0}
+header.top .right{margin-left:auto;display:flex;gap:14px;font-size:12.5px}
+header.top a{color:#93c5fd;text-decoration:none}
+header.top a:hover{text-decoration:underline}
+
+/* ---------- chapter strip / scene picker ---------- */
+.chapters{display:flex;gap:4px;margin:0 0 10px}
+.chapters button{
+  flex:1 1 auto; min-width:0; position:relative; overflow:hidden;
+  background:var(--chrome-2); border:1px solid #334155; border-radius:6px;
+  color:#cbd5e1; font:inherit; font-size:11.5px; text-align:left;
+  padding:7px 9px; cursor:pointer; line-height:1.25;
+}
+.chapters button:hover{border-color:#64748b;color:#fff}
+.chapters button[aria-current="true"]{border-color:#93c5fd;color:#fff;background:#1d2b45}
+.chapters .n{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#64748b}
+.chapters button[aria-current="true"] .n{color:#93c5fd}
+.chapters .nm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chapters .fill{position:absolute;left:0;bottom:0;height:2px;background:#93c5fd;width:0}
+@media (max-width:900px){
+  .chapters{flex-wrap:wrap}
+  .chapters button{flex:1 1 28%}
+  .chapters .ix{display:none}
+  .chapters .nm{white-space:normal}
+}
+
+/* ---------- stage ---------- */
+.stagewrap{position:relative;background:var(--paper);border-radius:10px;overflow:hidden;
+  box-shadow:0 1px 0 #334155, 0 18px 40px rgba(0,0,0,.35)}
+.stage{display:block;width:100%;height:auto}
+
+/* ---------- transport ---------- */
+.transport{display:flex;align-items:center;gap:12px;padding:10px 2px 0;color:#cbd5e1;font-size:12px}
+.transport button{
+  background:#1e293b;border:1px solid #475569;color:#e2e8f0;border-radius:6px;
+  font:inherit;padding:6px 12px;cursor:pointer;min-width:78px
+}
+.transport button:hover{border-color:#93c5fd;color:#fff}
+.transport input[type=range]{flex:1;accent-color:#93c5fd}
+.transport .clock{font-family:var(--mono);font-variant-numeric:tabular-nums;color:#94a3b8;min-width:96px;text-align:right}
+
+/* ---------- caption / controls / sources ---------- */
+.rail{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-top:16px}
+@media (max-width:900px){.rail{grid-template-columns:1fr}}
+.card{background:#fff;border-radius:10px;padding:14px 16px}
+.card h3{margin:0 0 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)}
+.lands{font-size:15.5px;line-height:1.45;color:var(--ink);margin:0}
+.lands em{font-style:normal;background:var(--amber-bg);padding:0 3px;border-radius:3px}
+.sources{margin:12px 0 0;padding:0;list-style:none;font-size:12.5px;line-height:1.7;color:var(--ink-3)}
+.sources a{color:#1d4ed8}
+.drive{display:flex;flex-wrap:wrap;gap:7px;margin:0}
+.drive button{
+  background:var(--paper);border:1px solid var(--line);border-radius:6px;color:var(--ink);
+  font:inherit;font-size:12.5px;padding:6px 11px;cursor:pointer
+}
+.drive button:hover{border-color:var(--ink-3);background:#fff}
+.drive button.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.drive button[aria-pressed="true"]{background:var(--indigo-bg);border-color:var(--indigo);color:var(--indigo)}
+.drive button:disabled{opacity:.45;cursor:default}
+.drive .sep{width:100%;height:0}
+.readout{margin:11px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.55}
+.readout b{font-family:var(--mono);color:var(--ink)}
+.nodrive{margin:0;font-size:12.5px;color:var(--ink-4);line-height:1.5}
+footer.foot{margin-top:22px;color:#64748b;font-size:12px;line-height:1.7}
+footer.foot a{color:#93c5fd}
+kbd{font-family:var(--mono);font-size:11px;background:#1e293b;border:1px solid #475569;border-radius:4px;padding:1px 5px;color:#cbd5e1}
+
+/* ---------- svg text defaults ---------- */
+svg text{font-family:var(--sans);fill:var(--ink)}
+svg .mono{font-family:var(--mono)}
+svg .lbl{font-size:13px}
+svg .sm{font-size:11.5px;fill:var(--ink-3)}
+svg .xs{font-size:10px;fill:var(--ink-4)}
+svg .h{font-size:15px;font-weight:600}
+svg .big{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums}
+svg .huge{font-size:52px;font-weight:600;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){ .chapters .fill{transition:none} }
+
+/* ---------- ?render=1 — the MP4 frame source (output B) ----------
+   The stage alone, full-bleed 16:9, no page furniture. Driven by
+   window.FCDemo.seekGlobal(t) from the frame grabber. */
+body.render{background:var(--paper)}
+body.render .app{max-width:none;margin:0;padding:0}
+body.render header.top,
+body.render .chapters,
+body.render .transport,
+body.render .rail,
+body.render footer.foot{display:none}
+body.render .stagewrap{border-radius:0;box-shadow:none;background:var(--paper)}
+body.render .stage{width:100vw;height:100vh;display:block}
+.caption{
+  position:absolute; left:7%; right:23.5%; bottom:1.4%;
+  text-align:center; font-size:2.75vh; line-height:1.32; color:var(--ink);
+  pointer-events:none; opacity:0
+}
+.caption span{
+  background:rgba(255,255,255,.92); border:1px solid var(--line-2);
+  border-radius:6px; padding:.28em .62em; box-decoration-break:clone;
+  -webkit-box-decoration-break:clone
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="top">
+  <h1>Frontcache — <b>interactive walkthrough</b></h1>
+  <p class="tag">7 scenes · 5:30 · click through it, or press play</p>
+  <div class="right">
+    <a href="../value.md">The measured payoff</a>
+    <a href="../concept.md">Concepts</a>
+    <a href="https://github.com/eternita/frontcache">Repository</a>
+  </div>
+</header>
+
+<nav class="chapters" id="chapters" aria-label="Scenes"></nav>
+
+<div class="stagewrap">
+  <svg class="stage" id="stage" viewBox="0 0 1600 900" role="img" aria-labelledby="stagetitle"></svg>
+  <div class="caption" id="caption" aria-live="off"><span></span></div>
+</div>
+
+<div class="transport">
+  <button id="play" aria-keyshortcuts="k">▶ Play</button>
+  <input type="range" id="scrub" min="0" max="1" step="0.01" value="0" aria-label="Scene position">
+  <span class="clock" id="clock">0:00 / 5:30</span>
+</div>
+
+<div class="rail">
+  <div class="card">
+    <h3 id="stagetitle">Scene</h3>
+    <p class="lands" id="lands"></p>
+    <ul class="sources" id="sources"></ul>
+  </div>
+  <div class="card">
+    <h3 id="drivehead">Drive it yourself</h3>
+    <div class="drive" id="drive"></div>
+    <p class="readout" id="readout"></p>
+  </div>
+</div>
+
+<footer class="foot">
+  <p>
+    <kbd>space</kbd> play/pause · <kbd>←</kbd> <kbd>→</kbd> ±2 s · <kbd>1</kbd>…<kbd>7</kbd> jump to a scene.
+    Every scene stands alone; nothing here needs a server, a build step or a network connection.
+  </p>
+  <p>
+    Scene&nbsp;5 (<i>combine &amp; reduce</i>) is held until a measured number exists for it and keeps its
+    number so it can drop in without renumbering the rest — see
+    <a href="../include-combining.md">include-combining.md</a> for the feature itself.
+    Narration script: <a href="script.md">script.md</a> · how this page is built and rendered to video:
+    <a href="README.md">README.md</a>.
+  </p>
+</footer>
+
+</div>
+<script>
+"use strict";
+/* =====================================================================
+   Frontcache interactive walkthrough.
+   One source, two outputs (plan §2): the viewer drives it here, and a
+   render timeline drives the same scenes for the narrated MP4. Which is
+   why every scene is a PURE FUNCTION OF (local time, driven state) --
+   render(t) may be called for any t, in any order, with no memory of the
+   frame before it. Nothing animates by mutating state over time except
+   the driven passes, which carry their own start stamp.
+   ===================================================================== */
+
+const NS = "http://www.w3.org/2000/svg";
+const stage = document.getElementById("stage");
+
+/* ------------------------------ tiny helpers ------------------------------ */
+function el(tag, attrs, text){
+  const n = document.createElementNS(NS, tag);
+  if (attrs) for (const k in attrs){
+    // a fill= attribute on <text> would lose to the stylesheet's svg text{fill}
+    // and to the .sm / .xs class rules, so it goes in as an inline style
+    if (k === "fill" && tag === "text") n.style.fill = attrs[k];
+    else n.setAttribute(k, attrs[k]);
+  }
+  if (text != null) n.textContent = text;
+  return n;
+}
+function add(parent, tag, attrs, text){ const n = el(tag, attrs, text); parent.appendChild(n); return n; }
+function g(parent, attrs){ return add(parent, "g", attrs || {}); }
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const lerp = (a, b, u) => a + (b - a) * u;
+/** progress of t through the window [t0,t1], clamped to 0..1 */
+const seg = (t, t0, t1) => clamp01((t - t0) / (t1 - t0));
+/** cubic ease-in-out */
+const ease = u => u < .5 ? 4*u*u*u : 1 - Math.pow(-2*u + 2, 3)/2;
+const easeOut = u => 1 - Math.pow(1 - u, 3);
+const fmtInt = n => Math.round(n).toLocaleString("en-US");
+const mmss = s => Math.floor(s/60) + ":" + String(Math.floor(s%60)).padStart(2,"0");
+
+/** opacity + optional slide-in, from a time window */
+function fade(node, u, dy){
+  node.setAttribute("opacity", u);
+  if (dy) node.setAttribute("transform", "translate(0," + ((1-u)*dy).toFixed(2) + ")");
+}
+/** cumulative-length interpolation along a polyline of [x,y] points */
+function along(points, u){
+  let total = 0; const d = [];
+  for (let i=1;i<points.length;i++){
+    const s = Math.hypot(points[i][0]-points[i-1][0], points[i][1]-points[i-1][1]);
+    d.push(s); total += s;
+  }
+  let want = clamp01(u) * total;
+  for (let i=0;i<d.length;i++){
+    if (want <= d[i] || i === d.length-1){
+      const f = d[i] ? want/d[i] : 0;
+      return [lerp(points[i][0], points[i+1][0], f), lerp(points[i][1], points[i+1][1], f)];
+    }
+    want -= d[i];
+  }
+  return points[points.length-1];
+}
+function dispo(kind){ /* the four dispositions of §3, plus two structural colours */
+  return ({
+    cached:  {stroke:"var(--green)",  fill:"var(--green-bg)",  dot:"var(--green)"},
+    dynamic: {stroke:"var(--amber)",  fill:"var(--amber-bg)",  dot:"var(--amber)"},
+    error:   {stroke:"var(--red)",    fill:"var(--red-bg)",    dot:"var(--red)"},
+    refused: {stroke:"var(--grey)",   fill:"var(--grey-bg)",   dot:"var(--grey)"},
+    l2:      {stroke:"var(--teal)",   fill:"var(--teal-bg)",   dot:"var(--teal)"},
+    engine:  {stroke:"var(--indigo)", fill:"var(--indigo-bg)", dot:"var(--indigo)"}
+  })[kind];
+}
+/** a rounded box with a title and up to two subtitles; returns {box, g} */
+function box(parent, x, y, w, h, title, sub, kind){
+  const c = dispo(kind || "refused");
+  const grp = g(parent);
+  const r = add(grp, "rect", {x, y, width:w, height:h, rx:7, fill:c.fill, stroke:c.stroke});
+  if (title != null) add(grp, "text", {x:x+w/2, y:y + (sub?h/2-2:h/2+5), "text-anchor":"middle", class:"lbl"}, title);
+  if (sub != null)  add(grp, "text", {x:x+w/2, y:y + h/2 + 15, "text-anchor":"middle", class:"sm"}, sub);
+  return {g:grp, rect:r};
+}
+/** monospace code panel; lines is an array of strings ("" for a blank line) */
+function codePanel(parent, x, y, w, lines, opt){
+  opt = opt || {};
+  const lh = opt.lh || 19, pad = opt.pad || 12;
+  const h = lines.length * lh + pad*2;
+  const grp = g(parent);
+  add(grp, "rect", {x, y, width:w, height:h, rx:7, fill:"#0f172a", stroke:"#334155"});
+  const rows = lines.map((s,i) => add(grp, "text", {
+    x:x+pad, y:y+pad+13+i*lh, class:"mono", "font-size": opt.fs || 12.5, fill: opt.fill || "#e2e8f0"
+  }, s));
+  return {g:grp, rows, h};
+}
+
+/* ------------------------- the shared lane geometry -------------------------
+   §3 of the plan: the same six lanes, in the same positions, in every scene
+   that uses them. A scene draws a subset; it never moves one.              */
+const LANES = [
+  {id:"client",  name:"Client",            sub:"browser · bot",        x: 40,  w:210},
+  {id:"guard",   name:"Guard",             sub:"guard-rules.conf",     x:272,  w:170},
+  {id:"cache",   name:"Cache",             sub:"L1 memory · L2 disk",  x:464,  w:236},
+  {id:"include", name:"Include processor", sub:"fc:include · parallel", x:722, w:222},
+  {id:"origin",  name:"Origin",            sub:"your application",     x:966,  w:212},
+  {id:"backend", name:"Backend",           sub:"DB · search · APIs",   x:1200, w:212}
+];
+const LANE_TOP = 112, LANE_BOT = 706;
+
+function laneFrame(root, only){
+  const wrap = g(root);
+  const map = {};
+  LANES.forEach(L => {
+    if (only && only.indexOf(L.id) < 0) return;
+    const grp = g(wrap);
+    add(grp, "rect", {x:L.x, y:LANE_TOP, width:L.w, height:LANE_BOT-LANE_TOP, rx:10,
+                      fill:"#ffffff", stroke:"var(--line-2)"});
+    const head = g(grp);
+    add(head, "rect", {x:L.x, y:60, width:L.w, height:40, rx:7, fill:"#f1f5f9", stroke:"var(--line-2)"});
+    add(head, "text", {x:L.x+L.w/2, y:76, "text-anchor":"middle", class:"lbl", "font-weight":600}, L.name);
+    add(head, "text", {x:L.x+L.w/2, y:91, "text-anchor":"middle", class:"xs"}, L.sub);
+    map[L.id] = {x:L.x, w:L.w, cx:L.x+L.w/2, g:grp, head};
+  });
+  map.g = wrap;
+  return map;
+}
+/** the "Frontcache" bracket over the guard/cache/include lanes */
+function fcBracket(root){
+  const x0 = LANES[1].x - 8, x1 = LANES[3].x + LANES[3].w + 8;
+  const grp = g(root);
+  add(grp, "rect", {x:x0, y:44, width:x1-x0, height:LANE_BOT-44+10, rx:14,
+                    fill:"none", stroke:"var(--indigo)", "stroke-dasharray":"5 5", opacity:.55});
+  const tag = g(grp);
+  add(tag, "rect", {x:(x0+x1)/2-72, y:24, width:144, height:26, rx:13,
+                    fill:"var(--indigo-bg)", stroke:"var(--indigo)"});
+  add(tag, "text", {x:(x0+x1)/2, y:41, "text-anchor":"middle", class:"lbl",
+                    "font-weight":600, fill:"var(--indigo)"}, "Frontcache");
+  return grp;
+}
+/** the disposition legend established once, in scene 1, and never redefined */
+function legend(root, x, y){
+  const items = [
+    ["from-cache","cached"], ["dynamic","dynamic"],
+    ["error · fallback","error"], ["rejected · redirected","refused"]
+  ];
+  const grp = g(root);
+  add(grp, "text", {x, y:y-14, class:"xs"}, "COLOUR = DISPOSITION, IN FRONTCACHE'S OWN LOG VOCABULARY");
+  let cx = x;
+  items.forEach(([label, kind]) => {
+    const c = dispo(kind);
+    add(grp, "circle", {cx:cx+7, cy:y+6, r:7, fill:c.fill, stroke:c.dot, "stroke-width":2});
+    const t = add(grp, "text", {x:cx+21, y:y+10, class:"sm", fill:"var(--ink-2)"}, label);
+    cx += 21 + label.length*6.4 + 26;
+  });
+  return grp;
+}
+
+/* ============================ the scenes ============================ */
+/* Each entry: {num, name, dur, lands, sources[], build(root) -> {render(t),
+   counters(t), controls?, readout?}}. Scene numbers follow the storyboard,
+   so 5 is absent by design (plan §7.3).                                  */
+const SCENES = [];
+
+/* ---------------------------------------------------------------- scene 1 */
+SCENES.push({
+  num:1, name:"The request path", dur:35,
+  lands:"Frontcache sits in front of your app and answers most requests <em>before your app runs</em>.",
+  sources:[
+    ["The 41.3 ms → 1.6 ms A/B, and how it was measured", "../value.md"],
+    ["What is in the request path, lane by lane", "../concept.md"],
+    ["The request lifecycle as a diagram", "../diagrams/02-request-lifecycle.svg"]
+  ],
+  build(root){
+    const lanes = laneFrame(root);
+    const bracket = fcBracket(root);
+    const later = [lanes.guard, lanes.cache, lanes.include];
+
+    // the two fixed actors
+    box(root, lanes.client.x+22, 300, 166, 66, "Browser", "one page request", "refused");
+    box(root, lanes.origin.x+16, 300, 180, 66, "Your app", "renders the page", "engine");
+    box(root, lanes.backend.x+16, 300, 180, 66, "Database", "search · APIs", "refused");
+    // backend ticks: a query is a tick on this lane, and offload is ticks that never happen
+    const ticks = [];
+    for (let i=0;i<5;i++) ticks.push(add(root, "rect",
+      {x:lanes.backend.x+30+i*32, y:392, width:20, height:34, rx:3, fill:"var(--amber-bg)", stroke:"var(--amber)"}));
+    add(root, "text", {x:lanes.backend.cx, y:446, "text-anchor":"middle", class:"xs"}, "queries this request");
+
+    // cache lane innards, revealed with the Frontcache lanes
+    const l1 = box(root, lanes.cache.x+18, 280, 200, 52, "L1 — memory", null, "cached");
+    const l2 = box(root, lanes.cache.x+18, 342, 200, 52, "L2 — disk (Lucene)", null, "l2");
+    const gate = box(root, lanes.guard.x+14, 300, 142, 66, "Guard", "before the cache", "refused");
+    const inc = box(root, lanes.include.x+14, 300, 194, 66, "Includes", "fetched in parallel", "engine");
+
+    // the travelling request
+    const trail = add(root, "path", {d:"", fill:"none", stroke:"var(--line)", "stroke-width":2, "stroke-dasharray":"4 5"});
+    const dot = add(root, "circle", {cx:0, cy:333, r:11, fill:"var(--amber-bg)", stroke:"var(--amber)", "stroke-width":3});
+
+    // the two verdict badges
+    function badge(x, label, value, kind, note){
+      const c = dispo(kind), grp = g(root);
+      add(grp, "rect", {x, y:520, width:290, height:96, rx:9, fill:c.fill, stroke:c.stroke});
+      add(grp, "text", {x:x+20, y:552, class:"sm", fill:c.stroke}, label);
+      add(grp, "text", {x:x+20, y:594, class:"big", fill:c.stroke}, value);
+      add(grp, "text", {x:x+150, y:594, class:"sm", fill:c.stroke}, "ms, median");
+      if (note) add(grp, "text", {x:x+20, y:612, class:"xs"}, note);
+      return grp;
+    }
+    const b1 = badge(lanes.client.x+30, "WITHOUT FRONTCACHE", "41.3", "dynamic");
+    const b2 = badge(lanes.client.x+340, "WITH FRONTCACHE", "1.6", "cached");
+    const caveat = add(root, "text", {x:lanes.client.x+30, y:648, class:"sm"},
+      "Measured A/B, 100,000 requests replayed from a production log · 8 concurrent · one application · value.md §3");
+    const leg = legend(root, 60, 760);
+    const nameTag = g(root);
+    const nameTagR = add(nameTag, "rect", {x:0, y:0, width:0, height:0, fill:"none"});
+
+    const ROUTE_LONG = [[lanes.client.cx, 333],[lanes.origin.cx, 333],[lanes.backend.x+20, 333]];
+    const ROUTE_SHORT = [[lanes.client.cx, 333],[lanes.cache.cx, 306]];
+
+    return {
+      render(t){
+        // 0-1s: the world without Frontcache
+        [lanes.client, lanes.origin, lanes.backend].forEach(L => fade(L.g, 1));
+        later.forEach(L => fade(L.g, seg(t,8,9.6)));
+        fade(bracket, seg(t,8.4,10));
+        [l1.g,l2.g,gate.g,inc.g].forEach((n,i) => fade(n, seg(t,9+i*.35,10.2+i*.35)));
+
+        // pass 1 - to the origin and the database and back
+        const p1 = seg(t,1.4,4.2), p1back = seg(t,4.4,6.2);
+        const live1 = t>=1.4 && t<6.4;
+        dot.setAttribute("opacity", live1 ? 1 : (t>=10.6 && t<14.4 ? 1 : 0));
+        if (live1){
+          const pos = p1back>0 ? along(ROUTE_LONG.slice().reverse(), ease(p1back)) : along(ROUTE_LONG, ease(p1));
+          dot.setAttribute("cx", pos[0]); dot.setAttribute("cy", pos[1]);
+          dot.setAttribute("stroke","var(--amber)"); dot.setAttribute("fill","var(--amber-bg)");
+        }
+        ticks.forEach((r,i) => r.setAttribute("opacity", seg(t, 3.0+i*.16, 3.25+i*.16)));
+        fade(b1, seg(t,5.4,6.4));
+
+        // pass 2 - answered from L1, the origin never runs
+        const live2 = t>=10.6 && t<14.4;
+        if (live2){
+          const u = t < 12.4 ? ease(seg(t,10.6,12.2)) : 1-ease(seg(t,12.5,14.2));
+          const pos = along(ROUTE_SHORT, u);
+          dot.setAttribute("cx", pos[0]); dot.setAttribute("cy", pos[1]);
+          dot.setAttribute("stroke","var(--green)"); dot.setAttribute("fill","var(--green-bg)");
+        }
+        l1.rect.setAttribute("stroke-width", live2 && t>11.9 ? 3 : 1);
+        fade(b2, seg(t,13.4,14.4));
+        fade(caveat, seg(t,14.6,15.8));
+        trail.setAttribute("opacity", 0);
+
+        // the lanes get named, one at a time
+        LANES.forEach((L,i) => {
+          const u = seg(t, 17+i*1.25, 17.9+i*1.25);
+          const lane = lanes[L.id];
+          lane.head.setAttribute("opacity", .55 + .45*u);
+          lane.head.querySelector("rect").setAttribute("stroke", u>.5 ? "var(--ink-3)" : "var(--line-2)");
+        });
+        fade(leg, seg(t,26,27.6));
+      },
+      counters(t){
+        return {
+          origin: t < 3.2 ? 0 : 1,                          // request two never reached it
+          queries: ticks.reduce((n,r,i) => n + (t >= 3.25+i*.16 ? 1 : 0), 0),
+          p50: t < 5.4 ? "—" : (t < 13.4 ? "41.3 ms" : "1.6 ms")
+        };
+      }
+    };
+  }
+});
+
+/* ---------------------------------------------------------------- scene 2 */
+SCENES.push({
+  num:2, name:"A page is fragments", dur:50, interactive:true,
+  lands:"One dynamic fragment does not make the page uncacheable. It makes <em>one tile amber</em>.",
+  sources:[
+    ["Fragments and includes — the attribute table", "../concept.md"],
+    ["The header contract, in any language", "../http-headers.md"],
+    ["fc:include and fc:component as JSP tags", "../jsp-tags.md"]
+  ],
+  build(root){
+    const PX=60, PY=150, PW=560;              // the page mock
+    const RX=700;                             // everything right of the page
+    add(root,"text",{x:PX,y:112,class:"h"},"One storefront page, as the origin describes it");
+    add(root,"text",{x:PX,y:132,class:"sm"},"example.com/store/category-12.htm");
+    const whole = g(root);
+    add(whole,"rect",{x:PX,y:PY,width:PW,height:474,rx:9,fill:"var(--amber-bg)",stroke:"var(--amber)"});
+    add(whole,"text",{x:PX+PW/2,y:PY+230,"text-anchor":"middle",class:"h",fill:"var(--amber)"},"one document, one TTL");
+    add(whole,"text",{x:PX+PW/2,y:PY+256,"text-anchor":"middle",class:"sm",fill:"var(--amber)"},'"our pages are personalized, so they cannot be cached"');
+
+    // ---- the tiles. dx/dy are where they sit once the page has split.
+    const T = [
+      {id:"header", nm:"header",          x:PX+16, y:PY+20,  w:388, h:44,  attr:"maxage=3600 · tags=chrome",  st:"cached", url:"/fc/header"},
+      {id:"cart",   nm:"cart badge",      x:PX+412,y:PY+20,  w:132, h:44,  attr:"maxage=0",                   st:"dynamic",url:"/cart/badge"},
+      {id:"nav",    nm:"nav",             x:PX+16, y:PY+74,  w:528, h:36,  attr:"maxage=600 · tags=nav",      st:"cached", url:"/fc/nav"},
+      {id:"body",   nm:"category body",   x:PX+16, y:PY+120, w:330, h:104, attr:"maxage=300 · tags=cat-12",   st:"cached", url:"(the page itself)"},
+      {id:"grid",   nm:"product grid",    x:PX+16, y:PY+234, w:330, h:120, attr:"maxage=300 · tags=cat-12",   st:"cached", url:"/fc/grid?cat=12"},
+      {id:"recs",   nm:"recommendations", x:PX+356,y:PY+120, w:188, h:234, attr:"maxage=60 · tags=product-42",st:"cached", url:"/fc/recommendations"},
+      {id:"count",  nm:"visit counter",   x:PX+16, y:PY+364, w:528, h:32,  attr:'call="async" — nothing is inserted', st:"async", url:"/visit-counter?id=42"},
+      {id:"footer", nm:"footer",          x:PX+16, y:PY+406, w:528, h:48,  attr:"maxage=86400 · client=bot",  st:"cached", url:"/seo/footer"}
+    ];
+    const tiles = T.map(d => {
+      const grp = g(root, {style:"cursor:pointer"});
+      const rect = add(grp,"rect",{x:d.x,y:d.y,width:d.w,height:d.h,rx:6});
+      const narrow = d.w < 220;
+      const nm   = add(grp,"text",{x:d.x+11, y:d.y + (d.h>60 ? 22 : narrow ? 19 : d.h/2+4), class:"lbl"}, d.nm);
+      const attr = add(grp,"text", narrow
+        ? {x:d.x+11, y:d.y+35, class:"mono xs"}
+        : {x:d.x+d.w-10, y:d.y+(d.h>60 ? d.h-10 : d.h/2+4), "text-anchor":"end", class:"mono xs"}, d.attr);
+      const t = {d, g:grp, rect, nm, attr, st:d.st};
+      if (d.st !== "async") grp.addEventListener("click", () => {
+        t.st = t.st === "cached" ? "dynamic" : "cached";
+        api.touched = true; api.refresh && api.refresh();
+      });
+      else grp.setAttribute("style","cursor:default");
+      return t;
+    });
+    const api = {touched:false};
+
+    // ---- what the origin actually returned, and who fills the holes
+    const code = codePanel(root, RX, PY, 840, [
+      "HTTP/1.1 200 OK",
+      "x-frontcache-component-maxage: 300",
+      "x-frontcache-component-tags: cat-12",
+      "",
+      "<html> … <fc:include url=\"/fc/header\"/>",
+      "  <fc:include url=\"/fc/nav\"/>",
+      "  <fc:include url=\"/cart/badge\"/>          <!-- maxage=0, and in dynamic-urls.conf -->",
+      "  <fc:include url=\"/fc/grid?cat=12\"/>",
+      "  <fc:include url=\"/fc/recommendations\"/>",
+      "  <fc:include url=\"/visit-counter?id=42\" call=\"async\"/>",
+      "  <fc:include url=\"/seo/footer\" client=\"bot\"/> … </html>"
+    ]);
+    const capA = add(root,"text",{x:RX,y:PY+code.h+26,class:"sm"},
+      "The origin returns the outer document with markers in it — it does not assemble the page.");
+
+    const IY = PY + code.h + 56;
+    const inc = box(root, RX, IY, 300, 74, "Include processor", "fetches what is missing, in parallel", "engine");
+    const org = box(root, RX+380, IY, 220, 74, "Origin", "one call per missing tile", "engine");
+    const capB = add(root,"text",{x:RX,y:IY+112,class:"sm"},
+      "Cached tiles are spliced in with no origin call at all. " +
+      "An async include is fired and forgotten: nothing is waited for, nothing is inserted.");
+    const capC = add(root,"text",{x:RX,y:IY+134,class:"sm"},
+      "So a cart badge that must never be cached costs one small request — not the page.");
+
+    // dots: one per tile that still has to be fetched on every hit
+    const dots = tiles.map(t => add(root,"circle",{r:8,opacity:0,"stroke-width":2.5}));
+
+    function missing(){ return tiles.filter(t => t.st !== "cached"); }
+
+    return {
+      controls(host, refresh){
+        api.refresh = refresh;
+        const b = document.createElement("button");
+        b.textContent = "Make every tile cacheable";
+        b.onclick = () => { tiles.forEach(t => { if (t.st==="dynamic") t.st="cached"; }); api.touched=true; refresh(); };
+        const c = document.createElement("button");
+        c.textContent = "Reset the page";
+        c.onclick = () => { tiles.forEach(t => t.st = t.d.st); api.touched=false; refresh(); };
+        const note = document.createElement("p");
+        note.className = "nodrive";
+        note.style.margin = "8px 0 0";
+        note.textContent = "Click any tile on the page to flip it between cached and dynamic.";
+        host.append(b, c, note);
+      },
+      readout(){
+        const m = missing(), dyn = m.filter(t=>t.st==="dynamic").length, asy = m.filter(t=>t.st==="async").length;
+        return "Every hit on this page now costs the origin <b>" + m.length + "</b> request" +
+               (m.length===1?"":"s") + " — " + dyn + " dynamic, " + asy + " fire-and-forget — instead of a " +
+               "full page render. The " + (tiles.length - m.length) + " cached tiles cost it nothing until their TTL runs out.";
+      },
+      render(t){
+        // A: the whole page.  B: it splits.  C: the attributes land.  D: resolution.
+        const split = ease(seg(t,6,11.5));
+        fade(whole, 1 - seg(t,6,8.5));
+        tiles.forEach((tl,i) => {
+          const u = seg(t, 6.4+i*.25, 7.6+i*.25);
+          tl.g.setAttribute("opacity", u);
+          const cy = PY+237, dy = (1-split)*((cy - (tl.d.y+tl.d.h/2))*.55);
+          tl.g.setAttribute("transform","translate(0,"+dy.toFixed(2)+")");
+          const c = dispo(tl.st==="async" ? "refused" : tl.st);
+          tl.rect.setAttribute("fill", tl.st==="async" ? "#f8fafc" : c.fill);
+          tl.rect.setAttribute("stroke", c.stroke);
+          tl.rect.setAttribute("stroke-dasharray", tl.st==="async" ? "5 4" : "");
+          tl.attr.setAttribute("opacity", seg(t, 16+i*.9, 17.4+i*.9));
+          tl.attr.setAttribute("fill", tl.st==="dynamic" ? "var(--amber)" : "var(--ink-4)");
+        });
+        fade(code.g, seg(t,12,13.6));
+        code.rows.forEach((r,i)=> r.setAttribute("opacity", seg(t,12.2+i*.28,13+i*.28)));
+        fade(capA, seg(t,13.8,15));
+        fade(inc.g, seg(t,28,29.2)); fade(org.g, seg(t,28,29.2));
+        fade(capB, seg(t,33,34.4)); fade(capC, seg(t,37,38.4));
+
+        // D: the missing tiles are fetched concurrently - all dots move together
+        const m = missing();
+        dots.forEach(d => d.setAttribute("opacity", 0));
+        if (t >= 29 && t < 42){
+          const u = ease(seg(t,29.2,33.2)), back = ease(seg(t,33.6,37.4));
+          m.forEach((tl,i) => {
+            const d = dots[i]; if (!d) return;
+            const from = [tl.d.x + tl.d.w/2, tl.d.y + tl.d.h/2];
+            const to   = [RX+380+110, IY+37];
+            const via  = [RX+150, IY+37];
+            const c = dispo(tl.st==="async" ? "refused" : tl.st);
+            const pos = back>0 && tl.st!=="async"
+              ? along([to, via, from], back)
+              : along([from, via, to], u);
+            d.setAttribute("cx", pos[0]); d.setAttribute("cy", pos[1]);
+            d.setAttribute("fill", c.fill); d.setAttribute("stroke", c.dot);
+            // the async one dissolves at the origin: the call is made, nothing comes back
+            d.setAttribute("opacity", tl.st==="async" ? (1 - seg(t,33.4,34.6)) : 1);
+          });
+        }
+      },
+      counters(t){
+        const m = missing();
+        return {rows:[["Origin requests per hit", m.length],
+                      ["Tiles served from cache", tiles.length - m.length],
+                      ["Full page renders", 0]]};
+      }
+    };
+  }
+});
+
+/* ---------------------------------------------------------------- scene 3 */
+SCENES.push({
+  num:3, name:"1st hit, 2nd hit, N hits", dur:55, interactive:true,
+  lands:"The second request is a <em>different physical event</em> from the first — and the thousandth is a third one.",
+  sources:[
+    ["The request lifecycle, decision by decision", "../diagrams/02-request-lifecycle.svg"],
+    ["Cache levels and soft refresh (x-frontcache-component-*)", "../concept.md"],
+    ["Where the 41.3 → 1.6 ms median comes from", "../value.md"]
+  ],
+  build(root){
+    const lanes = laneFrame(root, ["client","cache","include","origin","backend"]);
+    const FR = [
+      {id:"header", nm:"header",          q:1},
+      {id:"nav",    nm:"nav",             q:1},
+      {id:"body",   nm:"category body",   q:3},
+      {id:"grid",   nm:"product grid",    q:3},
+      {id:"recs",   nm:"recommendations", q:2},
+      {id:"cart",   nm:"cart badge",      q:1, never:true}
+    ];
+    const ROWY = i => 152 + i*72;
+    const rows = FR.map((f,i) => {
+      const y = ROWY(i), grp = g(root);
+      add(grp,"rect",{x:lanes.client.x+14,y:y,width:lanes.client.w-28,height:44,rx:6,
+                      fill:"#f8fafc",stroke:"var(--line-2)"});
+      add(grp,"text",{x:lanes.client.x+26,y:y+21,class:"lbl"},f.nm);
+      const state = add(grp,"text",{x:lanes.client.x+26,y:y+36,class:"mono xs"},"");
+      add(grp,"line",{x1:lanes.client.x+lanes.client.w-8,y1:y+22,
+                      x2:lanes.backend.x+8,y2:y+22,stroke:"var(--line-2)","stroke-dasharray":"3 6"});
+      return {f, g:grp, state, y};
+    });
+    // where each lane answers from
+    box(root, lanes.cache.x+18, 132, 200, 42, "L1 — memory", null, "cached").g.setAttribute("opacity",1);
+    box(root, lanes.cache.x+18, 182, 200, 42, "L2 — Lucene on disk", null, "l2");
+    const inc = box(root, lanes.include.x+12, 132, 198, 42, "parallel fan-out", null, "engine");
+    const org = box(root, lanes.origin.x+12, 132, 188, 42, "renders", null, "engine");
+    const bk  = box(root, lanes.backend.x+12, 132, 188, 42, "DB · Solr · APIs", null, "refused");
+
+    // a backend query is a tick on the backend lane; offload is ticks that never happen
+    const ticks = [];
+    for (let i=0;i<11;i++) ticks.push(add(root,"rect",
+      {x:lanes.backend.x+18+ (i%6)*30, y:600 + Math.floor(i/6)*26, width:20, height:18, rx:3,
+       fill:"var(--amber-bg)", stroke:"var(--amber)", opacity:0}));
+
+    const cap = add(root,"text",{x:lanes.cache.x-6,y:664,class:"h"},"");
+    const cap2= add(root,"text",{x:lanes.cache.x-6,y:686,class:"sm"},"");
+
+    // the cache-state bar
+    const panel = g(root);
+    add(panel,"rect",{x:60,y:726,width:1200,height:104,rx:9,fill:"#fff",stroke:"var(--line)"});
+    add(panel,"text",{x:78,y:750,class:"xs"},"CACHE STATE, FRAGMENT BY FRAGMENT");
+    const chips = FR.map((f,i) => {
+      const x = 78 + i*198, grp = g(panel);
+      const r = add(grp,"rect",{x,y:762,width:186,height:48,rx:7,fill:"#f8fafc",stroke:"var(--line-2)"});
+      add(grp,"text",{x:x+12,y:782,class:"sm",fill:"var(--ink-2)"},f.nm);
+      const v = add(grp,"text",{x:x+12,y:800,class:"mono xs"},"");
+      return {rect:r, val:v};
+    });
+
+    const dots = FR.map(() => add(root,"circle",{r:9,opacity:0,"stroke-width":2.5}));
+    const bgdots = FR.map(() => add(root,"circle",{r:6,opacity:0,"stroke-width":2}));
+
+    /* ---- state model. 'miss' | 'l1' | 'l2' | 'stale' | 'never' ---- */
+    const fresh = () => ({header:"miss",nav:"miss",body:"miss",grid:"miss",recs:"miss",cart:"never"});
+    const warm  = () => ({header:"l1",nav:"l1",body:"l1",grid:"l1",recs:"l1",cart:"never"});
+    const tail  = () => ({header:"l1",nav:"l1",body:"l1",grid:"l2",recs:"stale",cart:"never"});
+    const SCRIPT = [
+      {t0:2,  dur:14, states:fresh(), title:"1st hit — nothing is cached",
+       sub:"Every fragment goes to the origin, the origin renders, the backend is asked, and every response is written to both cache tiers on the way back. p50 41.3 ms."},
+      {t0:20, dur:8,  states:warm(),  title:"2nd hit — answered from L1, in memory",
+       sub:"The origin lane is silent except the cart badge, which is in dynamic-urls.conf and was never cached. p50 1.6 ms."},
+      {t0:32, dur:14, states:tail(),  title:"N hits — the long tail: L2, and soft refresh",
+       sub:"A fragment pushed out of memory is still on disk (L2, slower than L1, nowhere near the origin). An expired one with refresh=soft serves stale now and revalidates behind it — no visitor waits for the refill."}
+    ];
+    const live = {states:warm(), pass:null, sent:0, origin:0, queries:0};
+
+    /** how long a fragment's answer takes, and the route it takes */
+    function route(st){
+      const c = lanes.client, ca = lanes.cache, ic = lanes.include, or = lanes.origin, bk = lanes.backend;
+      if (st === "l1")    return {legs:[[c.cx,0],[ca.cx,-1]], dur:1.4, kind:"cached"};
+      if (st === "l2")    return {legs:[[c.cx,0],[ca.cx,1]],  dur:2.6, kind:"l2"};
+      if (st === "stale") return {legs:[[c.cx,0],[ca.cx,1]],  dur:1.6, kind:"cached"};
+      if (st === "never") return {legs:[[c.cx,0],[ca.cx,0],[or.cx,0]], dur:4.2, kind:"dynamic"};
+      return {legs:[[c.cx,0],[ca.cx,0],[ic.cx,0],[or.cx,0],[bk.x+30,0]], dur:6.4, kind:"dynamic"};
+    }
+    function pts(r, y){ return r.legs.map(([x,off]) => [x, y + 22 + off*24]); }
+
+    function drawPass(states, lt, dur){
+      let originCalls = 0, q = 0;
+      FR.forEach((f,i) => {
+        const st = states[f.id], r = route(st), row = rows[i], d = dots[i], bd = bgdots[i];
+        const u = clamp01(lt / (dur*.52)), back = clamp01((lt - dur*.56) / (dur*.44));
+        const p = pts(r, row.y);
+        const pos = back>0 ? along(p.slice().reverse(), ease(back)) : along(p, ease(u));
+        const c = dispo(r.kind);
+        d.setAttribute("cx",pos[0]); d.setAttribute("cy",pos[1]);
+        d.setAttribute("fill",c.fill); d.setAttribute("stroke",c.dot);
+        d.setAttribute("opacity", lt>0 && back<1 ? 1 : 0);
+        // soft refresh: a second, smaller dot goes on to the origin after the stale answer left
+        if (st === "stale"){
+          const bu = clamp01((lt - dur*.3) / (dur*.6));
+          const bp = along(pts({legs:[[lanes.cache.cx,0],[lanes.include.cx,0],[lanes.origin.cx,0]]}, row.y), ease(bu));
+          bd.setAttribute("cx",bp[0]); bd.setAttribute("cy",bp[1]-16);
+          bd.setAttribute("fill","var(--indigo-bg)"); bd.setAttribute("stroke","var(--indigo)");
+          bd.setAttribute("opacity", bu>0 && bu<1 ? 1 : 0);
+        } else bd.setAttribute("opacity",0);
+        if (st === "miss" || st === "never" || st === "stale"){ originCalls++; q += f.q; }
+      });
+      return {originCalls, q};
+    }
+    function clearDots(){ dots.concat(bgdots).forEach(d => d.setAttribute("opacity",0)); }
+    function commit(states){
+      const n = {};
+      FR.forEach(f => {
+        const st = states[f.id];
+        n[f.id] = st === "never" ? "never" : "l1";      // anything fetched or served is now hot in L1
+      });
+      return n;
+    }
+    function labelStates(states){
+      const words = {miss:"not cached", l1:"L1 · memory", l2:"L2 · disk", stale:"expired · soft refresh", never:"never cached"};
+      const kinds = {miss:"dynamic", l1:"cached", l2:"l2", stale:"dynamic", never:"dynamic"};
+      FR.forEach((f,i) => {
+        const st = states[f.id], c = dispo(kinds[st]);
+        chips[i].val.textContent = words[st];
+        chips[i].val.setAttribute("fill", c.stroke);
+        chips[i].rect.setAttribute("fill", c.fill);
+        chips[i].rect.setAttribute("stroke", c.stroke);
+        rows[i].state.textContent = st === "never" ? "dynamic-urls.conf" : "";
+        rows[i].state.setAttribute("fill","var(--amber)");
+      });
+    }
+
+    return {
+      controls(host, refresh){
+        const send = document.createElement("button");
+        send.className = "primary"; send.textContent = "Send a request";
+        send.onclick = () => {
+          const snapshot = Object.assign({}, live.states);
+          const r = drawPassCost(snapshot);
+          live.pass = {t0: performance.now()/1000, states:snapshot, dur:passDur(snapshot)};
+          live.states = commit(snapshot);
+          live.sent++; live.origin += r.originCalls; live.queries += r.q;
+          refresh();
+        };
+        const expire = document.createElement("button");
+        expire.textContent = "Expire the recommendations (soft)";
+        expire.onclick = () => { live.states.recs = "stale"; refresh(); };
+        const evict = document.createElement("button");
+        evict.textContent = "Push the grid out of L1";
+        evict.onclick = () => { live.states.grid = "l2"; refresh(); };
+        const drop = document.createElement("button");
+        drop.textContent = "Drop the whole cache";
+        drop.onclick = () => { live.states = fresh(); live.sent=0; live.origin=0; live.queries=0; refresh(); };
+        host.append(send, expire, evict, drop);
+      },
+      readout(){
+        return "You have sent <b>" + live.sent + "</b> request" + (live.sent===1?"":"s") +
+          " on this cache state, costing the origin <b>" + live.origin + "</b> render" +
+          (live.origin===1?"":"s") + " and the backend <b>" + live.queries + "</b> quer" +
+          (live.queries===1?"y":"ies") + ". Six fragments, and only the ones that missed cost anything.";
+      },
+      render(t, driving){
+        [inc,org,bk].forEach(b => b.g.setAttribute("opacity",1));
+        if (driving){
+          const p = live.pass;
+          let states = live.states, cost = {originCalls:0,q:0};
+          if (p){
+            const lt = performance.now()/1000 - p.t0;
+            if (lt <= p.dur){ cost = drawPass(p.states, lt, p.dur); states = p.states; }
+            else { clearDots(); live.pass = null; }
+          } else clearDots();
+          labelStates(states);
+          cap.textContent = "You are driving. Every button changes what the next request has to do.";
+          cap2.textContent = "Expire a fragment or push it out of L1, then send a request and watch which lane answers.";
+          ticks.forEach((r,i) => r.setAttribute("opacity", i < live.queries % 12 ? 1 : 0));
+          return;
+        }
+        // ---- timeline mode: three scripted passes over the identical diagram
+        let cur = null;
+        for (const s of SCRIPT) if (t >= s.t0 && t < s.t0 + s.dur + 9) cur = s;
+        const active = cur && t < cur.t0 + cur.dur ? cur : null;
+        labelStates(cur ? cur.states : fresh());
+        if (active) drawPass(active.states, t - active.t0, active.dur); else clearDots();
+        cap.textContent  = cur ? cur.title : "The same page, requested three times.";
+        cap2.textContent = cur ? cur.sub : "";
+        cap.setAttribute("opacity", 1); cap2.setAttribute("opacity", 1);
+        const q = t < 2 ? 0 : (t < 20 ? Math.min(11, Math.floor((t-3)*1.1)) : (t<32 ? 1 : (t<38 ? 2 : 3)));
+        ticks.forEach((r,i) => r.setAttribute("opacity", i < q ? 1 : 0));
+      },
+      counters(t, driving){
+        if (driving) return {origin:live.origin, queries:live.queries, p50:"—"};
+        if (t < 2)  return {origin:0, queries:0, p50:"—"};
+        if (t < 20) return {origin:6, queries:11, p50:"41.3 ms"};
+        if (t < 32) return {origin:7, queries:12, p50:"1.6 ms"};
+        return {origin:9, queries:15, p50:"1.6 ms"};
+      }
+    };
+    function passDur(states){ return Math.max.apply(null, FR.map(f => route(states[f.id]).dur)) + .4; }
+    function drawPassCost(states){
+      let originCalls = 0, q = 0;
+      FR.forEach(f => { const st = states[f.id];
+        if (st==="miss"||st==="never"||st==="stale"){ originCalls++; q += f.q; } });
+      return {originCalls, q};
+    }
+  }
+});
+
+/* ---------------------------------------------------------------- scene 4 */
+SCENES.push({
+  num:4, name:"Invalidation", dur:40, interactive:true,
+  lands:"A content change clears exactly what it touched — <em>everywhere it appears</em>, in one call.",
+  sources:[
+    ["Invalidation by URL and by tag", "../concept.md"],
+    ["Invalidating one node and a whole cluster", "../deployment-usecases.md"],
+    ["The site key, and the blast radius of filter=*", "../security.md"]
+  ],
+  build(root){
+    add(root,"text",{x:60,y:112,class:"h"},"One product changes. Three pages show it.");
+    const PAGES = [
+      {url:"/store/product-details-42.htm", x:60, tiles:[
+        ["header",         [],                        "/fc/header"],
+        ["product body",   ["product-42"],            "/store/product-details-42.htm"],
+        ["recommendations",["product-42"],            "/fc/recommendations?id=42"],
+        ["footer",         [],                        "/seo/footer"]]},
+      {url:"/store/category-12.htm", x:430, tiles:[
+        ["header",         [],                        "/fc/header"],
+        ["product grid",   ["cat-12","product-42"],   "/fc/grid?cat=12"],
+        ["recommendations",["product-42"],            "/fc/recommendations?cat=12"],
+        ["footer",         [],                        "/seo/footer"]]},
+      {url:"/search.htm?q=…", x:800, tiles:[
+        ["header",         [],                        "/fc/header"],
+        ["result cells",   ["product-42"],            "/fc/search-cell?id=42"],
+        ["footer",         [],                        "/seo/footer"]]}
+    ];
+    const pages = PAGES.map(p => {
+      const grp = g(root);
+      add(grp,"rect",{x:p.x,y:140,width:340,height:320,rx:9,fill:"#fff",stroke:"var(--line)"});
+      add(grp,"text",{x:p.x+14,y:164,class:"mono sm",fill:"var(--ink-2)"},p.url);
+      const tiles = p.tiles.map((tt,i) => {
+        const y = 176 + i*66, tg = g(grp);
+        const r = add(tg,"rect",{x:p.x+14,y,width:312,height:56,rx:6});
+        add(tg,"text",{x:p.x+26,y:y+21,class:"lbl"},tt[0]);
+        add(tg,"text",{x:p.x+26,y:y+37,class:"mono","font-size":9.5,fill:"var(--ink-3)"},"key " + tt[2]);
+        const tags = add(tg,"text",{x:p.x+26,y:y+49,class:"mono","font-size":9.5},
+          tt[1].length ? "tags: " + tt[1].join(" ") : "no tags");
+        return {name:tt[0], tags:tt[1], own:tt[2], rect:r, tagsText:tags, url:p.url, st:"cached"};
+      });
+      return {p, g:grp, tiles};
+    });
+    const allTiles = pages.reduce((a,p) => a.concat(p.tiles), []);
+
+    const changed = g(root);
+    add(changed,"rect",{x:1180,y:140,width:360,height:64,rx:9,fill:"var(--amber-bg)",stroke:"var(--amber)"});
+    add(changed,"text",{x:1200,y:166,class:"lbl",fill:"var(--amber)"},"Product 42: price changed");
+    add(changed,"text",{x:1200,y:186,class:"sm",fill:"var(--amber)"},"your application just committed it");
+
+    const codeUrl = codePanel(root, 1180, 224, 360, [
+      "// by URL pattern",
+      "agent.removeFromCache(siteKey,",
+      '  "/store/product-details-42.*");'
+    ], {fs:11.5});
+    const codeTag = codePanel(root, 1180, 320, 360, [
+      "// by tag - the origin stored it",
+      "x-frontcache-component-tags:",
+      "  product-42",
+      "",
+      "agent.removeFromCache(siteKey,",
+      '  "product-42");'
+    ], {fs:11.5});
+
+    // the cluster fan-out, which is scene 7 in one line
+    const cluster = g(root);
+    add(cluster,"text",{x:60,y:512,class:"xs"},"ONE CALL, EVERY NODE — FrontCacheAgentCluster");
+    const agent = box(cluster, 60, 528, 220, 62, "your app", "frontcache-agent", "engine");
+    const nodes = ["edge · US","edge · EU","edge · APAC","origin filter"].map((nm,i) =>
+      box(cluster, 360 + i*200, 528, 176, 62, nm, i===3 ? "in the app's JVM" : "standalone", "refused"));
+    const fanDots = nodes.map(() => add(cluster,"circle",{r:7,opacity:0,fill:"var(--indigo-bg)",stroke:"var(--indigo)","stroke-width":2}));
+
+    const cap = add(root,"text",{x:60,y:640,class:"h"},"");
+    const cap2= add(root,"text",{x:60,y:664,class:"sm"},"");
+    const warn = g(root);
+    add(warn,"rect",{x:60,y:690,width:1200,height:56,rx:8,fill:"var(--red-bg)",stroke:"var(--red)"});
+    add(warn,"text",{x:80,y:714,class:"lbl",fill:"var(--red)"},"invalidate with filter=* and you have emptied the whole node");
+    add(warn,"text",{x:80,y:732,class:"sm",fill:"var(--red)"},
+      "Replicated entries included. It is one call, it needs the site key, and it is the one to keep out of a deploy script — security.md");
+
+    const live = {mode:null, fanned:false, calls:0};
+    function paint(marks){
+      allTiles.forEach(t => {
+        const st = marks(t), c = dispo(st === "gone" ? "error" : st === "empty" ? "refused" : "cached");
+        t.rect.setAttribute("fill", c.fill); t.rect.setAttribute("stroke", c.stroke);
+        t.tagsText.setAttribute("fill", st === "gone" ? "var(--red)" : "var(--ink-4)");
+      });
+    }
+    const byUrl  = t => /^\/store\/product-details-42/.test(t.own) ? "gone" : "cached";
+    const byTag  = t => t.tags.indexOf("product-42") >= 0 ? "gone" : "cached";
+    const byStar = () => "empty";
+
+    return {
+      controls(host, refresh){
+        const u = document.createElement("button");
+        u.textContent = "Invalidate by URL pattern";
+        u.onclick = () => { live.mode = "url"; live.calls++; refresh(); };
+        const g2 = document.createElement("button");
+        g2.textContent = "Invalidate by tag product-42";
+        g2.onclick = () => { live.mode = "tag"; live.calls++; refresh(); };
+        const f = document.createElement("button");
+        f.textContent = "filter=* (empty the node)";
+        f.onclick = () => { live.mode = "star"; live.calls++; refresh(); };
+        const r = document.createElement("button");
+        r.textContent = "Refill from the origin";
+        r.onclick = () => { live.mode = null; refresh(); };
+        host.append(u, g2, f, r);
+      },
+      readout(){
+        if (!live.mode) return "Every fragment is cached. Pick an invalidation and watch which tiles go.";
+        if (live.mode === "url"){
+          const n = allTiles.filter(x => byUrl(x) === "gone").length;
+          return "By URL: <b>" + n + "</b> entr" + (n===1?"y":"ies") + " cleared — the ones whose own cache key matched. " +
+            "The header, the footer and the recommendations rail have their own keys, so they stayed; the same product is " +
+            "still being served from cache on the category and search pages.";
+        }
+        if (live.mode === "tag"){
+          const n = allTiles.filter(x => byTag(x) === "gone").length;
+          const pg = pages.filter(p => p.tiles.some(x => byTag(x) === "gone")).length;
+          return "By tag: <b>" + n + "</b> fragments cleared, across <b>" + pg + "</b> different pages. " +
+            "The origin decided what belonged together when it set the tag; the edge just honours it.";
+        }
+        return "filter=* : <b>every</b> entry on this node, replicated ones included. One call, no undo.";
+      },
+      render(t, driving){
+        if (driving){
+          pages.forEach(pg => fade(pg.g, 1));
+          paint(live.mode === "url" ? byUrl : live.mode === "tag" ? byTag : live.mode === "star" ? byStar : () => "cached");
+          fade(changed, 1); fade(codeUrl.g, live.mode==="url"?1:.35); fade(codeTag.g, live.mode==="tag"?1:.35);
+          fade(cluster, 1); fade(warn, live.mode==="star" ? 1 : .3);
+          fanDots.forEach(d => d.setAttribute("opacity",0));
+          cap.textContent = "You are driving.";
+          cap2.textContent = "URL patterns cut down the site. Tags cut across it. Both are one call from your application.";
+          return;
+        }
+        pages.forEach((pg,i) => fade(pg.g, seg(t,0+i*.4,1.2+i*.4)));
+        fade(changed, seg(t,4,5));
+        fade(codeUrl.g, t<16 ? seg(t,7,8) : .35);
+        fade(codeTag.g, t<16 ? 0 : 1);
+        fade(cluster, seg(t,26.5,27.5));
+        fade(warn, seg(t,34,35));
+
+        if (t < 7)       paint(() => "cached");
+        else if (t < 15) paint(byUrl);
+        else if (t < 16) paint(() => "cached");
+        else if (t < 34) paint(byTag);
+        else             paint(byStar);
+
+        // the fan-out
+        fanDots.forEach((d,i) => {
+          const u = seg(t, 28 + i*.5, 30 + i*.5);
+          const from = [280, 559], to = [360 + i*200 + 88, 559];
+          d.setAttribute("opacity", u>0 && u<1 ? 1 : 0);
+          const p = along([from,[ (from[0]+to[0])/2, 500 ],to], ease(u));
+          d.setAttribute("cx",p[0]); d.setAttribute("cy",p[1]);
+        });
+        nodes.forEach((n,i) => n.rect.setAttribute("stroke", t > 30 + i*.5 ? "var(--indigo)" : "var(--grey)"));
+
+        if (t < 7){ cap.textContent = "The same fragment is on three pages, and the origin said so with a tag.";
+                    cap2.textContent = ""; }
+        else if (t < 15){ cap.textContent = "By URL pattern — the entries whose own key matched, and only those.";
+                    cap2.textContent = "Exactly right for the product page itself. It leaves the same product stale in the category listing, in search, and in every recommendations rail."; }
+        else if (t < 26){ cap.textContent = "By tag — every fragment carrying product-42, wherever it appears.";
+                    cap2.textContent = "URL patterns cut down the site. Tags cut across it. That is the whole difference, and it is why the origin sets tags."; }
+        else if (t < 34){ cap.textContent = "One call reaches every node.";
+                    cap2.textContent = "FrontCacheAgentCluster fans the same invalidation to every edge and to the origin's own filter — the topology of scene 7."; }
+        else { cap.textContent = "And the honest bit.";
+                    cap2.textContent = ""; }
+      },
+      counters(t, driving){
+        const marks = driving
+          ? (live.mode === "url" ? byUrl : live.mode === "tag" ? byTag : live.mode === "star" ? byStar : () => "cached")
+          : (t < 7 ? () => "cached" : t < 15 ? byUrl : t < 16 ? () => "cached" : t < 34 ? byTag : byStar);
+        const gone = allTiles.filter(x => marks(x) !== "cached").length;
+        const pgs = pages.filter(p => p.tiles.some(x => marks(x) !== "cached")).length;
+        return {rows:[["Fragments cleared", gone], ["Pages affected", pgs],
+                      ["Calls your app made", gone ? 1 : 0]]};
+      }
+    };
+  }
+});
+
+/* ---------------------------------------------------------------- scene 6 */
+SCENES.push({
+  num:6, name:"Guard: refuse it first", dur:45,
+  lands:"The cheapest request is the one you <em>never serve</em>.",
+  sources:[
+    ["Guard rules: the format, the recipes, rate limiting", "../guard-getting-started.md"],
+    ["…and §5.1, the trusted-proxy setting behind nginx or a CDN", "../guard-getting-started.md"],
+    ["What the guard writes to the log and to Prometheus", "../console-dashboards.md"]
+  ],
+  build(root){
+    const lanes = laneFrame(root, ["client","guard","cache","origin"]);
+    add(root,"text",{x:60,y:36,class:"h"},"The guard runs before the cache, and long before your application.");
+    const dim = g(root);
+    [lanes.cache, lanes.origin].forEach(L => L.g.setAttribute("opacity",.35));
+
+    const REQ = [
+      {y:150, txt:"http://203.0.113.9/store/…", sub:"walking the server by IP", rule:6,  verdict:"301", kind:"refused",
+       t0:4.5, note:"a scanner: every request is a cache miss and an origin render"},
+      {y:222, txt:"/en/ccc/va/report", sub:"no session cookie", rule:7, verdict:"302", kind:"refused",
+       t0:10.5, note:"would have rendered at your origin only to say “log in”"},
+      {y:294, txt:"/search.htm ×3", sub:"one IP, above the limit", rule:8, verdict:"429", kind:"error",
+       t0:16.5, note:"429 + Retry-After — what a well-behaved crawler acts on"},
+      {y:366, txt:"/fc-ping.jsp", sub:"your load balancer, by IP", rule:1, verdict:"allow", kind:"cached",
+       t0:24.5, note:"the exemption that keeps a healthy node looking healthy"},
+      {y:438, txt:"/store/category-12.htm", sub:"a visitor", rule:9, verdict:"dry-run", kind:"cached",
+       t0:36, note:"ip-flood is still in dry-run: it counted this and touched nothing"}
+    ];
+    const rows = REQ.map(r => {
+      const grp = g(root);
+      add(grp,"rect",{x:lanes.client.x+12,y:r.y,width:lanes.client.w-24,height:52,rx:6,fill:"#f8fafc",stroke:"var(--line-2)"});
+      add(grp,"text",{x:lanes.client.x+24,y:r.y+22,class:"mono","font-size":11.5},r.txt);
+      add(grp,"text",{x:lanes.client.x+24,y:r.y+39,class:"xs"},r.sub);
+      return {r, g:grp};
+    });
+    const dots = REQ.map(() => add(root,"circle",{r:9,opacity:0,"stroke-width":2.5}));
+    const extra = [0,1].map(() => add(root,"circle",{r:7,opacity:0,"stroke-width":2}));  // the flood's other two
+    const verdicts = REQ.map(r => {
+      const grp = g(root, {opacity:0});
+      const c = dispo(r.kind);
+      add(grp,"rect",{x:lanes.guard.x+lanes.guard.w+16,y:r.y+8,width:96,height:36,rx:6,fill:c.fill,stroke:c.stroke});
+      add(grp,"text",{x:lanes.guard.x+lanes.guard.w+64,y:r.y+31,"text-anchor":"middle",class:"lbl",fill:c.stroke},r.verdict);
+      return grp;
+    });
+
+    const RULES = [
+      "# guard-rules.conf — exemptions FIRST, always",
+      "ping-by-ip     | uri~^/fc-ping\\.jsp$                     | allow",
+      "mgmt-by-ip     | uri~^/frontcache-io                     | allow",
+      "dash-stream    | uri~^/fc-dashboard\\.stream              | allow",
+      "legacy-stream  | uri~^/hystrix\\.stream                   | allow",
+      "",
+      "ip-access      | host:ip                                 | redirect:301 https://www.example.com/",
+      "anon-analytics | uri~^/[a-z]{2}/ccc/va/ ; !cookie:hruc    | redirect:302 …/login.htm?return=${url:enc}",
+      "search-flood   | uri~^/search\\.htm ; rate:20/10s         | reject:429 Too Many Requests",
+      "ip-flood       | rate:100/10s                            | reject:429 Too Many Requests | dry-run"
+    ];
+    const code = codePanel(root, 700, 130, 840, RULES, {fs:12});
+    const resp = codePanel(root, 700, 130 + code.h + 26, 400, [
+      "HTTP/1.1 429 Too Many Requests",
+      "Retry-After: 7",
+      "Cache-Control: no-store"
+    ], {fs:12, fill:"#fca5a5"});
+    const gotcha1 = g(root);
+    add(gotcha1,"rect",{x:1130,y:130+code.h+26,width:410,height:76,rx:8,fill:"var(--amber-bg)",stroke:"var(--amber)"});
+    add(gotcha1,"text",{x:1150,y:130+code.h+50,class:"lbl",fill:"var(--amber)"},"The exemptions are not optional");
+    add(gotcha1,"text",{x:1150,y:130+code.h+70,class:"sm",fill:"var(--amber)"},"Health checks, frontcache-agent, the console and");
+    add(gotcha1,"text",{x:1150,y:130+code.h+86,class:"sm",fill:"var(--amber)"},"replication all address this node by IP.");
+    const gotcha2 = g(root);
+    const gy = 130 + code.h + 122;
+    add(gotcha2,"rect",{x:700,y:gy,width:840,height:76,rx:8,fill:"var(--red-bg)",stroke:"var(--red)"});
+    add(gotcha2,"text",{x:720,y:gy+24,class:"lbl",fill:"var(--red)"},"Behind nginx or a CDN, set front-cache.client-ip.trusted-proxies first");
+    add(gotcha2,"text",{x:720,y:gy+46,class:"sm",fill:"var(--red)"},"Until you do, every request looks like it comes from the proxy — so your whole site is one client, and");
+    add(gotcha2,"text",{x:720,y:gy+64,class:"sm",fill:"var(--red)"},"a rate rule is either silent or catastrophic. Frontcache WARNs at startup. Ship every rule with | dry-run.");
+
+    const cap = add(root,"text",{x:60,y:660,class:"h"},"");
+    const cap2= add(root,"text",{x:60,y:684,class:"sm"},"");
+    const counted = add(root,"text",{x:60,y:730,class:"mono sm",fill:"var(--indigo)"},"");
+
+    return {
+      render(t){
+        rows.forEach((row,i) => fade(row.g, seg(t, .4+i*.35, 1.4+i*.35)));
+        fade(code.g, seg(t,1.4,2.6));
+        code.rows.forEach((r,i) => {
+          const active = REQ.some(q => q.rule === i && t >= q.t0 + 1 && t < q.t0 + 5.5);
+          r.setAttribute("fill", active ? "#fde68a" : (i===0 ? "#64748b" : "#e2e8f0"));
+          r.setAttribute("font-weight", active ? 600 : 400);
+        });
+        fade(resp.g,   seg(t,19,20));
+        fade(gotcha1,  seg(t,25.5,26.5));
+        fade(gotcha2,  seg(t,30.5,31.5));
+
+        REQ.forEach((r,i) => {
+          const d = dots[i], v = verdicts[i];
+          const gx = lanes.guard.cx, cy = r.y + 26;
+          const inbound = seg(t, r.t0, r.t0 + 1.6);
+          const passes = r.verdict === "allow" || r.verdict === "dry-run";
+          const outbound = seg(t, r.t0 + 2.0, r.t0 + 3.8);
+          const alive = t >= r.t0 && t < r.t0 + 5.2;
+          d.setAttribute("opacity", alive ? 1 : 0);
+          if (alive){
+            let pos;
+            if (outbound <= 0) pos = along([[lanes.client.x+lanes.client.w, cy],[gx, cy]], ease(inbound));
+            else if (passes)   pos = along([[gx,cy],[lanes.cache.cx,cy]], ease(outbound));
+            else               pos = along([[gx,cy],[lanes.client.x+lanes.client.w+40, cy + 46]], ease(outbound));
+            const c = dispo(outbound > .2 ? r.kind : "refused");
+            d.setAttribute("cx",pos[0]); d.setAttribute("cy",pos[1]);
+            d.setAttribute("fill",c.fill); d.setAttribute("stroke",c.dot);
+            d.setAttribute("opacity", passes ? 1 : 1 - seg(t, r.t0+3.4, r.t0+5.0));
+          }
+          fade(v, seg(t, r.t0+1.9, r.t0+2.6) * (1 - seg(t, r.t0+8, r.t0+9)));
+        });
+        // the flood is more than one request
+        extra.forEach((d,i) => {
+          const t0 = 16.5 + .45*(i+1), cy = 294 + 26;
+          const u = seg(t, t0, t0+1.6), o = seg(t, t0+2.0, t0+3.8);
+          const alive = t >= t0 && t < t0 + 5.0;
+          d.setAttribute("opacity", alive ? 1 - seg(t,t0+3.2,t0+4.8) : 0);
+          const pos = o <= 0 ? along([[lanes.client.x+lanes.client.w, cy],[lanes.guard.cx, cy]], ease(u))
+                             : along([[lanes.guard.cx,cy],[lanes.client.x+lanes.client.w+40, cy+46+12*(i+1)]], ease(o));
+          d.setAttribute("cx",pos[0]); d.setAttribute("cy",pos[1]);
+          d.setAttribute("fill","var(--red-bg)"); d.setAttribute("stroke","var(--red)");
+        });
+
+        const cur = REQ.slice().reverse().find(r => t >= r.t0 + .6);
+        if (t < 4.4 || !cur){ cap.textContent = "Four conditions, three actions, one file.";
+                      cap2.textContent = "A rule matches on the URL, the host, a header, a cookie, the client type — or, since 2.8.0, on how often a client is asking."; }
+        else { cap.textContent = ({301:"Sent away with a redirect, before the cache was even consulted.",
+                                   302:"The edge read the cookie and made the decision your origin would have made.",
+                                   429:"Refused by rate, with a Retry-After.",
+                                   allow:"Allowed by an exemption — and this one is why exemptions go first.",
+                                   "dry-run":"Matched, counted, and let through."})[cur.verdict];
+               cap2.textContent = cur.note; }
+        counted.setAttribute("opacity", seg(t,36.5,37.5));
+        counted.textContent = "frontcache_guard_actions_total{name=\"ip-flood\", result=\"dry-run\"}  →  1   (it counts, it does not act)";
+      },
+      counters(t){
+        const refused = REQ.filter(r => r.verdict!=="allow" && r.verdict!=="dry-run" && t >= r.t0+2).length
+                      + extra.reduce((n,_,i) => n + (t >= 16.5+.45*(i+1)+2 ? 1 : 0), 0);
+        const served  = REQ.filter(r => (r.verdict==="allow"||r.verdict==="dry-run") && t >= r.t0+2).length;
+        return {rows:[["Refused at the guard", refused], ["Passed to the cache", served],
+                      ["Origin renders", 0]]};
+      }
+    };
+  }
+});
+
+/* ---------------------------------------------------------------- scene 7 */
+SCENES.push({
+  num:7, name:"One host, then the world", dur:50,
+  lands:"Start with a filter and one JAR; the <em>same engine</em> scales to three continents without a redesign.",
+  sources:[
+    ["Filter, standalone proxy, or multi-region — with config", "../deployment-usecases.md"],
+    ["Filter topology", "../diagrams/03-filter-topology.svg"],
+    ["Multi-region topology and its request sequence", "../diagrams/06-gslb-topology.svg"]
+  ],
+  build(root){
+    const title = add(root,"text",{x:60,y:60,class:"h"},"");
+    const sub   = add(root,"text",{x:60,y:84,class:"sm"},"");
+
+    /* ---- 1. filter mode: nothing new to operate */
+    const A = g(root, {opacity:0});
+    box(A, 60, 300, 190, 76, "Browser / bot", null, "refused");
+    add(A,"rect",{x:330,y:190,width:800,height:330,rx:12,fill:"#fff",stroke:"var(--ink-3)","stroke-dasharray":"6 5"});
+    add(A,"text",{x:350,y:220,class:"lbl","font-weight":600},"Your servlet container — one JVM");
+    box(A, 360, 250, 240, 100, "FrontCacheFilter", "url-pattern /*", "engine");
+    box(A, 640, 250, 250, 100, "Your servlets / JSPs", "unchanged", "refused");
+    box(A, 360, 380, 240, 60, "L1 Ehcache", "in memory", "cached");
+    box(A, 640, 380, 250, 60, "L2 Lucene", "FRONTCACHE_HOME/cache", "l2");
+    box(A, 930, 250, 180, 100, "your headers", "x-frontcache-*", "refused");
+    add(A,"path",{d:"M250,338 L356,300", stroke:"var(--ink-3)", fill:"none"});
+    box(A, 1180, 300, 200, 76, "DB · services", null, "refused");
+    add(A,"text",{x:60,y:580,class:"sm"},"One JAR, one filter registration, response headers. No new tier, no new host, nothing extra to operate.");
+
+    /* ---- 2. standalone: an origin in any language */
+    const B = g(root, {opacity:0});
+    box(B, 60, 300, 190, 76, "Browser / bot", null, "refused");
+    add(B,"rect",{x:330,y:210,width:420,height:300,rx:12,fill:"#fff",stroke:"var(--ink-3)","stroke-dasharray":"6 5"});
+    add(B,"text",{x:350,y:240,class:"lbl","font-weight":600},"Frontcache host");
+    box(B, 356, 262, 370, 84, "FrontCache", "reverse proxy · :9080 / :9443", "engine");
+    box(B, 356, 360, 176, 56, "L1 Ehcache", null, "cached");
+    box(B, 550, 360, 176, 56, "L2 Lucene", null, "l2");
+    box(B, 356, 430, 370, 56, "/frontcache-io", "management API · site key", "refused");
+    add(B,"rect",{x:830,y:210,width:460,height:300,rx:12,fill:"#fff",stroke:"var(--ink-3)","stroke-dasharray":"6 5"});
+    add(B,"text",{x:850,y:240,class:"lbl","font-weight":600},"Origin host");
+    box(B, 856, 262, 406, 84, "Your web app — any language", "PHP · Node · Python · Java", "refused");
+    box(B, 856, 360, 406, 56, "emits x-frontcache-* headers", null, "refused");
+    box(B, 856, 430, 406, 56, "frontcache-agent", "invalidate on content change", "engine");
+    add(B,"path",{d:"M250,338 L326,338", stroke:"var(--ink-3)", fill:"none"});
+    add(B,"path",{d:"M750,304 L826,304", stroke:"var(--ink-3)", fill:"none"});
+    add(B,"text",{x:770,y:296,class:"xs"},"miss →");
+    add(B,"text",{x:60,y:580,class:"sm"},"Your app does not know what is in front of it. It answers HTTP and sets headers — that is the whole contract.");
+
+    /* ---- 3. GSLB, N regional edges, and the origin's own filter */
+    const C = g(root, {opacity:0});
+    const regions = ["US","EU","APAC"];
+    const users = regions.map((r,i) => box(C, 60, 190 + i*120, 170, 76, "Users · " + r, "and bots", "refused"));
+    box(C, 290, 310, 150, 76, "GSLB", "geo-routing", "refused");
+    const edges = regions.map((r,i) => box(C, 500, 190 + i*120, 210, 76, "Edge · " + r, "standalone :9080", "engine"));
+    add(C,"rect",{x:790,y:230,width:380,height:250,rx:12,fill:"#fff",stroke:"var(--ink-3)","stroke-dasharray":"6 5"});
+    add(C,"text",{x:810,y:260,class:"lbl","font-weight":600},"Origin region");
+    box(C, 812, 282, 336, 84, "Your app + FrontCacheFilter", "the second cache tier", "engine");
+    box(C, 812, 386, 336, 60, "DB · Solr · third-party APIs", null, "refused");
+    box(C, 1200, 168, 170, 76, "your app", "agent cluster", "refused");
+    regions.forEach((r,i) => {
+      add(C,"path",{d:"M230,"+(228+i*120)+" L286,"+(340 - (1-i)*0)+"", stroke:"var(--line)", fill:"none"});
+      add(C,"path",{d:"M440,348 L496,"+(228+i*120), stroke:"var(--line)", fill:"none"});
+      add(C,"path",{d:"M710,"+(228+i*120)+" L786,344", stroke:"var(--line)", fill:"none","stroke-dasharray":"4 4"});
+    });
+    add(C,"text",{x:718,y:196,class:"xs"},"miss →");
+    const stampede = g(C, {opacity:0});
+    add(stampede,"rect",{x:500,y:560,width:670,height:70,rx:8,fill:"var(--indigo-bg)",stroke:"var(--indigo)"});
+    add(stampede,"text",{x:520,y:586,class:"lbl",fill:"var(--indigo)"},"Two tiers, and the second one is the point");
+    add(stampede,"text",{x:520,y:608,class:"sm",fill:"var(--indigo)"},"When several edges miss the same fragment at once, the origin's own filter is what stops that arriving as a stampede.");
+    const fan = edges.map(() => add(C,"circle",{r:8,opacity:0,fill:"var(--indigo-bg)",stroke:"var(--indigo)","stroke-width":2}));
+    add(C,"text",{x:60,y:660,class:"sm"},"Every edge absorbs its own region's traffic. One invalidation call from your app reaches all of them, and the origin filter too.");
+
+    const STAGES = [
+      {gr:A, in:0.4,  out:15.5, t:"1 — Filter mode: inside your app's own JVM",
+       s:"Frontcache as a servlet filter. It reads the headers your controllers already set, and caches what they allow."},
+      {gr:B, in:16,   out:30.5, t:"2 — Standalone: a reverse proxy in front of anything",
+       s:"The same engine as a separate process, in front of an origin written in PHP, Node, Python or Java."},
+      {gr:C, in:31,   out:99,   t:"3 — Geo-routing to regional edges, in front of an origin that runs the filter",
+       s:"Users reach the nearest edge; misses go to the origin region, where the app's own filter is a second cache tier."}
+    ];
+    return {
+      render(t){
+        let cur = STAGES[0];
+        STAGES.forEach(s => {
+          const u = seg(t, s.in, s.in+1.4) * (1 - seg(t, s.out, s.out+1.2));
+          s.gr.setAttribute("opacity", u);
+          if (u > .5) cur = s;
+        });
+        title.textContent = cur.t; sub.textContent = cur.s;
+        fade(stampede, seg(t,38,39.2));
+        fan.forEach((d,i) => {
+          const u = seg(t, 43 + i*.4, 46 + i*.4);
+          d.setAttribute("opacity", u>0 && u<1 ? 1 : 0);
+          const p = along([[1285,206],[980,140],[710,228+i*120]], ease(u));
+          d.setAttribute("cx",p[0]); d.setAttribute("cy",p[1]);
+        });
+      },
+      counters(t){
+        const tier = t < 16 ? "1 (in your JVM)" : t < 31 ? "1 (a proxy)" : "2 (edge + origin filter)";
+        return {rows:[["Cache tiers", tier], ["New hosts to operate", t < 16 ? "0" : t < 31 ? "1" : "N + 0"],
+                      ["Application changes", "0"]]};
+      }
+    };
+  }
+});
+
+/* ---------------------------------------------------------------- scene 8 */
+SCENES.push({
+  num:8, name:"What it costs the origin", dur:55,
+  lands:"100,000 replayed production requests: <em>98.7% fewer origin renders</em>, byte-identical content, application unchanged.",
+  sources:[
+    ["The full A/B: method, results, and how to read them honestly", "../value.md"],
+    ["The harness — replay your own access log", "../../benchmark"],
+    ["Get it running first", "../install-guide.md"]
+  ],
+  build(root){
+    add(root,"text",{x:60,y:60,class:"h"},"Two runs of the same 100,000 requests. Cache off, then cache on.");
+    add(root,"text",{x:60,y:84,class:"sm"},
+      "Replayed from a production request log in recorded order · 8 concurrent workers, both runs · 7.26 GB transferred, both runs · value.md §2–§3");
+
+    // ---- the race
+    const race = g(root);
+    const RY = 130;
+    [["Cache off","79,900 origin renders","dynamic",0],["Cache on","1,003 origin renders","cached",1]].forEach(() => {});
+    const bars = [
+      {label:"Cache off", final:79900, kind:"dynamic", y:RY+34},
+      {label:"Cache on",  final:1003,  kind:"cached",  y:RY+134}
+    ].map(b => {
+      const c = dispo(b.kind), grp = g(race);
+      add(grp,"text",{x:60,y:b.y-10,class:"lbl"},b.label);
+      add(grp,"rect",{x:60,y:b.y,width:1180,height:64,rx:7,fill:"#f1f5f9",stroke:"var(--line-2)"});
+      const fill = add(grp,"rect",{x:60,y:b.y,width:0,height:64,rx:7,fill:c.fill,stroke:c.stroke});
+      const num  = add(grp,"text",{x:1256,y:b.y+42,class:"big",fill:c.stroke},"0");
+      return Object.assign(b, {fill, num});
+    });
+    add(race,"text",{x:60,y:RY+240,class:"sm"},"requests that reached the origin, of 100,000 served");
+
+    // ---- the table
+    const TABLE = [
+      ["Throughput",              "172.4 req/s", "1054.0 req/s", "6.1×"],
+      ["Median response (p50)",   "41.3 ms",     "1.6 ms",       "−96%"],
+      ["Requests reaching origin","79,900",      "1,003",        "−98.7%"],
+      ["Bytes served",            "7.26 GB",     "7.26 GB",      "identical"],
+      ["Application code",        "unchanged",   "unchanged",    "—"]
+    ];
+    const table = g(root, {opacity:0});
+    const TY = 300;
+    add(table,"rect",{x:60,y:TY,width:840,height:250,rx:9,fill:"#fff",stroke:"var(--line)"});
+    ["", "cache off", "cache on", ""].forEach((h,i) =>
+      add(table,"text",{x:[80,470,640,800][i], y:TY+26, class:"xs"}, h.toUpperCase()));
+    const trows = TABLE.map((r,i) => {
+      const y = TY + 54 + i*38, grp = g(table);
+      add(grp,"text",{x:80,y,class:"lbl"},r[0]);
+      add(grp,"text",{x:560,y,"text-anchor":"end",class:"mono sm"},r[1]);
+      add(grp,"text",{x:730,y,"text-anchor":"end",class:"mono sm",fill:"var(--green)"},r[2]);
+      add(grp,"text",{x:800,y,class:"lbl","font-weight":600,fill:"var(--green)"},r[3]);
+      return grp;
+    });
+
+    // ---- the two caveats, on their own beat
+    const honest = g(root, {opacity:0});
+    add(honest,"rect",{x:940,y:TY,width:600,height:250,rx:9,fill:"var(--amber-bg)",stroke:"var(--amber)"});
+    add(honest,"text",{x:960,y:TY+30,class:"lbl","font-weight":600,fill:"var(--amber)"},"Read these two before you quote the rest");
+    [ "Max latency got worse: 295.2 ms → 775.4 ms, and p99 gained least of",
+      "any percentile (−42%, against −96% at p50). 6.1× more traffic now",
+      "queues on the ~1.3% that still reaches the origin. If your SLO is a",
+      "hard maximum, size the origin for the uncached fraction.",
+      "",
+      "98.74% hit ratio is this working set — 1,000 URLs replayed 100 times.",
+      "Over the full 681k-request log the same harness measures ~66.7%.",
+      "Expect a number between them, shaped by your TTLs and traffic."
+    ].forEach((s,i) => add(honest,"text",{x:960,y:TY+62+i*24,class:"sm",fill:"#92400e"},s));
+
+    // ---- below the origin
+    const below = g(root, {opacity:0});
+    add(below,"text",{x:60,y:600,class:"h"},"And below the origin, the same cut.");
+    [["Application tier","serves 1.3% of what it served"],
+     ["Database","the queries behind those renders are not run"],
+     ["Search index","the same"],
+     ["Third-party APIs","the ones you pay per call for"]].forEach((r,i) => {
+      const x = 60 + i*370, grp = g(below);
+      add(grp,"rect",{x,y:620,width:346,height:74,rx:8,fill:"var(--green-bg)",stroke:"var(--green)"});
+      add(grp,"text",{x:x+16,y:648,class:"lbl",fill:"#14532d"},r[0]);
+      add(grp,"text",{x:x+16,y:670,class:"sm",fill:"#166534"},r[1]);
+    });
+
+    // ---- the CTA
+    const cta = g(root, {opacity:0});
+    add(cta,"rect",{x:60,y:722,width:1200,height:124,rx:10,fill:"#0f172a",stroke:"#334155"});
+    add(cta,"text",{x:84,y:760,class:"lbl",fill:"#fff"},"Do not take the number — get your own.");
+    add(cta,"text",{x:84,y:786,class:"mono sm",fill:"#93c5fd"},
+      "docker run -d -p 8080:9080 -e ORIGIN_HOST=your-origin.example.com pavlikovskiy/frontcache-server:2.8.0");
+    add(cta,"text",{x:84,y:812,class:"sm",fill:"#cbd5e1"},
+      "then replay your own access log against your own app with benchmark/ — extract-requests.js, load-test.js, both dependency-free Node.");
+    add(cta,"text",{x:84,y:834,class:"sm",fill:"#94a3b8"},
+      "value.md has the full method and every caveat · licensing: www.eternita.co/frontcache.html");
+
+    return {
+      render(t){
+        const u = easeOut(seg(t,1,12));
+        fade(race, 1 - seg(t,13.5,14.8));
+        bars.forEach(b => {
+          b.fill.setAttribute("width", Math.max(0, 1180 * (b.final/100000) * u));
+          b.num.textContent = fmtInt(b.final * u);
+        });
+        fade(table,  seg(t,15,16.4));
+        trows.forEach((r,i) => r.setAttribute("opacity", seg(t,15.4+i*.7,16.4+i*.7)));
+        fade(honest, seg(t,26,27.4));
+        fade(below,  seg(t,36,37.4));
+        fade(cta,    seg(t,44,45.4));
+      },
+      counters(t){
+        const u = easeOut(seg(t,1,12));
+        return {rows:[["Origin renders, cache off", fmtInt(79900*u)],
+                      ["Origin renders, cache on",  fmtInt(1003*u)],
+                      ["Median response", t < 15 ? "—" : "41.3 → 1.6 ms"]]};
+      }
+    };
+  }
+});
+
+/* the counter panel of §3, always bottom-right, drawn over the scene */
+function buildHud(){
+  const X = 1286, Y = 722, W = 278;
+  const grp = g(stage);
+  add(grp,"rect",{x:X,y:Y,width:W,height:134,rx:9,fill:"#ffffff",stroke:"var(--line)"});
+  const head = add(grp,"text",{x:X+16,y:Y+24,class:"xs"},"THIS SCENE");
+  const rows = [0,1,2].map(i => ({
+    label: add(grp,"text",{x:X+16, y:Y+50+i*22, class:"sm", fill:"var(--ink-2)"}, ""),
+    value: add(grp,"text",{x:X+W-16, y:Y+50+i*22, "text-anchor":"end", class:"mono lbl",
+                           "font-weight":600, fill:"var(--ink)"}, "")
+  }));
+  const note = [0,1].map(i => add(grp,"text",{x:X+16, y:Y+118+i*13, class:"xs", "font-size":9.5}, ""));
+  return {g:grp, head, rows, note};
+}
+
+/* ============================== the engine ==============================
+   Output A drives (t) from the transport or from the viewer's clicks;
+   output B drives the same (t) from a render timeline. Same DOM either way.
+   ====================================================================== */
+const chaptersEl = document.getElementById("chapters");
+const playBtn  = document.getElementById("play");
+const scrub    = document.getElementById("scrub");
+const clockEl  = document.getElementById("clock");
+const landsEl  = document.getElementById("lands");
+const srcEl    = document.getElementById("sources");
+const driveEl  = document.getElementById("drive");
+const readEl   = document.getElementById("readout");
+const titleEl  = document.getElementById("stagetitle");
+const driveHead= document.getElementById("drivehead");
+const capEl    = document.getElementById("caption");
+const capSpan  = capEl.firstElementChild;
+const TOTAL    = SCENES.reduce((a,s) => a + s.dur, 0);
+let CUES = null;                                  // set by FCDemo.setCaptions()
+const offsetOf = i => SCENES.slice(0,i).reduce((a,s) => a + s.dur, 0);
+
+let cur = {idx:-1, scene:null, inst:null, hud:null, t:0, playing:false, driving:false, lastRead:0};
+
+/* ---- the chapter strip doubles as the scene picker ---- */
+const chips = SCENES.map((s,i) => {
+  const b = document.createElement("button");
+  b.style.flexGrow = s.dur;
+  b.innerHTML = '<span class="n">Scene ' + s.num +
+                (s.interactive ? '<i class="ix"> · interactive</i>' : '') +
+                '</span><span class="nm">' + s.name + '</span><span class="fill"></span>';
+  b.onclick = () => { mount(i); play(true); };
+  chaptersEl.appendChild(b);
+  return {b, fill:b.querySelector(".fill")};
+});
+
+function mount(idx, t){
+  if (idx === cur.idx){ cur.t = t || 0; return; }
+  const s = SCENES[idx];
+  while (stage.firstChild) stage.removeChild(stage.firstChild);
+  add(stage, "rect", {x:0, y:0, width:1600, height:900, fill:"var(--paper)"});
+  cur = {idx, scene:s, inst:null, hud:null, t:t || 0, playing:cur.playing, driving:false, lastRead:0};
+  cur.inst = s.build(stage);
+  cur.hud = buildHud();                       // last, so it is never drawn under a scene
+  titleEl.textContent = "Scene " + s.num + " — " + s.name;
+  landsEl.innerHTML = s.lands;
+  srcEl.innerHTML = s.sources.map(([txt,href]) => '<li>→ <a href="' + href + '">' + txt + "</a></li>").join("");
+  scrub.max = s.dur;
+  chips.forEach((c,i) => c.b.setAttribute("aria-current", i === idx ? "true" : "false"));
+  // the drive panel
+  driveEl.innerHTML = ""; readEl.innerHTML = "";
+  if (cur.inst.controls){
+    driveHead.textContent = "Drive it yourself";
+    cur.inst.controls(driveEl, () => {                       // any control hands control to the viewer
+      cur.driving = true; play(false); refreshReadout(); render();
+    });
+    const back = document.createElement("button");
+    back.textContent = "↩ Back to the timeline";
+    back.onclick = () => { cur.driving = false; refreshReadout(); render(); };
+    driveEl.appendChild(back);
+    refreshReadout();
+  } else {
+    driveHead.textContent = "Watch this one";
+    driveEl.innerHTML = '<p class="nodrive">This scene runs on the timeline — scenes 2, 3 and 4 are the ones you drive. ' +
+                        'Scrub it, or use ← → to step through the beats.</p>';
+  }
+  if (!RENDER && location.hash !== "#scene-" + s.num) history.replaceState(null, "", "#scene-" + s.num);
+  render();
+}
+function refreshReadout(){
+  readEl.innerHTML = cur.inst.readout ? cur.inst.readout() : "";
+}
+function render(){
+  const s = cur.scene;
+  cur.inst.render(cur.t, cur.driving);
+  const c = cur.inst.counters ? cur.inst.counters(cur.t, cur.driving) : null;
+  const rows = c ? (c.rows || [["Origin renders", fmtInt(c.origin||0)],
+                               ["Backend queries", typeof c.queries === "number" ? fmtInt(c.queries) : (c.queries||"—")],
+                               ["Median response", c.p50 || "—"]]) : [];
+  cur.hud.rows.forEach((r,i) => {
+    r.label.textContent = rows[i] ? rows[i][0] : "";
+    r.value.textContent = rows[i] ? rows[i][1] : "";
+  });
+  const note = cur.driving
+    ? ["You are driving this scene. The counts are of", "what you have asked for."]
+    : ["Counts what happens on screen. The measured", "figures are scene 8's, and carry their source."];
+  cur.hud.note.forEach((n,i) => n.textContent = note[i]);
+  // transport
+  scrub.value = cur.t;
+  const gt = offsetOf(cur.idx) + cur.t;
+  clockEl.textContent = mmss(gt) + " / " + mmss(TOTAL);
+  chips.forEach((ch,i) => {
+    ch.fill.style.width = i < cur.idx ? "100%" : i === cur.idx ? (100*cur.t/s.dur) + "%" : "0%";
+  });
+  if (cur.driving && performance.now() - cur.lastRead > 200){ cur.lastRead = performance.now(); refreshReadout(); }
+  if (CUES){                                      // burned captions, in global time
+    const c = CUES.find(q => gt >= q.start && gt < q.end);
+    capSpan.textContent = c ? c.text : "";
+    capEl.style.opacity = c ? 1 : 0;
+  }
+}
+function play(on){
+  cur.playing = on;
+  playBtn.textContent = on ? "❚❚ Pause" : "▶ Play";
+}
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(.25, (now - last)/1000); last = now;
+  if (cur.playing && !cur.driving){
+    cur.t += dt;
+    if (cur.t >= cur.scene.dur){
+      if (cur.idx < SCENES.length - 1){ const keep = cur.playing; mount(cur.idx + 1); play(keep); }
+      else { cur.t = cur.scene.dur; play(false); }
+    }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+/* ---- transport wiring ---- */
+playBtn.onclick = () => { cur.driving = false; play(!cur.playing); };
+scrub.oninput = () => { cur.driving = false; cur.t = parseFloat(scrub.value); render(); };
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.metaKey || e.ctrlKey) return;
+  if (e.key === " " || e.key === "k"){ e.preventDefault(); cur.driving = false; play(!cur.playing); }
+  else if (e.key === "ArrowRight"){ cur.driving = false; cur.t = Math.min(cur.scene.dur, cur.t + 2); render(); }
+  else if (e.key === "ArrowLeft"){ cur.driving = false; cur.t = Math.max(0, cur.t - 2); render(); }
+  else if (/^[1-7]$/.test(e.key)){ mount(parseInt(e.key,10) - 1); play(true); }
+});
+
+/* ---- the hook the MP4 render harness uses (plan §2, §8.4) ----
+   Deterministic: seek(scene, t) then read the DOM. No animation state. */
+window.FCDemo = {
+  total: TOTAL,
+  scenes: SCENES.map((s,i) => ({index:i, num:s.num, name:s.name, dur:s.dur, offset:offsetOf(i)})),
+  seek(index, t){ mount(index); cur.driving = false; cur.t = t; render(); },
+  /** burn-in captions for the MP4: [{start,end,text}] in GLOBAL seconds */
+  setCaptions(cues){ CUES = cues && cues.length ? cues : null; render(); },
+  seekGlobal(gt){
+    let i = 0, acc = 0;
+    while (i < SCENES.length - 1 && acc + SCENES[i].dur <= gt){ acc += SCENES[i].dur; i++; }
+    this.seek(i, gt - acc);
+  },
+  pause(){ play(false); }
+};
+
+/* ---- boot ---- */
+const RENDER = new URLSearchParams(location.search).has("render");
+if (RENDER) document.body.classList.add("render");
+const fromHash = (location.hash.match(/^#scene-(\d+)$/) || [])[1];
+const startIdx = Math.max(0, SCENES.findIndex(s => String(s.num) === fromHash));
+mount(startIdx === -1 ? 0 : startIdx);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

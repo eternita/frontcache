@@ -1,6 +1,6 @@
 # Frontcache — JSP Tags
 
-Concepts: [concept.md](concept.md) · Header equivalents: [http-headers.md](http-headers.md)
+Concepts: [concept.md](concept.md) · Header equivalents: [http-headers.md](http-headers.md) · Batching includes: [include-combining.md](include-combining.md)
 
 These tags manage Frontcache's behaviour from a Java app: a convenient way to set its HTTP
 headers from a JSP rather than writing them by hand.
@@ -56,7 +56,7 @@ Cache time can be client type specific. Page can be cached for bots and dynamic 
 
 ## fc:include - setting policy for processing server-side includes.
 
-        <fc:include url="/example/include-page.jsp" client="all|browser|bot" call="sync|async" />
+        <fc:include url="/example/include-page.jsp" client="all|browser|bot" call="sync|async" combine="true|group-name" />
 
 Attributes:
 
@@ -65,6 +65,7 @@ Attribute | Description
 **url** | data to be included, mandatory
 **client** | set if include is client type specific, optional, default value is "all"
 **call** | set if include is executed synchronously or asynchronously, optional, default is "sync"
+**combine** | set if the include may be batched with its siblings into one origin call, optional, default - not combinable
 
 * **url** - data to be included. Attribute is mandatory.
 
@@ -78,3 +79,10 @@ Attribute | Description
 
         call="sync" - include call is executed synchronously and include's data is inserted to the page.
         call="async" - include call is executed asynchronously, so no data is inserted to the page.
+
+* **combine** - Set if this include may be batched with its siblings. When several combinable includes of one page miss the cache, the edge fetches them in a **single** origin request instead of one request each - so an origin that batches its data access pays its page-level query cost once. Attribute is optional; without it the include is fetched on its own, as before. Requires a handler at the origin: see [include-combining.md](include-combining.md).
+
+        combine="true" - combinable, grouped with every other combine="true" include of the same URL path
+        combine="search-cell" - combinable, grouped by path AND that name, so one endpoint can serve two sets on one page without merging them
+
+Combining never applies to `call="async"` includes - nothing waits for them, so batching them buys nothing.

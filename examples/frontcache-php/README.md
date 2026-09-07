@@ -21,13 +21,13 @@ Two ways; pick either. Both are described in full in the
 ```sh
 docker run -d --name frontcache -p 9080:9080 \
   -e ORIGIN_HOST=host.docker.internal \
-  pavlikovskiy/frontcache-server:2.8.0
+  pavlikovskiy/frontcache-server:2.9.0
 ```
 
 *Archive:*
 
 ```sh
-V=2.8.0
+V=2.9.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 curl -fLO $BASE/frontcache-server-$V.tar.gz
 curl -fLO $BASE/frontcache-server-$V.tar.gz.sha256
@@ -51,7 +51,7 @@ front-cache.origin-http-port=80        # your Apache/nginx + PHP port
 front-cache.origin-https-port=443
 
 front-cache.default-domain=localhost
-front-cache.site-key=CHANGE_ME
+front-cache.api-key=CHANGE_ME
 
 # the CLIENT-FACING ports - what redirect rewriting uses
 front-cache.http-port=9080
@@ -65,7 +65,7 @@ Copy everything in this directory into your web server's `DocumentRoot`.
 **4. Start Frontcache**
 
 ```sh
-./frontcache-server-2.8.0/bin/frontcache        # listens on 9080
+./frontcache-server-2.9.0/bin/frontcache        # listens on 9080
 ```
 
 **5. Open it**
@@ -107,9 +107,9 @@ per-user content is never cached. The full header set:
 The management API is plain HTTP, so no Java client is needed:
 
 ```sh
-curl -s -H "x-frontcache-site-key: YOUR_SITE_KEY" \
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
   "http://localhost:9080/frontcache-io?action=invalidate&filter=/product-42.*"
 ```
 
-Restrict that endpoint with `front-cache.management.port` and a firewall — anything that can
-reach it with the site key can flush your cache.
+Restrict that endpoint at your reverse proxy or firewall — anything that can reach it with the
+api key can flush your cache.

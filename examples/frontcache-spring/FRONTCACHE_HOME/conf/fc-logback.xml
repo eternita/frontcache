@@ -99,7 +99,7 @@ front-cache.request-logs-config=fc-logback.xml
 	</logger>
 	
     <!-- for fallback logger -->
-    <logger name="org.frontcache.hystrix.FallbackLogger">
+    <logger name="org.frontcache.resilience.FallbackLogger">
         <level value="TRACE" />
         <appender-ref ref="FallbackLoggerFile" />
     </logger>

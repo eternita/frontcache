@@ -1,39 +1,39 @@
 # Frontcache — Security
 
-Notes on what protects what. Current as of **2.8.0**.
+Notes on what protects what. Current as of **2.9.0**.
 
 The model is small, and worth stating plainly because two of its three parts are weaker than
 their names suggest:
 
 | | What it is | What it actually gives you |
 | --- | --- | --- |
-| `front-cache.site-key` | a shared secret on management requests | **the access control.** This is the one that decides *who may* |
-| `front-cache.management.port` | which connector answers management traffic | a **routing** rule, not a boundary — see below |
+| `front-cache.api-key` | a shared secret on management requests | **the access control.** This is the one that decides *who may* |
+| `front-cache.management.port` | **removed in 2.9.0** | nothing — it was a routing hint, never a boundary; see below |
 | the console | the UI for all of it | **no authentication of its own** |
 
-Three management surfaces exist, and they are **not** protected alike. The management API
-(`/frontcache-io`) and the dashboard stream (`/fc-dashboard.stream`, `/hystrix.stream`) require
-the site key. The Prometheus scrape (`/fc-metrics`) does **not** at 2.7 — only the management-port
-rule stands in front of it (§2).
+Three management surfaces exist, and as of 2.9.0 they are protected alike. The management API
+(`/frontcache-io`), the dashboard stream (`/fc-dashboard.stream`, `/hystrix.stream`) and the
+Prometheus scrape (`/fc-metrics`) all require the api key. There is nothing else in front of
+them — the management port that used to be described here is gone (§2).
 
 ---
 
-## 1. The site key
+## 1. The api key
 
 ```properties
-front-cache.site-key=CHANGE_ME        # guards the management API
+front-cache.api-key=CHANGE_ME        # guards the management API
 ```
 
 Callers send it as a header:
 
 ```sh
-curl -H "x-frontcache-site-key: YOUR_SITE_KEY" \
+curl -H "Authorization: Bearer YOUR_API_KEY" \
   "http://<edge>/frontcache-io?action=get-cache-status"
 ```
 
 - **It ships as the literal `CHANGE_ME`.** So does `front-cache.default-domain`. Editing both is
   step one of any install.
-- **A node with no site key configured is OPEN.** `SiteKey.isAuthorized` returns true when the
+- **A node with no api key configured is OPEN.** `ApiKey.isAuthorized` returns true when the
   property is empty — the historical default, kept so an upgrade does not refuse traffic. The
   node warns once at startup. This is the single most important line on this page: an unset key
   is not "no management API", it is "an unauthenticated one".
@@ -43,26 +43,21 @@ curl -H "x-frontcache-site-key: YOUR_SITE_KEY" \
   cannot reach is a **502** (new in 2.7) — previously an empty `200`, which looked like "no data"
   rather than "not reachable".
 
-## 2. The management port is not a boundary
+## 2. There is no management port — removed in 2.9.0
 
-```properties
-front-cache.management.port=443       # firewall this
-```
+`front-cache.management.port` **no longer exists.** If your `frontcache.properties` still sets it,
+the property is simply ignored; nothing fails, and nothing it used to do is missing, because it
+never did what its name suggested.
 
-It compares `request.getServerPort()`, which the Servlet spec derives from the **Host header** —
-so it reports the port the caller *addressed*, not the socket the connection arrived on. Anyone
-who can reach any connector can send `Host: whatever:443` and satisfy it.
+It compared `request.getServerPort()`, which the Servlet spec derives from the **Host header** — so
+it reported the port the caller *addressed*, not the socket the connection arrived on. Anyone who
+could reach any connector could send `Host: whatever:443` and satisfy it. It was a routing hint a
+caller could satisfy at will, and never an access control.
 
-That is deliberate, not an oversight. The documented topology terminates TLS upstream and
-proxies to `127.0.0.1:9080` with `X-Forwarded-*`, so the local socket port is 9080 while the port
-the operator means — and configures here — is 443. Reading the socket instead would lock those
-deployments out of their own management API on upgrade, to gain a boundary this property was
-never able to be.
-
-**So: the port decides *which connector*; the site key decides *who*.** Firewall the connector
-too, but do not treat the property as the lock. A node with a management port and no site key
-has nothing enforcing the latter, and says so once at startup. When the property is unset the
-check is open, and also says so once.
+**The api key is the only access control.** Confining management traffic to one connector is the
+reverse proxy's job, not the application's: terminate TLS upstream, and route `/frontcache-io`,
+`/fc-dashboard.stream` and `/fc-metrics` only from where you intend them to be reachable. A node
+with no api key set has nothing enforcing anything, and says so once at startup.
 
 `/fc-metrics` sits behind the same port rule. A scrape endpoint is unauthenticated by
 convention, so at 2.7 the connector is its only control — keep it internal, and if you run guard
@@ -73,10 +68,10 @@ rules, allow it (Frontcache warns at startup when a rule would block it).
 - **No authentication of its own, and it can invalidate cache across your whole fleet.** Keep it
   on loopback (`-p 127.0.0.1:7080:7080`), on an internal network, behind an ssh tunnel, or behind
   an authenticating proxy. Never public.
-- Its `siteKey` must match each node's `front-cache.site-key`, so the console holds a credential
+- Its `apiKey` must match each node's `front-cache.api-key`, so the console holds a credential
   for every node it watches. Treat `conf/frontcache-console.conf` as a secret.
 - **2.7 closed a real hole in the stream proxy.** It used to fetch whatever URL was passed in its
-  `origin` parameter — *and attach your site key to the request*. A crafted `origin` could
+  `origin` parameter — *and attach your api key to the request*. A crafted `origin` could
   therefore aim an authenticated request at a host of the caller's choosing. It now refuses
   anything not in `frontcache.console.urls` (or added via the Edges page) and appends the stream
   path itself. If you scripted against `/resources/hystrix/proxy.stream`, it is now
@@ -87,11 +82,11 @@ rules, allow it (Frontcache warns at startup when a rule would block it).
 
 ## 4. Invalidation — the blast radius
 
-Anything holding the site key can empty the cache. That is the point of the key.
+Anything holding the api key can empty the cache. That is the point of the key.
 
 ```java
-new FrontCacheAgent("http://fc-host:9080").removeFromCache(siteKey, "/store/product/42.*");
-cluster.removeFromCache(siteKey, "/store/product/42.*");   // fans out to every node
+new FrontCacheAgent("http://fc-host:9080", apiKey).removeFromCache("/store/product/42.*");
+cluster.removeFromCache("/store/product/42.*");   // fans out to every node
 ```
 
 - **`filter=*` empties the whole node**, replicated entries included. There is no confirmation
@@ -142,8 +137,9 @@ your origin, which makes it the cheapest place to shed abuse. Two security-relev
 
 ## Minimum checklist
 
-1. `front-cache.site-key` is not `CHANGE_ME`, and is set on **every** node.
-2. `front-cache.management.port` is set **and** that connector is firewalled.
+1. `front-cache.api-key` is not `CHANGE_ME`, and is set on **every** node.
+2. Management paths (`/frontcache-io`, `/fc-dashboard.stream`, `/fc-metrics`) are reachable only
+   from where you intend, enforced at your reverse proxy or firewall — not by any node property.
 3. The console is not publicly reachable, and its config file is treated as a secret.
 4. TLS terminates in front of Frontcache.
 5. The front door overwrites client-IP headers if any rule or report depends on them.

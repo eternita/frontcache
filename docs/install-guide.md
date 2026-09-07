@@ -10,7 +10,7 @@
 | **D. Container** | a Docker image | Docker | containers, Kubernetes, quickest trial, **and Windows**     |
 | **E. Console** | the management UI | JDK 25 or Docker | realtime stats, cache invalidation                          |
 
-Frontcache 2.8.0 requires **Java 25** and is **Jakarta EE 10** (`jakarta.servlet`, Servlet 6.0).
+Frontcache 2.9.0 requires **Java 25** and is **Jakarta EE 10** (`jakarta.servlet`, Servlet 6.0).
 It will not load in a `javax.servlet` container or on an older JVM. The container images and the
 bundled-runtime archives carry their own runtime, so those two need no JDK at all.
 
@@ -28,8 +28,8 @@ repositories {
     maven { url = 'https://repo.eternita.co/maven2' }
 }
 dependencies {
-    implementation 'org.frontcache:frontcache-core:2.8.0'
-    implementation 'org.frontcache:frontcache-agent:2.8.0'   // optional: invalidate from app code
+    implementation 'org.frontcache:frontcache-core:2.9.0'
+    implementation 'org.frontcache:frontcache-agent:2.9.0'   // optional: invalidate from app code
 }
 ```
 
@@ -38,7 +38,7 @@ dependencies {
   <repository><id>eternita</id><url>https://repo.eternita.co/maven2</url></repository>
 </repositories>
 <dependency>
-  <groupId>org.frontcache</groupId><artifactId>frontcache-core</artifactId><version>2.8.0</version>
+  <groupId>org.frontcache</groupId><artifactId>frontcache-core</artifactId><version>2.9.0</version>
 </dependency>
 ```
 
@@ -47,12 +47,12 @@ dependencies {
 Frontcache reads its configuration from a directory, not from your app's config:
 
 ```sh
-curl -fLO https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.8.0/frontcache-core-2.8.0-home.zip
-unzip frontcache-core-2.8.0-home.zip
+curl -fLO https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0-home.zip
+unzip frontcache-core-2.9.0-home.zip
 ```
 
 It contains a filter-mode `conf/frontcache.properties` plus `README-FILTER.md` with the rest of
-the steps. Edit at least `front-cache.default-domain` and `front-cache.site-key` — both ship as
+the steps. Edit at least `front-cache.default-domain` and `front-cache.api-key` — both ship as
 `CHANGE_ME`.
 
 **3. Register the filter**
@@ -100,7 +100,7 @@ command and show cached vs. dynamic fragments in the response headers.
 Use case #2: a standalone reverse proxy in front of an app in any language.
 
 ```sh
-V=2.8.0
+V=2.9.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V.tar.gz
@@ -142,14 +142,12 @@ front-cache.origin-http-port=8080
 front-cache.origin-https-port=8443
 
 front-cache.default-domain=www.example.com
-front-cache.site-key=CHANGE_ME                      # guards the management API
+front-cache.api-key=CHANGE_ME                      # guards the management API
 
 # The CLIENT-FACING ports. These drive redirect rewriting, so behind a TLS terminator they are
 # 80/443 - NOT the 9080 Frontcache itself listens on.
 front-cache.http-port=80
 front-cache.https-port=443
-
-front-cache.management.port=443                     # firewall this
 ```
 
 Then, as needed: `dynamic-urls.conf` (never-cache paths), `bots.conf`, `fallbacks.conf`,
@@ -171,9 +169,8 @@ curl -s -o /dev/null -w '%{http_code}\n' \
   "http://127.0.0.1:9080/frontcache-io?action=get-cache-state"
 ```
 
-`200` means Frontcache is live. The body will say *access denied* unless the request arrived on
-`front-cache.management.port` — that is expected, and is exactly why this works as a health check
-without a site key.
+`200` means Frontcache is live. The body will say *access denied* unless the request carries the
+api key — that is expected, and is exactly why this works as a health check without one.
 
 ### Put it in front of traffic
 
@@ -211,7 +208,7 @@ Frontcache and nothing else — a front door on 80/443 is a separate, optional s
 [examples/front-door](../examples/front-door).
 
 ```sh
-V=2.8.0
+V=2.9.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V-installer.sh
@@ -265,7 +262,7 @@ docker run -d --name frontcache --restart unless-stopped \
   -e ORIGIN_HOST=origin.example.com \
   -v /srv/frontcache/conf:/opt/frontcache-server/FRONTCACHE_HOME/conf \
   -v fc-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache \
-  pavlikovskiy/frontcache-server:2.8.0
+  pavlikovskiy/frontcache-server:2.9.0
 ```
 
 The image is **Frontcache alone** — plain HTTP on 9080, no TLS. That is what a Kubernetes
@@ -278,7 +275,7 @@ It is multi-arch (amd64 + arm64) and carries a `HEALTHCHECK`.
 ### With compose
 
 ```sh
-V=2.8.0
+V=2.9.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 curl -fLO $BASE/frontcache-server-$V-compose.yml
 curl -fL  $BASE/frontcache-server-$V-env.example -o .env
@@ -299,7 +296,7 @@ docker compose -f frontcache-server-$V-compose.yml --profile console up -d   # +
 - **TLS is not this container's job.** It serves plain HTTP; terminate TLS in front of it.
 - **Upgrade** with `docker compose pull && docker compose up -d` on a new tag. The `cache` volume
   is pure cache and can be dropped at any time.
-- Pin the exact version. `latest` exists and currently points at 2.8.0; naming it in production is how you get surprised.
+- Pin the exact version. `latest` exists and currently points at 2.9.0; naming it in production is how you get surprised.
 
 ---
 
@@ -310,14 +307,14 @@ The console is a **separate process** from the server, on port 7080.
 ```sh
 docker run -d --name frontcache-console --restart unless-stopped \
   -p 127.0.0.1:7080:7080 \
-  -e FC_NODES=http://fc-server:9080/ -e FC_SITE_KEY=YOUR_SITE_KEY \
-  pavlikovskiy/frontcache-console:2.8.0
+  -e FC_NODES=http://fc-server:9080/ -e FC_API_KEY=YOUR_API_KEY \
+  pavlikovskiy/frontcache-console:2.9.0
 ```
 
 Or as an archive:
 
 ```sh
-V=2.8.0
+V=2.9.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-console/$V
 curl -fLO $BASE/frontcache-console-$V.tar.gz
 curl -fLO $BASE/frontcache-console-$V.tar.gz.sha256
@@ -326,12 +323,12 @@ curl -fLO $BASE/frontcache-console-$V.tar.gz.sha256
 [ "$(shasum -a 256 frontcache-console-$V.tar.gz | cut -d' ' -f1)" \
   = "$(cut -d' ' -f1 < frontcache-console-$V.tar.gz.sha256)" ] && echo "checksum OK"
 tar -xzf frontcache-console-$V.tar.gz
-$EDITOR frontcache-console-$V/conf/frontcache-console.conf     # node urls + siteKey
+$EDITOR frontcache-console-$V/conf/frontcache-console.conf     # node urls + apiKey
 ./frontcache-console-$V/bin/frontcache-console                 # :7080
 ```
 
-`siteKey` must match each node's `front-cache.site-key`, and each node must admit the console
-through `front-cache.management.port`.
+`apiKey` must match each node's `front-cache.api-key`, and each node must be reachable from the
+console.
 
 > **The console has no authentication of its own** and can invalidate cache across your whole
 > fleet. Keep it on loopback or an internal network, reach it over an ssh tunnel, or put an
@@ -371,14 +368,14 @@ Java/JSP origins can use the taglib instead:
 From Java:
 
 ```java
-new FrontCacheAgent("http://fc-host:9080").removeFromCache(siteKey, "/store/product/42.*");
+new FrontCacheAgent("http://fc-host:9080", apiKey).removeFromCache("/store/product/42.*");
 ```
 
 `FrontCacheAgentCluster` fans the same call out to every node in a multi-region deployment. From
 anything else, the management API is plain HTTP:
 
 ```sh
-curl -s -H "x-frontcache-site-key: YOUR_SITE_KEY" \
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
   "http://fc-host:9080/frontcache-io?action=invalidate&filter=/store/product/42.*"
 ```
 
@@ -387,20 +384,21 @@ curl -s -H "x-frontcache-site-key: YOUR_SITE_KEY" \
 ## Download reference
 
 Everything lives under `https://repo.eternita.co/maven2/org/frontcache/`, and every artifact has
-a companion `.sha256`.
+a companion `.sha256`. File names below; **clickable per-version links, for 2.9.0 and 2.8.0
+alike, are in [downloads.md](downloads.md)**.
 
 | What | Coordinate / file |
 | --- | --- |
-| Library | `org.frontcache:frontcache-core:2.8.0` |
-| Config skeleton | `frontcache-core-2.8.0-home.zip` |
-| Invalidation client | `org.frontcache:frontcache-agent:2.8.0` |
-| Standalone server | `frontcache-server-2.8.0.tar.gz` / `.zip` |
-| Server, bundled runtime | `frontcache-server-2.8.0-{linux-x64,linux-aarch64,macos-aarch64}.tar.gz` |
-| Console | `frontcache-console-2.8.0.tar.gz` / `.zip` (+ the same platform builds) |
-| Installer | `frontcache-server-2.8.0-installer.sh` |
-| Compose + env | `frontcache-server-2.8.0-compose.yml`, `-env.example` |
-| Container, server | `pavlikovskiy/frontcache-server:2.8.0` |
-| Container, console | `pavlikovskiy/frontcache-console:2.8.0` |
+| Library | `org.frontcache:frontcache-core:2.9.0` |
+| Config skeleton | `frontcache-core-2.9.0-home.zip` |
+| Invalidation client | `org.frontcache:frontcache-agent:2.9.0` |
+| Standalone server | `frontcache-server-2.9.0.tar.gz` / `.zip` |
+| Server, bundled runtime | `frontcache-server-2.9.0-{linux-x64,linux-aarch64,macos-aarch64}.tar.gz` |
+| Console | `frontcache-console-2.9.0.tar.gz` / `.zip` (+ the same platform builds) |
+| Installer | `frontcache-server-2.9.0-installer.sh` |
+| Compose + env | `frontcache-server-2.9.0-compose.yml`, `-env.example` |
+| Container, server | `pavlikovskiy/frontcache-server:2.9.0` |
+| Container, console | `pavlikovskiy/frontcache-console:2.9.0` |
 
 ---
 
@@ -422,8 +420,8 @@ the **client-facing** ports, not the port Frontcache listens on.
 **`UnsupportedClassVersionError` on startup.** The JVM is older than 25. Use a bundled-runtime
 archive, a container, or point `FRONTCACHE_JAVA_HOME` at a JDK 25.
 
-**The management API returns "access denied".** The request did not arrive on
-`front-cache.management.port`, or the `x-frontcache-site-key` header does not match.
+**The management API returns "access denied".** The request carried no api key, or the
+`Authorization: Bearer <api-key>` credential does not match this node's `front-cache.api-key`.
 
 **Logs.** `FRONTCACHE_HOME/logs/`: `frontcache-requests.log` (one line per request/fragment),
 `error.log`, `fallback.log`, `frontcache-failed-requests.log` (guard-rule rejections and
@@ -432,6 +430,7 @@ Elasticsearch + Kibana with ready-made dashboards.
 
 ---
 
+Downloads: [downloads.md](downloads.md) ·
 Concepts: [concept.md](concept.md) ·
 Topologies: [deployment-usecases.md](deployment-usecases.md) ·
 Licensing: <https://www.eternita.co/frontcache.html>

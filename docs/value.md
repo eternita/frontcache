@@ -108,12 +108,13 @@ Nothing here is generic HTTP caching — it is the four mechanisms described in
 
 ## 6. How to read these numbers honestly
 
-- **The p99 and max got worse, and that is expected.** With the cache on, the run pushes 6.1×
-  more requests through in the same window, so the ~1.3% of requests that still reach the origin
-  queue behind far more concurrency — plus L2 (Lucene) reads and one tripped circuit breaker
-  (a single `503`). The trade is real: near-everything gets much faster, the small uncached
-  remainder gets a worse worst case. If your SLO is a hard max rather than a percentile, size the
-  origin for the uncached fraction.
+- **The max got worse, and the p99 gained least — both expected.** Maximum latency went from
+  295.2 ms to 775.4 ms, and p99 fell only 42% (208.1 → 120.3 ms) where p50 fell 96%. With the
+  cache on, the run pushes 6.1× more requests through in the same window, so the ~1.3% of
+  requests that still reach the origin queue behind far more concurrency — plus L2 (Lucene)
+  reads and one tripped circuit breaker (a single `503`). The trade is real: near-everything
+  gets much faster, the small uncached remainder gets a worse worst case. If your SLO is a hard
+  max rather than a percentile, size the origin for the uncached fraction.
 - **98.74% is this working set's hit ratio, not a universal one.** 1,000 URLs replayed 100 times
   is a hot set by construction. Over the full 681k-request log the same harness measures ~66.7%
   from-cache (see the sample report in [benchmark/README.md](../benchmark/README.md)). Expect a number between the two, shaped by your TTLs and traffic shape — the

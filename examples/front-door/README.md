@@ -157,9 +157,10 @@ directly, and 443 answers. `KEEP=1 ./smoke-test.sh` leaves it running to poke at
 
 ## Version note
 
-`FC_IMAGE` in [`docker/.env.example`](docker/.env.example) pins `frontcache-server:2.8.0`, which
+`FC_IMAGE` in [`docker/.env.example`](docker/.env.example) pins `frontcache-server:2.9.0`, which
 is Frontcache alone — plain HTTP on 9080, no nginx inside it.
 
-On **2.5.1 and earlier** that plain tag was nginx + Frontcache on 80/443; the image you want on
-those versions is the `-slim` one (`pavlikovskiy/frontcache-server:2.5.1-slim`). From 2.6.0 the
-plain tag is the only one published. Pin an exact version either way.
+On **2.5.1 and earlier** that plain tag was nginx + Frontcache on 80/443, and the Frontcache-only
+variant was the `-slim` one — but those versions are no longer on Docker Hub: **2.6.0 is the
+oldest tag published**, and it is there under both names (`2.6.0` and `2.6.0-slim`, identical).
+From 2.7.0 the plain tag is the only one pushed. Pin an exact version either way.

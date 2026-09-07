@@ -1,32 +1,95 @@
-<svg viewBox="0 0 800 760" width="800" height="760" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="12">
+<svg viewBox="0 0 880 872" width="880" height="872" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="12">
   <defs>
     <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#475569"/></marker>
   </defs>
-  <rect x="0" y="0" width="800" height="760" fill="#ffffff"/>
-  <rect x="230" y="14" width="150" height="38" rx="6" fill="#e2e8f0" stroke="#475569"/><text x="305" y="38" text-anchor="middle">Incoming request</text>
-  <polygon points="215,100 305,68 395,100 305,132" fill="#fef9c3" stroke="#ca8a04"/><text x="305" y="96" text-anchor="middle">URL in</text><text x="305" y="110" text-anchor="middle">dynamic-urls.conf?</text>
-  <rect x="500" y="78" width="180" height="44" rx="6" fill="#fee2e2" stroke="#dc2626"/><text x="590" y="98" text-anchor="middle">Bypass → origin → return</text><text x="590" y="113" text-anchor="middle" fill="#64748b">(FC_BypassCache)</text>
-  <polygon points="225,190 305,160 385,190 305,220" fill="#fef9c3" stroke="#ca8a04"/><text x="305" y="186" text-anchor="middle">Bot?</text><text x="305" y="200" text-anchor="middle" fill="#64748b">(bots.conf UA)</text>
-  <polygon points="225,278 305,248 385,278 305,308" fill="#fef9c3" stroke="#ca8a04"/><text x="305" y="274" text-anchor="middle">Cache hit?</text><text x="305" y="288" text-anchor="middle" fill="#64748b">L1 then L2</text>
-  <rect x="20" y="372" width="150" height="44" rx="6" fill="#dcfce7" stroke="#16a34a"/><text x="95" y="392" text-anchor="middle">Serve cached</text><text x="95" y="407" text-anchor="middle">fragment(s)</text>
-  <rect x="210" y="372" width="180" height="44" rx="6" fill="#dcfce7" stroke="#16a34a"/><text x="300" y="392" text-anchor="middle">Serve stale now,</text><text x="300" y="407" text-anchor="middle">refresh in background</text>
-  <rect x="440" y="372" width="170" height="44" rx="6" fill="#e0e7ff" stroke="#4338ca"/><text x="525" y="392" text-anchor="middle">FC_ThroughCache:</text><text x="525" y="407" text-anchor="middle">call origin (circuit-broken)</text>
-  <rect x="430" y="478" width="180" height="44" rx="6" fill="#e0e7ff" stroke="#4338ca"/><text x="520" y="498" text-anchor="middle">Read x-frontcache-*,</text><text x="520" y="513" text-anchor="middle">store (maxage/level/tags)</text>
-  <rect x="640" y="478" width="150" height="44" rx="6" fill="#fee2e2" stroke="#dc2626"/><text x="715" y="498" text-anchor="middle">FallbackResolver</text><text x="715" y="513" text-anchor="middle" fill="#64748b">(fallbacks.conf)</text>
-  <rect x="200" y="588" width="220" height="50" rx="6" fill="#e0e7ff" stroke="#4338ca"/><text x="310" y="608" text-anchor="middle">IncludeProcessor resolves</text><text x="310" y="623" text-anchor="middle">fc:include (recurse flow)</text>
-  <rect x="220" y="690" width="180" height="40" rx="6" fill="#e2e8f0" stroke="#475569"/><text x="310" y="715" text-anchor="middle">Assemble + return page</text>
-  <line x1="305" y1="52" x2="305" y2="66" stroke="#475569" marker-end="url(#a)"/>
-  <line x1="395" y1="100" x2="496" y2="100" stroke="#475569" marker-end="url(#a)"/><text x="430" y="92" fill="#16a34a">yes</text>
-  <line x1="305" y1="132" x2="305" y2="158" stroke="#475569" marker-end="url(#a)"/><text x="312" y="150" fill="#dc2626">no</text>
-  <line x1="305" y1="220" x2="305" y2="246" stroke="#475569" marker-end="url(#a)"/>
-  <line x1="240" y1="295" x2="110" y2="368" stroke="#475569" marker-end="url(#a)"/><text x="120" y="345">hit &amp; fresh</text>
-  <line x1="305" y1="308" x2="302" y2="368" stroke="#475569" marker-end="url(#a)"/><text x="312" y="345">stale+soft</text>
-  <line x1="370" y1="295" x2="500" y2="368" stroke="#475569" marker-end="url(#a)"/><text x="430" y="345">miss</text>
-  <line x1="520" y1="416" x2="520" y2="474" stroke="#475569" marker-end="url(#a)"/><text x="525" y="450" fill="#16a34a">origin OK</text>
-  <line x1="600" y1="416" x2="700" y2="474" stroke="#475569" marker-end="url(#a)"/><text x="635" y="450" fill="#dc2626">5XX/open</text>
-  <line x1="95" y1="416" x2="240" y2="586" stroke="#475569" marker-end="url(#a)"/>
-  <line x1="300" y1="416" x2="305" y2="586" stroke="#475569" marker-end="url(#a)"/>
-  <line x1="520" y1="522" x2="370" y2="586" stroke="#475569" marker-end="url(#a)"/>
-  <line x1="715" y1="522" x2="395" y2="600" stroke="#475569" marker-end="url(#a)"/>
-  <line x1="310" y1="638" x2="310" y2="686" stroke="#475569" marker-end="url(#a)"/>
+  <rect x="0" y="0" width="880" height="872" fill="#ffffff"/>
+
+  <!-- 1. request in -->
+  <rect x="235" y="14" width="150" height="38" rx="6" fill="#e2e8f0" stroke="#475569"/>
+  <text x="310" y="38" text-anchor="middle">Incoming request</text>
+  <line x1="310" y1="52" x2="310" y2="72" stroke="#475569" marker-end="url(#a)"/>
+
+  <!-- 2. client classification -->
+  <rect x="210" y="76" width="200" height="44" rx="6" fill="#e2e8f0" stroke="#475569"/>
+  <text x="310" y="96" text-anchor="middle">Classify client</text>
+  <text x="310" y="112" text-anchor="middle" font-size="11" fill="#64748b">bot / browser (bots.conf)</text>
+  <line x1="310" y1="120" x2="310" y2="140" stroke="#475569" marker-end="url(#a)"/>
+
+  <!-- 3. guard rules -->
+  <polygon points="210,178 310,144 410,178 310,212" fill="#fef9c3" stroke="#ca8a04"/>
+  <text x="310" y="174" text-anchor="middle">Guard rule</text>
+  <text x="310" y="188" text-anchor="middle">matches?</text>
+  <rect x="500" y="152" width="240" height="52" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="620" y="174" text-anchor="middle">Reject 4xx · redirect · 429</text>
+  <text x="620" y="192" text-anchor="middle" font-size="11" fill="#64748b">(guard-rules.conf; never reaches cache)</text>
+  <line x1="410" y1="178" x2="496" y2="178" stroke="#475569" marker-end="url(#a)"/>
+  <text x="453" y="170" text-anchor="middle" fill="#16a34a">yes</text>
+  <line x1="310" y1="212" x2="310" y2="234" stroke="#475569" marker-end="url(#a)"/>
+  <text x="318" y="230" fill="#dc2626">no</text>
+
+  <!-- 4. dynamic urls -->
+  <polygon points="200,272 310,238 420,272 310,306" fill="#fef9c3" stroke="#ca8a04"/>
+  <text x="310" y="268" text-anchor="middle">URL in</text>
+  <text x="310" y="282" text-anchor="middle">dynamic-urls.conf?</text>
+  <rect x="500" y="246" width="240" height="52" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="620" y="268" text-anchor="middle">Bypass → origin → return</text>
+  <text x="620" y="286" text-anchor="middle" font-size="11" fill="#64748b">(FC_BypassCache; nothing stored)</text>
+  <line x1="420" y1="272" x2="496" y2="272" stroke="#475569" marker-end="url(#a)"/>
+  <text x="458" y="264" text-anchor="middle" fill="#16a34a">yes</text>
+  <line x1="310" y1="306" x2="310" y2="328" stroke="#475569" marker-end="url(#a)"/>
+  <text x="318" y="324" fill="#dc2626">no</text>
+
+  <!-- 5. cache lookup -->
+  <polygon points="175,368 310,330 445,368 310,406" fill="#fef9c3" stroke="#ca8a04"/>
+  <text x="310" y="364" text-anchor="middle">Cache hit?</text>
+  <text x="310" y="378" text-anchor="middle" font-size="11" fill="#64748b">L1 then L2, per client type</text>
+
+  <!-- 6. three outcomes -->
+  <rect x="30" y="474" width="180" height="52" rx="6" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="120" y="496" text-anchor="middle">Serve cached</text>
+  <text x="120" y="514" text-anchor="middle">fragment(s)</text>
+
+  <rect x="230" y="474" width="190" height="52" rx="6" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="325" y="496" text-anchor="middle">Serve stale now,</text>
+  <text x="325" y="514" text-anchor="middle">refresh in background</text>
+
+  <rect x="470" y="474" width="215" height="52" rx="6" fill="#e0e7ff" stroke="#4338ca"/>
+  <text x="577" y="496" text-anchor="middle">FC_ThroughCache</text>
+  <text x="577" y="514" text-anchor="middle" font-size="11" fill="#4338ca">call origin (circuit-broken)</text>
+
+  <line x1="243" y1="349" x2="130" y2="470" stroke="#475569" marker-end="url(#a)"/>
+  <text x="140" y="424" text-anchor="middle">hit &amp; fresh</text>
+  <line x1="310" y1="406" x2="310" y2="470" stroke="#475569" marker-end="url(#a)"/>
+  <text x="318" y="442">stale + soft</text>
+  <line x1="377" y1="349" x2="520" y2="470" stroke="#475569" marker-end="url(#a)"/>
+  <text x="470" y="424" text-anchor="middle">miss</text>
+
+  <!-- 7. store / fallback -->
+  <rect x="455" y="590" width="230" height="52" rx="6" fill="#e0e7ff" stroke="#4338ca"/>
+  <text x="570" y="612" text-anchor="middle">Read x-frontcache-* headers,</text>
+  <text x="570" y="630" text-anchor="middle" font-size="11" fill="#4338ca">store (maxage · level · tags)</text>
+
+  <rect x="710" y="590" width="150" height="52" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="785" y="612" text-anchor="middle">FallbackResolver</text>
+  <text x="785" y="630" text-anchor="middle" font-size="11" fill="#64748b">(fallbacks.conf)</text>
+
+  <line x1="545" y1="526" x2="545" y2="586" stroke="#475569" marker-end="url(#a)"/>
+  <text x="552" y="560" fill="#16a34a">origin OK</text>
+  <line x1="665" y1="526" x2="770" y2="586" stroke="#475569" marker-end="url(#a)"/>
+  <text x="676" y="556" text-anchor="end" fill="#dc2626">5XX / open</text>
+
+  <!-- 8. includes -->
+  <rect x="215" y="700" width="250" height="52" rx="6" fill="#e0e7ff" stroke="#4338ca"/>
+  <text x="340" y="722" text-anchor="middle">IncludeProcessor resolves</text>
+  <text x="340" y="740" text-anchor="middle" font-size="11" fill="#4338ca">fc:include — this flow recurses</text>
+
+  <line x1="120" y1="526" x2="255" y2="696" stroke="#475569" marker-end="url(#a)"/>
+  <line x1="325" y1="526" x2="330" y2="696" stroke="#475569" marker-end="url(#a)"/>
+  <line x1="520" y1="642" x2="410" y2="696" stroke="#475569" marker-end="url(#a)"/>
+  <line x1="770" y1="642" x2="469" y2="726" stroke="#475569" marker-end="url(#a)"/>
+
+  <!-- 9. out -->
+  <rect x="250" y="810" width="180" height="42" rx="6" fill="#e2e8f0" stroke="#475569"/>
+  <text x="340" y="836" text-anchor="middle">Assemble + return page</text>
+  <line x1="340" y1="752" x2="340" y2="806" stroke="#475569" marker-end="url(#a)"/>
 </svg>
