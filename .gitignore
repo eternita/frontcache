@@ -20,3 +20,8 @@
 # Written at runtime, not by hand: fallbacks.conf gives fallback2.txt an init URL
 /frontcache-tests/FRONTCACHE_HOME_FILTER/fallbacks/fallback2.txt
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/fallbacks/fallback2.txt
+
+# set-config keeps the previous content as conf/<file>.backup-<timestamp> before it writes. The conf
+# dirs of both e2e homes ARE checked in, so without this a config-write test dirties the working tree.
+/frontcache-tests/FRONTCACHE_HOME_FILTER/conf/*.backup-*
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/conf/*.backup-*

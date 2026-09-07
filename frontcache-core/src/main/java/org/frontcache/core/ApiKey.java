@@ -72,7 +72,8 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 public class ApiKey {
 
-	static final String API_KEY_PROPERTY = "front-cache.api-key";
+	/** Public so a refusal message can name the property the operator has to set. */
+	public static final String API_KEY_PROPERTY = "front-cache.api-key";
 
 	private static final String BEARER = "Bearer ";
 
@@ -112,6 +113,34 @@ public class ApiKey {
 			return true;
 
 		return matches(expected, presented(request));
+	}
+
+	/**
+	 * The stricter rule, for management calls that WRITE.
+	 *
+	 * <h2>Why an un-keyed node is refused here and allowed by {@link #isAuthorized}</h2>
+	 *
+	 * An un-keyed node is open, deliberately, and that is tolerable for reads and for cache
+	 * invalidation. Accepting arbitrary content into conf/guard-rules.conf (redirects, rate limits,
+	 * allowed redirect hosts), conf/bots.conf (who is classified how, hence what is cached and for how
+	 * long) or conf/resilience.properties (the timeouts and breakers in front of the origin) is a
+	 * different thing: it is remote configuration of how the node handles requests.
+	 *
+	 * And the un-keyed state is usually <b>accidental</b> - a 2.9.0 upgrade that left
+	 * {@code front-cache.site-key} in the properties file produces a node with no key at all and no
+	 * failure to notice. Writes must not be what that state silently enables.
+	 *
+	 * This is the third rule in the family, alongside {@code FCUtils.isAuthorizedApiKeyHeader} for the
+	 * SSE stream (see the class comment above), and it lives here so there is only one spelling of it.
+	 *
+	 * @return true when the node has an API key AND the request carries it
+	 */
+	public static boolean isAuthorizedToWrite(HttpServletRequest request)
+	{
+		if (!isConfigured())
+			return false;
+
+		return isAuthorized(request);
 	}
 
 	/**

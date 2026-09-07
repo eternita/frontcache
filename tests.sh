@@ -17,6 +17,10 @@ rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/logs/*
 # fallback2.txt is fetched from its init URL at engine startup - but only when it is ABSENT
 rm -f "$TESTS_DIR"/FRONTCACHE_HOME_FILTER/fallbacks/fallback2.txt
 rm -f "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/fallbacks/fallback2.txt
+# set-config backs a config file up before writing it; the config-write tests restore the file
+# itself, but the timestamped copies accumulate
+rm -f "$TESTS_DIR"/FRONTCACHE_HOME_FILTER/conf/*.backup-*
+rm -f "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/conf/*.backup-*
 # end cleanup cache dirs & logs
 
 # stop gradle daemons

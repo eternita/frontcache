@@ -53,6 +53,10 @@ import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.bots.BotRuleEntry;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.io.ActionResponse;
+import org.frontcache.io.ConfigFile;
+import org.frontcache.io.ReloadDynamicUrlsActionResponse;
+import org.frontcache.io.ReloadResilienceActionResponse;
+import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.CacheStatusActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
@@ -801,6 +805,131 @@ public class FrontCacheClient {
 			return null;
 
 		return actionResponse.getResilienceConfig();
+	}
+
+	/**
+	 * The raw content of any of the five editable config files, by logical id.
+	 *
+	 * Dispatches to the per-file getters rather than replacing them: each one carries its own
+	 * wire-format compatibility (the resilience getter retries with the pre-2.7 action name, the
+	 * others read a field an older node may not send), and folding that into one call would drop it.
+	 *
+	 * @return the file's content, null when the edge could not be reached or has no such file
+	 */
+	public String getConfigFile(ConfigFile configFile)
+	{
+		switch (configFile)
+		{
+		case RESILIENCE:
+			return getResilienceConfig();
+		case GUARD_RULES:
+			return getGuardConfig();
+		case BOTS:
+			return getBotsConfig();
+		case DYNAMIC_URLS:
+			return getDynamicURLsConfig();
+		case FALLBACKS:
+			return getFallbacksConfig();
+		}
+
+		return null;
+	}
+
+	/**
+	 * Writes one config file on the edge and applies it.
+	 *
+	 * <h2>A ping means the node predates this action</h2>
+	 *
+	 * An unrecognized action is answered with a ping, not an error, so without this check a save to an
+	 * older node would parse into a response with {@code responseStatus=OK} and {@code written=false}
+	 * - i.e. the console would report a success that never happened. That is the worst outcome
+	 * available here, and a mixed fleet is the normal state: the console upgrades independently of the
+	 * nodes, in either order.
+	 *
+	 * @param baseHash sha-256 of the content being replaced, or null to skip the concurrency check
+	 * @return the outcome, or null when the edge could not be reached at all
+	 */
+	public SetConfigActionResponse setConfig(ConfigFile configFile, String content, String baseHash, boolean apply)
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.SET_CONFIG));
+		urlParameters.add(new BasicNameValuePair("file", configFile.getId()));
+		urlParameters.add(new BasicNameValuePair("content", (null == content) ? "" : content));
+		urlParameters.add(new BasicNameValuePair("apply", Boolean.toString(apply)));
+
+		if (null != baseHash && 0 < baseHash.trim().length())
+			urlParameters.add(new BasicNameValuePair("baseHash", baseHash.trim()));
+
+		String responseStr = null;
+		try {
+			responseStr = requestFrontCache(urlParameters);
+			SetConfigActionResponse actionResponse = jsonMapper.readValue(responseStr.getBytes(), SetConfigActionResponse.class);
+
+			if (FrontcacheAction.PING.equals(actionResponse.getAction()))
+			{
+				logger.debug(getFrontCacheURL() + " does not know " + FrontcacheAction.SET_CONFIG
+						+ " - it predates config editing");
+
+				SetConfigActionResponse unsupported = new SetConfigActionResponse();
+				unsupported.setFile(configFile.getFileName());
+				unsupported.refuse("this node does not support editing config files - upgrade it, or edit"
+						+ " conf/" + configFile.getFileName() + " on the node and reload");
+				return unsupported;
+			}
+
+			return actionResponse;
+
+		} catch (Exception e) {
+			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Reloads the edge's conf/resilience.properties.
+	 *
+	 * @return the outcome - {@code getWarnings()} carries what could not be applied - or null when the
+	 *         edge could not be reached
+	 */
+	public ReloadResilienceActionResponse reloadResilience()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.RELOAD_RESILIENCE));
+
+		String responseStr = null;
+		try {
+			responseStr = requestFrontCache(urlParameters);
+			return jsonMapper.readValue(responseStr.getBytes(), ReloadResilienceActionResponse.class);
+
+		} catch (Exception e) {
+			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Reloads the edge's conf/dynamic-urls.conf.
+	 *
+	 * @return the outcome - {@code getPatternCount()} is how many patterns survived the parse - or
+	 *         null when the edge could not be reached
+	 */
+	public ReloadDynamicUrlsActionResponse reloadDynamicURLs()
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.RELOAD_DYNAMIC_URLS));
+
+		String responseStr = null;
+		try {
+			responseStr = requestFrontCache(urlParameters);
+			return jsonMapper.readValue(responseStr.getBytes(), ReloadDynamicUrlsActionResponse.class);
+
+		} catch (Exception e) {
+			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
+		}
+
+		return null;
 	}
 
 	/** @deprecated pre-2.7 name of {@link #getResilienceConfigActionResponse()} */

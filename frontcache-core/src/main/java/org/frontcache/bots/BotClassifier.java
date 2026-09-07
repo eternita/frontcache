@@ -282,6 +282,42 @@ public class BotClassifier {
 	}
 
 	/**
+	 * Dry-parses a candidate bots.conf without touching anything live, for the {@code set-config}
+	 * management action.
+	 *
+	 * The line-kind decision is the same one {@link #readConfigFile} makes - a line with no {@code |}
+	 * outside a group is a bare keyword, anything else is a rule - because a validator that classified
+	 * lines differently from the loader would pass files the loader then refuses, which is worse than
+	 * no validator.
+	 *
+	 * @return one message per unusable line, {@code "line N: ..."}, in file order; empty when the
+	 *         whole file parses
+	 */
+	public static List<String> validate(String content)
+	{
+		List<String> errors = new ArrayList<String>();
+
+		if (null == content)
+			return errors;
+
+		String[] lines = content.split("\n", -1);
+		for (int i = 0; i < lines.length; i++)
+		{
+			String trimmed = lines[i].trim();
+			if (0 == trimmed.length() || trimmed.startsWith("#"))
+				continue;
+
+			try {
+				BotRuleParser.parse(trimmed);
+			} catch (GuardConfigException e) {
+				errors.add("line " + (i + 1) + ": " + e.getMessage());
+			}
+		}
+
+		return errors;
+	}
+
+	/**
 	 * Today's hard-coded {@code else} branch, made an explicit rule so it shows up in get-bots with
 	 * a hit count of its own and can be switched off where a health checker or an internal client
 	 * legitimately sends no User-Agent.

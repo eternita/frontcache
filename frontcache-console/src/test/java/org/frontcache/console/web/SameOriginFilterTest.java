@@ -189,4 +189,29 @@ public class SameOriginFilterTest {
 		assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
 	}
 
+	/**
+	 * /save-config writes a node's config file and applies it, which makes it the most consequential
+	 * POST the console has - a page the operator has open in another tab must not be able to rewrite
+	 * the fleet's guard rules through their cached Basic credentials.
+	 */
+	@Test
+	public void aCrossSiteConfigSaveIsRejected() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/save-config");
+		request.addHeader("Host", "console.example.com:7080");
+		request.addHeader("Origin", "https://evil.example.net");
+
+		assertFalse(passes(request));
+		assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
+	}
+
+	/** ...and the operator's own page still works. */
+	@Test
+	public void aSameOriginConfigSaveIsAllowed() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/save-config");
+		request.addHeader("Host", "console.example.com:7080");
+		request.addHeader("Origin", "https://console.example.com:7080");
+
+		assertTrue(passes(request));
+	}
+
 }

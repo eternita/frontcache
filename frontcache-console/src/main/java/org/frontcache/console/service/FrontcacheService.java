@@ -23,19 +23,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.frontcache.client.FrontCacheClient;
-import org.frontcache.console.model.BotConfig;
+import org.frontcache.console.model.EdgeConfigFile;
 import org.frontcache.console.model.VisitorTypesConfig;
-import org.frontcache.console.model.DynamicURLsConfig;
-import org.frontcache.console.model.FallbackConfig;
 import org.frontcache.console.model.FrontCacheStatus;
-import org.frontcache.console.model.GuardConfig;
 import org.frontcache.console.model.GuardRulesConfig;
-import org.frontcache.console.model.ResilienceConfig;
 import org.frontcache.console.model.DashboardStream;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.BackupActionResponse;
+import org.frontcache.io.ConfigFile;
+import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.replication.CacheReplicator;
 import org.frontcache.replication.ReplicationProgressListener;
@@ -217,10 +215,14 @@ public class FrontcacheService {
 		if (isAuthEnabled())
 		{
 			logger.info(" -- Console authentication is ON for user '{}'", user);
+			logger.info(" -- Config editing is {}", isConfigEditingEnabled() ? "ON" : "OFF (config-editing = false)");
 
 			if (SHIPPED_DEFAULT_PASSWORD.equals(password))
 				logger.warn("Console authentication is ON, but the password is still the shipped "
-						+ "default. Change 'password' in frontcache-console.conf.");
+						+ "default. Change 'password' in frontcache-console.conf."
+						+ (isConfigEditingEnabled()
+							? " Anyone with it can rewrite the config files of every configured node."
+							: ""));
 
 			return;
 		}
@@ -228,6 +230,8 @@ public class FrontcacheService {
 		logger.warn("Console authentication is OFF - no 'user'/'password' in frontcache-console.conf."
 				+ " Anyone who can reach this port can invalidate the cache of every configured node."
 				+ " Add:   user = admin / password = <choose one>");
+		logger.warn("Config editing is therefore OFF too - the Configs screens stay read-only. An"
+				+ " unauthenticated console is a monitoring tool; it is not a fleet configuration tool.");
 	}
 
 	/** True when a login is configured. False = every request is served without a check. */
@@ -386,60 +390,12 @@ public class FrontcacheService {
 
 
 	/**
-	 *
-	 * @param domain
-	 * @return
-	 */
-	/**
-	 * The raw conf/fallbacks.conf per edge, for the Configs / Fallback Config screen.
-	 *
-	 * An edge that has no such file, or that predates the action, contributes a null value rather than
-	 * dropping out of the map: the tab still appears, saying the file is not there.
-	 */
-	public Map<String, String> getFallbackConfigs() {
-		List<FrontCacheClient> fcClients = getFrontCacheAgents();
-
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order) so the UI
-		// tabs appear in the configured order.
-		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
-
-        List<Future<FallbackConfig>> futureList = new ArrayList<Future<FallbackConfig>>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
-            futureList.add(executor.submit(new FallbackConfigsCaller(fcClient)));
-
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<FallbackConfig> f : futureList)
-        {
-            try {
-            	FallbackConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result.getConfig());
-
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
-            }
-        }
-
-		return clusterStatus;
-	}
-
-	/**
 	 * How each edge classifies a visitor - the ordered rules and the bare keywords - for the Visitor
 	 * Types screen.
 	 *
 	 * One entry per reachable edge. The value carries both shapes - rules (2.9.0+) and bare keywords -
 	 * because the console reads a mixed fleet and the JSP renders whichever the edge answered with.
-	 * The raw file behind this is {@link #getBotConfigs()}.
+	 * The raw file behind this is what {@link #getConfigFiles} returns for ConfigFile.BOTS.
 	 */
 	public Map<String, VisitorTypesConfig> getVisitorTypes() {
 
@@ -466,49 +422,6 @@ public class FrontcacheService {
 
             	if (null != result)
             		clusterStatus.put(result.getName(), result);
-
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
-            }
-        }
-
-		return clusterStatus;
-	}
-
-	/**
-	 * The raw conf/bots.conf per edge, for the Configs / Bot Configs screen - what the operator wrote,
-	 * as opposed to what the node parsed out of it ({@link #getVisitorTypes()}).
-	 *
-	 * An edge that has no such file, or that predates the action, contributes a null value rather than
-	 * dropping out of the map: the tab still appears, saying the file is not there.
-	 */
-	public Map<String, String> getBotConfigs() {
-
-        List<Future<BotConfig>> futureList = new ArrayList<Future<BotConfig>>();
-
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order) so the UI
-		// tabs appear in the configured order.
-		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
-            futureList.add(executor.submit(new BotConfigsCaller(fcClient)));
-
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<BotConfig> f : futureList)
-        {
-            try {
-            	BotConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result.getConfig());
 
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
@@ -561,117 +474,157 @@ public class FrontcacheService {
 	}
 
 	/**
-	 * The raw conf/dynamic-urls.conf per edge, for the Configs / Dynamic URLs screen.
+	 * One raw config file, from every configured edge, for a Configs screen.
 	 *
-	 * An edge that has no such file, or that predates the action, contributes a null value rather than
-	 * dropping out of the map: the tab still appears, saying the file is not there.
+	 * Replaces five identical fan-outs - {@code getFallbackConfigs}, {@code getBotConfigs},
+	 * {@code getDynamicURLsConfigs}, {@code getGuardConfigs}, {@code getResilienceConfigs} - which
+	 * differed only in the action they sent.
+	 *
+	 * <b>A List, not a Map keyed by edge name.</b> That name is not unique (see
+	 * {@link EdgeConfigFile}), so the map silently dropped a tab whenever two edges shared a host.
+	 * The list is in the console config's edge order, which is the order every other screen uses.
+	 *
+	 * An edge that times out keeps its tab and is marked unreachable, rather than vanishing from the
+	 * page - a missing tab reads as "this node has no such file", which is a different thing.
 	 */
-	public Map<String, String> getDynamicURLsConfigs() {
+	public List<EdgeConfigFile> getConfigFiles(ConfigFile configFile) {
 
-        List<Future<DynamicURLsConfig>> futureList = new ArrayList<Future<DynamicURLsConfig>>();
+		List<FrontCacheClient> fcClients = getFrontCacheAgents();
 
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order) so the UI
-		// tabs appear in the configured order.
-		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
+		List<Future<EdgeConfigFile>> futureList = new ArrayList<Future<EdgeConfigFile>>();
+		for (FrontCacheClient fcClient : fcClients)
+			futureList.add(executor.submit(new ConfigFileCaller(fcClient, configFile)));
 
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
-            futureList.add(executor.submit(new DynamicURLsConfigsCaller(fcClient)));
+		List<EdgeConfigFile> result = new ArrayList<EdgeConfigFile>();
 
 		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<DynamicURLsConfig> f : futureList)
-        {
-            try {
-            	DynamicURLsConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		boolean timeoutReached = false;
+		for (int i = 0; i < futureList.size(); i++)
+		{
+			Future<EdgeConfigFile> f = futureList.get(i);
+			FrontCacheClient fcClient = fcClients.get(i);
 
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result.getConfig());
+			try {
+				EdgeConfigFile edgeConfig = timeoutReached
+						? f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS)
+						: f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
-            }
-        }
+				result.add((null != edgeConfig) ? edgeConfig
+						: EdgeConfigFile.unreachable(fcClient.getName(), fcClient.getFrontCacheURL()));
 
-		return clusterStatus;
+			} catch (TimeoutException | InterruptedException | ExecutionException e) {
+				f.cancel(true);
+				timeoutReached = true;
+				logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for " + fcClient.getFrontCacheURL());
+				result.add(EdgeConfigFile.unreachable(fcClient.getName(), fcClient.getFrontCacheURL()));
+			}
+		}
+
+		return result;
 	}
 
-	public Map<String, String> getGuardConfigs() {
-
-        List<Future<GuardConfig>> futureList = new ArrayList<Future<GuardConfig>>();
-
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order) so the UI
-		// tabs appear in the configured order.
-		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
-            futureList.add(executor.submit(new GuardConfigsCaller(fcClient)));
-
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<GuardConfig> f : futureList)
-        {
-            try {
-            	GuardConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result.getConfig());
-
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
-            }
-        }
-
-		return clusterStatus;
+	/**
+	 * Whether the Configs screens offer an Edit button.
+	 *
+	 * <b>Off when the console has no credentials, whatever the property says.</b> An unauthenticated
+	 * console is a monitoring tool anyone who can reach it can read; it must not also be a fleet
+	 * configuration tool. That is the mirror of the node's own rule - {@code ApiKey.isAuthorizedToWrite}
+	 * refuses a write on a node with no API key - and for the same reason: neither permissive default
+	 * was chosen, both are what an un-migrated config file produces.
+	 */
+	public boolean isConfigEditingEnabled() {
+		return configEditingEnabled(fcConsoleConfig, isAuthEnabled());
 	}
 
-	public Map<String, String> getResilienceConfigs() {
+	/**
+	 * The decision half of {@link #isConfigEditingEnabled()}, split out so it can be tested without a
+	 * config file, an environment variable or a thread pool - the same arrangement as
+	 * {@link #parseCredentials}.
+	 *
+	 * Read through {@code hasPath}, like the credentials are: {@code Config.getString} and friends throw
+	 * on a missing key, so reading this the way {@code apiKey} is read would make every console whose
+	 * config predates the feature fail to start.
+	 */
+	static boolean configEditingEnabled(Config config, boolean authEnabled) {
 
-        List<Future<ResilienceConfig>> futureList = new ArrayList<Future<ResilienceConfig>>();
+		if (!authEnabled)
+			return false;
 
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order) so the UI
-		// tabs appear in the configured order.
-		Map<String, String> clusterStatus = new LinkedHashMap<String, String>();
+		if (null != config && config.hasPath(CONFIG_EDITING_KEY))
+			return config.getBoolean(CONFIG_EDITING_KEY);
 
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
-            futureList.add(executor.submit(new ResilienceConfigsCaller(fcClient)));
+		return true;
+	}
 
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<ResilienceConfig> f : futureList)
-        {
-            try {
-            	ResilienceConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
+	private static final String CONFIG_EDITING_KEY = "config-editing";
 
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result.getConfig());
+	/**
+	 * Writes one config file to one edge and applies it.
+	 *
+	 * Addressed by edge URL, never by name - see {@link EdgeConfigFile}.
+	 *
+	 * @param baseHash sha-256 of the content being replaced, or null/blank to skip the concurrency
+	 *                 check (the browser cannot always compute one - see fc-config-editor.js)
+	 * @return the node's answer, or a synthetic refusal when the node could not be reached at all
+	 */
+	public SetConfigActionResponse saveConfigFile(String edgeURL, ConfigFile configFile, String content, String baseHash) {
 
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
-            }
-        }
+		if (!isConfigEditingEnabled())
+		{
+			SetConfigActionResponse refused = new SetConfigActionResponse();
+			refused.setFile(configFile.getFileName());
+			refused.refuse("config editing is disabled on this console");
+			return refused;
+		}
 
-		return clusterStatus;
+		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		SetConfigActionResponse response = fcClient.setConfig(configFile, content, baseHash, true);
+
+		if (null == response)
+		{
+			// null means the call itself failed. The screen has to say something per edge, so this
+			// becomes a refusal rather than a blank - "nothing happened" and "we don't know" would
+			// otherwise look identical.
+			SetConfigActionResponse unreachable = new SetConfigActionResponse();
+			unreachable.setFile(configFile.getFileName());
+			unreachable.refuse("edge " + edgeURL + " is not available");
+			return unreachable;
+		}
+
+		return response;
+	}
+
+	/**
+	 * Writes one config file to every configured edge.
+	 *
+	 * <b>Not all-or-nothing, and it must not pretend to be.</b> Each node is a separate HTTP call to a
+	 * separate machine, so a partial result is the normal outcome - the answer is therefore per edge,
+	 * in edge order, and the screen shows every line.
+	 *
+	 * Sequential, not fanned out: this writes config to production nodes, and doing them one at a time
+	 * means a file that breaks something breaks it on one node while the operator is still watching,
+	 * rather than on all of them at once. The console's own latency is not the thing to optimize here.
+	 *
+	 * @param baseHash the hash of the content as the console rendered it, which is meaningful only for
+	 *                 the edge it was read from - see the note in the caller
+	 */
+	public Map<String, SetConfigActionResponse> saveConfigFileToAllEdges(ConfigFile configFile, String content, String baseHash, String baseHashEdgeURL) {
+
+		Map<String, SetConfigActionResponse> results = new LinkedHashMap<String, SetConfigActionResponse>();
+
+		for (String edgeURL : frontcacheAgentURLs)
+		{
+			// The hash guards the file the operator was LOOKING at. Sending it to the other nodes would
+			// refuse every one of them whose file differs - which is most of the reason a fleet has more
+			// than one node's config in the first place - so those are written unchecked, and the screen
+			// says so.
+			String hashForEdge = edgeURL.equals(baseHashEdgeURL) ? baseHash : null;
+
+			results.put(edgeURL, saveConfigFile(edgeURL, configFile, content, hashForEdge));
+		}
+
+		return results;
 	}
 
 	/**

@@ -11,6 +11,7 @@ package org.frontcache.guard;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -490,6 +491,64 @@ public class GuardRuleEngineTest {
 	 * something to read. A dynamic proxy keeps this to a few lines - HttpServletRequest has far too
 	 * many methods to implement by hand, and the core module has no mocking library.
 	 */
+	// ---- validate(): the dry parse behind the console's Save ---------------------------------
+
+	/**
+	 * {@code validate} runs through the same parser and the same redirect-host allowlist the engine
+	 * loads with, so what the console refuses to save is exactly what this node would have refused to
+	 * load - and the operator finds out while the text is still in front of them, with a line number,
+	 * instead of from an error.log line after the fact.
+	 */
+	@Test
+	public void validateAcceptsAGoodFile() {
+		List<String> errors = engine.validate(
+				"# comment\n"
+				+ "\n"
+				+ "ping-by-ip | uri~^/fc-ping\\.jsp$ | allow\n"
+				+ "own-site   | uri~^/own-site\\.htm | redirect:302 https://own.example.com/welcome.htm\n"
+				+ "noisy      | uri~^/search\\.htm ; client-type:bot | reject:429 Slow Down | dry-run\n");
+
+		assertTrue("expected no errors, got " + errors, errors.isEmpty());
+	}
+
+	/**
+	 * Every kind of bad line the fixture file holds, reported with its line number. Each of these is a
+	 * line the loader skips with an error today - which is precisely why the console has to refuse the
+	 * save: the alternative is a rule that sits in the file looking active and does nothing.
+	 */
+	@Test
+	public void validateReportsEveryBadLineWithItsNumber() {
+		List<String> errors = engine.validate(
+				"ping-by-ip     | uri~^/fc-ping\\.jsp$ | allow\n"        // 1 - fine
+				+ "open-redirect  | uri~^/anything | redirect:302 https://evil.example.com/\n" // 2
+				+ "bad-regex      | uri~^/[unclosed | allow\n"            // 3
+				+ "unknown-pred   | cookies:hruc | allow\n"               // 4
+				+ "no-action      | uri~^/x\n");                          // 5
+
+		assertEquals("expected one error per bad line, got " + errors, 4, errors.size());
+		assertTrue(errors.get(0).startsWith("line 2:"));
+		assertTrue(errors.get(1).startsWith("line 3:"));
+		assertTrue(errors.get(2).startsWith("line 4:"));
+		assertTrue(errors.get(3).startsWith("line 5:"));
+	}
+
+	/**
+	 * Validation must not touch anything live.
+	 *
+	 * It parses rate-limit predicates, which bind to a process-wide bucket registry, and a rule list
+	 * the engine is serving from. Validating a file the operator has not saved yet must not swap the
+	 * rules, reset a hit counter or create a bucket - otherwise looking at a draft would change how
+	 * the node behaves.
+	 */
+	@Test
+	public void validateLeavesTheLiveRulesAlone() {
+		List<GuardRule> before = engine.getRules();
+
+		engine.validate("brand-new | uri~^/nothing/ ; rate:99/1s | reject:429\n");
+
+		assertSame("the live rule list must be the same object", before, engine.getRules());
+	}
+
 	private static RequestContext requestContext(String url, final Cookie[] cookies) {
 		RequestContext context = GuardRuleEngine.probeContext(url);
 

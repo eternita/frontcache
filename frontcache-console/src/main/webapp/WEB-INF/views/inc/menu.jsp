@@ -7,7 +7,10 @@
 <c:set var="uri" value="${empty requestScope['jakarta.servlet.forward.request_uri'] ? pageContext.request.requestURI : requestScope['jakarta.servlet.forward.request_uri']}"/>
 <c:choose>
 	<c:when test="${fn:contains(uri, 'realtime')}"><c:set var="topActive" value="realtime"/></c:when>
-	<c:when test="${fn:contains(uri, 'fallbacks') or fn:contains(uri, 'bot-configs') or fn:contains(uri, 'dynamic-urls') or fn:contains(uri, 'resilience') or fn:contains(uri, 'hystrix') or fn:contains(uri, 'guard-configs')}"><c:set var="topActive" value="configs"/></c:when>
+	<%-- save-config is in this list because the Configs screens render their POST result in place
+	     rather than redirecting (as cache-invalidation does), so the forward URI is /save-config and
+	     the top menu would otherwise lose its highlight on exactly the page that just did something. --%>
+	<c:when test="${fn:contains(uri, 'fallbacks') or fn:contains(uri, 'bot-configs') or fn:contains(uri, 'dynamic-urls') or fn:contains(uri, 'resilience') or fn:contains(uri, 'hystrix') or fn:contains(uri, 'guard-configs') or fn:contains(uri, 'save-config')}"><c:set var="topActive" value="configs"/></c:when>
 	<c:when test="${fn:contains(uri, 'cache-')}"><c:set var="topActive" value="cache"/></c:when>
 	<c:when test="${fn:contains(uri, 'guard')}"><c:set var="topActive" value="guard"/></c:when>
 	<c:when test="${fn:contains(uri, 'visitor-types')}"><c:set var="topActive" value="visitor"/></c:when>

@@ -80,6 +80,21 @@ public class FcResilienceRegistry {
 		return CIRCUIT_BREAKERS.find(commandKey).orElse(null);
 	}
 
+	/**
+	 * Forgets every breaker, bulkhead and time limiter, so the next command builds its own from the
+	 * config that is current then.
+	 *
+	 * <b>This drops circuit state.</b> An open breaker snaps closed and every rolling window restarts
+	 * at zero, which is visible on the realtime page as a step change. That is the cost of applying a
+	 * changed resilience.properties without a restart, and {@link FcResilienceReload} reports it rather
+	 * than leaving the operator to infer it - a breaker whose configuration just changed has no
+	 * meaningful accumulated history anyway.
+	 */
+	public static void invalidateAll()
+	{
+		reset();
+	}
+
 	/** Test seam - drops accumulated state so each test starts from a closed circuit. */
 	static void reset()
 	{

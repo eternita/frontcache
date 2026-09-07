@@ -209,6 +209,44 @@ public class GuardRuleEngine {
 		return builtIns;
 	}
 
+	/**
+	 * Dry-parses a candidate guard-rules.conf without touching anything live, for the
+	 * {@code set-config} management action.
+	 *
+	 * <b>Nothing here mutates state.</b> No rule swap, no {@code ClientIpResolver.reload()}, no hit
+	 * counters reset, no rate-limit buckets bound to the live registry - the parsed rules are thrown
+	 * away. The allowlist used is the live one, which is correct: it comes from
+	 * frontcache.properties, not from the file being edited.
+	 *
+	 * @return one message per unusable line, {@code "line N: ..."}, in file order; empty when the
+	 *         whole file parses
+	 */
+	public List<String> validate(String content)
+	{
+		List<String> errors = new ArrayList<String>();
+
+		if (null == content)
+			return errors;
+
+		GuardRuleParser parser = new GuardRuleParser(this.redirectHostAllowlist);
+
+		String[] lines = content.split("\n", -1);
+		for (int i = 0; i < lines.length; i++)
+		{
+			String trimmed = lines[i].trim();
+			if (0 == trimmed.length() || trimmed.startsWith("#"))
+				continue;
+
+			try {
+				checkNoSelfRedirect(parser.parse(trimmed));
+			} catch (GuardConfigException e) {
+				errors.add("line " + (i + 1) + ": " + e.getMessage());
+			}
+		}
+
+		return errors;
+	}
+
 	private List<GuardRule> loadConfiguredRules()
 	{
 		List<GuardRule> loaded = new ArrayList<GuardRule>();
