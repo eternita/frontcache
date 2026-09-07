@@ -353,7 +353,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				// trace headers of its own, and the parent's map is only ever read after parse.
 				// The batch endpoint has to be built from the FETCH base, or single includes go to the
 				// origin while combined ones keep looping back - the same fragment reachable two ways,
-				// which is how section 2 of docs/input-request-count-fix.md happened. Members stay
+				// which is how section 2 of docs/archive/input-request-count-fix.md happened. Members stay
 				// keyed on their public URLs; only the endpoint moves.
 				CombinedIncludeBatch batch = new CombinedIncludeBatch(
 						group.getKey(),
@@ -492,7 +492,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					// what this fragment is keyed, logged and fallen back on, and the fetch one is what
 					// goes on the wire. The fetch URL is DERIVED from the public one rather than
 					// re-concatenated from the tag, so FCUtils.canonicalizeURL stays the single
-					// normaliser for both - see docs/include-fetch-fix.md section 5.
+					// normaliser for both - see docs/archive/include-fetch-fix.md section 5.
 					String publicIncludeURL = hostURL + includeURL;
 					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, publicIncludeURL,
 							FCUtils.rebaseURL(publicIncludeURL, fetchBaseURL),

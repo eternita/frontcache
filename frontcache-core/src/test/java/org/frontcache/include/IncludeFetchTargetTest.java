@@ -57,7 +57,7 @@ import ch.qos.logback.core.read.ListAppender;
 /**
  * Where a cache-missing {@code <fc:include>} is fetched from, and who caches the answer.
  *
- * See docs/include-fetch-fix.md. One string used to do two jobs: the include's absolute URL was both
+ * See docs/archive/include-fetch-fix.md. One string used to do two jobs: the include's absolute URL was both
  * the cache key and the fetch target, so a miss was fetched from this node's own {@code Host} - back
  * out to the CDN and in at its own front door, which fetched the origin and cached the result on the
  * way through. {@code front-cache.include-fetch-target=origin} splits the two: the key stays the
@@ -348,7 +348,7 @@ public class IncludeFetchTargetTest {
 	 * Step 5. {@code CombineProtocol.endpointOf} derives the batch endpoint from a member's URL, so it
 	 * inherits whatever base that member carries. Leave it on the edge base and single includes go to
 	 * the origin while combined ones keep looping back - the same fragment reachable two ways, which
-	 * is how section 2 of docs/input-request-count-fix.md happened.
+	 * is how section 2 of docs/archive/input-request-count-fix.md happened.
 	 *
 	 * The members are the other half: they must stay keyed on their public URLs, or a combined write
 	 * and a single-include read never meet.

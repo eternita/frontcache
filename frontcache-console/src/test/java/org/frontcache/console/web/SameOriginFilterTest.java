@@ -21,7 +21,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * The cross-origin check on state-changing requests - docs/basic-auth-proposal.md section 8.1.
+ * The cross-origin check on state-changing requests - docs/archive/basic-auth-proposal.md section 8.1.
  *
  * It exists because turning Basic auth on makes CSRF reachable: the browser attaches cached Basic
  * credentials to a cross-site request by itself, and they are not cookies, so SameSite does not
@@ -217,7 +217,7 @@ public class SameOriginFilterTest {
 	/**
 	 * The login page is the one thing ConsoleAuthFilter serves without a credential, so this filter
 	 * is the only check standing in front of it - and login itself must not be drivable from
-	 * another site. See docs/console-login-ui.md section 8.
+	 * another site. See docs/archive/console-login-ui.md section 8.
 	 */
 	@Test
 	public void aCrossSiteLoginIsRejected() throws Exception {

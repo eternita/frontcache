@@ -25,7 +25,7 @@ import org.springframework.ui.ModelMap;
 import jakarta.servlet.http.HttpSession;
 
 /**
- * The console's login screen - see docs/console-login-ui.md.
+ * The console's login screen - see docs/archive/console-login-ui.md.
  *
  * Three of these carry more weight than the rest, and all three are silent when they break: the
  * {@code next} validation (an open redirect on a host an operator trusts), the failure branch

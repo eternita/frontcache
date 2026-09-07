@@ -217,7 +217,7 @@ public class GuardPredicateFactory {
 			// The bare-keyword form of bots.conf. Case-INSENSITIVE as of 2.9.0: the pre-2.9.0
 			// String.contains() meant a file listing 'Googlebot' did not match 'googlebot/2.1',
 			// which was a latent bug rather than a contract (see
-			// docs/dynamic-bots-classification-proposal.md section 4.2).
+			// docs/archive/dynamic-bots-classification-proposal.md section 4.2).
 			if (0 == arg.length())
 				throw new GuardConfigException("ua-contains predicate needs a value in '" + expr + "'");
 

@@ -416,7 +416,7 @@ var FcDashboard = (function () {
 			// One of the reasons for that error is that the session expired while the page was
 			// open, and EventSource never surfaces it: it does not expose the HTTP status and it
 			// retries a 401 forever, so the page would sit on "retrying ..." for good. Probe a
-			// normal endpoint once per error event to find out. See docs/console-login-ui.md
+			// normal endpoint once per error event to find out. See docs/archive/console-login-ui.md
 			// section 9.
 			probeForSignOut();
 		}, false);

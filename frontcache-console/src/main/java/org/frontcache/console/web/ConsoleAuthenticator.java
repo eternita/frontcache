@@ -16,7 +16,7 @@ import org.frontcache.console.service.FrontcacheService;
 
 /**
  * The console's single credential, and the ONE place it is compared - see
- * docs/console-login-ui.md section 6.3.
+ * docs/archive/console-login-ui.md section 6.3.
  *
  * Two callers present the same credential in two shapes: {@link ConsoleAuthFilter} reads an
  * {@code Authorization: Basic} header (a script, the container healthcheck, anything automated

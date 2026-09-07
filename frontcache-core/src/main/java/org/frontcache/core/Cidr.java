@@ -15,7 +15,7 @@ import java.net.InetAddress;
  *
  * Lived inside {@link ClientIpResolver} as a package-private nested class until a second caller
  * appeared in another package (the {@code client-ip:} rule predicate, shared by guard rules and
- * bots.conf - see docs/dynamic-bots-classification-proposal.md). Promoted rather than copied: one
+ * bots.conf - see docs/archive/dynamic-bots-classification-proposal.md). Promoted rather than copied: one
  * definition of "is this address inside that block", so a fix reaches both callers.
  *
  * Never throws. An address or block that cannot be parsed is null, and every caller treats null as

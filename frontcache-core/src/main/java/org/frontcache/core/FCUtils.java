@@ -527,7 +527,7 @@ public class FCUtils {
 	 * origin.example.com} because buildRequestHeaders drops the client's Host) and its port always
 	 * comes from our own config.
 	 *
-	 * Three things changed here in docs/guard-redirect-url-host-fix.md, all of them silent before:
+	 * Three things changed here in docs/archive/guard-redirect-url-host-fix.md, all of them silent before:
 	 *
 	 * <ul>
 	 * <li>the substituted host is the site's public name, not the Host this request arrived under -
@@ -992,7 +992,7 @@ public class FCUtils {
 	 *
 	 * That loop ran in production: 33 fragment URLs generating 608 origin fetches a second, each
 	 * one re-fetching a fragment that was already cached, unexpired and cacheable - because the key
-	 * being looked up had never existed. See docs/input-request-count-fix.md section 3.
+	 * being looked up had never existed. See docs/archive/input-request-count-fix.md section 3.
 	 *
 	 * Idempotent: canonicalizing an already-canonical URL returns it unchanged, so it is safe to
 	 * apply on a path that may already have applied it.
@@ -1021,12 +1021,12 @@ public class FCUtils {
 	/**
 	 * The same path and query, addressed at a different {@code scheme://host[:port]}.
 	 *
-	 * This is what splits an include's two jobs apart (docs/include-fetch-fix.md section 5). A
+	 * This is what splits an include's two jobs apart (docs/archive/include-fetch-fix.md section 5). A
 	 * cache-missing {@code <fc:include>} is keyed on the public URL and fetched from
 	 * {@code front-cache.origin-host}; the two differ only in the base, so the fetch URL is derived
 	 * from the public one rather than re-concatenated from the tag - re-concatenating would give a
 	 * second string to keep in step with {@link #canonicalizeURL}, and that drift is what section 2
-	 * of docs/input-request-count-fix.md was.
+	 * of docs/archive/input-request-count-fix.md was.
 	 *
 	 * The base is expected without a trailing slash, which is what {@code FrontCacheEngine.makeURL}
 	 * and {@code URL.toString()} produce for a host-only URL.

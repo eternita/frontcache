@@ -22,7 +22,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Rejects a state-changing request that a browser made from another site - see
- * docs/basic-auth-proposal.md section 8.1.
+ * docs/archive/basic-auth-proposal.md section 8.1.
  *
  * <h2>Why this ships with Basic auth rather than after it</h2>
  *

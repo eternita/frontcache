@@ -189,7 +189,7 @@ var FcEdgesStatus = (function () {
 			.then(function (response) {
 				// The session expired while this page was open. Without this the panel just goes
 				// quietly stale - "the numbers stopped updating" - which gets diagnosed as a broken
-				// edge rather than as a sign-out. See docs/console-login-ui.md section 9.
+				// edge rather than as a sign-out. See docs/archive/console-login-ui.md section 9.
 				if (401 === response.status)
 					return goToLogin();
 				if (!response.ok)

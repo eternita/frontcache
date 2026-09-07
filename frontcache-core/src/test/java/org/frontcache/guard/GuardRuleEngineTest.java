@@ -61,7 +61,7 @@ public class GuardRuleEngineTest {
 		FCConfig.setProperty("front-cache.guard-rules.allowed-redirect-hosts", "www.example-site.com");
 
 		// This node's own site. Deliberately NOT one of the allowed-redirect-hosts above: as of
-		// docs/guard-redirect-url-host-fix.md it is allowed as a redirect target on its own, which
+		// docs/archive/guard-redirect-url-host-fix.md it is allowed as a redirect target on its own, which
 		// is what the own-site fixture rule exists to prove. It is also what the runtime sanitizer
 		// rewrites a disallowed embedded host onto.
 		FCConfig.setProperty("front-cache.default-domain", "own.example.com");

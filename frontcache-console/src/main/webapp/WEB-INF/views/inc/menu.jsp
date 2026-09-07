@@ -50,7 +50,7 @@
 				<li><a href="edges" class="${topActive == 'edges' ? 'active-top' : ''}">Edges </a></li>
 			</ul>
 			<%-- Who is signed in, and the only way to stop being signed in - see
-			     docs/console-login-ui.md section 8.
+			     docs/archive/console-login-ui.md section 8.
 
 			     Rendered from the session attribute, so the block is absent for exactly the two
 			     cases where it would lie: authentication off (nothing to sign out of) and a

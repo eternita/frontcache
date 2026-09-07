@@ -26,7 +26,7 @@ import org.junit.Test;
  *
  * The origin cannot work it out: buildRequestHeaders has to drop the client's Host, because the
  * connection goes to the origin, so the app sees {@code Host: origin.example.com} and builds
- * absolute URLs naming it. See docs/guard-redirect-url-host-fix.md §3.
+ * absolute URLs naming it. See docs/archive/guard-redirect-url-host-fix.md §3.
  *
  * Off by default, and that default is the thing most worth pinning: switching it on changes every
  * absolute URL an app with a forwarded-headers filter emits.

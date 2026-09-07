@@ -34,7 +34,7 @@ import org.junit.Test;
 
 /**
  * What {@code front-cache.origin-host} / {@code front-cache.origin-http-port} actually address in
- * <b>filter mode</b> - the question docs/include-fetch-fix.md section 5, step 6 left open before
+ * <b>filter mode</b> - the question docs/archive/include-fetch-fix.md section 5, step 6 left open before
  * includes could be pointed at the origin there.
  *
  * The shipped properties say those ports are <i>"mandatory for FILTER MODE (used for soft

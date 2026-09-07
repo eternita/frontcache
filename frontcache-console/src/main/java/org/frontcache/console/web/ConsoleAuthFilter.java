@@ -29,8 +29,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 /**
- * Authentication for the whole console - see docs/basic-auth-proposal.md (the credential) and
- * docs/console-login-ui.md (the login screen).
+ * Authentication for the whole console - see docs/archive/basic-auth-proposal.md (the credential) and
+ * docs/archive/console-login-ui.md (the login screen).
  *
  * One user, no roles, credentials from conf/frontcache-console.conf. The console can invalidate the
  * cache of every node it knows and holds the api-key that authorizes it, so an unauthenticated
@@ -81,7 +81,7 @@ public class ConsoleAuthFilter implements Filter {
 	public static final String LOGIN_PATH = "/login";
 
 	/**
-	 * The only paths served without a credential - see docs/console-login-ui.md section 6.2.
+	 * The only paths served without a credential - see docs/archive/console-login-ui.md section 6.2.
 	 *
 	 * <b>Exact match, never a prefix, and this is the security-critical line of the change.</b> A
 	 * prefix match on {@code /static/} would be shorter and would also expose every asset the
@@ -204,7 +204,7 @@ public class ConsoleAuthFilter implements Filter {
 
 	/**
 	 * Refuse - as a redirect to the login page for a browser, as a 401 with the Basic challenge for
-	 * everything else. See docs/console-login-ui.md section 5.2.
+	 * everything else. See docs/archive/console-login-ui.md section 5.2.
 	 *
 	 * <b>{@code Accept} chooses the shape of the refusal and never authorizes anything.</b> Both
 	 * misclassifications are visible immediately: a page navigation read as programmatic shows the

@@ -206,7 +206,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * configured.
      *
      * This is NOT {@link #getFrontCacheHost()} and the two must not be confused - that is the whole
-     * of docs/guard-redirect-url-host-fix.md. getFrontCacheHost() is the Host header as it arrived,
+     * of docs/archive/guard-redirect-url-host-fix.md. getFrontCacheHost() is the Host header as it arrived,
      * which is what predicates match, what the log lines record and what the cache key is built
      * from; a node is reachable under several of them (the CDN's, an internal alias, its own name,
      * a bare IP). This one is the single name we are willing to hand to a browser.

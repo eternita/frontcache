@@ -313,7 +313,7 @@ public class ClientIpResolverTest {
 	 * The scheme of an emitted URL is read from X-Forwarded-Proto under exactly this rule, and for a
 	 * sharper reason than the client IP: that value goes into a redirect a browser follows, so a
 	 * client able to set it could choose the scheme of a URL Frontcache vouches for.
-	 * See docs/guard-redirect-url-host-fix.md.
+	 * See docs/archive/guard-redirect-url-host-fix.md.
 	 */
 	@Test
 	public void aPeerInsideAConfiguredCidrIsTrusted() {

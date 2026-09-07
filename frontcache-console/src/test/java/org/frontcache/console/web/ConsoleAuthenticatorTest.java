@@ -21,7 +21,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 /**
- * The one place the console's credential is compared - see docs/console-login-ui.md section 6.3.
+ * The one place the console's credential is compared - see docs/archive/console-login-ui.md section 6.3.
  *
  * Both callers are covered here because they are the same comparison in two shapes: the login form
  * (two fields) and {@code Authorization: Basic} (one header). A second copy of a constant-time

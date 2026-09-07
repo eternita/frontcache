@@ -121,7 +121,7 @@ public class BotRuleParser {
 	 * stylistic choice: a WebResponse's expireTimeMap is stored in the L2 index keyed by client
 	 * type, so a third value would leave every entry already on disk without a key for it - which
 	 * FCUtils.isWebComponentCacheableForClientType answers by logging an error and never caching
-	 * that URL again. See docs/dynamic-bots-classification-proposal.md section 3.
+	 * that URL again. See docs/archive/dynamic-bots-classification-proposal.md section 3.
 	 */
 	private static String parseClientType(String value, String line)
 	{

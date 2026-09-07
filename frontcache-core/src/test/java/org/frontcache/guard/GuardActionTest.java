@@ -25,7 +25,7 @@ import org.junit.Test;
 /**
  * What a guard redirect PUTS IN the URL it hands to a browser.
  *
- * The bug this covers (docs/guard-redirect-url-host-fix.md): ${url} was built from the Host header
+ * The bug this covers (docs/archive/guard-redirect-url-host-fix.md): ${url} was built from the Host header
  * as it arrived, so a node reached under its own name, an internal alias, the origin's name or a
  * bare IP baked that into a {@code return=} parameter and handed it to a visitor. On one edge, one
  * day, 18.9% of the login redirects carried a hostname or scheme the public site does not use.

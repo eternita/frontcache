@@ -109,7 +109,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * public hostname to {@code origin-host}, that node - us - starts writing the fragment under a
 	 * SECOND key, while this side writes it under the public one. Two entries per fragment: exactly
 	 * the failure this whole change exists to avoid, arriving through a door section 8 of
-	 * docs/include-fetch-fix.md did not know about.
+	 * docs/archive/include-fetch-fix.md did not know about.
 	 *
 	 * It is invisible in the obvious deployment, because {@code origin-host} usually resolves to the
 	 * same name the node is reached at - the two keys coincide and nothing looks wrong. It took
@@ -372,7 +372,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	/**
 	 * Resolve one include: from cache when it is there, from the origin when it is not.
 	 *
-	 * The two URLs are the whole of docs/include-fetch-fix.md. {@code publicURL} is this node's own
+	 * The two URLs are the whole of docs/archive/include-fetch-fix.md. {@code publicURL} is this node's own
 	 * address for the fragment and is what the entry is KEYED on - rebasing the key would orphan
 	 * every existing entry and leave two keys per fragment depending on which path filled it.
 	 * {@code fetchURL} is what goes on the wire. They are the same string until
@@ -519,7 +519,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * origin directly and both of those stop happening - so both are done here instead, and only
 	 * then ({@link #isDirectOriginFetch}). Miss the cache write and every include becomes an
 	 * uncached origin call, forever, with nothing in the logs to say so: failure mode 1 of
-	 * docs/include-fetch-fix.md section 8.
+	 * docs/archive/include-fetch-fix.md section 8.
 	 *
 	 * @param publicURL cache key and log line - never the URL this fetched with
 	 * @param fetchURL  what goes on the wire

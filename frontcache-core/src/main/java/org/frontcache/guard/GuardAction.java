@@ -116,7 +116,7 @@ public class GuardAction {
 	 * (front-cache.default-domain), not the Host this particular request arrived under.
 	 *
 	 * The two are different questions and conflating them is the bug in
-	 * docs/guard-redirect-url-host-fix.md: a node is reachable under the CDN's name, an internal
+	 * docs/archive/guard-redirect-url-host-fix.md: a node is reachable under the CDN's name, an internal
 	 * alias, its own hostname and a bare IP, and every one of those used to end up in a browser's
 	 * address bar via ${url}. Predicates (host~, host:ip) still read getFrontCacheHost(), because
 	 * they ask the opposite question - what actually arrived.

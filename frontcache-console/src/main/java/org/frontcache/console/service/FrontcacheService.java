@@ -135,7 +135,7 @@ public class FrontcacheService {
 	}
 
 	/**
-	 * Reads the console's single login - see docs/basic-auth-proposal.md.
+	 * Reads the console's single login - see docs/archive/basic-auth-proposal.md.
 	 *
 	 * <b>Every key here is read through hasPath first.</b> {@code Config.getString} throws on a
 	 * missing key, so reading these the way apiKey is read would make every console whose config
@@ -561,7 +561,7 @@ public class FrontcacheService {
 
 	/**
 	 * Whether the session cookie carries the {@code Secure} attribute - see
-	 * docs/console-login-ui.md section 4.4.
+	 * docs/archive/console-login-ui.md section 4.4.
 	 *
 	 * <b>A config key rather than a detection, and it has to be.</b> The attribute is set once per
 	 * servlet context at startup, while whether the browser used HTTPS is a per-request fact

@@ -24,12 +24,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
 /**
- * The console's login screen - see docs/console-login-ui.md.
+ * The console's login screen - see docs/archive/console-login-ui.md.
  *
  * The credential is unchanged from 2.9.0: one user, no roles, read from
  * conf/frontcache-console.conf, compared in {@link ConsoleAuthenticator}. What this adds is the
  * page, the session that remembers a successful sign-in, and a logout - which Basic authentication
- * could not have (section 9.3 of docs/basic-auth-proposal.md) because a browser re-sends a cached
+ * could not have (section 9.3 of docs/archive/basic-auth-proposal.md) because a browser re-sends a cached
  * credential whatever the server does.
  */
 @Controller
@@ -156,7 +156,7 @@ public class LoginController {
 	}
 
 	/**
-	 * Validates where a login is allowed to send the browser - see docs/console-login-ui.md
+	 * Validates where a login is allowed to send the browser - see docs/archive/console-login-ui.md
 	 * section 7.6.
 	 *
 	 * {@code next} reaches here from a query parameter and from a form field, so it is caller

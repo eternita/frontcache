@@ -543,7 +543,7 @@ public class FrontCacheEngine {
 					+ " (it is " + ((null == domain) ? "null" : "'" + domain + "'") + ")."
 					+ " Guard-rule ${url} / ${host} and origin-redirect rewriting will echo whatever Host"
 					+ " each request arrives under, which is not always the public one"
-					+ " - see docs/guard-redirect-url-host-fix.md");
+					+ " - see docs/archive/guard-redirect-url-host-fix.md");
 		} else {
 			String scheme = (null != publicScheme) ? publicScheme : "<from X-Forwarded-Proto or the incoming connection>";
 			logger.info("Public identity for emitted URLs (guard-rule ${url} / ${host}, origin-redirect"

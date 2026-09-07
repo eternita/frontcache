@@ -19,7 +19,7 @@ import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.SessionCookieConfig;
 
 /**
- * The two session-cookie attributes web.xml cannot express - see docs/console-login-ui.md
+ * The two session-cookie attributes web.xml cannot express - see docs/archive/console-login-ui.md
  * section 4.4.
  *
  * {@code HttpOnly}, the cookie name and the timeout are in web.xml. These two are not:
@@ -27,7 +27,7 @@ import jakarta.servlet.SessionCookieConfig;
  * <ul>
  * <li><b>{@code SameSite=Lax}</b> has no web.xml element; {@code SessionCookieConfig.setAttribute}
  *     (Servlet 6.0) is the only way to set it. It is a real gain over Basic, which section 8.1 of
- *     docs/basic-auth-proposal.md had to note was immune to SameSite because Basic credentials are
+ *     docs/archive/basic-auth-proposal.md had to note was immune to SameSite because Basic credentials are
  *     not cookies. {@code Lax} rather than {@code Strict} so following a bookmark or a link into
  *     the console does not land on the login page while a perfectly good session exists.</li>
  * <li><b>{@code Secure}</b> is in web.xml but has to be a decision, not a constant - see
