@@ -454,9 +454,23 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 					cacheProcessor.doSoftInvalidation(cacheKey, FCUtils.canonicalizeURL(fetchURL), requestHeaders, client, context);
 					softRefresh = true;
 				} else {
-					// regular expiration
-					cacheProcessor.removeFromCache(cacheKey);
-					webResponse = null; // refresh from origin
+					// Regular expiration - but only for THIS request's client type. With two live TTLs
+					// (maxage="bot:30d, guest:1d") the entry is one shared copy carrying two expiration
+					// stamps, so a guest arriving at T+25h must not delete the copy that is valid for
+					// bots for another 29 days. Drop it only once NO client type can still be served
+					// from it - the same max(T_bot, T_guest) predicate purge() already uses.
+					//
+					// Usually the refetch below puts the entry straight back, which is what makes this
+					// invisible in testing. The cases where it does not are the ones that hurt: the
+					// write is skipped when a fallback was served (origin down), on a 5xx, on an empty
+					// body, on a non-text content type. Then the delete succeeded, the repopulate did
+					// not, and every crawler goes to a dead origin because one human happened by.
+					long latestExpireTime = webResponse.getExpireTimeMillis(); // max across client types
+					if (CacheProcessor.CACHE_FOREVER != latestExpireTime
+							&& latestExpireTime < System.currentTimeMillis())
+						cacheProcessor.removeFromCache(cacheKey);
+
+					webResponse = null; // refresh from origin either way
 				}
 			}
 		}
