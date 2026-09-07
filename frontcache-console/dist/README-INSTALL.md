@@ -40,13 +40,19 @@ frontcache {
   node's management API for cache state and stats.
 - `apiKey` — must match `front-cache.api-key` in every node's `frontcache.properties`.
   Without it the nodes reject the console's calls.
-- `user` / `password` — the console's single login (one user, no roles), asked for by the browser
-  as HTTP Basic. **Change the password**: `admin`/`admin` is what the bundle ships with, and the
-  console warns on every startup until it is something else.
+- `user` / `password` — the console's single login (one user, no roles). A browser signs in on the
+  console's own login page; `curl`, the container healthcheck and anything already automated keep
+  presenting the same pair as HTTP Basic. **Change the password**: `admin`/`admin` is what the
+  bundle ships with, and the console warns on every startup until it is something else.
 
   Remove **both** lines to run without authentication — the console then warns about *that* on
-  every startup instead. Setting one without the other is a startup failure, not a guess. Add
-  `auth-required = true` to refuse to start rather than run unauthenticated.
+  every startup instead, and `/login` stops being a page. Setting one without the other is a
+  startup failure, not a guess. Add `auth-required = true` to refuse to start rather than run
+  unauthenticated.
+- `session-cookie-secure` — adds `Secure` to the session cookie. Default false; turn it on when the
+  console is reached over HTTPS, including through a TLS-terminating proxy, which the console cannot
+  detect for itself. With it on behind plain HTTP the login page accepts the password and comes
+  straight back, because the cookie is never sent.
 
 
 ## 3. Run
@@ -67,16 +73,19 @@ The console can invalidate cache across the whole fleet, so **do not expose it p
 
 1. **Change the password** in `conf/frontcache-console.conf` (§2). The shipped `admin`/`admin` is
    a published default, and the console says so at startup until you change it.
-2. **Terminate TLS in front of it, or keep it on an internal network.** HTTP Basic sends
-   `user:password` base64-encoded — that is encoding, not encryption — on *every* request,
-   including the long-lived dashboard stream. Authentication makes the console safe to leave
-   running; it does not make it safe to publish.
+2. **Terminate TLS in front of it, or keep it on an internal network**, and set
+   `session-cookie-secure = true` when you do. The session cookie is a bearer token, and the Basic
+   path — which `curl` and the healthcheck still use — sends `user:password` base64-encoded on
+   *every* request, which is encoding, not encryption. Authentication makes the console safe to
+   leave running; it does not make it safe to publish.
 3. **For more than one operator, put it behind an authenticating reverse proxy** (nginx,
    oauth2-proxy, your SSO). One shared password has no accountability — nothing in a log can say
    *who* flushed the cache — and no revocation short of changing it for everybody.
 
-There is no logout: HTTP Basic has none. Browsers cache the credentials for the origin until they
-are closed.
+**Sign out** is in the top right of every screen, beside the user name. It ends the browser's
+session; a restart of the console ends every session, since they are held in memory and not
+persisted. It does not affect a `curl` that sends the credential on each call — there is nothing
+there to end.
 
 ## Upgrading
 

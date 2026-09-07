@@ -29,6 +29,25 @@ var FcEdgesStatus = (function () {
 		return typeof value === "number" && value >= 0;
 	}
 
+	/**
+	 * The session expired: hand the browser to the login page, remembering where it was.
+	 *
+	 * Deliberately not shared with fc-dashboard.js, which needs the same three lines: these two
+	 * modules are dependency-free and load on different sets of pages, and a shared helper would
+	 * make one of them depend on the other's script tag being present.
+	 */
+	function goToLogin() {
+		// The LAST path segment plus the query, not the whole pathname: every console URL is one
+		// segment under the context root, and LoginController resolves "next" relative to the
+		// context - so a console deployed at /console would otherwise come back to
+		// /console/console/cache-view. Both URLs here are relative for the same reason, which is
+		// the convention the JSPs already follow ("realtime", "edges-status.json").
+		var path = window.location.pathname;
+		var here = path.substring(path.lastIndexOf("/")) + window.location.search;
+
+		window.location.replace("login?next=" + encodeURIComponent(here));
+	}
+
 	// ---- formatting ------------------------------------------------------------------------------
 
 	function count(value) {
@@ -168,12 +187,19 @@ var FcEdgesStatus = (function () {
 
 		fetch(this.url, { credentials: "same-origin", headers: { "Accept": "application/json" } })
 			.then(function (response) {
+				// The session expired while this page was open. Without this the panel just goes
+				// quietly stale - "the numbers stopped updating" - which gets diagnosed as a broken
+				// edge rather than as a sign-out. See docs/console-login-ui.md section 9.
+				if (401 === response.status)
+					return goToLogin();
 				if (!response.ok)
 					throw new Error("HTTP " + response.status);
 				return response.json();
 			})
 			.then(function (edges) {
-				self.apply(edges || []);
+				// undefined is the sign-out branch above having taken over the page
+				if (edges)
+					self.apply(edges);
 			})
 			.catch(function (e) {
 				// A failed poll is not worth disturbing the panel over: the numbers on screen are the

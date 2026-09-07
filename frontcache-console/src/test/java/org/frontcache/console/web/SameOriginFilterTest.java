@@ -214,4 +214,30 @@ public class SameOriginFilterTest {
 		assertTrue(passes(request));
 	}
 
+	/**
+	 * The login page is the one thing ConsoleAuthFilter serves without a credential, so this filter
+	 * is the only check standing in front of it - and login itself must not be drivable from
+	 * another site. See docs/console-login-ui.md section 8.
+	 */
+	@Test
+	public void aCrossSiteLoginIsRejected() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/login");
+		request.addHeader("Host", "console.example.com:7080");
+		request.addHeader("Origin", "https://evil.example.net");
+
+		assertFalse(passes(request));
+		assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
+	}
+
+	/** Same for the sign-out, which is a POST for exactly this reason. */
+	@Test
+	public void aCrossSiteLogoutIsRejected() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/logout");
+		request.addHeader("Host", "console.example.com:7080");
+		request.addHeader("Origin", "https://evil.example.net");
+
+		assertFalse(passes(request));
+		assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
+	}
+
 }

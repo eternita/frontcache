@@ -80,9 +80,16 @@ That matters because Docker seeds a named volume from the image **only the first
 used** — without this, a newer image's config files would never reach an existing volume, and
 upgrades would silently keep running on old config. Files you have edited are never touched.
 
-> **The console has no authentication of its own** and can invalidate cache across the whole
-> fleet. It is published on `127.0.0.1` by default; reach it over an ssh tunnel, or put an
-> authenticating proxy in front of it. Do not bind it to a public interface.
+> **The console the image renders has no login**, and can invalidate cache across the whole fleet.
+> The console itself authenticates - a login page, one user - but the config the entrypoint writes
+> from `FC_NODES` carries no `user`/`password`, so authentication is off until you mount a
+> `frontcache-console.conf` that sets them. It is published on `127.0.0.1` by default; reach it over
+> an ssh tunnel, or put an authenticating proxy in front of it. Do not bind it to a public
+> interface.
+>
+> Note that this image's `HEALTHCHECK` (`curl -f .../realtime`) predates console authentication and
+> **reports unhealthy on a console that has credentials**, since an un-authenticated request is a
+> `401` by design. It only passes today because the rendered config sets no login.
 
 ## Building and publishing images
 

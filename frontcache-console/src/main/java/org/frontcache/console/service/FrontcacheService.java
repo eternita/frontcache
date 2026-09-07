@@ -560,6 +560,33 @@ public class FrontcacheService {
 	private static final String CONFIG_EDITING_KEY = "config-editing";
 
 	/**
+	 * Whether the session cookie carries the {@code Secure} attribute - see
+	 * docs/console-login-ui.md section 4.4.
+	 *
+	 * <b>A config key rather than a detection, and it has to be.</b> The attribute is set once per
+	 * servlet context at startup, while whether the browser used HTTPS is a per-request fact
+	 * ({@code X-Forwarded-Proto}) on exactly the deployments careful enough to put TLS in front -
+	 * the same split {@code SameOriginFilter} documents. Defaulting it ON would mean the cookie is
+	 * never sent on the plain-HTTP internal consoles that are the common case, and the symptom is a
+	 * login page that accepts the password and returns to the login page.
+	 */
+	public boolean isSessionCookieSecure() {
+		return sessionCookieSecure(fcConsoleConfig);
+	}
+
+	/** The reading half of {@link #isSessionCookieSecure()}, testable without a config file. */
+	static boolean sessionCookieSecure(Config config) {
+
+		if (null != config && config.hasPath(SESSION_COOKIE_SECURE_KEY))
+			return config.getBoolean(SESSION_COOKIE_SECURE_KEY);
+
+		return false;
+	}
+
+	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
+	private static final String SESSION_COOKIE_SECURE_KEY = "session-cookie-secure";
+
+	/**
 	 * Writes one config file to one edge and applies it.
 	 *
 	 * Addressed by edge URL, never by name - see {@link EdgeConfigFile}.
