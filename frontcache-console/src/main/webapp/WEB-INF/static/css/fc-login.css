@@ -1,0 +1,111 @@
+/* ---- the login page (views/login.jsp) ----
+
+   Named after the page it styles, the arrangement fc-config-editor.css, fc-edges-status.css and
+   fc-dashboard.css already follow - and the reason app.css (minified, vendor-ish) is not touched.
+
+   Bootstrap is local and could have been reused, but it would have had to join the filter's
+   exclusion set (ConsoleAuthFilter.ANONYMOUS_PATHS) for a card layout that is thirty lines of CSS.
+   Nothing here is fetched: system fonts, no images beyond the logo the page already carries. */
+
+body {
+	margin: 0;
+	background-color: #f4f5f7;
+	color: #333;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	font-size: 14px;
+}
+
+.fc-login {
+	display: flex;
+	justify-content: center;
+	/* Slightly above centre rather than dead-centre, which reads better under tall browser chrome. */
+	padding: 10vh 16px 16px;
+}
+
+.fc-login-card {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 360px;
+	padding: 28px 28px 24px;
+	background-color: #fff;
+	border: 1px solid #e1e4e8;
+	border-radius: 6px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+	text-align: left;
+}
+
+.fc-login-logo {
+	display: block;
+	margin: 0 auto 18px;
+}
+
+.fc-login-title {
+	margin: 0 0 20px;
+	font-size: 18px;
+	font-weight: 600;
+	text-align: center;
+	color: #24292e;
+}
+
+/* One message for every kind of wrong credential (LoginController.WRONG_CREDENTIAL), above the
+   fields rather than beside one of them - it does not say WHICH field was wrong, and must not
+   look like it does. */
+.fc-login-error {
+	margin: 0 0 16px;
+	padding: 9px 12px;
+	background-color: #fdecea;
+	border: 1px solid #f5c2bd;
+	border-radius: 4px;
+	color: #a12622;
+}
+
+.fc-login-label {
+	display: block;
+	margin-bottom: 5px;
+	font-weight: 600;
+	color: #444;
+}
+
+.fc-login-input {
+	box-sizing: border-box;
+	width: 100%;
+	margin-bottom: 16px;
+	padding: 8px 10px;
+	font-size: 14px;
+	font-family: inherit;
+	color: #333;
+	background-color: #fff;
+	border: 1px solid #ccd1d5;
+	border-radius: 4px;
+}
+
+/* Never "outline: none" here: this is a two-field form and the focus ring is how a keyboard user
+   knows which field they are in. */
+.fc-login-input:focus {
+	border-color: #66afe9;
+	outline: 2px solid rgba(102, 175, 233, .45);
+	outline-offset: 0;
+}
+
+.fc-login-submit {
+	width: 100%;
+	margin-top: 4px;
+	padding: 9px 12px;
+	font-size: 14px;
+	font-weight: 600;
+	font-family: inherit;
+	color: #fff;
+	background-color: #337ab7;
+	border: 1px solid #2e6da4;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.fc-login-submit:hover {
+	background-color: #2d6da3;
+}
+
+.fc-login-submit:focus {
+	outline: 2px solid rgba(102, 175, 233, .65);
+	outline-offset: 2px;
+}

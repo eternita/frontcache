@@ -412,8 +412,52 @@ var FcDashboard = (function () {
 			self.status.style.display = "";
 			self.status.className = "fc-status failed";
 			self.status.textContent = "Unable to read the metrics stream from " + edgeUrl + " - retrying ...";
+
+			// One of the reasons for that error is that the session expired while the page was
+			// open, and EventSource never surfaces it: it does not expose the HTTP status and it
+			// retries a 401 forever, so the page would sit on "retrying ..." for good. Probe a
+			// normal endpoint once per error event to find out. See docs/console-login-ui.md
+			// section 9.
+			probeForSignOut();
 		}, false);
 	};
+
+	/**
+	 * Hand the browser to the login page if - and only if - the console is answering 401.
+	 *
+	 * Any other outcome (the node is down, the relay dropped, the console is unreachable) is left
+	 * to the "retrying ..." message above, which is the honest description of it.
+	 *
+	 * At most one probe is in flight: an error event fires per reconnect, per panel, and a fleet of
+	 * edges behind a signed-out console would otherwise issue a burst of them.
+	 */
+	var signOutProbeInFlight = false;
+
+	function probeForSignOut() {
+
+		if (signOutProbeInFlight || !window.fetch)
+			return;
+
+		signOutProbeInFlight = true;
+
+		fetch("edges-status.json", { credentials: "same-origin", headers: { "Accept": "application/json" } })
+			.then(function (response) {
+				if (401 === response.status)
+				{
+					// The last path segment only - see the same note in fc-edges-status.js.
+					var path = window.location.pathname;
+					var here = path.substring(path.lastIndexOf("/")) + window.location.search;
+
+					window.location.replace("login?next=" + encodeURIComponent(here));
+				}
+			})
+			.catch(function () {
+				// The console itself is unreachable. Not a sign-out; the panel already says so.
+			})
+			.then(function () {
+				signOutProbeInFlight = false;
+			});
+	}
 
 	StreamPanel.prototype.onFrame = function (raw) {
 

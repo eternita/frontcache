@@ -3,8 +3,10 @@
 # Entrypoint for the Frontcache console image.
 #
 # The console is a separate process from the server (the server's launcher deploys exactly
-# one webapp at context "/"), listening on $FRONTCACHE_CONSOLE_PORT (7080 by default). It
-# has NO authentication of its own and can invalidate cache across the whole fleet, so it
+# one webapp at context "/"), listening on $FRONTCACHE_CONSOLE_PORT (7080 by default). The
+# console CAN authenticate (a login page, one user), but the config rendered below carries no
+# user/password - so this container runs unauthenticated unless the operator mounts their own
+# frontcache-console.conf. It can invalidate cache across the whole fleet either way, so it
 # must never be published to a public interface.
 #
 # Config resolution, in order:

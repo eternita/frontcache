@@ -66,8 +66,13 @@ webapp and the engine are up.
 
 ## Console
 
-`pavlikovskiy/frontcache-console` — realtime stats and cache management on 7080. It has **no
-authentication** and can invalidate cache across a fleet; keep it on loopback.
+`pavlikovskiy/frontcache-console` — realtime stats and cache management on 7080. The console can
+authenticate (a login page, one user), but **the config this image renders sets no login**, so the
+container runs unauthenticated unless you mount a `frontcache-console.conf` with `user`/`password`.
+It can invalidate cache across a fleet; keep it on loopback either way.
+
+A `HEALTHCHECK` GETs `/login` — the one path served without a credential, so it works whether or not
+a login is configured.
 
 ## Licence
 

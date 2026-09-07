@@ -19,6 +19,11 @@
 
 <style>
 	#top .navbar-nav > li > a.active-top { font-weight: bold; text-decoration: underline; }
+	/* the identity block below: a one-button form has to sit on the navbar's baseline without
+	   Bootstrap's form margins pushing the row taller */
+	#top .fc-signed-in { padding-right: 6px; }
+	#top .fc-signout { margin: 0; padding: 0; display: inline; }
+	#top .fc-signout button { border: 0; background: none; }
 </style>
 
 <nav class="navbar navbar-default navbar-static-top" id="top">
@@ -44,6 +49,24 @@
                 <li><a href="visitor-types" class="${topActive == 'visitor' ? 'active-top' : ''}">Visitor Types </a></li>
 				<li><a href="edges" class="${topActive == 'edges' ? 'active-top' : ''}">Edges </a></li>
 			</ul>
+			<%-- Who is signed in, and the only way to stop being signed in - see
+			     docs/console-login-ui.md section 8.
+
+			     Rendered from the session attribute, so the block is absent for exactly the two
+			     cases where it would lie: authentication off (nothing to sign out of) and a
+			     Basic-authenticated caller, whose browser re-sends the credential whatever the
+			     server does. POST, not a link: a GET /logout is prefetchable and embeddable, and
+			     POST is what SameOriginFilter covers. --%>
+			<c:if test="${not empty sessionScope['fc.user']}">
+				<ul class="nav navbar-nav navbar-right">
+					<li class="navbar-text fc-signed-in"><c:out value="${sessionScope['fc.user']}"/></li>
+					<li>
+						<form class="fc-signout" method="post" action="<c:url value='/logout'/>">
+							<button type="submit" class="btn btn-link">Sign out</button>
+						</form>
+					</li>
+				</ul>
+			</c:if>
 		</nav>
 	</div>
 </nav>

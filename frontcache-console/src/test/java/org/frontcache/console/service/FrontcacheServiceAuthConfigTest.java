@@ -9,6 +9,7 @@
 package org.frontcache.console.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -134,6 +135,30 @@ public class FrontcacheServiceAuthConfigTest {
 		} catch (IllegalStateException e) {
 			assertTrue(e.getMessage(), e.getMessage().contains("must not"));
 		}
+	}
+
+	// ---- the session cookie's Secure attribute -------------------------------------------------
+
+	/**
+	 * Default OFF, and that is the decision rather than an oversight - see
+	 * docs/console-login-ui.md section 4.4. Defaulting it on means the cookie is never sent on the
+	 * plain-HTTP internal consoles that are the common case, and the symptom is a login page that
+	 * accepts the password and returns to the login page.
+	 */
+	@Test
+	public void theSessionCookieIsNotSecureUnlessTheFileSaysSo() {
+		assertFalse(FrontcacheService.sessionCookieSecure(config(PRE_UPGRADE_FILE)));
+		assertFalse(FrontcacheService.sessionCookieSecure(config("")));
+		assertFalse(FrontcacheService.sessionCookieSecure(null));
+	}
+
+	@Test
+	public void theSessionCookieIsSecureWhenTheFileSaysSo() {
+		assertTrue(FrontcacheService.sessionCookieSecure(
+				config(PRE_UPGRADE_FILE + "session-cookie-secure = true\n")));
+
+		assertFalse(FrontcacheService.sessionCookieSecure(
+				config(PRE_UPGRADE_FILE + "session-cookie-secure = false\n")));
 	}
 
 }
