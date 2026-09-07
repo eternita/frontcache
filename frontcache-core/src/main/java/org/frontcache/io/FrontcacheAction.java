@@ -83,6 +83,40 @@ public abstract class FrontcacheAction {
 
 	public static final String RELOAD_GUARD_RULES = "reload-guard-rules";
 
+	/**
+	 * Writes one config file and (unless {@code apply=false}) applies it - the console's Configs
+	 * screens save through this.
+	 *
+	 * <b>One action for all five files, and the {@code file} parameter is a logical id, never a path
+	 * or a file name</b> - {@code resilience}, {@code guard-rules}, {@code bots},
+	 * {@code dynamic-urls}, {@code fallbacks}. The read side has five actions because each returns a
+	 * differently-named field for wire-format reasons that predate the current shape; the write side
+	 * has one uniform outcome, so five actions would be one operation spelled five times. And a
+	 * caller-supplied file name - even one checked for {@code ..} - is how this becomes an arbitrary
+	 * file write on a node, so it is not accepted at all.
+	 *
+	 * Unlike every other action here this one refuses a node with no API key configured, where
+	 * {@code ApiKey.isAuthorized} allows it. See {@code ApiKey.isAuthorizedToWrite}.
+	 */
+	public static final String SET_CONFIG = "set-config";
+
+	/**
+	 * Re-reads ./conf/resilience.properties and applies what can be applied without a restart.
+	 *
+	 * New because there was no way to apply that file at all: it is read once into a cached singleton
+	 * and two further caches are built from it. See {@code FcResilienceReload}.
+	 */
+	public static final String RELOAD_RESILIENCE = "reload-resilience";
+
+	/**
+	 * Re-reads ./conf/dynamic-urls.conf.
+	 *
+	 * New for the same reason: the file is read by FCConfig's static initializer, and the {@code reload}
+	 * action does NOT re-read it (the FCConfig.init() call in FrontCacheEngine is commented out), so
+	 * adding a pattern meant restarting the node.
+	 */
+	public static final String RELOAD_DYNAMIC_URLS = "reload-dynamic-urls";
+
 	public static final String PATCH = "patch";
 
 	public static final String PURGE = "purge";
@@ -116,6 +150,9 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.GET_GUARD_RULES, "get guard rules (checks running before cache & origin) in evaluation order, with hit counts - built-ins plus ./conf/guard-rules.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_GUARD_CONFIG, "get raw guard rules configuration from ./conf/guard-rules.conf");
 		actionsDescriptionMap.put(FrontcacheAction.RELOAD_GUARD_RULES, "reload guard rules from ./conf/guard-rules.conf (resets hit counters)");
+		actionsDescriptionMap.put(FrontcacheAction.SET_CONFIG, "write one config file and apply it; accepts 'file' (resilience|guard-rules|bots|dynamic-urls|fallbacks), 'content', optional 'baseHash' (sha-256 of the content being replaced) and optional 'apply' (default true). Requires a configured API key");
+		actionsDescriptionMap.put(FrontcacheAction.RELOAD_RESILIENCE, "reload ./conf/resilience.properties (resets circuit-breaker state; a changed threadpool maxQueueSize still needs a restart)");
+		actionsDescriptionMap.put(FrontcacheAction.RELOAD_DYNAMIC_URLS, "reload dynamic URL patterns from ./conf/dynamic-urls.conf");
 		actionsDescriptionMap.put(FrontcacheAction.PURGE, "purge expired entries from the cache (keeps non-expired and cache-forever entries)");
 		actionsDescriptionMap.put(FrontcacheAction.BACKUP_INDEX, "backup the L2 (Lucene) index to a zip archive at the edge (l2-lucene-index.backup-{yyyyMMdd_HHmmss}.zip)");
 		actionsDescriptionMap.put(FrontcacheAction.PING, "ping for GSLB");

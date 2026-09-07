@@ -558,5 +558,161 @@ public abstract class ClientTests extends TestsBase {
 		}
 	}
 
+	// ---- set-config: the console's Save ------------------------------------------------------
+
+	/**
+	 * <b>Saving a file unchanged must not change one byte of it.</b>
+	 *
+	 * This is the CRLF regression test, and it is the one a unit test cannot really make: it needs a
+	 * real form-encoded POST, which is where a textarea's line breaks become CRLF. Without the
+	 * server-side normalization the first Save rewrites every line ending in the file - a whole-file
+	 * diff on a version-controlled FRONTCACHE_HOME, from a save the operator made no edit in.
+	 *
+	 * conf/bots.conf is used because both e2e nodes ship one, and the standalone node's copy ends
+	 * WITHOUT a trailing newline - which is the case that would break if the normalizer helpfully
+	 * added one.
+	 */
+	@Test
+	public void savingAConfigFileUnchangedLeavesItByteForByteIdentical() throws Exception {
+		String before = frontcacheClient.getBotsConfig();
+		Assert.assertNotNull("this node must ship a conf/bots.conf for this test", before);
+
+		org.frontcache.io.SetConfigActionResponse response =
+				frontcacheClient.setConfig(org.frontcache.io.ConfigFile.BOTS, before, null, true);
+
+		Assert.assertNotNull("set-config must answer", response);
+		Assert.assertEquals("save with no edit must not be an error: " + response.getErrorDescription(),
+				org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+		Assert.assertFalse("identical content must not be rewritten", response.isWritten());
+		Assert.assertTrue("...but it must still be applied - that is how an operator re-applies a file"
+				+ " they edited on the box by hand", response.isApplied());
+
+		Assert.assertEquals("the file must be byte-for-byte what it was", before, frontcacheClient.getBotsConfig());
+	}
+
+	/**
+	 * An edit, applied, and then put back.
+	 *
+	 * The restore is in a finally because FRONTCACHE_HOME_FILTER/conf and
+	 * FRONTCACHE_HOME_STANDALONE/conf are CHECKED IN: a test that writes them and does not restore
+	 * leaves the working tree dirty and makes the suite order-dependent.
+	 */
+	@Test
+	public void anEditIsWrittenAppliedAndCanBePutBack() throws Exception {
+		String original = frontcacheClient.getBotsConfig();
+		Assert.assertNotNull(original);
+
+		String marker = "# e2e-set-config-marker";
+
+		try {
+			org.frontcache.io.SetConfigActionResponse response = frontcacheClient.setConfig(
+					org.frontcache.io.ConfigFile.BOTS, original + "\n" + marker + "\n", null, true);
+
+			Assert.assertNotNull(response);
+			Assert.assertEquals("write refused: " + response.getErrorDescription(),
+					org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+			Assert.assertTrue("the file must have been written", response.isWritten());
+			Assert.assertTrue("...and applied", response.isApplied());
+			Assert.assertNotNull("the previous content must be kept as a backup", response.getBackupFile());
+			Assert.assertTrue("expected bots.conf.backup-<stamp>, got " + response.getBackupFile(),
+					response.getBackupFile().startsWith("bots.conf.backup-"));
+
+			String after = frontcacheClient.getBotsConfig();
+			Assert.assertTrue("the node must be serving the edited file now, got: " + after, after.contains(marker));
+
+			// The apply step ran, so the node re-read the file: the rules it parsed must still be there
+			// (a comment line changes nothing) rather than the reload having emptied them.
+			Assert.assertFalse("reload-bots must not have left the node with no rules",
+					frontcacheClient.getBotRules().isEmpty());
+
+		} finally {
+			org.frontcache.io.SetConfigActionResponse restored =
+					frontcacheClient.setConfig(org.frontcache.io.ConfigFile.BOTS, original, null, true);
+
+			Assert.assertNotNull("the file must be restorable", restored);
+			Assert.assertEquals(original, frontcacheClient.getBotsConfig());
+		}
+	}
+
+	/**
+	 * A broken line refuses the whole save, and the file on disk is untouched.
+	 *
+	 * {@code browser} was the client type through 2.8 and is exactly the edit someone would make from
+	 * memory, so this is both the validation test and a check that the vocabulary really is closed -
+	 * it keys expireTimeMap in every L2 entry on disk.
+	 */
+	@Test
+	public void aBrokenLineIsRefusedAndNothingIsWritten() throws Exception {
+		String before = frontcacheClient.getBotsConfig();
+
+		org.frontcache.io.SetConfigActionResponse response = frontcacheClient.setConfig(
+				org.frontcache.io.ConfigFile.BOTS, before + "\nbad | ua~x | browser\n", null, true);
+
+		Assert.assertNotNull(response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_ERROR, response.getResponseStatus());
+		Assert.assertFalse(response.isWritten());
+		Assert.assertEquals("one bad line, one message", 1, response.getValidationErrors().size());
+		Assert.assertTrue("the message must name the line, got: " + response.getValidationErrors().get(0),
+				response.getValidationErrors().get(0).startsWith("line "));
+
+		Assert.assertEquals("nothing may have been written", before, frontcacheClient.getBotsConfig());
+	}
+
+	/**
+	 * Someone else changed the file since it was read. Nothing is written, and what is on disk comes
+	 * back with the refusal so the console can show what the operator was about to overwrite.
+	 */
+	@Test
+	public void aStaleBaseHashIsRefusedWithTheCurrentContent() throws Exception {
+		String before = frontcacheClient.getBotsConfig();
+
+		org.frontcache.io.SetConfigActionResponse response = frontcacheClient.setConfig(
+				org.frontcache.io.ConfigFile.BOTS, before + "\n# never lands\n",
+				"0000000000000000000000000000000000000000000000000000000000000000", true);
+
+		Assert.assertNotNull(response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_ERROR, response.getResponseStatus());
+		Assert.assertFalse(response.isWritten());
+		Assert.assertEquals("the refusal must carry what is on disk", before, response.getCurrentContent());
+		Assert.assertEquals(before, frontcacheClient.getBotsConfig());
+	}
+
+	// ---- the two reloads that did not exist before --------------------------------------------
+
+	/**
+	 * conf/dynamic-urls.conf had no live reload at all: it is read by FCConfig's static initializer,
+	 * and the {@code reload} action does not re-read it, so adding a pattern meant restarting the node.
+	 */
+	@Test
+	public void dynamicUrlsCanBeReloadedWithoutARestart() throws Exception {
+		org.frontcache.io.ReloadDynamicUrlsActionResponse response = frontcacheClient.reloadDynamicURLs();
+
+		Assert.assertNotNull("reload-dynamic-urls must answer", response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+		Assert.assertTrue("both e2e nodes ship patterns, so the count must not be zero - a zero here"
+				+ " would mean every one of them failed to parse", 0 < response.getPatternCount());
+
+		// The patterns are still enforced afterwards, i.e. the swap put a live set in place
+		Assert.assertFalse("the node must still know its dynamic URLs", frontcacheClient.getDynamicUrlPatterns().isEmpty());
+	}
+
+	/**
+	 * conf/resilience.properties had none either - it is a cached singleton with two further caches
+	 * built from it. The warnings are asserted because they are the honest half of the answer: circuit
+	 * state is lost, and a changed thread-pool queue size cannot be applied at all.
+	 */
+	@Test
+	public void resilienceCanBeReloadedWithoutARestart() throws Exception {
+		org.frontcache.io.ReloadResilienceActionResponse response = frontcacheClient.reloadResilience();
+
+		Assert.assertNotNull("reload-resilience must answer", response);
+		Assert.assertEquals(org.frontcache.io.ActionResponse.RESPONSE_STATUS_OK, response.getResponseStatus());
+		Assert.assertTrue("the circuit-state reset must be reported, got " + response.getWarnings(),
+				response.getWarnings().stream().anyMatch(w -> w.contains("circuit-breaker state")));
+
+		// and the node keeps serving - the reload must not have left it without a config
+		Assert.assertNotNull(frontcacheClient.getResilienceConfig());
+	}
+
 
 }

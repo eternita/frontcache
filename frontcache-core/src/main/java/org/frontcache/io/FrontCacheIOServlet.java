@@ -44,6 +44,7 @@ import org.frontcache.core.ApiKey;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
+import org.frontcache.resilience.FcResilienceReload;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
@@ -199,6 +200,18 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.RELOAD_GUARD_RULES:
 			aResponse = reloadGuardRules(request);
+			break;
+
+		case FrontcacheAction.SET_CONFIG:
+			aResponse = setConfig(request);
+			break;
+
+		case FrontcacheAction.RELOAD_RESILIENCE:
+			aResponse = reloadResilience(request);
+			break;
+
+		case FrontcacheAction.RELOAD_DYNAMIC_URLS:
+			aResponse = reloadDynamicURLs(request);
 			break;
 
 		case FrontcacheAction.PATCH:
@@ -684,6 +697,41 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse.setResilienceConfig(raw);
 		}
 
+		return aResponse;
+	}
+
+	/**
+	 * Writes one config file and applies it - see {@link FrontcacheAction#SET_CONFIG}.
+	 *
+	 * Parameter extraction only; {@link ConfigWriteAction} is the operation, so it can be tested
+	 * without a servlet container or a live engine. The one thing decided here is the authorization,
+	 * because it is the only part that needs the request: {@code isAuthorizedToWrite} is stricter than
+	 * the check {@link #process} already ran, which lets an un-keyed node through.
+	 */
+	private ActionResponse setConfig(HttpServletRequest req)
+	{
+		String applyParam = req.getParameter("apply");
+		boolean apply = (null == applyParam) || Boolean.parseBoolean(applyParam);
+
+		return ConfigWriteAction.perform(
+				req.getParameter("file"),
+				req.getParameter("content"),
+				req.getParameter("baseHash"),
+				apply,
+				ApiKey.isAuthorizedToWrite(req));
+	}
+
+	private ActionResponse reloadResilience(HttpServletRequest req)
+	{
+		ReloadResilienceActionResponse aResponse = new ReloadResilienceActionResponse();
+		aResponse.setWarnings(new ArrayList<String>(FcResilienceReload.reload().warnings()));
+		return aResponse;
+	}
+
+	private ActionResponse reloadDynamicURLs(HttpServletRequest req)
+	{
+		ReloadDynamicUrlsActionResponse aResponse = new ReloadDynamicUrlsActionResponse();
+		aResponse.setPatternCount(FCConfig.reloadDynamicURLs());
 		return aResponse;
 	}
 

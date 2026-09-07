@@ -14,6 +14,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
@@ -45,7 +46,17 @@ public class FCConfig {
 
 	private static final String CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE = "dynamic-urls.conf";
 
-	private static Set<Pattern> dynamicURLPatterns = new HashSet<Pattern>();
+	/**
+	 * URL patterns that are never cached, from conf/dynamic-urls.conf.
+	 *
+	 * <b>Volatile, and replaced wholesale - never mutated in place.</b> It used to be a plain HashSet
+	 * that {@link #loadCacheIgnoreURIPatterns()} cleared and refilled, which was safe only because the
+	 * one caller was the static initializer, before any request existed. {@code reload-dynamic-urls}
+	 * calls that same loader on a live node, and a request thread reading a half-filled set through
+	 * {@link #getDynamicURLPatterns()} would cache a URL that must never be cached. Same shape as
+	 * {@code GuardRuleEngine.load()} and {@code BotClassifier.reload()}: build locally, swap the field.
+	 */
+	private static volatile Set<Pattern> dynamicURLPatterns = Collections.emptySet();
 
 	private static Logger logger = LoggerFactory.getLogger(FCConfig.class);
 
@@ -100,7 +111,7 @@ public class FCConfig {
     public static void destroy()
     {
     	config = null;
-    	dynamicURLPatterns.clear();
+    	dynamicURLPatterns = Collections.emptySet();
     }
 
     public static String getProperty(String key, String defaultValue)
@@ -145,6 +156,29 @@ public class FCConfig {
 	 * Package-private: used by FrontCacheEngine to detect leftover per-domain config directories
 	 * (see FrontCacheEngine.findRetiredDomainConfigDirs).
 	 */
+	/**
+	 * The file under FRONTCACHE_HOME/conf a management write should target, or null when this node has
+	 * no conf directory on disk at all.
+	 *
+	 * <b>Null means refuse the write, not pick somewhere else.</b> {@link #getConfigInputStream} falls
+	 * back to the classpath, so the file the console DISPLAYS may not be a file on disk - it can come
+	 * from inside the war. There is then nothing to write, and inventing a location is worse than
+	 * saying so.
+	 *
+	 * The returned file need not exist: a conf directory with no guard-rules.conf in it is the normal
+	 * state of a node that has never used guard rules, and creating that file is exactly what an
+	 * operator adding their first rule is asking for. The caller reports the creation - see
+	 * {@code FrontCacheIOServlet.setConfig}.
+	 */
+	public static File getWritableConfigFile(String name)
+	{
+		File confDir = getConfDir();
+		if (null == confDir)
+			return null;
+
+		return new File(confDir, name);
+	}
+
 	static File getConfDir()
 	{
 		// 1. frontcache.home java system variable
@@ -280,19 +314,37 @@ public class FCConfig {
 	}
 
 	private static void loadCacheIgnoreURIPatterns() {
-		dynamicURLPatterns.clear();
 
 		logger.info("Starting dynamic URLs configs loading ...");
 		Set<Pattern> dynamicURLsConfig = loadCacheIgnoreURIPatterns(CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
 		if (null != dynamicURLsConfig)
 		{
-			dynamicURLPatterns.addAll(dynamicURLsConfig);
+			// Swapped, not cleared-and-refilled - see the field comment. A reader either sees the whole
+			// previous set or the whole new one.
+			dynamicURLPatterns = Collections.unmodifiableSet(dynamicURLsConfig);
 			logger.info("   loaded " + dynamicURLsConfig.size() + " dynamic urls from " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE);
 		} else {
+			dynamicURLPatterns = Collections.emptySet();
 			logger.info("   no dynamic urls found in " + CACHE_IGNORE_URI_PATTERNS_CONFIG_FILE + " - every cacheable URL may be cached");
 		}
 		logger.info("Dynamic URLs configs loading is completed ...");
 		return;
+	}
+
+	/**
+	 * Re-reads conf/dynamic-urls.conf. Called by the {@code reload-dynamic-urls} management action.
+	 *
+	 * <b>This file had no live reload before.</b> It is read by {@link #init()}, whose only caller is
+	 * this class's static initializer - the call in {@code FrontCacheEngine.getFrontCache()} is
+	 * commented out - so {@code FrontCacheEngine.reload()} does not re-read it either, and adding a URL
+	 * pattern meant restarting the node.
+	 *
+	 * @return how many patterns are now active
+	 */
+	public static int reloadDynamicURLs()
+	{
+		loadCacheIgnoreURIPatterns();
+		return dynamicURLPatterns.size();
 	}
 
 	private static Set<Pattern> loadCacheIgnoreURIPatterns(String file) {

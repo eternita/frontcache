@@ -137,6 +137,12 @@ public class FcResilienceConfig {
 		this.loadedFrom = loadedFrom;
 	}
 
+	/** Which file these settings came from, so a caller can name the file the operator has to edit. */
+	public String loadedFrom()
+	{
+		return loadedFrom;
+	}
+
 	public static FcResilienceConfig getInstance()
 	{
 		FcResilienceConfig local = instance;
@@ -158,6 +164,24 @@ public class FcResilienceConfig {
 	static void reset()
 	{
 		instance = null;
+	}
+
+	/**
+	 * Re-reads conf/resilience.properties and installs the result.
+	 *
+	 * Only half of applying that file, and the smaller half - the Resilience4j objects built from it
+	 * are cached per command key and the thread pools are cached per pool key, so both have to be told
+	 * as well. {@link FcResilienceReload} is the whole operation; call that, not this.
+	 *
+	 * @return the newly loaded config
+	 */
+	static FcResilienceConfig reload()
+	{
+		synchronized (FcResilienceConfig.class) {
+			FcResilienceConfig loaded = load();
+			instance = loaded;
+			return loaded;
+		}
 	}
 
 	/** Test seam - runs the machinery against an explicit properties set instead of the config file. */
