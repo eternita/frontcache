@@ -41,10 +41,16 @@ DEFAULT_TARGETS="linux-x64 linux-aarch64 macos-aarch64"
 JDK_CACHE="${JDK_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/frontcache-jdks}"
 
 # ---- the module set ----------------------------------------------------------
-# Computed with jdeps over every jar the server actually ships (launcher classpath +
-# WEB-INF/lib), then extended by hand for the things jdeps structurally CANNOT see: JCE
-# providers and filesystem providers are found through ServiceLoader, not through bytecode
-# references, so a purely computed set silently omits them.
+# Computed with jdeps over every jar the BUNDLES ship (launcher classpath + WEB-INF/lib -
+# both the server's and the console's; they share one module set), then extended by hand for
+# the things jdeps structurally CANNOT see: JCE providers and filesystem providers are found
+# through ServiceLoader, not through bytecode references, so a purely computed set silently
+# omits them.
+#
+# The scan has to cover the console war as well as the server's. It did not once, and
+# java.net.http went missing from the set below: the console started, served every screen and
+# read every edge's status over the Apache client, and only the realtime page failed - with a
+# NoClassDefFoundError from a static initializer, on a code path no smoke test reached.
 #
 # Deliberately NOT using --add-modules java.se: that pulls in every Java SE module whether or
 # not anything can reach it. The set below is verified the only way that counts - the
@@ -57,6 +63,7 @@ java.instrument,\
 java.logging,\
 java.management,\
 java.naming,\
+java.net.http,\
 java.rmi,\
 java.security.jgss,\
 java.sql,\

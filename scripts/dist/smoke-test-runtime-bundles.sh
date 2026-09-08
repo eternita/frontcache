@@ -78,6 +78,36 @@ if [ "${1:-}" = "--_inner" ]; then
   (exec 3<>"/dev/tcp/127.0.0.1/$port" && exec 3>&-) 2>/dev/null \
     || { echo "INNER-FAIL: nothing accepting connections on :$port"; exit 1; }
 
+  # The console's realtime page is the only thing in either bundle that uses the JDK's own
+  # java.net.http client (DashboardStreamProxyServlet relays an edge's SSE stream through it).
+  # A jlink runtime built without that module boots, serves every other screen and accepts
+  # connections on the port exactly like a correct one - the failure is a NoClassDefFoundError
+  # out of that servlet's static initializer, the first time anyone opens the page. Which is
+  # how frontcache-console 2.9.0 shipped with java.net.http missing from JLINK_MODULES.
+  #
+  # So ask for the relay. "Unknown edge" (403) is the expected answer - "smoke-test" is not one
+  # of the console's edges - and any answer at all means the class initialized. A 5xx does not.
+  if [ "$module" = "frontcache-console" ]; then
+    reply=""
+    # admin/admin is what the bundled conf ships; ConsoleAuthFilter answers 401 without it, and
+    # a 401 never reaches the servlet, so that is a broken assertion rather than a pass.
+    if exec 3<>"/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+      printf 'GET /fc-dashboard-proxy.stream?origin=smoke-test HTTP/1.1\r\nHost: 127.0.0.1:%s\r\nAuthorization: Basic YWRtaW46YWRtaW4=\r\nConnection: close\r\n\r\n' "$port" >&3
+      read -t 15 -r reply <&3 || true
+      exec 3>&-
+    fi
+    set -- $reply
+    case "${2:-}" in
+      5*)  echo "INNER-FAIL: dashboard relay answered '$reply' - runtime is probably missing java.net.http"
+           exit 1 ;;
+      401) echo "INNER-FAIL: dashboard relay answered 401 - the bundled conf's login is no longer admin/admin,"
+           echo "           so this check never reached the servlet. Fix the credentials used here."
+           exit 1 ;;
+      "")  echo "INNER-FAIL: no reply from the dashboard relay on :$port"; exit 1 ;;
+      *)   ;;
+    esac
+  fi
+
   echo "INNER-OK: $module-$VERSION on its embedded runtime ($("$root/runtime/bin/java" -version 2>&1 | head -1))"
   exit 0   # the EXIT trap stops the JVM and removes the workdir
 fi
