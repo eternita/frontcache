@@ -26,28 +26,14 @@
 	padding: 6px 0 0 0;
 }
 
-/* A cluster's aggregate panel and, on each of its members' panels, the line that says so.
-
-   The cluster panel is deliberately the same panel: same .fc-dashboard, same .fc-circuits grid,
-   same .fc-circuit cards with data-command set to the CANONICAL command key, so the `order` block
-   below puts its cards in request-travel order without knowing a cluster exists. Only the heading
-   is new. See docs/circuit-cluster-proposal.md section 7. */
-.fc-dashboard.fc-cluster .fc-stream-name {
-	color: #000;
-	font-size: 95%;
-}
-
-.fc-dashboard.fc-cluster .fc-stream-name .fc-cluster-name {
-	font-weight: 700;
-	font-size: 115%;
-}
-
-/* On a member's own panel, directly under its hostname. Small and grey: it is a pointer back up to
-   the aggregate, not a heading of its own - the panel is still about this one node. */
+/* On a clustered edge's panel, directly under its hostname: which cluster its cards' "Cluster
+   req / s" line is adding up, with the member list in the tooltip. Small and grey - the panel is
+   still about this one node. See docs/circuit-cluster-proposal.md. */
 .fc-dashboard .fc-cluster-member {
 	font-size: 80%;
 	color: grey;
 	font-style: italic;
+	cursor: default;
 }
 
 .fc-dashboard .fc-status {
@@ -206,6 +192,14 @@
 
 .fc-dashboard .fc-rate .fc-value {
 	font-weight: 700;
+}
+
+/* The cluster total, under this node's own rate. Deliberately NOT emphasised over the Host line
+   above it: the panel is one node's, and its own number is the one an operator reads first when
+   they are looking at a single node's panel. The label carries the unit ("Cluster req / s"), so
+   nothing is appended after the value - .fc-rate's own alignment does the rest. */
+.fc-dashboard .fc-rate.fc-cluster-rate {
+	font-size: 10pt;
 }
 
 .fc-dashboard .fc-circuit-status {

@@ -804,8 +804,8 @@ public class FrontcacheService {
 	 *
 	 * Membership is resolved HERE rather than at startup, because the edge list changes at runtime
 	 * from the Edges page. Which also settles the one-member case: a cluster the current edge list
-	 * leaves with fewer than two members is reported as no cluster at all, since its aggregate panel
-	 * would be a copy of the node's own panel with a different heading. See
+	 * leaves with fewer than two members is reported as no cluster at all, since its "Cluster req / s"
+	 * line would repeat the Host line above it - the very thing this feature exists to stop. See
 	 * docs/circuit-cluster-proposal.md section 4.3.
 	 */
 	public String getDashboardStreams()
@@ -839,8 +839,8 @@ public class FrontcacheService {
 			Integer members = membersPerCluster.get(cluster);
 			if (null != members && members.intValue() < 2)
 			{
-				logger.info(" -- Cluster '{}' has one configured edge in this console's edge list, so it"
-						+ " is rendered as a plain edge", cluster);
+				logger.info(" -- Cluster '{}' has one configured edge in this console's edge list, so its"
+						+ " members show no cluster rate", cluster);
 				stream.setCluster(null);
 			}
 		}
