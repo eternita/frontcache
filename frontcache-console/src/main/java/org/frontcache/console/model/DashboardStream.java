@@ -17,18 +17,34 @@ package org.frontcache.console.model;
  * Was {@code HystrixConnection}, and carried Netflix-era {@code auth} / {@code delay} fields that
  * Frontcache never set - they existed for pointing the vendored dashboard at an arbitrary Turbine
  * stream, which the console does not do.
+ *
+ * <h2>{@code cluster} is why this is the one JSON here with no compatibility burden</h2>
+ *
+ * The node's stream format and the management API both have to work in a mixed fleet, in either
+ * upgrade order, which is why every change to them carries both shapes. This one does not: the
+ * console serves it to its own page, and both halves ship in the same war. So {@code cluster} is
+ * simply a new key - null for an edge in no cluster, which is every edge on a config file written
+ * before {@code frontcache.console.clusters} existed.
  */
 public class DashboardStream {
 
 	private String name;
 	private String url;
 
+	/** The cluster this edge belongs to, or null when it belongs to none. */
+	private String cluster;
+
 	public DashboardStream() {
 	}
 
 	public DashboardStream(String name, String url) {
+		this(name, url, null);
+	}
+
+	public DashboardStream(String name, String url, String cluster) {
 		this.name = name;
 		this.url = url;
+		this.cluster = cluster;
 	}
 
 	public String getName() {
@@ -47,12 +63,21 @@ public class DashboardStream {
 		this.url = url;
 	}
 
+	public String getCluster() {
+		return cluster;
+	}
+
+	public void setCluster(String cluster) {
+		this.cluster = cluster;
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + ((name == null) ? 0 : name.hashCode());
 		result = prime * result + ((url == null) ? 0 : url.hashCode());
+		result = prime * result + ((cluster == null) ? 0 : cluster.hashCode());
 		return result;
 	}
 
@@ -76,12 +101,18 @@ public class DashboardStream {
 		} else if (!url.equals(other.url))
 			return false;
 
+		if (cluster == null) {
+			if (other.cluster != null)
+				return false;
+		} else if (!cluster.equals(other.cluster))
+			return false;
+
 		return true;
 	}
 
 	@Override
 	public String toString() {
-		return "DashboardStream{name=" + name + ", url=" + url + "}";
+		return "DashboardStream{name=" + name + ", url=" + url + ", cluster=" + cluster + "}";
 	}
 
 }

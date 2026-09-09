@@ -10,6 +10,7 @@ package org.frontcache.console.service;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -45,7 +46,9 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.typesafe.config.Config;
+import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
+import com.typesafe.config.ConfigObject;
 import com.typesafe.config.ConfigValue;
 
 @Service("frontcacheService")
@@ -58,6 +61,15 @@ public class FrontcacheService {
 	private ObjectMapper jsonMapper = new ObjectMapper();
 
 	private Set<String> frontcacheAgentURLs = new LinkedHashSet<String>();
+
+	/**
+	 * Canonical edge URL -> the cluster it belongs to, from {@code frontcache.console.clusters}.
+	 *
+	 * Empty on every config file written before that key existed, which is what makes the realtime
+	 * page render exactly as it did: no cluster, no aggregate panel. See
+	 * docs/circuit-cluster-proposal.md section 4.
+	 */
+	private Map<String, String> clusterByEdgeURL = new LinkedHashMap<String, String>();
 
 	private String apiKey = "default-api-key";
 
@@ -130,6 +142,10 @@ public class FrontcacheService {
 		}
 		apiKey = fcConsoleConfig.getString("apiKey");
 		logger.info(" -- Loading apiKey {} from console config", apiKey);
+
+		clusterByEdgeURL = parseClusters(fcConsoleConfig, frontcacheAgentURLs);
+		for (Map.Entry<String, String> member : clusterByEdgeURL.entrySet())
+			logger.info(" -- Edge {} is in cluster '{}'", member.getKey(), member.getValue());
 
 		readCredentials();
 	}
@@ -586,6 +602,132 @@ public class FrontcacheService {
 	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
 	private static final String SESSION_COOKIE_SECURE_KEY = "session-cookie-secure";
 
+	// ---- clusters ------------------------------------------------------------------------------
+
+	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
+	private static final String CLUSTERS_KEY = "clusters";
+
+	/**
+	 * An edge URL as it is compared, keyed and handed to the page.
+	 *
+	 * <b>The trailing slash is the whole reason this exists.</b> {@link #getDashboardStreams} appends
+	 * one, so the stream list carries {@code https://fc-edge.example.com:443/} while {@code urls} - and
+	 * therefore anything an operator copies out of it into {@code clusters} - says
+	 * {@code https://fc-edge.example.com:443}. Comparing the two raw forms makes every cluster come out
+	 * empty on a config file that reads perfectly correctly, with nothing to say so.
+	 *
+	 * Matching is on the URL and never on {@link FrontCacheClient#getName()}: that name strips the
+	 * scheme and everything from the first colon, so {@code localhost:8080} and {@code localhost:9080}
+	 * - the e2e topology - are the same string. See {@code EdgeConfigFile}, where keying a fan-out by
+	 * it used to drop a tab.
+	 */
+	static String canonicalEdgeURL(String edgeURL) {
+
+		if (null == edgeURL)
+			return null;
+
+		String canonical = edgeURL.trim();
+		if (canonical.isEmpty())
+			return canonical;
+
+		return canonical.endsWith("/") ? canonical : canonical + "/";
+	}
+
+	/**
+	 * {@code clusters { "Edge layer" = [url, url, url] }} -> canonical edge URL -> cluster name.
+	 *
+	 * Read through {@code hasPath}, like every other key added after the first release: absent means
+	 * no clusters, which is every existing config file and is not an error.
+	 *
+	 * <b>Nothing here refuses to start.</b> The console is a monitoring tool and an upgrade must not
+	 * take it offline, so each way of getting this wrong is a WARN and a documented resolution - warn,
+	 * not info, because the shipped fc-logback.xml filters stdout at WARN and an info line would leave
+	 * the operator of a silently-empty cluster with nothing at all:
+	 *
+	 * <ul>
+	 * <li>a member that is not in {@code urls} is kept in the map but never rendered, since the page
+	 *     only groups edges the console actually lists - so it also picks up its cluster if it is added
+	 *     later on the Edges page;</li>
+	 * <li>a URL named by two clusters keeps the FIRST, the same resolution a duplicate client type in a
+	 *     {@code maxage} takes;</li>
+	 * <li>a cluster whose value is not a list, or whose name is blank, is skipped whole.</li>
+	 * </ul>
+	 *
+	 * A cluster that ends up with fewer than two live members is not decided here - it depends on the
+	 * edge list, which changes at runtime. {@link #getDashboardStreams} makes that call.
+	 *
+	 * @param knownEdgeURLs the configured edges, for the "not in urls" warning only
+	 */
+	static Map<String, String> parseClusters(Config config, Collection<String> knownEdgeURLs) {
+
+		Map<String, String> clusters = new LinkedHashMap<String, String>();
+
+		if (null == config || !config.hasPath(CLUSTERS_KEY))
+			return clusters;
+
+		Set<String> known = new LinkedHashSet<String>();
+		if (null != knownEdgeURLs)
+			for (String edgeURL : knownEdgeURLs)
+				known.add(canonicalEdgeURL(edgeURL));
+
+		ConfigObject configured;
+		try {
+			configured = config.getObject(CLUSTERS_KEY);
+		} catch (ConfigException e) {
+			logger.warn("frontcache-console.conf: 'clusters' is not a block of <name> = [url, ...] - "
+					+ "no clusters are configured ({})", e.getMessage());
+			return clusters;
+		}
+
+		for (Map.Entry<String, ConfigValue> entry : configured.entrySet())
+		{
+			String clusterName = null == entry.getKey() ? "" : entry.getKey().trim();
+
+			if (clusterName.isEmpty())
+			{
+				logger.warn("frontcache-console.conf: a cluster with a blank name is skipped");
+				continue;
+			}
+
+			Object value = entry.getValue().unwrapped();
+			if (!(value instanceof List))
+			{
+				logger.warn("frontcache-console.conf: cluster '{}' is not a list of edge urls - skipped",
+						clusterName);
+				continue;
+			}
+
+			for (Object member : (List<?>) value)
+			{
+				String memberURL = canonicalEdgeURL(null == member ? null : member.toString());
+
+				if (null == memberURL || memberURL.isEmpty())
+				{
+					logger.warn("frontcache-console.conf: cluster '{}' names an empty edge url - skipped",
+							clusterName);
+					continue;
+				}
+
+				String claimedBy = clusters.get(memberURL);
+				if (null != claimedBy)
+				{
+					logger.warn("frontcache-console.conf: edge {} is in both cluster '{}' and cluster "
+							+ "'{}' - keeping '{}'", memberURL, claimedBy, clusterName, claimedBy);
+					continue;
+				}
+
+				if (!known.contains(memberURL))
+					logger.warn("frontcache-console.conf: cluster '{}' names {}, which is not in 'urls'"
+							+ " - it is ignored unless that edge is added on the Edges page",
+							clusterName, memberURL);
+
+				clusters.put(memberURL, clusterName);
+			}
+		}
+
+		return clusters;
+	}
+
 	/**
 	 * Writes one config file to one edge and applies it.
 	 *
@@ -657,22 +799,50 @@ public class FrontcacheService {
 	/**
 	 * The edges the realtime page subscribes to, as JSON.
 	 *
-	 * Only names and edge URLs - the page hands an edge URL back to
+	 * Only names, edge URLs and cluster names - the page hands an edge URL back to
 	 * {@code DashboardStreamProxyServlet}, which is where the stream path and the API key live.
+	 *
+	 * Membership is resolved HERE rather than at startup, because the edge list changes at runtime
+	 * from the Edges page. Which also settles the one-member case: a cluster the current edge list
+	 * leaves with fewer than two members is reported as no cluster at all, since its aggregate panel
+	 * would be a copy of the node's own panel with a different heading. See
+	 * docs/circuit-cluster-proposal.md section 4.3.
 	 */
 	public String getDashboardStreams()
 	{
-		// [{"name":"My Super App","url":"http://sg.example.com/"},{"name":"My Super App","url":"http://or.example.com/"}]
+		// [{"name":"My Super App","url":"http://sg.example.com/","cluster":"Edge layer"}, ... ]
 
 		List<DashboardStream> streams = new ArrayList<DashboardStream>();
 
+		Map<String, Integer> membersPerCluster = new LinkedHashMap<String, Integer>();
+
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
 		{
-			String fcURL = fcClient.getFrontCacheURL();
-			if (!fcURL.endsWith("/"))
-				fcURL += "/";
+			String fcURL = canonicalEdgeURL(fcClient.getFrontCacheURL());
 
-			streams.add(new DashboardStream(fcClient.getName(), fcURL));
+			String cluster = clusterByEdgeURL.get(fcURL);
+			if (null != cluster)
+			{
+				Integer members = membersPerCluster.get(cluster);
+				membersPerCluster.put(cluster, null == members ? 1 : members.intValue() + 1);
+			}
+
+			streams.add(new DashboardStream(fcClient.getName(), fcURL, cluster));
+		}
+
+		for (DashboardStream stream : streams)
+		{
+			String cluster = stream.getCluster();
+			if (null == cluster)
+				continue;
+
+			Integer members = membersPerCluster.get(cluster);
+			if (null != members && members.intValue() < 2)
+			{
+				logger.info(" -- Cluster '{}' has one configured edge in this console's edge list, so it"
+						+ " is rendered as a plain edge", cluster);
+				stream.setCluster(null);
+			}
 		}
 
 		try {
@@ -682,6 +852,7 @@ public class FrontcacheService {
 			return "[]";
 		}
 	}
+
 
 	public Set<String> getFrontCacheAgentURLs()
 	{
