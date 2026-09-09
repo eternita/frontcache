@@ -108,6 +108,63 @@ if [ "${1:-}" = "--_inner" ]; then
     esac
   fi
 
+  # The server bundle's counterpart of the check above, for the same class of defect one module
+  # over. Process CPU comes from com.sun.management.OperatingSystemMXBean, which lives in
+  # jdk.management - NOT in java.management. A runtime linked without it boots, serves pages,
+  # caches, and answers get-node-stats with correct heap, correct uptime and cpuProcessLoad -1.0
+  # forever, because the instanceof guarding that bean raises NoClassDefFoundError and FcNodeStats
+  # catches it by design. The only symptom is one dash in one column of the console's Edges status,
+  # which is how a release shipped with it missing.
+  #
+  # So ask the node for its own stats and require a real number. The api-key is the one the bundled
+  # conf ships; a 401/"NOT_AUTHORIZED" means that default changed and this check stopped testing
+  # anything, which is a failure rather than a pass - same reasoning as the 401 branch above.
+  if [ "$module" = "frontcache-server" ]; then
+    # RETRIED, not asserted once: the bean returns a negative value until it has two samples of its
+    # own, so a single reading taken the instant the node finished starting is legitimately -1 on a
+    # perfectly good runtime. A broken one never produces anything else, which is what separates
+    # them.
+    #
+    # `read -d ''` takes the WHOLE response in one go - headers and body - bounded by -t so a server
+    # that never closes cannot wedge this. Deliberately not a read-per-line loop: the JSON body is
+    # the last line and carries no trailing newline, so the read that returns it also reports
+    # failure, and a loop using read as its condition drops exactly the line being tested for.
+    # (`timeout cat` would be the obvious alternative and is not portable - stock macOS has no
+    # timeout, and this same inner branch runs on the build host when the target matches it.)
+    stats=""
+    tries=0
+    while [ "$tries" -lt 10 ]; do
+      stats=""
+      if exec 3<>"/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+        printf 'GET /frontcache-io?action=get-node-stats HTTP/1.1\r\nHost: 127.0.0.1:%s\r\nAuthorization: Bearer your-key-1234-5678-90000\r\nConnection: close\r\n\r\n' "$port" >&3
+        read -t 10 -r -d '' stats <&3 || true
+        exec 3>&-
+      fi
+      case "$stats" in
+        *'"cpuProcessLoad":-1'*) ;;             # not settled yet, try again
+        *'"cpuProcessLoad"'*)    break ;;       # a real number
+        *)                       break ;;       # something else is wrong; reported below
+      esac
+      tries=$((tries + 1)); sleep 1
+    done
+
+    case "$stats" in
+      "")                 echo "INNER-FAIL: no reply to get-node-stats on :$port"; exit 1 ;;
+      *NOT_AUTHORIZED*|*" 401 "*)
+        echo "INNER-FAIL: get-node-stats answered unauthorized - the bundled conf's"
+        echo "           front-cache.api-key is no longer your-key-1234-5678-90000, so this check"
+        echo "           never reached the action. Fix the key used here."
+        exit 1 ;;
+      *'"cpuProcessLoad":-1'*)
+        echo "INNER-FAIL: the node still reports cpuProcessLoad -1 after ${tries}s - this runtime is"
+        echo "           missing jdk.management (or whatever else carries com.sun.management). See"
+        echo "           JLINK_MODULES in build-runtime-bundles.sh; heap and uptime look fine either way."
+        exit 1 ;;
+      *'"cpuProcessLoad"'*) ;;
+      *)                  echo "INNER-FAIL: get-node-stats reply carried no cpuProcessLoad: $stats"; exit 1 ;;
+    esac
+  fi
+
   echo "INNER-OK: $module-$VERSION on its embedded runtime ($("$root/runtime/bin/java" -version 2>&1 | head -1))"
   exit 0   # the EXIT trap stops the JVM and removes the workdir
 fi
