@@ -73,7 +73,7 @@ var FcDashboard = (function () {
 	// One number per command: what the whole cluster is taking, shown on every member's own card
 	// beside that member's rate. The page already holds an open EventSource per edge, so this costs
 	// no connection and no request to the fleet - the frames are here.
-	// See docs/circuit-cluster-proposal.md.
+	// See docs/archive/circuit-cluster-proposal.md.
 
 	/**
 	 * How long a member's last frame for a command still counts.

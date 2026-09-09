@@ -67,7 +67,7 @@ public class FrontcacheService {
 	 *
 	 * Empty on every config file written before that key existed, which is what makes the realtime
 	 * page render exactly as it did: no cluster, no aggregate panel. See
-	 * docs/circuit-cluster-proposal.md section 4.
+	 * docs/archive/circuit-cluster-proposal.md section 4.
 	 */
 	private Map<String, String> clusterByEdgeURL = new LinkedHashMap<String, String>();
 
@@ -806,7 +806,7 @@ public class FrontcacheService {
 	 * from the Edges page. Which also settles the one-member case: a cluster the current edge list
 	 * leaves with fewer than two members is reported as no cluster at all, since its "Cluster:" line
 	 * would repeat the "Host:" line above it - the very thing this feature exists to stop. See
-	 * docs/circuit-cluster-proposal.md section 4.3.
+	 * docs/archive/circuit-cluster-proposal.md section 4.3.
 	 */
 	public String getDashboardStreams()
 	{

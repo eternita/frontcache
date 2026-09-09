@@ -503,7 +503,7 @@ project(':frontcache-console') {
 
 	// ---- the realtime monitor's JavaScript -----------------------------------
 	// fc-dashboard.js is the whole realtime monitor and has no dependencies, so there was nothing to
-	// run its code with until the cluster merge (docs/circuit-cluster-proposal.md) put arithmetic in
+	// run its code with until the cluster merge (docs/archive/circuit-cluster-proposal.md) put arithmetic in
 	// it that is silent when wrong. Node's own test runner, no package.json, no node_modules.
 	//
 	// SKIPPED when node is not on the PATH rather than failing: a JDK is this build's only stated
