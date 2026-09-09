@@ -68,6 +68,174 @@ var FcDashboard = (function () {
 		return value < min ? min : (value > max ? max : value);
 	}
 
+	// ---- cluster request rate ------------------------------------------------------------------
+	//
+	// One number per command: what the whole cluster is taking, shown on every member's own card
+	// beside that member's rate. The page already holds an open EventSource per edge, so this costs
+	// no connection and no request to the fleet - the frames are here.
+	// See docs/archive/circuit-cluster-proposal.md.
+
+	/**
+	 * How long a member's last frame for a command still counts.
+	 *
+	 * Ten node ticks (the node publishes every 500 ms - FcSampleSseServlet's
+	 * DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS). Without an expiry a node that goes away leaves its
+	 * last frame in the cluster total for as long as the page is open, so every surviving member's
+	 * card would keep claiming traffic from a dead region. With it the cluster figure FALLS when a
+	 * member drops out, which is the correct answer and is what that member's own panel switching to
+	 * "retrying ..." explains.
+	 */
+	var MEMBER_STALE_MS = 5000;
+
+	/**
+	 * Pre-2.9.0 command key -> the key that replaced it. Mirrors FcCommandKeys.LEGACY_COMMAND_KEYS.
+	 *
+	 * The console reads a MIXED fleet, so mid-upgrade one member emits Input-Request and another
+	 * Input-Requests. Without canonicalizing, those are two separate cluster totals and each member's
+	 * card shows a figure covering only the half of the fleet that spells the command its way.
+	 *
+	 * Cache-Miss is two legacy keys folding into ONE, and on a pre-2.9.0 filter-mode node both are
+	 * live at once (the filter chain serves the page's origin call, HTTP serves its includes) - so one
+	 * member can contribute two frames to one command, and for a request rate both of them count.
+	 *
+	 * This is the map's third copy: FcCommandKeys, the `order` block in fc-dashboard.css, and here.
+	 * Worth saying out loud; the CSS copy is the precedent, and the alternative is a wire addition to
+	 * carry six rows.
+	 */
+	var CANONICAL_COMMAND = {
+		"Input-Requests": "Input-Request",
+		"Include-Requests": "Include-Request",
+		"Cache-Hits": "Cache-Hit",
+		"Cache-Origin-http": "Cache-Miss",
+		"Cache-Origin-filter": "Cache-Miss",
+		"Origin-Hits": "Cache-Bypass"
+	};
+
+	function canonicalCommand(name) {
+		return CANONICAL_COMMAND[name] || name;
+	}
+
+	var WINDOW_KEY = "propertyValue_metricsRollingStatisticalWindowInMilliseconds";
+	var DEFAULT_WINDOW_MS = 10000;
+
+	/**
+	 * The request rate of a group of edges, per command.
+	 *
+	 * Members' frames are simply added up, and the reason that is sound is worth being explicit
+	 * about: requestCount is a windowed count over the node's own rolling window (10 s by default),
+	 * not a delta since its last frame. So adding frames that arrived at different moments
+	 * double-counts nothing, and the most a member can contribute is one 500 ms tick of staleness
+	 * inside a twenty-tick window.
+	 *
+	 * Each member is converted to a rate against ITS OWN window before being added, so a fleet whose
+	 * nodes disagree on resilience.command.<key>.metrics.rollingStats.timeInMilliseconds still gets
+	 * the right answer - there is no shared divisor to get wrong.
+	 */
+	function ClusterRates(name, memberUrls) {
+
+		this.name = name;
+		this.members = memberUrls;
+
+		// canonical command -> contribution key -> {rate, at}
+		this.contributions = {};
+
+		this.listeners = [];
+	}
+
+	/**
+	 * Called whenever any member reports, so every member's panel shows the same total.
+	 *
+	 * Without this each card only refreshed its cluster line when its OWN node's frame arrived, and
+	 * since the members publish on their own clocks the three panels showed three figures for the one
+	 * quantity - a couple of percent apart, which reads as an arithmetic bug rather than as the
+	 * half-second of skew it is.
+	 */
+	ClusterRates.prototype.subscribe = function (listener) {
+		this.listeners.push(listener);
+	};
+
+	ClusterRates.prototype.publish = function () {
+		this.listeners.forEach(function (listener) { listener(); });
+	};
+
+	ClusterRates.prototype.accept = function (memberUrl, frame) {
+
+		var command = canonicalCommand(frame.name);
+		var count = num(frame, "requestCount");
+
+		if (count === null)
+			return;
+
+		if (!this.contributions[command])
+			this.contributions[command] = {};
+
+		// Keyed by member AND by the key as it arrived, so a pre-2.9.0 filter node's Cache-Origin-http
+		// and Cache-Origin-filter are two contributions to Cache-Miss rather than one overwriting the
+		// other.
+		this.contributions[command][memberUrl + " " + frame.name] = {
+			rate: Math.max(0, count) / ((num(frame, WINDOW_KEY) || DEFAULT_WINDOW_MS) / 1000),
+			at: Date.now()
+		};
+
+		this.publish();
+	};
+
+	ClusterRates.prototype.drop = function (memberUrl, commandName) {
+
+		var contributions = this.contributions[canonicalCommand(commandName)];
+
+		if (contributions) {
+			delete contributions[memberUrl + " " + commandName];
+			this.publish();
+		}
+	};
+
+	/**
+	 * The cluster's rate for one command, or null when nothing live reports it.
+	 *
+	 * Stale contributions are pruned here rather than on a timer: this is called as each frame
+	 * arrives, which is twice a second per member, so there is nothing a timer would notice sooner.
+	 */
+	ClusterRates.prototype.ratePerSecond = function (commandName) {
+
+		var contributions = this.contributions[canonicalCommand(commandName)];
+
+		if (!contributions)
+			return null;
+
+		var now = Date.now();
+		var total = null;
+
+		for (var key in contributions)
+			if (contributions.hasOwnProperty(key)) {
+				if (now - contributions[key].at > MEMBER_STALE_MS)
+					delete contributions[key];
+				else
+					total = (total || 0) + contributions[key].rate;
+			}
+
+		return total;
+	};
+
+	/** How many members are currently counted towards a command - for the line's tooltip. */
+	ClusterRates.prototype.reporting = function (commandName) {
+
+		var contributions = this.contributions[canonicalCommand(commandName)];
+
+		if (!contributions)
+			return 0;
+
+		var now = Date.now();
+		var members = {};
+
+		for (var key in contributions)
+			if (contributions.hasOwnProperty(key) && now - contributions[key].at <= MEMBER_STALE_MS)
+				members[key.substring(0, key.indexOf(" "))] = true;
+
+		return Object.keys(members).length;
+	};
+
+
 	// ---- colour ramps --------------------------------------------------------------------------
 	// Piecewise-linear RGB over a sorted domain, clamped at both ends. The vendored dashboard got this
 	// from d3.scale.linear(); the stops below are its exact values, so the panel keeps its colours.
@@ -177,7 +345,12 @@ var FcDashboard = (function () {
 		self.body.appendChild(self.data);
 	}
 
-	Circuit.prototype.update = function (frame) {
+	/**
+	 * @param cluster the ClusterRates this edge belongs to, or null. The rate is read here rather
+	 *                than passed in as a number so the line and its tooltip agree on how many
+	 *                members are being counted.
+	 */
+	Circuit.prototype.update = function (frame, cluster) {
 
 		var self = this;
 
@@ -197,7 +370,23 @@ var FcDashboard = (function () {
 		self.data.textContent = "";
 		self.data.appendChild(counters(frame, errorPercentage));
 		self.data.appendChild(rateLine("Host: ", ratePerSecondPerHost, "Total Request Rate per Second per Reporting Host"));
-		self.data.appendChild(rateLine("Cluster: ", ratePerSecond, "Total Request Rate per Second for Cluster"));
+
+		// The old "Cluster:" line divided THIS frame by the same reportingHosts the Host line used, so
+		// on a node's own frame - reportingHosts:1, which is every frame a node sends - it printed the
+		// Host number a second time. It is now rendered only where there is a cluster to add up, and
+		// it is the sum of the members' own rates rather than anything derived from this one frame.
+		var clusterRate = cluster ? cluster.ratePerSecond(frame.name) : null;
+
+		// Rebuilt with the rest of the card, so the handle setClusterRate writes through is replaced
+		// here on every frame rather than kept across renders.
+		self.clusterValue = null;
+
+		if (clusterRate !== null) {
+			var line = clusterRateLine(clusterRate, cluster, frame.name);
+			self.clusterValue = line.value;
+			self.data.appendChild(line.node);
+		}
+
 		self.data.appendChild(circuitStatus(frame, reportingHosts));
 		self.data.appendChild(latencyTable(frame, reportingHosts));
 
@@ -207,6 +396,19 @@ var FcDashboard = (function () {
 		self.bubble.setAttribute("fill", circuitColor(errorPercentage));
 
 		self.pushPoint(ratePerSecond);
+	};
+
+	/**
+	 * Writes a new cluster total into a card that already has the line, between full renders.
+	 *
+	 * Only the number is touched - not the card, not its own rate, not the sparkline, which stay on
+	 * this node's own 500 ms frame. A null (every member of the cluster now silent) is left alone: the
+	 * line goes when the card is next drawn, which is at most one tick away.
+	 */
+	Circuit.prototype.setClusterRate = function (value) {
+
+		if (this.clusterValue && value !== null)
+			this.clusterValue.textContent = round1(value);
 	};
 
 	/** Rolls the sparkline window forward one frame and redraws the path. */
@@ -291,6 +493,32 @@ var FcDashboard = (function () {
 		return node;
 	}
 
+	/**
+	 * The cluster total, on a member's own card - the same shape as the Host line above it, since it
+	 * is the same quantity over more nodes.
+	 *
+	 * Returns the value span alongside the line, rather than leaving the caller to find it by child
+	 * position: setClusterRate writes through that reference twice a second per member, and "the
+	 * second child" would break silently the first time anything is added to the line.
+	 */
+	function clusterRateLine(value, cluster, commandName) {
+
+		var node = el("div", "fc-rate fc-cluster-rate");
+
+		node.title = "Total request rate per second across cluster \u201c" + cluster.name + "\u201d - "
+				+ cluster.reporting(commandName) + " of " + cluster.members.length
+				+ " node(s) currently reporting " + canonicalCommand(commandName) + ":\n"
+				+ cluster.members.map(hostOf).join("\n");
+
+		var valueNode = el("span", "fc-value", round1(value));
+
+		node.appendChild(el("span", "fc-smaller", "Cluster: "));
+		node.appendChild(valueNode);
+		node.appendChild(document.createTextNode("/s"));
+
+		return { node: node, value: valueNode };
+	}
+
 	function circuitStatus(frame, reportingHosts) {
 
 		var node = el("div", "fc-circuit-status");
@@ -360,15 +588,86 @@ var FcDashboard = (function () {
 		return table;
 	}
 
-	// ---- one edge's stream ---------------------------------------------------------------------
+	// ---- the row of cards ----------------------------------------------------------------------
 
-	function StreamPanel(container, stream) {
+	/**
+	 * A row of circuit cards, keyed by command name. Owns the cards' lifecycle and nothing else.
+	 *
+	 * @param cluster the ClusterRates the panel's edge belongs to, or null - handed to every card so
+	 *                it can show what the whole cluster is taking beside what this node is taking.
+	 */
+	function CircuitBoard(cluster) {
 
 		var self = this;
 
 		self.circuits = {};
+		self.cluster = cluster || null;
+		self.node = el("div", "fc-circuits");
 
-		self.root = el("div", "fc-dashboard");
+		if (self.cluster)
+			self.cluster.subscribe(function () { self.refreshClusterRates(); });
+	}
+
+	/** Any member reported: re-read the totals this row is showing. */
+	CircuitBoard.prototype.refreshClusterRates = function () {
+
+		var self = this;
+
+		for (var commandName in self.circuits)
+			if (self.circuits.hasOwnProperty(commandName))
+				self.circuits[commandName].setClusterRate(self.cluster.ratePerSecond(commandName));
+	};
+
+	CircuitBoard.prototype.update = function (commandName, frame) {
+
+		var circuit = this.circuits[commandName];
+
+		if (!circuit) {
+			circuit = new Circuit(commandName);
+			this.circuits[commandName] = circuit;
+			this.insertSorted(circuit);
+		}
+
+		circuit.update(frame, this.cluster);
+	};
+
+	/**
+	 * How many cards this row holds. The row is a responsive grid that fits as many cards per row as
+	 * the column width allows (see .fc-circuits in fc-dashboard.css); this is what stops it from
+	 * reserving room for cards that do not exist.
+	 */
+	CircuitBoard.prototype.syncCardCount = function () {
+		this.node.style.setProperty("--fc-cards", this.node.children.length);
+	};
+
+	/** Alphabetical, which was the vendored panel's default sort. CSS `order` then pins the known commands. */
+	CircuitBoard.prototype.insertSorted = function (circuit) {
+
+		var existing = this.node.children;
+
+		for (var i = 0; i < existing.length; i++)
+			if (existing[i].getAttribute("data-command") > circuit.name) {
+				this.node.insertBefore(circuit.root, existing[i]);
+				this.syncCardCount();
+				return;
+			}
+
+		this.node.appendChild(circuit.root);
+		this.syncCardCount();
+	};
+
+	CircuitBoard.prototype.remove = function (commandName) {
+
+		var circuit = this.circuits[commandName];
+		if (!circuit)
+			return;
+
+		this.node.removeChild(circuit.root);
+		delete this.circuits[commandName];
+		this.syncCardCount();
+	};
+
+	function legendNode() {
 
 		var legend = el("div", "fc-legend");
 		legend.appendChild(el("span", "fc-legend-title", "Circuits"));
@@ -379,15 +678,46 @@ var FcDashboard = (function () {
 					legend.appendChild(document.createTextNode(" | "));
 				legend.appendChild(el("span", entry[0], entry[1]));
 			});
-		self.root.appendChild(legend);
 
-		self.root.appendChild(el("div", "fc-stream-name", stream.name || stream.url));
+		return legend;
+	}
+
+	// ---- one edge's stream ---------------------------------------------------------------------
+
+	/**
+	 * @param cluster the ClusterRates shared with this edge's peers, or null. Every frame is rendered
+	 *                on this panel AND added to that - one EventSource either way, since the frames a
+	 *                cluster total needs are the ones this panel is already receiving.
+	 */
+	function StreamPanel(container, stream, cluster) {
+
+		var self = this;
+
+		self.url = stream.url;
+		self.cluster = cluster || null;
+		self.board = new CircuitBoard(self.cluster);
+
+		self.root = el("div", "fc-dashboard");
+		self.root.appendChild(legendNode());
+
+		var name = el("div", "fc-stream-name", stream.name || stream.url);
+
+		// On the hostname's own line rather than under it: it qualifies the hostname ("this node, as
+		// part of that group"), and a line of its own read as a heading for the cards below it.
+		if (self.cluster) {
+			var note = el("span", "fc-cluster-member",
+					" in cluster \u201c" + self.cluster.name + "\u201d, "
+					+ self.cluster.members.length + " nodes");
+			note.title = self.cluster.members.map(hostOf).join("\n");
+			name.appendChild(note);
+		}
+
+		self.root.appendChild(name);
 
 		self.status = el("span", "fc-status", "Connecting ...");
 		self.root.appendChild(self.status);
 
-		self.circuitsNode = el("div", "fc-circuits");
-		self.root.appendChild(self.circuitsNode);
+		self.root.appendChild(self.board.node);
 
 		container.appendChild(self.root);
 
@@ -477,63 +807,44 @@ var FcDashboard = (function () {
 			return;
 
 		if ("true" === String(frame.deleteData)) {
-			self.remove(frame.name);
+			self.board.remove(frame.name);
+			if (self.cluster)
+				self.cluster.drop(self.url, frame.name);
 			return;
 		}
 
-		var circuit = self.circuits[frame.name];
-		if (!circuit) {
-			circuit = new Circuit(frame.name);
-			self.circuits[frame.name] = circuit;
-			self.insertSorted(circuit);
-		}
+		// The cluster is fed BEFORE the card is drawn, so the line this node's own card shows includes
+		// this node's own contribution. The other order lags one frame behind, per member, forever.
+		if (self.cluster)
+			self.cluster.accept(self.url, frame);
 
-		circuit.update(frame);
+		self.board.update(frame.name, frame);
 	};
 
 	/**
-	 * How many cards this circuit row holds. The row is a responsive grid that fits as many
-	 * cards per row as the column width allows (see .fc-circuits in fc-dashboard.css); this
-	 * is what stops it from reserving room for cards that do not exist.
+	 * An edge url's host AND port, for the cluster tooltip - the full urls would be unreadable.
+	 *
+	 * The port stays. Dropping it would be FrontCacheClient.getName(), which strips the scheme and
+	 * everything from the first colon, so localhost:8080 and localhost:9080 - the e2e topology - come
+	 * out as one name; a tooltip listing the same node twice is the mildest form of that bug.
 	 */
-	StreamPanel.prototype.syncCardCount = function () {
-		this.circuitsNode.style.setProperty("--fc-cards", this.circuitsNode.children.length);
-	};
+	function hostOf(edgeUrl) {
+		return String(edgeUrl).replace(/^[a-z]+:\/\//i, "").replace(/\/.*$/, "");
+	}
 
-	/** Alphabetical, which was the vendored panel's default sort. CSS `order` then pins the known commands. */
-	StreamPanel.prototype.insertSorted = function (circuit) {
-
-		var self = this;
-		var existing = self.circuitsNode.children;
-
-		for (var i = 0; i < existing.length; i++)
-			if (existing[i].getAttribute("data-command") > circuit.name) {
-				self.circuitsNode.insertBefore(circuit.root, existing[i]);
-				self.syncCardCount();
-				return;
-			}
-
-		self.circuitsNode.appendChild(circuit.root);
-		self.syncCardCount();
-	};
-
-	StreamPanel.prototype.remove = function (commandName) {
-
-		var circuit = this.circuits[commandName];
-		if (!circuit)
-			return;
-
-		this.circuitsNode.removeChild(circuit.root);
-		delete this.circuits[commandName];
-		this.syncCardCount();
-	};
 
 	// ---- entry point ---------------------------------------------------------------------------
 
 	return {
 		/**
 		 * @param container  the element to render into
-		 * @param streams    [{name, url}] - one per edge, from the console's edge list
+		 * @param streams    [{name, url, cluster}] - one per edge, from the console's edge list.
+		 *                   cluster is null for an edge in none, which is every edge on a console
+		 *                   config that predates frontcache.console.clusters.
+		 *
+		 * One panel per edge, in the console's edge order, exactly as before - a cluster adds a line
+		 * to its members' cards and no panel of its own. Members of one cluster share a ClusterRates,
+		 * which is the only thing on the page that knows two edges belong together.
 		 */
 		attach: function (container, streams) {
 
@@ -542,13 +853,31 @@ var FcDashboard = (function () {
 				return;
 			}
 
+			var clusters = {};
+
 			streams.forEach(function (stream) {
-				new StreamPanel(container, stream);
+				if (!stream.cluster)
+					return;
+				if (!clusters[stream.cluster])
+					clusters[stream.cluster] = [];
+				clusters[stream.cluster].push(stream.url);
+			});
+
+			for (var name in clusters)
+				if (clusters.hasOwnProperty(name))
+					clusters[name] = new ClusterRates(name, clusters[name]);
+
+			streams.forEach(function (stream) {
+				new StreamPanel(container, stream, stream.cluster ? clusters[stream.cluster] : null);
 			});
 		},
 
 		// exposed for the console's own tests, not for page code
-		_internals: { num: num, ramp: ramp, bubbleRadius: bubbleRadius, addCommas: addCommas }
+		_internals: {
+			num: num, ramp: ramp, bubbleRadius: bubbleRadius, addCommas: addCommas,
+			ClusterRates: ClusterRates, canonicalCommand: canonicalCommand,
+			MEMBER_STALE_MS: MEMBER_STALE_MS
+		}
 	};
 
 })();

@@ -12,6 +12,10 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A cheap snapshot of the JVM this node runs in: heap, process CPU, uptime.
@@ -37,6 +41,8 @@ import java.lang.management.RuntimeMXBean;
  * because one bean was unavailable is worse than one reporting {@link #UNKNOWN} for that field.
  */
 public class FcNodeStats {
+
+	private static final Logger logger = LoggerFactory.getLogger(FcNodeStats.class);
 
 	/** The JVM does not report this number. Distinct from zero. */
 	public static final long UNKNOWN = -1;
@@ -135,19 +141,39 @@ public class FcNodeStats {
 	}
 
 	/**
+	 * Said once, at WARN, when this JVM cannot produce a process CPU figure at all.
+	 *
+	 * Not for the transient case - the bean returns a negative value until it has two samples of its
+	 * own, and warning about the first reading after every restart would train an operator to ignore
+	 * the line. This is for the permanent one, where the bean is simply not there, and it is worth a
+	 * line because the symptom is a single dash in one column of one console screen: everything else
+	 * in the response is correct, so nothing looks broken enough to investigate.
+	 *
+	 * That is not hypothetical. An embedded-runtime bundle shipped for a whole release with
+	 * jdk.management missing from its jlink module set, and reported "JVM CPU -" on every node.
+	 */
+	private static final AtomicBoolean cpuUnavailableReported = new AtomicBoolean(false);
+
+	/**
 	 * Guarded by an instanceof rather than a cast: {@code getProcessCpuLoad()} lives on the
 	 * {@code com.sun.management} extension of the bean, which a non-HotSpot JVM need not implement.
 	 * There the answer is "unknown", not a ClassCastException out of a management endpoint.
+	 *
+	 * <b>The instanceof itself is what throws when the extension is absent.</b> On a jlink'd runtime
+	 * built without {@code jdk.management} the interface is not on the module path at all, so the test
+	 * against it raises {@code NoClassDefFoundError} rather than evaluating to false - which is why
+	 * the catch below is a Throwable and why both paths end in the same report.
 	 */
 	private static double processCpuLoad() {
 		try {
 			OperatingSystemMXBean os = ManagementFactory.getOperatingSystemMXBean();
 			if (!(os instanceof com.sun.management.OperatingSystemMXBean))
-				return UNKNOWN_LOAD;
+				return cpuUnavailable(null == os ? "no OperatingSystemMXBean" : os.getClass().getName());
 
 			double load = ((com.sun.management.OperatingSystemMXBean) os).getProcessCpuLoad();
 
-			// negative until the bean has two samples of its own; NaN has been seen on some platforms
+			// negative until the bean has two samples of its own; NaN has been seen on some platforms.
+			// Deliberately NOT reported: this one clears itself.
 			if (Double.isNaN(load) || load < 0)
 				return UNKNOWN_LOAD;
 
@@ -156,8 +182,22 @@ public class FcNodeStats {
 		} catch (Throwable t) {
 			// Throwable, not Exception: a JVM without the com.sun extension on its module path fails
 			// this with an Error, and a missing CPU number must not fail the whole response.
-			return UNKNOWN_LOAD;
+			return cpuUnavailable(t.toString());
 		}
+	}
+
+	/** {@link #UNKNOWN_LOAD}, plus one line about why - see {@link #cpuUnavailableReported}. */
+	private static double cpuUnavailable(String detail) {
+
+		if (cpuUnavailableReported.compareAndSet(false, true))
+			logger.warn("Process CPU is not available in this JVM, so 'JVM CPU' reads as unknown on the"
+					+ " console's Edges status - and frontcache_process_cpu_usage is empty too, since"
+					+ " Micrometer's ProcessorMetrics reads the same bean."
+					+ " com.sun.management.OperatingSystemMXBean is unusable here ({}). On an embedded"
+					+ " runtime that means the jlink module set is missing jdk.management - see"
+					+ " scripts/dist/build-runtime-bundles.sh. Heap and uptime are unaffected.", detail);
+
+		return UNKNOWN_LOAD;
 	}
 
 	private static long uptime() {

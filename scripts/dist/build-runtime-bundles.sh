@@ -52,6 +52,19 @@ JDK_CACHE="${JDK_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/frontcache-jdks}"
 # read every edge's status over the Apache client, and only the realtime page failed - with a
 # NoClassDefFoundError from a static initializer, on a code path no smoke test reached.
 #
+# This set is a SNAPSHOT of a jdeps run, so it goes stale the moment our own code reaches for a
+# module it did not before - and that has now happened twice. jdk.management went missing when
+# FcNodeStats landed: process CPU lives on com.sun.management.OperatingSystemMXBean, which is in
+# jdk.management and not in java.management, so `instanceof` on it threw NoClassDefFoundError,
+# FcNodeStats caught it as designed, and every node on an embedded runtime reported "JVM CPU -"
+# for a whole release while heap and uptime were fine. jdeps had always named the module; nobody
+# re-ran it. `--verify-modules` below now does, on every build.
+#
+# java.scripting is deliberately NOT here even though a jdeps scan of the console bundle asks for
+# it: it comes from org.springframework.scripting.support, which a console of @Controllers with no
+# scripted beans never loads. java.prefs is not here either and does not need to be - java.desktop
+# `requires transitive` it, so jlink pulls it in regardless.
+#
 # Deliberately NOT using --add-modules java.se: that pulls in every Java SE module whether or
 # not anything can reach it. The set below is verified the only way that counts - the
 # resulting bundle is booted and served from (see smoke-test-dist.sh).
@@ -69,6 +82,7 @@ java.security.jgss,\
 java.sql,\
 java.xml,\
 jdk.incubator.vector,\
+jdk.management,\
 jdk.unsupported,\
 jdk.xml.dom"
 
@@ -95,13 +109,69 @@ warn() { printf 'WARNING: %s\n' "$*" >&2; }
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" > /dev/null 2>&1; }
 
+# ---- module-set drift check --------------------------------------------------
+# Asks jdeps what OUR OWN jars need and fails if JLINK_MODULES does not cover it. Runs before
+# any linking, on every build, because the two modules this set has lost so far were both lost
+# the same way: our code started using one and nobody re-ran the scan (see the note above).
+#
+# Scoped to the frontcache jars deliberately, NOT to the whole bundle. A JDK module our code
+# names in bytecode is reachable by definition, so a miss there is always a bug. The same claim
+# about a third-party jar is a judgement call - Spring asks for java.scripting from classes this
+# console never loads - and a check that fails on those gets switched off, which is worse than
+# not having one.
+#
+# Skipped, with a warning, when jdeps is unavailable (a bundle built from a JRE, say). This is a
+# guard against our own drift, not a gate on being able to build at all.
+verify_modules() {
+  have jdeps || { warn "jdeps not found - skipping the JLINK_MODULES drift check"; return 0; }
+
+  local jars=""
+  local j
+  for j in "$REPO_ROOT"/frontcache-core/build/libs/frontcache-core-"$VERSION".jar \
+           "$REPO_ROOT"/frontcache-agent/build/libs/frontcache-agent-"$VERSION".jar \
+           "$REPO_ROOT"/frontcache-server/build/libs/frontcache-server-"$VERSION".jar \
+           "$REPO_ROOT"/frontcache-console/build/libs/frontcache-console-"$VERSION".jar; do
+    [ -f "$j" ] && jars="${jars:+$jars }$j"
+  done
+
+  if [ -z "$jars" ]; then
+    warn "no frontcache jars built - skipping the JLINK_MODULES drift check (run ./gradlew build first)"
+    return 0
+  fi
+
+  # --ignore-missing-deps: these jars reference Jetty, Spring and Lucene, none of which is on the
+  # path here. Only the JDK modules jdeps resolves are of interest, hence the java./jdk. filter.
+  local needed missing
+  # shellcheck disable=SC2086
+  needed="$(jdeps --multi-release "$JDK_FEATURE" --print-module-deps --ignore-missing-deps $jars 2>/dev/null \
+            | tr ',' '\n' | grep -E '^(java|jdk)\.' | sort -u)" || true
+  [ -n "$needed" ] || { warn "jdeps produced nothing - skipping the JLINK_MODULES drift check"; return 0; }
+
+  missing="$(comm -23 <(printf '%s\n' "$needed") <(printf '%s\n' "$JLINK_MODULES" | tr ',' '\n' | sort -u) | tr '\n' ' ')"
+  missing="${missing% }"
+
+  if [ -n "$missing" ]; then
+    die "JLINK_MODULES is missing a module our own code needs: $missing
+
+       jdeps resolved it from the frontcache jars, so it is reachable - add it to
+       JLINK_MODULES_COMPUTED in this script. Shipping without it produces a runtime that
+       BOOTS and serves: the failure is a NoClassDefFoundError on whichever code path
+       touches it, which may be one field of one screen (jdk.management), or one page
+       (java.net.http). Both of those shipped."
+  fi
+
+  log "JLINK_MODULES covers what our jars need ($(printf '%s\n' "$needed" | tr '\n' ' '))"
+}
+
 # ---- args --------------------------------------------------------------------
 TARGETS=""
 ONLY="all"
+VERIFY_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --only)          ONLY="${2:?--only needs server|console|all}"; shift ;;
     --list-modules)  echo "$JLINK_MODULES" | tr ',' '\n'; exit 0 ;;
+    --verify-modules) VERIFY_ONLY=1 ;;
     -h|--help)       sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)              die "unknown option: $1" ;;
     *)               TARGETS="${TARGETS:+$TARGETS }$1" ;;
@@ -127,6 +197,9 @@ case "$(uname -m)" in
 esac
 HOST_TARGET="$HOST_OS-$HOST_ARCH"
 log "Build host is $HOST_TARGET; version $VERSION"
+
+verify_modules
+[ "$VERIFY_ONLY" = "1" ] && exit 0
 
 # ---- JDK acquisition ---------------------------------------------------------
 # Downloads go through the Adoptium assets API rather than the plain binary redirect,

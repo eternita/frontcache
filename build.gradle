@@ -501,6 +501,40 @@ project(':frontcache-console') {
 		archiveExtension = 'tar.gz'
 	}
 
+	// ---- the realtime monitor's JavaScript -----------------------------------
+	// fc-dashboard.js is the whole realtime monitor and has no dependencies, so there was nothing to
+	// run its code with until the cluster merge (docs/archive/circuit-cluster-proposal.md) put arithmetic in
+	// it that is silent when wrong. Node's own test runner, no package.json, no node_modules.
+	//
+	// SKIPPED when node is not on the PATH rather than failing: a JDK is this build's only stated
+	// prerequisite, and `./gradlew build` on a machine without node must keep working. The skip says
+	// so at lifecycle level, so it is visible in normal build output rather than only under --info.
+	def jsTest = tasks.register('jsTest', Exec) {
+		group = 'verification'
+		description = "Run the realtime monitor's JavaScript tests with node --test"
+
+		def testDir = file('src/test/js')
+		inputs.dir(testDir)
+		inputs.file('src/main/webapp/WEB-INF/static/js/fc-dashboard.js')
+		outputs.upToDateWhen { false }
+
+		// The PATH is scanned rather than `which` being run: this is configuration time, on every
+		// invocation of every task, and spawning a process there is not the place for it.
+		def nodeExe = System.getProperty('os.name').toLowerCase().contains('windows') ? 'node.exe' : 'node'
+		def nodePath = (System.getenv('PATH') ?: '').split(File.pathSeparator)
+				.collect { new File(it, nodeExe) }
+				.find { it.isFile() && it.canExecute() }
+
+		enabled = nodePath != null
+		if (nodePath == null)
+			logger.lifecycle(":${project.name}:jsTest SKIPPED - node is not on the PATH")
+
+		// The glob is the shell's: Exec does not expand one, and node --test needs the files named.
+		commandLine(['sh', '-c', "'${nodePath ?: 'node'}' --test src/test/js/*.test.js"])
+		workingDir = projectDir
+	}
+	tasks.named('check') { dependsOn jsTest }
+
 	// Run the console standalone on embedded Jetty 12.
 	tasks.register('appRun', JavaExec) {
 		group = 'application'

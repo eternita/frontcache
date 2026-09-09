@@ -26,6 +26,14 @@
 	padding: 6px 0 0 0;
 }
 
+/* On a clustered edge's panel, on the same line as its hostname: which cluster its cards' "Cluster"
+   line is adding up, with the member list in the tooltip. Size and colour are .fc-stream-name's -
+   it qualifies the hostname rather than competing with it. See docs/archive/circuit-cluster-proposal.md. */
+.fc-dashboard .fc-cluster-member {
+	font-style: italic;
+	cursor: help;
+}
+
 .fc-dashboard .fc-status {
 	display: block;
 	padding: 12px 0;
