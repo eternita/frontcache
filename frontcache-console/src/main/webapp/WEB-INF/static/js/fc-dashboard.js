@@ -383,8 +383,8 @@ var FcDashboard = (function () {
 
 		if (clusterRate !== null) {
 			var line = clusterRateLine(clusterRate, cluster, frame.name);
-			self.clusterValue = line.lastChild;
-			self.data.appendChild(line);
+			self.clusterValue = line.value;
+			self.data.appendChild(line.node);
 		}
 
 		self.data.appendChild(circuitStatus(frame, reportingHosts));
@@ -493,7 +493,14 @@ var FcDashboard = (function () {
 		return node;
 	}
 
-	/** The cluster total, on a member's own card. The unit is in the label, so no "/s" is appended. */
+	/**
+	 * The cluster total, on a member's own card - the same shape as the Host line above it, since it
+	 * is the same quantity over more nodes.
+	 *
+	 * Returns the value span alongside the line, rather than leaving the caller to find it by child
+	 * position: setClusterRate writes through that reference twice a second per member, and "the
+	 * second child" would break silently the first time anything is added to the line.
+	 */
 	function clusterRateLine(value, cluster, commandName) {
 
 		var node = el("div", "fc-rate fc-cluster-rate");
@@ -503,10 +510,13 @@ var FcDashboard = (function () {
 				+ " node(s) currently reporting " + canonicalCommand(commandName) + ":\n"
 				+ cluster.members.map(hostOf).join("\n");
 
-		node.appendChild(el("span", "fc-smaller", "Cluster req / s: "));
-		node.appendChild(el("span", "fc-value", round1(value)));
+		var valueNode = el("span", "fc-value", round1(value));
 
-		return node;
+		node.appendChild(el("span", "fc-smaller", "Cluster: "));
+		node.appendChild(valueNode);
+		node.appendChild(document.createTextNode("/s"));
+
+		return { node: node, value: valueNode };
 	}
 
 	function circuitStatus(frame, reportingHosts) {
@@ -690,15 +700,19 @@ var FcDashboard = (function () {
 		self.root = el("div", "fc-dashboard");
 		self.root.appendChild(legendNode());
 
-		self.root.appendChild(el("div", "fc-stream-name", stream.name || stream.url));
+		var name = el("div", "fc-stream-name", stream.name || stream.url);
 
+		// On the hostname's own line rather than under it: it qualifies the hostname ("this node, as
+		// part of that group"), and a line of its own read as a heading for the cards below it.
 		if (self.cluster) {
-			var note = el("div", "fc-cluster-member",
-					"in cluster \u201c" + self.cluster.name + "\u201d, "
+			var note = el("span", "fc-cluster-member",
+					" in cluster \u201c" + self.cluster.name + "\u201d, "
 					+ self.cluster.members.length + " nodes");
 			note.title = self.cluster.members.map(hostOf).join("\n");
-			self.root.appendChild(note);
+			name.appendChild(note);
 		}
+
+		self.root.appendChild(name);
 
 		self.status = el("span", "fc-status", "Connecting ...");
 		self.root.appendChild(self.status);

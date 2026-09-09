@@ -804,8 +804,8 @@ public class FrontcacheService {
 	 *
 	 * Membership is resolved HERE rather than at startup, because the edge list changes at runtime
 	 * from the Edges page. Which also settles the one-member case: a cluster the current edge list
-	 * leaves with fewer than two members is reported as no cluster at all, since its "Cluster req / s"
-	 * line would repeat the Host line above it - the very thing this feature exists to stop. See
+	 * leaves with fewer than two members is reported as no cluster at all, since its "Cluster:" line
+	 * would repeat the "Host:" line above it - the very thing this feature exists to stop. See
 	 * docs/circuit-cluster-proposal.md section 4.3.
 	 */
 	public String getDashboardStreams()

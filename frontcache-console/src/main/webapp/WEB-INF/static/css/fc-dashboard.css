@@ -26,14 +26,12 @@
 	padding: 6px 0 0 0;
 }
 
-/* On a clustered edge's panel, directly under its hostname: which cluster its cards' "Cluster
-   req / s" line is adding up, with the member list in the tooltip. Small and grey - the panel is
-   still about this one node. See docs/circuit-cluster-proposal.md. */
+/* On a clustered edge's panel, on the same line as its hostname: which cluster its cards' "Cluster"
+   line is adding up, with the member list in the tooltip. Size and colour are .fc-stream-name's -
+   it qualifies the hostname rather than competing with it. See docs/circuit-cluster-proposal.md. */
 .fc-dashboard .fc-cluster-member {
-	font-size: 80%;
-	color: grey;
 	font-style: italic;
-	cursor: default;
+	cursor: help;
 }
 
 .fc-dashboard .fc-status {
@@ -192,14 +190,6 @@
 
 .fc-dashboard .fc-rate .fc-value {
 	font-weight: 700;
-}
-
-/* The cluster total, under this node's own rate. Deliberately NOT emphasised over the Host line
-   above it: the panel is one node's, and its own number is the one an operator reads first when
-   they are looking at a single node's panel. The label carries the unit ("Cluster req / s"), so
-   nothing is appended after the value - .fc-rate's own alignment does the rest. */
-.fc-dashboard .fc-rate.fc-cluster-rate {
-	font-size: 10pt;
 }
 
 .fc-dashboard .fc-circuit-status {
