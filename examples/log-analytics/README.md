@@ -103,14 +103,32 @@ indices, sincedb and pulled files consistent.
 
 ### Frontcache Overview
 
-- **KPI tiles** — total requests, cache-hit ratio (toplevel), median & p95 latency, error rate,
-  bot share.
+- **KPI tiles** — all client requests and total guarded requests (the guard's share of inbound
+  traffic, ~29% here); then toplevel, include and include-async event counts, origin hits
+  (`is_cached:dynamic`) and total error count. The three request-type counts partition the
+  request index, so they sum to its total; the first tile is the sum of the second and third.
 - **Over time** — request volume by cache status (stacked), cache-hit ratio
   (percentage-stacked), latency percentiles (p50/p90/p95/p99), bandwidth served.
-- **Breakdowns** — median latency cache-vs-origin and bot-vs-browser; requests by FC node, by
-  domain, and by country; cache-status / cacheable / client-type pies.
+- **Breakdowns** — median latency cache-vs-origin; a toplevel-vs-include split and a cache
+  hit-vs-miss split for toplevels and for includes separately (the two behave nothing alike —
+  includes run ~99% from cache, toplevels far less); toplevel requests by FC node and requests by
+  country. The by-node bar counts **toplevels only**, so it reads as pages served per node rather
+  than being dominated by each page's includes.
 - **Top-N tables** — 20 slowest URLs (by median latency) and 20 hottest URLs (with a cache-hits
   column).
+
+The data view backing this dashboard is
+`frontcache-*,-frontcache-errors-*,-frontcache-fallbacks-*,-frontcache-rejected-*`: the bare
+`frontcache-*` also matches the three sibling indices, and rejected-request documents carry the
+same `hystrix_error` field, which would inflate every unfiltered panel here. The two leftmost KPI
+tiles are the exception — a guard rule acts *before* cache or origin, so a rejected request never
+gets a request-log line and has to be counted from the rejected index. They use a second data
+view, `frontcache-*,-frontcache-errors-*,-frontcache-fallbacks-*`, and tell the two populations
+apart by `reject_reason`, which only rejected documents carry.
+
+Upgrading from an older copy of this dashboard leaves eleven now-unused `lens` saved objects
+behind — import only ever adds and overwrites. They are harmless; delete them from
+**Stack Management → Saved Objects** if you want a clean list.
 
 ### Frontcache Errors
 
@@ -136,7 +154,7 @@ rejected (400 / 414), redirected (301 / 302), or matched in dry-run — plus req
 completed through a circuit-breaker fallback. **`reject_reason` is the headline dimension: it holds the
 rule name**, so a new rule appears in every panel without touching the dashboard.
 
-- **KPI tiles** — total guarded & failed requests, distinct client IPs, guard-action share
+- **KPI tiles** — total guarded requests, distinct client IPs, guard-action share
   (rule acted vs circuit-breaker fallback), bot share.
 - **Over time** — guard actions & failures by rule (stacked area) and by FC node.
 - **Breakdowns** — rule/reason pie and bar (top 10), guard-actions-vs-fallback pie,
