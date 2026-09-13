@@ -1,0 +1,185 @@
+<svg viewBox="0 0 1040 1044" width="1040" height="1044" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <title>hobbyray.com Frontcache deployment — GSLB, three standalone edges, Java origin with FrontCacheFilter</title>
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3.2" orient="auto"><path d="M0,0 L8,3.2 L0,6.4 z" fill="#475569"/></marker>
+    <marker id="arrPink" markerWidth="10" markerHeight="10" refX="8" refY="3.2" orient="auto"><path d="M0,0 L8,3.2 L0,6.4 z" fill="#db2777"/></marker>
+
+    <linearGradient id="gUsers" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eff6ff"/><stop offset="1" stop-color="#dbeafe"/></linearGradient>
+    <linearGradient id="gGslb"  x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbeb"/><stop offset="1" stop-color="#fde68a"/></linearGradient>
+    <linearGradient id="gUs"    x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef2ff"/><stop offset="1" stop-color="#c7d2fe"/></linearGradient>
+    <linearGradient id="gOrigin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1f2"/><stop offset="1" stop-color="#fecdd3"/></linearGradient>
+    <linearGradient id="gSolr"  x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0f9ff"/><stop offset="1" stop-color="#bae6fd"/></linearGradient>
+    <linearGradient id="gDb"    x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0fdf4"/><stop offset="1" stop-color="#bbf7d0"/></linearGradient>
+    <linearGradient id="gSvc"   x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff7ed"/><stop offset="1" stop-color="#fed7aa"/></linearGradient>
+    <linearGradient id="gNote"  x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdf4ff"/><stop offset="1" stop-color="#fbcfe8"/></linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1040" height="1044" fill="#ffffff"/>
+
+  <!-- ============ title ============ -->
+  <text x="520" y="34" text-anchor="middle" font-size="20" font-weight="bold" fill="#0f172a">hobbyray.com — Frontcache deployment (multi-tier)</text>
+  <text x="520" y="56" text-anchor="middle" font-size="13" fill="#64748b">GSLB → three standalone edges → Java origin with in-JVM Frontcache filter</text>
+
+  <!-- ============ visitors ============ -->
+  <rect x="250" y="76" width="540" height="60" rx="30" fill="url(#gUsers)" stroke="#2563eb" stroke-width="1.5"/>
+  <g fill="#2563eb">
+    <circle cx="286" cy="100" r="5.5"/><path d="M277,116 a9,9 0 0 1 18,0 z"/>
+    <circle cx="304" cy="103" r="4.5"/><path d="M296.5,116 a7.5,7.5 0 0 1 15,0 z"/>
+    <circle cx="320" cy="100" r="5.5"/><path d="M311,116 a9,9 0 0 1 18,0 z"/>
+  </g>
+  <text x="562" y="102" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a8a">Visitors &amp; Search-engine crawlers &amp; AI agents</text>
+  <text x="562" y="122" text-anchor="middle" font-size="12" fill="#475569">Worldwide · HTTPS · Different TTL per category</text>
+
+  <line x1="520" y1="136" x2="520" y2="166" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- ============ GSLB ============ -->
+  <rect x="260" y="170" width="520" height="92" rx="14" fill="url(#gGslb)" stroke="#d97706" stroke-width="2"/>
+  <g stroke="#b45309" stroke-width="1.6" fill="none">
+    <circle cx="306" cy="216" r="20" fill="#fffbeb"/>
+    <ellipse cx="306" cy="216" rx="9" ry="20"/>
+    <line x1="286" y1="216" x2="326" y2="216"/>
+    <path d="M290,204 Q306,211 322,204"/>
+    <path d="M290,228 Q306,221 322,228"/>
+  </g>
+  <text x="545" y="202" text-anchor="middle" font-size="17" font-weight="bold" fill="#92400e">www.hobbyray.com</text>
+  <text x="545" y="223" text-anchor="middle" font-size="13" fill="#78350f">Global Server Load Balancer</text>
+  <text x="545" y="244" text-anchor="middle" font-size="12" fill="#a16207">one hostname · geo-routes every visitor to the nearest healthy edge</text>
+
+  <line x1="440" y1="262" x2="200" y2="316" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="520" y1="262" x2="520" y2="316" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="640" y1="262" x2="860" y2="316" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="300" y="288" text-anchor="middle" font-size="11.5" fill="#64748b">nearest region</text>
+  <text x="770" y="288" text-anchor="middle" font-size="11.5" fill="#64748b">nearest region</text>
+
+  <!-- ============ edge node cards ============ -->
+  <!-- US -->
+  <rect x="30" y="318" width="290" height="212" rx="14" fill="url(#gUs)" stroke="#4338ca" stroke-width="2"/>
+  <g fill="#4338ca"><rect x="46" y="332" width="30" height="9" rx="2"/><rect x="46" y="345" width="30" height="9" rx="2"/><rect x="46" y="358" width="30" height="9" rx="2"/></g>
+  <g fill="#c7d2fe"><circle cx="51" cy="336.5" r="1.8"/><circle cx="51" cy="349.5" r="1.8"/><circle cx="51" cy="362.5" r="1.8"/></g>
+  <text x="88" y="346" font-size="15" font-weight="bold" fill="#312e81">fc-us.hobbyray.com</text>
+  <text x="88" y="365" font-size="11.5" fill="#4f46e5">edge node — North America</text>
+  <rect x="44" y="378" width="262" height="48" rx="8" fill="#ffffff" stroke="#4338ca"/>
+  <text x="175" y="397" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">nginx :80 / :443</text>
+  <text x="175" y="414" text-anchor="middle" font-size="11.5" fill="#64748b">TLS · gzip · front door</text>
+  <rect x="44" y="434" width="262" height="48" rx="8" fill="#eef2ff" stroke="#4338ca"/>
+  <text x="175" y="453" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Frontcache :9080</text>
+  <text x="175" y="470" text-anchor="middle" font-size="11.5" fill="#64748b">standalone proxy · one site per node</text>
+  <text x="175" y="500" text-anchor="middle" font-size="11.5" fill="#4f46e5">L1 Ehcache (RAM) + L2 Lucene (disk)</text>
+  <text x="175" y="517" text-anchor="middle" font-size="11.5" fill="#4f46e5">serves hits without touching the origin</text>
+
+  <!-- EU -->
+  <rect x="375" y="318" width="290" height="212" rx="14" fill="url(#gUs)" stroke="#4338ca" stroke-width="2"/>
+  <g fill="#4338ca"><rect x="391" y="332" width="30" height="9" rx="2"/><rect x="391" y="345" width="30" height="9" rx="2"/><rect x="391" y="358" width="30" height="9" rx="2"/></g>
+  <g fill="#c7d2fe"><circle cx="396" cy="336.5" r="1.8"/><circle cx="396" cy="349.5" r="1.8"/><circle cx="396" cy="362.5" r="1.8"/></g>
+  <text x="433" y="346" font-size="15" font-weight="bold" fill="#312e81">fc-eu.hobbyray.com</text>
+  <text x="433" y="365" font-size="11.5" fill="#4f46e5">edge node — Europe</text>
+  <rect x="389" y="378" width="262" height="48" rx="8" fill="#ffffff" stroke="#4338ca"/>
+  <text x="520" y="397" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">nginx :80 / :443</text>
+  <text x="520" y="414" text-anchor="middle" font-size="11.5" fill="#64748b">TLS · gzip · front door</text>
+  <rect x="389" y="434" width="262" height="48" rx="8" fill="#eef2ff" stroke="#4338ca"/>
+  <text x="520" y="453" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Frontcache :9080</text>
+  <text x="520" y="470" text-anchor="middle" font-size="11.5" fill="#64748b">standalone proxy · one site per node</text>
+  <text x="520" y="500" text-anchor="middle" font-size="11.5" fill="#4f46e5">independent cache — warms on its own traffic</text>
+  <text x="520" y="517" text-anchor="middle" font-size="11.5" fill="#4f46e5">Resilience + fallbacks.conf shield the origin</text>
+
+  <!-- AP -->
+  <rect x="720" y="318" width="290" height="212" rx="14" fill="url(#gUs)" stroke="#4338ca" stroke-width="2"/>
+  <g fill="#4338ca"><rect x="736" y="332" width="30" height="9" rx="2"/><rect x="736" y="345" width="30" height="9" rx="2"/><rect x="736" y="358" width="30" height="9" rx="2"/></g>
+  <g fill="#c7d2fe"><circle cx="741" cy="336.5" r="1.8"/><circle cx="741" cy="349.5" r="1.8"/><circle cx="741" cy="362.5" r="1.8"/></g>
+  <text x="778" y="346" font-size="15" font-weight="bold" fill="#312e81">fc-ap.hobbyray.com</text>
+  <text x="778" y="365" font-size="11.5" fill="#4f46e5">edge node — Asia / Pacific</text>
+  <rect x="734" y="378" width="262" height="48" rx="8" fill="#ffffff" stroke="#4338ca"/>
+  <text x="865" y="397" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">nginx :80 / :443</text>
+  <text x="865" y="414" text-anchor="middle" font-size="11.5" fill="#64748b">TLS · gzip · front door</text>
+  <rect x="734" y="434" width="262" height="48" rx="8" fill="#eef2ff" stroke="#4338ca"/>
+  <text x="865" y="453" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Frontcache :9080</text>
+  <text x="865" y="470" text-anchor="middle" font-size="11.5" fill="#64748b">standalone proxy · one site per node</text>
+  <text x="865" y="500" text-anchor="middle" font-size="11.5" fill="#4f46e5">dynamic visitor types identification</text>
+  <text x="865" y="517" text-anchor="middle" font-size="10.5" fill="#4f46e5">rules-based behaviour for TTL, rejects, redirects</text>
+
+  <!-- edge -> origin -->
+  <line x1="175" y1="530" x2="330" y2="592" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="520" y1="530" x2="520" y2="592" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="865" y1="530" x2="700" y2="592" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="238" y="556" text-anchor="middle" font-size="11.5" fill="#64748b">cache miss only</text>
+  <text x="520" y="556" text-anchor="middle" font-size="11.5" fill="#64748b">cache miss only</text>
+  <text x="800" y="556" text-anchor="middle" font-size="11.5" fill="#64748b">cache miss only</text>
+
+  <!-- ============ origin ============ -->
+  <rect x="300" y="594" width="440" height="158" rx="14" fill="url(#gOrigin)" stroke="#dc2626" stroke-width="2"/>
+  <g stroke="#b91c1c" stroke-width="1.6" fill="none">
+    <path d="M326,626 h22 v18 a11,11 0 0 1 -22,0 z" fill="#fff1f2"/>
+    <path d="M348,630 h6 a6,6 0 0 1 0,12 h-6"/>
+    <path d="M331,618 q3,-5 0,-9 M339,618 q3,-5 0,-9"/>
+  </g>
+  <text x="545" y="624" text-anchor="middle" font-size="17" font-weight="bold" fill="#991b1b">origin.hobbyray.com</text>
+  <text x="545" y="644" text-anchor="middle" font-size="12.5" fill="#7f1d1d">Java web app — FrontCache Filter in the same JVM</text>
+  <rect x="322" y="658" width="396" height="34" rx="8" fill="#ffffff" stroke="#dc2626"/>
+  <text x="520" y="680" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1e293b">FrontCache — second cache tier</text>
+  <text x="520" y="714" text-anchor="middle" font-size="11.5" fill="#b91c1c">the app decides what is cacheable: maxage · tags · refresh · cache-level</text>
+  <text x="520" y="731" text-anchor="middle" font-size="11.5" fill="#b91c1c">every edge obeys those headers — nothing is cached until it says so</text>
+
+  <!-- ============ invalidation note ============ -->
+  <rect x="762" y="594" width="248" height="158" rx="12" fill="url(#gNote)" stroke="#db2777" stroke-width="1.8" stroke-dasharray="6 3"/>
+  <text x="886" y="620" text-anchor="middle" font-size="14" font-weight="bold" fill="#9d174d">Cache invalidation</text>
+  <text x="886" y="642" text-anchor="middle" font-size="11.5" fill="#831843">content changes in the app →</text>
+  <text x="886" y="660" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#831843">FrontCacheAgent</text>
+  <text x="886" y="678" text-anchor="middle" font-size="11.5" fill="#831843">one call fans out to all edges</text>
+  <text x="886" y="700" text-anchor="middle" font-size="11" fill="#be185d"></text>
+  <text x="886" y="717" text-anchor="middle" font-size="11" fill="#be185d">guarded by x-frontcache-api-key</text>
+  <text x="886" y="738" text-anchor="middle" font-size="11" fill="#be185d">invalidate by tag, URI, ...</text>
+  <path d="M886,592 C886,560 880,548 872,534" stroke="#db2777" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#arrPink)"/>
+
+  <!-- ============ backend tier ============ -->
+  <rect x="130" y="790" width="790" height="152" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-dasharray="7 4"/>
+
+  <!-- origin -> backends -->
+  <line x1="420" y1="752" x2="292" y2="814" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="520" y1="752" x2="520" y2="814" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="620" y1="752" x2="762" y2="814" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Solr -->
+  <rect x="155" y="820" width="210" height="86" rx="12" fill="url(#gSolr)" stroke="#0284c7" stroke-width="2"/>
+  <g stroke="#0369a1" stroke-width="2.4" fill="none"><circle cx="187" cy="856" r="11" fill="#ffffff"/><line x1="195" y1="864" x2="204" y2="873"/></g>
+  <text x="275" y="854" text-anchor="middle" font-size="15" font-weight="bold" fill="#075985">Solr</text>
+  <text x="275" y="874" text-anchor="middle" font-size="11.5" fill="#0369a1">catalog search · facets</text>
+  <text x="275" y="891" text-anchor="middle" font-size="11.5" fill="#0369a1">the expensive path to protect</text>
+
+  <!-- SQL DB -->
+  <path d="M420,834 v56 a100,14 0 0 0 200,0 v-56 z" fill="url(#gDb)" stroke="#16a34a" stroke-width="2"/>
+  <ellipse cx="520" cy="834" rx="100" ry="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="520" y="863" text-anchor="middle" font-size="15" font-weight="bold" fill="#14532d">SQL DB</text>
+  <text x="520" y="882" text-anchor="middle" font-size="11.5" fill="#15803d">products · orders · accounts</text>
+  <text x="520" y="899" text-anchor="middle" font-size="11.5" fill="#15803d">system of record</text>
+
+  <!-- Other backend services -->
+  <rect x="648" y="820" width="252" height="86" rx="12" fill="url(#gSvc)" stroke="#ea580c" stroke-width="2"/>
+  <g transform="translate(677,856)" stroke="#c2410c" stroke-width="1.8" fill="none">
+    <circle r="11.5" fill="#ffffff"/><circle r="4.5"/>
+    <g fill="#c2410c" stroke="none">
+      <rect x="-2.5" y="-16.5" width="5" height="6" rx="1.2"/>
+      <rect x="-2.5" y="-16.5" width="5" height="6" rx="1.2" transform="rotate(60)"/>
+      <rect x="-2.5" y="-16.5" width="5" height="6" rx="1.2" transform="rotate(120)"/>
+      <rect x="-2.5" y="-16.5" width="5" height="6" rx="1.2" transform="rotate(180)"/>
+      <rect x="-2.5" y="-16.5" width="5" height="6" rx="1.2" transform="rotate(240)"/>
+      <rect x="-2.5" y="-16.5" width="5" height="6" rx="1.2" transform="rotate(300)"/>
+    </g>
+  </g>
+  <text x="789" y="854" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#7c2d12">Other Backend Services</text>
+  <text x="789" y="874" text-anchor="middle" font-size="11.5" fill="#c2410c">payments · shipping · CMS · ERP</text>
+  <text x="789" y="891" text-anchor="middle" font-size="11.5" fill="#c2410c">internal &amp; third-party APIs</text>
+
+  <text x="520" y="928" text-anchor="middle" font-size="11.5" fill="#64748b">origin backends — reached only on a true miss; Frontcache absorbs everything else</text>
+
+  <!-- ============ legend ============ -->
+  <rect x="30" y="958" width="980" height="66" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="48" y="981" font-size="12" font-weight="bold" fill="#334155">Legend</text>
+  <rect x="112" y="971" width="14" height="12" rx="3" fill="url(#gGslb)" stroke="#d97706"/><text x="132" y="981" font-size="11.5" fill="#475569">GSLB entry point</text>
+  <rect x="250" y="971" width="14" height="12" rx="3" fill="url(#gUs)" stroke="#4338ca"/>
+  <text x="270" y="981" font-size="11.5" fill="#475569">edge: nginx :80/:443 → Frontcache :9080 (standalone)</text>
+  <rect x="646" y="971" width="14" height="12" rx="3" fill="url(#gOrigin)" stroke="#dc2626"/><text x="666" y="981" font-size="11.5" fill="#475569">origin: Java app + FrontCache Filter</text>
+  <rect x="872" y="971" width="14" height="12" rx="3" fill="url(#gSolr)" stroke="#0284c7"/><rect x="890" y="971" width="14" height="12" rx="3" fill="url(#gDb)" stroke="#16a34a"/><rect x="908" y="971" width="14" height="12" rx="3" fill="url(#gSvc)" stroke="#ea580c"/><text x="928" y="981" font-size="11.5" fill="#475569">backends</text>
+  <line x1="112" y1="1006" x2="146" y2="1006" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/><text x="156" y="1010" font-size="11.5" fill="#475569">request path (each hop only on a miss)</text>
+  <line x1="406" y1="1006" x2="440" y2="1006" stroke="#db2777" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrPink)"/><text x="450" y="1010" font-size="11.5" fill="#475569">invalidation / management API</text>
+  <text x="1000" y="1010" text-anchor="end" font-size="11.5" fill="#64748b">An edge miss can still be served by the origin's own filter cache.</text>
+</svg>

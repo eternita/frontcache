@@ -209,8 +209,8 @@ Two caching tiers:
    against each edge's `:9080` (or a health URL). GSLB returns the nearest healthy edge IP.
 
 4. **Tune the two tiers differently.**
-   - Edges: longer TTLs for static/SEO fragments; honor `bot:`/`browser:` splits at the edge
-     so crawlers get long-lived SEO HTML while users get fresher content.
+   - Edges: longer TTLs for static/SEO fragments; honor `bot:`/`guest:` splits at the edge
+     so crawlers get long-lived SEO HTML while guests get fresher content.
    - Origin filter: shorter TTLs / `refresh=soft` so it revalidates against the DB but still
      shields it from stampedes when several edges miss together.
 

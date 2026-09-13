@@ -69,7 +69,7 @@ re-cutting anything around it. Plan §7.3.
 >
 > One dynamic fragment does not make the page uncacheable. It makes one tile amber.
 
-- **On screen:** the wireframe splitting along `fc:include` seams; label cards `maxage`, `tags`, `client=bot|browser`, `call=async`; the cart badge amber with `maxage=0` + `dynamic-urls.conf`.
+- **On screen:** the wireframe splitting along `fc:include` seams; label cards `maxage`, `tags`, `client=bot|guest`, `call=async`; the cart badge amber with `maxage=0` + `dynamic-urls.conf`.
 - **Interactive:** the viewer toggles any tile between cached and dynamic and watches the per-request origin-render count respond.
 - **Source:** [concept.md §5–§6](../concept.md), [http-headers.md](../http-headers.md), [jsp-tags.md](../jsp-tags.md).
 - **Markup is generic on purpose** (`example.com`, a storefront). Plan §5, §7.4.

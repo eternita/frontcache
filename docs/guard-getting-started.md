@@ -63,7 +63,7 @@ and `#` comments are ignored.
 | `query~<regex>` | the query string matches (`?` included) |
 | `url~<regex>` | the whole URL matches |
 | `method:GET` | the HTTP method is GET (POST, HEAD, …) |
-| `client-type:bot` \| `client-type:browser` | how Frontcache classified the visitor, using `bots.conf` |
+| `client-type:bot` \| `client-type:guest` | how Frontcache classified the visitor, using `bots.conf` |
 | `cookie:<name>` | that cookie is present (presence only — values are never read) |
 | `header:<name>` or `header:<name>~<regex>` | the header is present / matches |
 | `request-type:<toplevel\|include\|include-async>` | `toplevel` is a request from a client; the others are `<fc:include>` fragments re-entering the engine |
@@ -145,7 +145,7 @@ Worth knowing:
 - **Bots get redirected too.** They carry no session cookie, so crawlers stop costing
   you origin renders on login-gated pages — but `/login.htm` absorbs that crawl
   traffic, and those URLs will leave search results. If you would rather crawlers
-  render normally, add `; client-type:browser` to the condition.
+  render normally, add `; client-type:guest` to the condition.
 - **Presence only.** Frontcache checks that the cookie *exists*; it never validates a
   session. Deciding whether a session is real stays your app's job.
 
@@ -187,7 +187,7 @@ search-flood    | uri~^/search\.htm ; rate:20/10s | reject:429 Too Many Requests
 # 3. credential stuffing: only POSTs to that one page feed the counter
 login-flood     | uri~^/login\.htm$ ; method:POST ; rate:10/1m | reject:429 Slow down
 
-# 4. a misbehaving crawler gets slowed, not blocked; browsers never touch the counter
+# 4. a misbehaving crawler gets slowed, not blocked; guests never touch the counter
 bot-flood       | client-type:bot ; rate:100/10s | reject:429 Crawl slower
 ```
 
@@ -325,7 +325,7 @@ curl -H "Authorization: Bearer <your-api-key>" "http://<edge>/frontcache-io?acti
 status sent:
 
 ```
-2026-08-18T10:49:14,638-0600 5606c79f … direct redirected 0 -1 "127.0.0.1/whatever.htm" "160.202.254.65" fc-us-1 browser "curl/8.7.1" "ip-access" 301
+2026-08-18T10:49:14,638-0600 5606c79f … direct redirected 0 -1 "127.0.0.1/whatever.htm" "160.202.254.65" fc-us-1 guest "curl/8.7.1" "ip-access" 301
 ```
 
 For a **rate rule** the reason field carries the address that was counted, as

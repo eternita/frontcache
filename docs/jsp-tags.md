@@ -36,11 +36,29 @@ Attribute | Description
         maxage="24h" - cache for 24 hours
         maxage="30d" - cache for 30 days
 
-Cache time can be client type specific. Page can be cached for bots and dynamic for browsers (or opposite).
+Cache time can be client type specific. Page can be cached for bots and dynamic for guests (or opposite).
 
-        maxage="15m" - cache for 15 minutes for bots and browsers
-        maxage="bot:15m" - cache for 15 minutes for bots and dynamic for browsers
-        maxage="browser:15m" - cache for 15 minutes for browsers and dynamic for bots
+        maxage="15m" - cache for 15 minutes for bots and guests
+        maxage="bot:15m" - cache for 15 minutes for bots and dynamic for guests
+        maxage="guest:15m" - cache for 15 minutes for guests and dynamic for bots
+
+Client types can also be listed together, comma separated, so each one gets its own cache time. A
+client type the value does not name is not cached - bot:15m above is that same rule with one entry.
+
+        maxage="bot:30d, guest:1d" - cache for 30 days for bots and 1 day for guests
+        maxage="bot:forever, guest:1h" - cache forever for bots and 1 hour for guests
+
+Whitespace around the commas and colons does not matter. A repeated client type (bot:30d, bot:1h)
+warns and the first one wins.
+
+Worth knowing before setting a split: there is one cached copy carrying an expiration per client
+type, not a copy per client type, and whichever client type re-renders it resets both. So the
+shortest time sets how often the origin renders, and the longer ones say which client types never
+have to trigger a render - on a page with steady guest traffic bots ride along on the copy guests
+already paid for, and on a long tail page with no guest traffic the entry ages to the full bot time.
+
+Lists need 2.9.0 or later on every node. Reaching an older node, a list takes the page out of cache
+entirely, so upgrade the nodes before the pages.
 
 * **tags** - invalidation tags used for page invalidation. Page can be removed from cache by URL or by invalidation tag. Attribute is optional.
 
@@ -56,7 +74,7 @@ Cache time can be client type specific. Page can be cached for bots and dynamic 
 
 ## fc:include - setting policy for processing server-side includes.
 
-        <fc:include url="/example/include-page.jsp" client="all|browser|bot" call="sync|async" combine="true|group-name" />
+        <fc:include url="/example/include-page.jsp" client="all|guest|bot" call="sync|async" combine="true|group-name" />
 
 Attributes:
 
@@ -69,10 +87,10 @@ Attribute | Description
 
 * **url** - data to be included. Attribute is mandatory.
 
-* **client** - Set if include is client type specific. Options are "browser", "bot", "all". Attribute is optional, default value is "all".
+* **client** - Set if include is client type specific. Options are "guest", "bot", "all". Attribute is optional, default value is "all".
 
         client="bot" include is performed for bots only
-        client="browser" include is performed for browsers only
+        client="guest" include is performed for guests only
         client="all" include is performed for all client types (default)
 
 * **call** - Set if include is executed synchronously or asynchronously. Options are "sync", "async". Attribute is optional, default value is "sync".

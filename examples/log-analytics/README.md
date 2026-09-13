@@ -177,7 +177,7 @@ a scanner walking the node by IP shows up the same way under `ip-access`.
 `request_type` (`toplevel` / `include` / `include-async`), `is_cacheable` (`cacheable` /
 `direct`), `is_cached` (`from-cache` / `dynamic` / `dynamic-soft`), `hystrix_error` (`success` /
 `error`), `runtime_millis`, `length_bytes` (`-1` when unknown), `url`, `clientip`, `server`,
-`browserBot` (`bot` / `browser`), `agent`, plus flat `geoip.*` from the client IP (Logstash's
+`browserBot` (`bot` / `guest`), `agent`, plus flat `geoip.*` from the client IP (Logstash's
 bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
 
 **Error logs** (`error*.log`) — each ERROR entry is multi-line (header + stack trace); a

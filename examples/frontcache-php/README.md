@@ -97,7 +97,7 @@ per-user content is never cached. The full header set:
 
 | Header | Meaning |
 | --- | --- |
-| `x-frontcache-component-maxage` | TTL. `0` = never cache, `-1`/`forever` = forever, or `60`/`15m`/`24h`. `bot:` / `browser:` prefixes give crawlers and users different TTLs |
+| `x-frontcache-component-maxage` | TTL. `0` = never cache, `-1`/`forever` = forever, or `60`/`15m`/`24h`. `bot:` / `guest:` prefixes give crawlers and guests different TTLs |
 | `x-frontcache-component-tags` | pipe-separated invalidation tags, e.g. `catalog\|product-42` |
 | `x-frontcache-component-refresh` | `soft` = serve stale while revalidating |
 | `x-frontcache-component-cache-level` | `L1` (memory) or `L2` (disk, default) |

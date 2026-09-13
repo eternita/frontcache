@@ -12,7 +12,7 @@ proxy or as a servlet filter. It:
   mostly cached;
 - stitches fragments together, resolving `<fc:include url="..."/>` markers (by default
   concurrently);
-- serves bots differently from browsers, so crawlers can get long-lived SEO HTML while users get
+- serves bots differently from guests, so crawlers can get long-lived SEO HTML while guests get
   fresher content;
 - circuit-breaks each origin call and serves fallback content (uri pattern based) when the origin
   fails.
@@ -69,7 +69,7 @@ Source: `frontcache-core/.../core/FCHeaders.java`, taglib `META-INF/fc.tld`.
 
 | Header | Meaning | Example |
 |--------|---------|---------|
-| `x-frontcache-component-maxage` | TTL. `0`=no cache (default), `-1`/`forever`=forever, or `60`/`15m`/`24h`. Supports `bot:`/`browser:` prefixes | `24h`, `bot:30d` |
+| `x-frontcache-component-maxage` | TTL. `0`=no cache (default), `-1`/`forever`=forever, or `60`/`15m`/`24h`. Supports `bot:`/`guest:` prefixes, and a list giving each client type its own TTL | `24h`, `bot:30d`, `bot:30d, guest:1d` |
 | `x-frontcache-component-tags` | Pipe-separated invalidation tags | `product\|catalog` |
 | `x-frontcache-component-refresh` | `regular` (default) or `soft` (serve-stale-while-revalidate) | `soft` |
 | `x-frontcache-component-cache-level` | `L1` or `L2` (default L2) | `L1` |
@@ -97,14 +97,14 @@ the HTML they return; there is no other difference.
 
 A page is a composition. The origin returns an outer document containing
 `<fc:include url="..."/>` markers, and the IncludeProcessor fetches each included URL through the
-whole lifecycle above — so every fragment has its own TTL, tags, cache level and bot/browser
+whole lifecycle above — so every fragment has its own TTL, tags, cache level and bot/guest
 split, and a cache miss on one fragment does not cost the others.
 
 | Attribute | Values | Effect |
 |---|---|---|
 | `url` | required | the fragment to resolve (relative to the same origin) |
 | `call` | `sync` (default), `async` | `sync` fragments are fetched in parallel and waited for, and their content goes into the page. `async` is fire-and-forget: the call is made but nothing is waited for and **nothing is inserted** — for counters and pings that must not slow a page served from cache |
-| `client` | `bot`, `browser` | include the fragment only for that client class (per `bots.conf`); for the other class the marker is replaced with an empty string |
+| `client` | `bot`, `guest` | include the fragment only for that client class (per `bots.conf`); for the other class the marker is replaced with an empty string |
 | `combine` | `true`, or a group name | batch this fragment with its siblings into **one** origin call when they miss the cache — see [include-combining.md](include-combining.md) |
 
 `sync` includes that time out (`front-cache.include-processor.impl.concurrent.timeout`) fall back
