@@ -25,3 +25,4 @@
 # dirs of both e2e homes ARE checked in, so without this a config-write test dirties the working tree.
 /frontcache-tests/FRONTCACHE_HOME_FILTER/conf/*.backup-*
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/conf/*.backup-*
+/_ignored/
