@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
  *  cacheable_flag - true/1 if request is run through FrontCache engine (e.g. GET method, text data). false/0 - otherwise (request forwarded to origin)
  *  dynamic_flag{1|0} - true if origin has been requested. false/0 - otherwise (it's cacheable & cached).
  *
- *	log-timestamp request-id    domain   http-method   is-fallback-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache|dynamic-soft}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|guest}    user-agent
+ *	log-timestamp request-id    domain   http-method   is-fallback-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache|dynamic-soft}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|guest}    client-type-rule    user-agent
  *
  *  EXAMPLE
  *  2016-06-03T15:06:35,092-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 example.com GET success toplevel cacheable from-cache 0 50874 "http://myfc.example.com:8080/en/coin_definition-1_Thaler-Silver-Kingdom_of_Prussia_(1701_1918)-c_sK.GJAIx4AAAEvnTTi7NnT.htm" 0:0:0:0:0:0:0:1 front-cache-local-1 guest
@@ -40,6 +40,18 @@ import org.slf4j.LoggerFactory;
  *  2016-06-03T15:06:35,578-0600 cac3e17f-2084-4f18-b4f7-cb7ae6ee8a37 example.com GET success toplevel direct dynamic 2 -1 "http://myfc.example.com:8080/uinfo" 0:0:0:0:0:0:0:1 front-cache-local-1 guest
  *  2016-06-03T15:06:35,741-0600 55ba8287-cedd-43b6-ae47-357292664cb3 example.com GET success toplevel cacheable dynamic 4 9662 "http://myfc.example.com:8080/favicon.ico" 0:0:0:0:0:0:0:1 front-cache-local-1 bot
  *
+ *  The examples above predate the user-agent and client-type-rule columns (and the quotes around the
+ *  client IP); a current line ends with the client type, the conf/bots.conf rule that decided it, and
+ *  the evidence:
+ *
+ *  2026-09-21T09:14:02,118-0600 55ba8287-cedd-43b6-ae47-357292664cb3 example.com GET success toplevel cacheable from-cache 0 50874 "https://www.example.com/index.htm" "203.0.113.7" front-cache-local-1 bot "bingbot" "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)"
+ *
+ *  <b>client-type-rule was INSERTED, not appended</b>, and it is the only column ever to have been:
+ *  it is unreadable apart from the client type it explains, so the two are kept side by side and the
+ *  user-agent column moved right by one in 2.10.0. Every column before the client type is where it
+ *  always was, and an ELK pipeline reading from the left keeps working - but the request log is
+ *  parsed by position outside this jar (2.7.0 pins the layout), so a NEXT column goes on the END
+ *  unless there is as strong a reason as this one.
  *
  */
 public class RequestLogger {
@@ -81,9 +93,12 @@ public class RequestLogger {
 	/**
 	 * Logs a request a guard rule acted on before it touched cache or origin - rejected (e.g. a 400
 	 * for a malformed query), redirected (e.g. a scanner hitting the node by IP), or matched by a
-	 * dry-run rule that only observed it. Written to the dedicated failed-requests log with the rule
-	 * name as the reason and the sent HTTP status as the last two columns - NOT to error.log, so a
-	 * high-volume bad-crawler flood stays filterable without drowning real errors.
+	 * dry-run rule that only observed it. Written to the dedicated failed-requests log with the GUARD
+	 * rule name as the reason and the sent HTTP status as the last two columns - NOT to error.log, so
+	 * a high-volume bad-crawler flood stays filterable without drowning real errors. (A second rule name
+	 * sits earlier in the line, beside the client type - the bots.conf one behind it; see
+	 * {@link #clientTypeRule}. A guard rule matching on {@code client-type:} is exactly where that
+	 * matters.)
 	 *
 	 * The trailing status column is written for guard actions only; the fallback lines that
 	 * {@link #logRequest} adds to the same file end at the reason (the response there is a normal
@@ -116,6 +131,7 @@ public class RequestLogger {
 			.append(SEPARATOR).append("\"").append(context.getClientIP()).append("\"")
 			.append(SEPARATOR).append(context.getFrontCacheId())
 			.append(SEPARATOR).append(context.getClientType())
+			.append(SEPARATOR).append("\"").append(clientTypeRule(context)).append("\"")
 			.append(SEPARATOR).append("\"").append(userAgent).append("\"")
 			.append(SEPARATOR).append("\"").append(reason).append("\"")
 			.append(SEPARATOR).append(status);
@@ -162,6 +178,33 @@ public class RequestLogger {
 	}
 
 	/**
+	 * The conf/bots.conf rule that decided this request's client type - the {@code bingbot} behind a
+	 * {@code bot}, which is what makes the client-type column actionable: it names the line to edit.
+	 *
+	 * Only the DECIDING rule is named, so a {@code sort | uniq -c} over this column is the console's
+	 * Visitor Types Hits column, from the other side. Three of the values are not rule names from the
+	 * file: the built-in {@code no-user-agent} / {@code default}, and {@code propagated} - an include
+	 * whose client type was adopted from a trusted peer, where THIS node ran no rule at all.
+	 *
+	 * <b>Written quoted</b>, because a bare-keyword line's rule name is the keyword itself and a
+	 * keyword may contain a space ({@code Yahoo! Slurp} is in the shipped file). Unquoted, exactly the
+	 * lines worth reading would be the ones whose column count changed.
+	 *
+	 * Written <b>immediately after the client type</b>, which is the one thing in this format that was
+	 * inserted rather than appended - {@code bot "bingbot"} is one fact and reads as one, and a
+	 * consumer that has to skip a user-agent to pair them will eventually pair them wrong.
+	 *
+	 * @return the rule name, or {@code "-"} for a context the engine never stamped (a hand-built one;
+	 *         every served request is classified in FrontCacheEngine.init)
+	 */
+	private static String clientTypeRule(RequestContext context) {
+
+		String rule = context.getClientTypeRule();
+
+		return (null != rule && 0 < rule.length()) ? rule : "-";
+	}
+
+	/**
 	 *
 	 * @param url - request URL
 	 * @param isCacheable - true if request is run through FrontCache engine (e.g. GET method, text data). false - otherwise (request forwarded to origin)
@@ -194,6 +237,7 @@ public class RequestLogger {
 		.append(SEPARATOR).append("\"").append(context.getClientIP()).append("\"")
 		.append(SEPARATOR).append(context.getFrontCacheId())
 		.append(SEPARATOR).append(context.getClientType())
+		.append(SEPARATOR).append("\"").append(clientTypeRule(context)).append("\"")
 		.append(SEPARATOR).append("\"").append(userAgent).append("\"");
 
 		logger.trace(sb4file.toString());
@@ -239,7 +283,8 @@ public class RequestLogger {
     		.append(SEPARATOR).append("\"").append(url).append("\"")
     		.append(SEPARATOR).append(context.getFrontCacheId())
 //    		.append(SEPARATOR).append(dummy)
-    		.append(SEPARATOR).append(context.getClientType());
+    		.append(SEPARATOR).append(context.getClientType())
+    		.append(SEPARATOR).append("\"").append(clientTypeRule(context)).append("\"");
 
     		// Never touch HttpServletResponse from here: includes are resolved on the include-processor's
     		// worker threads and the servlet response is not thread safe (concurrent setHeader() corrupts
