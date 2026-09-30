@@ -120,6 +120,14 @@ public class FCHeaders {
      */
     public static final String X_FRONTCACHE_WARM_RESULT = "x-frontcache-warm-result";
 
+    /**
+     * Response header on a warm request only: the cache key the node built for it. The warmer
+     * compares it with its key base, because the key's scheme comes from the container's view of
+     * {@code X-Forwarded-Proto} and a container that ignores that header would otherwise have the
+     * run store every entry under a key no visitor's request produces - and report them stored.
+     */
+    public static final String X_FRONTCACHE_WARM_KEY = "x-frontcache-warm-key";
+
     // Standard forwarding headers. X_FORWARDED_PROTO is READ (from a trusted peer only - see
     // ClientIpResolver.isTrustedPeer) to recover the scheme the client actually used, which a
     // TLS-terminating proxy in front of us has already stripped. X_FORWARDED_HOST is WRITTEN, to

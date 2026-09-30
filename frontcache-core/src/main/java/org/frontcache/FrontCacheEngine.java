@@ -1489,7 +1489,8 @@ public class FrontCacheEngine {
 
 	/**
 	 * {@code x-frontcache-warm-result}, on a warm request only. What the cache processor recorded wins;
-	 * {@code defaultResult} answers for a path that never reached it.
+	 * {@code defaultResult} answers for a path that never reached it. Beside it, the key the request
+	 * was cached under ({@code x-frontcache-warm-key}), when it got as far as building one.
 	 */
 	private void addWarmResultHeader(RequestContext context, String defaultResult) {
 		if (!context.isWarmRequest())
@@ -1500,6 +1501,9 @@ public class FrontCacheEngine {
 			result = defaultResult;
 
 		context.getResponse().setHeader(FCHeaders.X_FRONTCACHE_WARM_RESULT, result);
+
+		if (null != context.getCurrentRequestURL())
+			context.getResponse().setHeader(FCHeaders.X_FRONTCACHE_WARM_KEY, context.getCurrentRequestURL());
 	}
 
 	private void addResponseHeaders(RequestContext context) {

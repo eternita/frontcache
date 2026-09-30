@@ -910,6 +910,13 @@ public class FrontCacheIOServlet extends HttpServlet {
 			return unavailable;
 		}
 
+		// the default key base follows the scheme the management request arrived with - see
+		// CacheWarmer.defaultKeyBase(WarmerConfig, boolean)
+		return WarmerActions.withRequestDefaults(warmerAction(action, warmer, req, resp), warmer.config(), req.isSecure());
+	}
+
+	private ActionResponse warmerAction(String action, CacheWarmer warmer, HttpServletRequest req, HttpServletResponse resp) throws IOException
+	{
 		boolean authorizedToWrite = ApiKey.isAuthorizedToWrite(req);
 
 		switch (action)

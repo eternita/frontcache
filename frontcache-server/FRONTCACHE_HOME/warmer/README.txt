@@ -18,7 +18,7 @@ List format - one entry per line, UTF-8:
     http://www.example.com/p/123      # absolute URLs work; only the path and query are used
 
 Only the path and query of an entry are used. The host every entry is stored under is the run's
-KEY BASE (front-cache.warmer.key-base, or http://<front-cache.default-domain>) - it must be what
+KEY BASE (front-cache.warmer.key-base, or <scheme>://<front-cache.default-domain>) - it must be what
 visitors' requests arrive with, or the run "succeeds" and nothing it warmed is ever read. The
 console's Check shows the keys the first entries will be stored under before anything is sent.
 
