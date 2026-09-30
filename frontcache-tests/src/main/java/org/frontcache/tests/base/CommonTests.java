@@ -156,6 +156,36 @@ public abstract class CommonTests extends TestsBase {
 
 	}
 
+	/**
+	 * The trace header's last two columns: the client type, and the conf/bots.conf rule that decided
+	 * it. The rule name is what makes the client type actionable - it names the line to edit - and
+	 * this is the only place the answer arrives without shell access to the node.
+	 *
+	 * Runs against both e2e nodes, which is the point of using a bare keyword: the standalone node
+	 * reads the 2.9.0 rule format and the filter node the pre-2.9.0 keyword-only format, and
+	 * "Googlebot" is a keyword line in both files. It also covers the wiring end to end -
+	 * FrontCacheEngine.init() classifies, stamps the context, and the logger reads it back.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void traceHeaderNamesTheRuleThatDecidedTheClientType() throws Exception {
+
+		webClient.addRequestHeader("User-Agent", "Googlebot");
+		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
+
+//		x-frontcache-trace-request.0: success toplevel dynamic 1 1 "http://localhost:9080/common/debug/a.jsp" frontcache-localhost-1 bot "Googlebot"
+		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/debug/a.jsp");
+		assertEquals("a", page.getPage().asNormalizedText());
+
+		String logStr = page.getWebResponse().getResponseHeaderValue(FCHeaders.X_FRONTCACHE_TRACE_REQUEST + ".0");
+
+		assertNotEquals("no client type in: " + logStr, -1,
+				logStr.indexOf(" " + FCHeaders.REQUEST_CLIENT_TYPE_BOT + " "));
+		assertTrue("the deciding bot rule must be the last column of: " + logStr,
+				logStr.endsWith("\"Googlebot\""));
+	}
+
 	@Test
 	public void httpHeadersMode() throws Exception {
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
