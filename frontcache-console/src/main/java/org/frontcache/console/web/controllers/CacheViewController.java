@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.frontcache.console.service.FrontcacheService;
+import org.frontcache.console.service.UnknownEdgeException;
 import org.frontcache.core.WebResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -50,9 +51,18 @@ public class CacheViewController {
 	@RequestMapping(method = RequestMethod.POST, params = "viewCache")
 	public String submitForm(Model model, CacheViewForm cacheViewForm) {
 		model.addAttribute("cacheView", cacheViewForm);
+
+		WebResponse webResponse;
+		try {
+			webResponse = frontcacheService.getFromCache(cacheViewForm.getEdge(), cacheViewForm.getKey());
+		} catch (UnknownEdgeException e) {
+			// not "submitted": the page would otherwise say "Nothing Found", as if the edge had been asked
+			model.addAttribute("edgeError", e.getMessage());
+			model.addAttribute("edgeList", frontcacheService.getFrontCacheAgentURLs());
+			return "cache_view";
+		}
 		model.addAttribute("submitted", true);
 
-		WebResponse webResponse = frontcacheService.getFromCache(cacheViewForm.getEdge(), cacheViewForm.getKey());
 		if (null != webResponse)
 		{
 			model.addAttribute("webResponse", webResponse);

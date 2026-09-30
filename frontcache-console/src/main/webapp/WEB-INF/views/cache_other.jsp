@@ -24,14 +24,17 @@
   <button type="submit" name="backupIndex" class="btn btn-success">Backup index</button>
   </form:form>
 
+  <c:if test="${not empty edgeError}">
+      <div class="alert alert-danger" style="margin-top: 15px;"><c:out value="${edgeError}"/></div>
+  </c:if>
   <c:if test="${not empty dumpKeysResult}">
-      <div class="alert alert-info" style="margin-top: 15px;">${dumpKeysResult}</div>
+      <div class="alert alert-info" style="margin-top: 15px;"><c:out value="${dumpKeysResult}"/></div>
   </c:if>
   <c:if test="${not empty purgeResult}">
-      <div class="alert alert-info" style="margin-top: 15px;">${purgeResult}</div>
+      <div class="alert alert-info" style="margin-top: 15px;"><c:out value="${purgeResult}"/></div>
   </c:if>
   <c:if test="${not empty backupResult}">
-      <div class="alert alert-info" style="margin-top: 15px;">${backupResult}</div>
+      <div class="alert alert-info" style="margin-top: 15px;"><c:out value="${backupResult}"/></div>
   </c:if>
 
 <p/>

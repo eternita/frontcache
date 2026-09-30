@@ -56,7 +56,8 @@ public class CacheReplicationController {
 			try {
 				frontcacheService.startReplication(sourceUrl, targetUrl);
 				model.addAttribute("replicationMessage", "Replication started: " + sourceUrl + " → " + targetUrl);
-			} catch (IllegalStateException e) {
+			} catch (IllegalStateException | IllegalArgumentException e) {
+				// IllegalArgumentException includes UnknownEdgeException: an edge this console does not have
 				model.addAttribute("replicationError", e.getMessage());
 			}
 		} else if (sourceUrl != null && sourceUrl.equals(targetUrl)) {

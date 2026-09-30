@@ -612,14 +612,19 @@ public class FrontcacheService {
 	 * A client for {@code edgeURL} - but only when it is one of this console's configured edges, and
 	 * then built from the CONFIGURED spelling, not the caller's.
 	 *
-	 * Every warmer call carries the fleet's API key, and the edge arrives as a request parameter. A
-	 * client built from whatever URL the request named would send that key to any host a caller
-	 * chooses - the reason {@code DashboardStreamProxyServlet} only relays edges in the list, and the
-	 * same rule here.
+	 * Every call a client makes carries the fleet's API key, and on every screen that names one edge -
+	 * Cache View, Invalidation, Other, Replication, Config editing, the Cache Warmer - the edge arrives
+	 * as a request parameter. A client built from whatever URL the request named would send that key to
+	 * any host a caller chooses, which a crafted POST from an authenticated session is enough to do.
+	 * {@code DashboardStreamProxyServlet} only relays edges in the list for the same reason.
+	 *
+	 * The allowlist is the CURRENT edge list, so an edge added at runtime from the Edges page is
+	 * accepted from then on. Matching is by {@link #canonicalEdgeURL}, so the trailing slash does not
+	 * matter; it is never by {@link FrontCacheClient#getName()}.
 	 *
 	 * @return the client, or null when the URL is not a configured edge
 	 */
-	public FrontCacheClient warmerClient(String edgeURL) {
+	public FrontCacheClient configuredEdgeClient(String edgeURL) {
 
 		String wanted = canonicalEdgeURL(edgeURL);
 		if (null == wanted || wanted.isEmpty())
@@ -632,10 +637,25 @@ public class FrontcacheService {
 		return null;
 	}
 
+	/**
+	 * {@link #configuredEdgeClient}, for the methods whose callers show an error rather than test for
+	 * null: every one of them either returns nothing or a string the page renders as a success.
+	 *
+	 * @throws UnknownEdgeException when the URL is not a configured edge - before any client exists
+	 */
+	private FrontCacheClient requireConfiguredEdgeClient(String edgeURL) {
+
+		FrontCacheClient client = configuredEdgeClient(edgeURL);
+		if (null == client)
+			throw new UnknownEdgeException(edgeURL);
+
+		return client;
+	}
+
 	/** One edge's warmer - see {@link EdgeWarmer}. Null when the URL is not a configured edge. */
 	public EdgeWarmer getWarmerStatus(String edgeURL) {
 
-		FrontCacheClient client = warmerClient(edgeURL);
+		FrontCacheClient client = configuredEdgeClient(edgeURL);
 		return (null == client) ? null : warmerStatusOf(client);
 	}
 
@@ -870,7 +890,15 @@ public class FrontcacheService {
 			return refused;
 		}
 
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = configuredEdgeClient(edgeURL);
+		if (null == fcClient)
+		{
+			SetConfigActionResponse refused = new SetConfigActionResponse();
+			refused.setFile(configFile.getFileName());
+			refused.refuse(UnknownEdgeException.messageFor(edgeURL));
+			return refused;
+		}
+
 		SetConfigActionResponse response = fcClient.setConfig(configFile, content, baseHash, true);
 
 		if (null == response)
@@ -985,12 +1013,13 @@ public class FrontcacheService {
 		return urls;
 	}
 
+	/** @throws UnknownEdgeException if the URL is not one of this console's edges */
 	public WebResponse getFromCache(String edgeURL, String key)
 	{
 		if (null == key)
 			return null;
 
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		WebResponse webResponse = fcClient.getFromCache(key.trim());
 
 		return webResponse;
@@ -1035,8 +1064,9 @@ public class FrontcacheService {
 			frontcacheAgentURLs.remove(edge);
 	}
 
+	/** @throws UnknownEdgeException if the URL is not one of this console's edges */
 	public void invalidateEdge(String edgeURL, String filter) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		fcClient.removeFromCache(filter);
 	}
 
@@ -1044,9 +1074,10 @@ public class FrontcacheService {
 	 * Triggers purge of expired entries on the given edge.
 	 *
 	 * @param edgeURL
+	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
 	public void purgeEdge(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		fcClient.purge();
 	}
 
@@ -1056,9 +1087,10 @@ public class FrontcacheService {
 	 *
 	 * @param edgeURL
 	 * @return status message returned by the edge, or an error message if the edge is not available
+	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
 	public String dumpKeys(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		DumpKeysActionResponse response = fcClient.dumpKeys();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
@@ -1072,9 +1104,10 @@ public class FrontcacheService {
 	 *
 	 * @param edgeURL
 	 * @return status message returned by the edge, or an error message if the edge is not available
+	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
 	public String backupEdge(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		BackupActionResponse response = fcClient.backup();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
@@ -1095,6 +1128,8 @@ public class FrontcacheService {
 	 * @param targetUrl the target edge URL
 	 * @return the initial ReplicationResult (status RUNNING)
 	 * @throws IllegalStateException if a replication is already in progress
+	 * @throws UnknownEdgeException if either URL is not one of this console's edges
+	 * @throws IllegalArgumentException if both name the same edge
 	 */
 	public ReplicationResult startReplication(String sourceUrl, String targetUrl) {
 		if (activeReplicator != null && activeReplicator.isRunning()) {
@@ -1103,8 +1138,13 @@ public class FrontcacheService {
 					+ " to " + activeReplicator.getCurrentResult().getTargetUrl());
 		}
 
-		FrontCacheClient source = new FrontCacheClient(sourceUrl, apiKey);
-		FrontCacheClient target = new FrontCacheClient(targetUrl, apiKey);
+		FrontCacheClient source = requireConfiguredEdgeClient(sourceUrl);
+		FrontCacheClient target = requireConfiguredEdgeClient(targetUrl);
+
+		// Compared on the configured spelling: "http://edge:9080" and "http://edge:9080/" are one edge,
+		// and replicating an edge onto itself would skip every key while reporting success.
+		if (source.getFrontCacheURL().equals(target.getFrontCacheURL()))
+			throw new IllegalArgumentException("Source and target edge must be different");
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		activeReplicator = replicator;

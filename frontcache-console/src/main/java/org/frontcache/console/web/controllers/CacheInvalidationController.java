@@ -11,6 +11,7 @@ package org.frontcache.console.web.controllers;
 import java.util.Set;
 
 import org.frontcache.console.service.FrontcacheService;
+import org.frontcache.console.service.UnknownEdgeException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -44,7 +45,11 @@ public class CacheInvalidationController {
 	public String submitForm(Model model, CacheInvalidationForm cacheInvalidationForm) {
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
 
-		frontcacheService.invalidateEdge(cacheInvalidationForm.getEdge(), cacheInvalidationForm.getFilter());
+		try {
+			frontcacheService.invalidateEdge(cacheInvalidationForm.getEdge(), cacheInvalidationForm.getFilter());
+		} catch (UnknownEdgeException e) {
+			model.addAttribute("edgeError", e.getMessage());
+		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
@@ -59,8 +64,12 @@ public class CacheInvalidationController {
 	public String purge(Model model, CacheInvalidationForm cacheInvalidationForm) {
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
 
-		frontcacheService.purgeEdge(cacheInvalidationForm.getEdge());
-		model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheInvalidationForm.getEdge());
+		try {
+			frontcacheService.purgeEdge(cacheInvalidationForm.getEdge());
+			model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheInvalidationForm.getEdge());
+		} catch (UnknownEdgeException e) {
+			model.addAttribute("edgeError", e.getMessage());
+		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
