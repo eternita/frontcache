@@ -80,6 +80,7 @@ import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.metrics.FcMetricsExport;
 import org.frontcache.reqlog.RequestLogger;
+import org.frontcache.warmer.WarmRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -999,6 +1000,11 @@ public class FrontCacheEngine {
         // is still knowable - an async include reads it after the container has recycled the request.
         context.setClientIP(FCUtils.getClientIP(servletRequest));
 
+        // The cache warmer's own requests carry the run's client type and skip bots.conf - which would
+        // otherwise classify the loopback peer, 127.0.0.1. Before setClientType, which leaves a warm
+        // request's type alone, and before the guard rules, which a warm request skips.
+        WarmRequest.resolve(servletRequest, context);
+
         // client type = bot | guest, from conf/bots.conf. After setRequest/setRequestURI above and
         // after the client IP: a rule may read any of them, and the servlet request is still live here.
         setClientType(context);
@@ -1025,6 +1031,11 @@ public class FrontCacheEngine {
 
 	private void setClientType(RequestContext context)
 	{
+		// Decided by the warm run, not by bots.conf - see WarmRequest. Like a propagated type, no rule
+		// counts a hit for it.
+		if (context.isWarmRequest())
+			return;
+
 		String propagated = FCUtils.propagatedClientType(context);
 		if (null != propagated)
 		{
@@ -1052,6 +1063,15 @@ public class FrontCacheEngine {
 	public void processRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse, FilterChain filterChain) throws Exception
 	{
 		RequestContext context = init(servletRequest, servletResponse, filterChain);
+
+		// The warmer is the operator, authenticated twice (the API key that started the run, and the
+		// token), and its peer is this node. A rate: rule keyed on the client IP would throttle it and a
+		// client-ip: block could refuse it outright - the guard protects the origin from clients.
+		if (context.isWarmRequest())
+		{
+			new FC_Total(this, context).execute();
+			return;
+		}
 
 		// Guard rules: reject or redirect abusive/pointless requests before they reach cache or
 		// origin. An abusive request is a unique cache key that misses the cache and hits origin -
@@ -1462,6 +1482,24 @@ public class FrontCacheEngine {
 
 		if (context.isFallbackUsed())
 			servletResponse.addHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED, "true");
+
+		// The bypass path: never stored, so "not-cacheable" unless a fallback was served instead
+		addWarmResultHeader(context, context.isFallbackUsed() ? WarmRequest.RESULT_FALLBACK : WarmRequest.RESULT_NOT_CACHEABLE);
+	}
+
+	/**
+	 * {@code x-frontcache-warm-result}, on a warm request only. What the cache processor recorded wins;
+	 * {@code defaultResult} answers for a path that never reached it.
+	 */
+	private void addWarmResultHeader(RequestContext context, String defaultResult) {
+		if (!context.isWarmRequest())
+			return;
+
+		String result = context.getWarmResult();
+		if (null == result)
+			result = defaultResult;
+
+		context.getResponse().setHeader(FCHeaders.X_FRONTCACHE_WARM_RESULT, result);
 	}
 
 	private void addResponseHeaders(RequestContext context) {
@@ -1507,6 +1545,8 @@ public class FrontCacheEngine {
 		servletResponse.addHeader(FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
 
 		flushTraceHeaders(context);
+
+		addWarmResultHeader(context, WarmRequest.RESULT_NOT_CACHEABLE);
 
 		if (webResponse.getHeaders() != null) {
 			for (String name : webResponse.getHeaders().keySet()) {

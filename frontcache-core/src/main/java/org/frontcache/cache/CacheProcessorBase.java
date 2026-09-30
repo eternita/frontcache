@@ -30,6 +30,7 @@ import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.resilience.FC_ThroughCache;
 import org.frontcache.reqlog.RequestLogger;
+import org.frontcache.warmer.WarmRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +117,8 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 		// when dynamic - don't update cache
 		boolean isCacheableForClientType = true; // true - save/update to cache (default value is incorrect when include is pure dynamic);  false - don't save/update to cache
 
+		boolean isWarmRequest = context.isWarmRequest();
+
 		if (null != cachedWebResponse)
 		{
 			String clientType = context.getClientType(); // bot | guest
@@ -123,16 +126,35 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);
 
+			if (isCacheableForClientType && isWarmRequest && WarmRequest.MODE_REFRESH.equals(context.getWarmMode()))
+			{
+				// A refresh-mode warm run reads past the entry, fresh or not, and the fetch below
+				// overwrites it. It is NOT removed first - the reasoning of doSoftInvalidation: removing
+				// opens a one-round-trip window in which every visitor misses, and a refresh whose
+				// origin call fails would leave the key empty instead of leaving the old copy serving.
+				cachedWebResponse = null;
+
 			// if data is cacheable for client type -> check data for expiration (only)
 			// if data is dynamic for client type -> no expiration / invalidation check
-			if (isCacheableForClientType && FCUtils.isWebComponentExpired(expireTimeMap, clientType))
+			} else if (isCacheableForClientType && FCUtils.isWebComponentExpired(expireTimeMap, clientType))
 			{
 
 				String refreshType = cachedWebResponse.getRefreshType();
 				if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType))
 				{
-					// soft expiration
-					doSoftInvalidation(currentRequestURL, originUrlStr, requestHeaders, client, context);
+					if (isWarmRequest)
+					{
+						// Soft expiration on a warm request is refreshed on THIS thread, through the miss
+						// path below, and again without a remove. Handed to softInvalidationExecutor, the
+						// warmer would read "fresh" at loopback speed while queueing one background origin
+						// fetch per key - single-flight dedupes a key, not a list - and the delay between
+						// warm calls would pace nothing. See docs/cache-warmer-proposal.md section 6.3.
+						// IncludeProcessorBase.getIncludeFromCache carries the same branch.
+						cachedWebResponse = null;
+					} else {
+						// soft expiration
+						doSoftInvalidation(currentRequestURL, originUrlStr, requestHeaders, client, context);
+					}
 				} else {
 					// Regular expiration - but only for THIS request's client type. With two live TTLs
 					// (maxage="bot:30d, guest:1d") the entry is one shared copy carrying two expiration
@@ -180,7 +202,13 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 					WebResponse copy4cache = cachedWebResponse.copy(); // copy - putToCache strips headers in place
 					copy4cache.setUrl(currentRequestURL);
 					putToCache(currentRequestURL, copy4cache); // put to cache copy
+
+					if (isWarmRequest)
+						context.setWarmResult(WarmRequest.RESULT_STORED);
 				}
+
+				if (isWarmRequest && null == context.getWarmResult())
+					context.setWarmResult(context.isFallbackUsed() ? WarmRequest.RESULT_FALLBACK : WarmRequest.RESULT_NOT_CACHEABLE);
 			} catch (FrontCacheException ex) {
 				throw ex;
 			} catch (Exception ex) {
@@ -192,6 +220,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 			cachedWebResponse = cachedWebResponse.copy(); //to avoid modification instance in cache
 			isCached = true;
+
+			if (isWarmRequest)
+				context.setWarmResult(WarmRequest.RESULT_FRESH);
 			context.setToplevelCached();
 			lengthBytes = cachedWebResponse.getContentLenth();
 		}

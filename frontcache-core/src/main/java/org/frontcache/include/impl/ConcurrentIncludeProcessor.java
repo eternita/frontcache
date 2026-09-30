@@ -199,7 +199,15 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				// for Async includes - do NOT wait for response from Origin
 				// response from Origin is NOT included to response to client
 				// useful for counters - e.g. response totally from cache (fast) and async call to origin
-				executor.submit(inc);
+				Future<?> asyncFuture = executor.submit(inc);
+
+				// ...except on a warm request, which waits for it like a sync include. A fire-and-forget
+				// include escapes the warmer's delay, so the delay would pace the pages and not the origin
+				// calls behind them. Its content is still left out of the page - replaceIncludePlaceholders
+				// renders sync includes only - and no fallback is resolved for it.
+				if (context.isWarmRequest())
+					futureList.add(asyncFuture);
+
 				continue;
 			}
 

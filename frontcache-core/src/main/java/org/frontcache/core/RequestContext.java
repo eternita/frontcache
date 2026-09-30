@@ -823,6 +823,41 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
             set(CLIENT_TYPE_RULE, ruleName);
     }
 
+    private static final String WARM_MODE = "warmMode";
+    private static final String WARM_RESULT = "warmResult";
+
+    /**
+     * Marks this request as the cache warmer's - set by the engine only after the warm token checked
+     * out (see {@code org.frontcache.warmer.WarmRequest}). Nothing a client sends can set it.
+     *
+     * @param mode {@code fill} | {@code refresh}
+     */
+    public void setWarmRequest(String mode) {
+        set(WARM_MODE, mode);
+    }
+
+    public boolean isWarmRequest() {
+        return null != get(WARM_MODE);
+    }
+
+    /** @return {@code fill} | {@code refresh}, or null when this is not a warm request */
+    public String getWarmMode() {
+        return (String) get(WARM_MODE);
+    }
+
+    /**
+     * What the cache processor did with a warm request - reported to the warmer as
+     * {@code x-frontcache-warm-result}. Recorded on warm requests only.
+     */
+    public void setWarmResult(String result) {
+        if (null != result)
+            set(WARM_RESULT, result);
+    }
+
+    public String getWarmResult() {
+        return (String) get(WARM_RESULT);
+    }
+
     private static final String GUARD_PROBE = "guardProbe";
 
     /**

@@ -28,6 +28,7 @@ import org.frontcache.guard.ratelimit.WindowLimiter;
 import org.frontcache.resilience.FcCommandMetrics;
 import org.frontcache.resilience.FcEventType;
 import org.frontcache.resilience.FcThreadPools;
+import org.frontcache.warmer.CacheWarmer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,7 +203,37 @@ public class FcMetricsExport {
 		bindCacheMetrics();
 		bindCombineMetrics();
 		bindGuardMetrics();
+		bindWarmerMetrics();
 		bindJvmMetrics();
+	}
+
+	private boolean warmerBound = false;
+
+	/**
+	 * The cache warmer: entries by what happened to them, and whether a run is going.
+	 *
+	 * Bound unconditionally, like the combine counters - the counts are static on {@code CacheWarmer}
+	 * and need no warmer instance, and a scrape must not create one (it resolves FRONTCACHE_HOME/warmer).
+	 * No list-name or URL label: {@code result} is the fixed set {@link CacheWarmer#RESULTS}.
+	 */
+	private synchronized void bindWarmerMetrics()
+	{
+		if (warmerBound)
+			return;
+		warmerBound = true;
+
+		for (final String result : CacheWarmer.RESULTS)
+			FunctionCounter.builder("warmer.entries", result, r -> CacheWarmer.entriesTotal(r))
+					.description("URI-list entries the cache warmer finished, by result, since JVM start")
+					.tags(Tags.of("result", result))
+					.register(registry);
+
+		Gauge.builder("warmer.running", () -> {
+					CacheWarmer warmer = CacheWarmer.existingInstance();
+					return (null != warmer && warmer.isRunning()) ? 1 : 0;
+				})
+				.description("1 while a cache warm run is in progress (running, paused or stopping)")
+				.register(registry);
 	}
 
 	/**

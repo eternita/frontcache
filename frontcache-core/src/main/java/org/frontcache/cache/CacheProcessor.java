@@ -67,6 +67,19 @@ public interface CacheProcessor {
 
 	public List<String> getCachedKeys();
 
+	/**
+	 * At most {@code limit} cached keys, in no particular order - for a caller that samples the key
+	 * space (the cache warmer's key-base check) rather than listing it.
+	 *
+	 * A {@code default} because it is additive: a processor that does not override it answers from
+	 * {@link #getCachedKeys()}, which is correct and merely as expensive as it always was. The
+	 * built-in L1/L2 processor overrides it to stop reading the index once it has enough.
+	 */
+	public default List<String> getCachedKeys(int limit) {
+		List<String> keys = getCachedKeys();
+		return (keys.size() <= limit) ? keys : keys.subList(0, Math.max(0, limit));
+	}
+
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context);
 
 	public void patch();

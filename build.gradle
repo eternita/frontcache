@@ -399,12 +399,20 @@ project(':frontcache-server') {
 				// 'cache/l2-lucene-index/*' drop a developer's logs and cache index while
 				// keeping the (empty) directories. ReadMe.txt is the stale pre-2.0
 				// Tomcat/Java-8 instructions, superseded by README-INSTALL.md.
+				// warmer/ ships its two files by name and nothing else: it is also where dump-keys and
+				// the cache warmer write URI lists, failed-entry lists and .state/run.json at runtime, so
+				// copying the directory would ship whatever a local run left in it.
 				from('FRONTCACHE_HOME') {
 					into 'FRONTCACHE_HOME'
-					exclude 'ReadMe.txt', 'logs/*', 'cache/l2-lucene-index/*', 'warmer/warmer.sh'
+					exclude 'ReadMe.txt', 'logs/*', 'cache/l2-lucene-index/*', 'warmer/**'
 				}
 				from('FRONTCACHE_HOME/warmer') {
 					into 'FRONTCACHE_HOME/warmer'
+					include 'README.txt'
+				}
+				from('FRONTCACHE_HOME/warmer') {
+					into 'FRONTCACHE_HOME/warmer'
+					include 'warmer.sh'
 					filePermissions { unix('0755') }
 				}
 

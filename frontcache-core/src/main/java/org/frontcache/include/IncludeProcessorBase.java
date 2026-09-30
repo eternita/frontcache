@@ -445,7 +445,18 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			{
 
 				String refreshType = webResponse.getRefreshType();
-				if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType))
+				if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType) && context.isWarmRequest())
+				{
+					// A warm request refreshes a soft-expired fragment on this thread, through the origin
+					// path, without removing the entry - the same branch CacheProcessorBase.processRequest
+					// has for the page, and for the same reason: a background refresh escapes the warmer's
+					// delay, so a warm run would queue one origin fetch per fragment instead of pacing
+					// them. Fixing one of the two copies only is how this regresses.
+					//
+					// With include-fetch-target=edge the fetch re-enters the front door without the warm
+					// token and is soft-refreshed there as usual; that escape hatch keeps the old pacing.
+					webResponse = null;
+				} else if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType))
 				{
 					// Soft expiration. First argument is the cache key, second is what the refresh
 					// fetches - the same distinction callInclude draws, and the reason they are not one

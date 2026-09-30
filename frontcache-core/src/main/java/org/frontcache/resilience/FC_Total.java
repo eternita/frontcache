@@ -17,6 +17,7 @@ import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
+import org.frontcache.warmer.WarmRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +39,9 @@ public class FC_Total extends FcCommand<Object> {
 
 	/** Requests that are a Frontcache include arriving back through the front door. */
 	public static final String COMMAND_KEY_INCLUDE_REQUEST = FcCommandKeys.INCLUDE_REQUEST;
+
+	/** The cache warmer's own requests - see {@code org.frontcache.warmer.WarmRequest}. */
+	public static final String COMMAND_KEY_WARM_REQUEST = FcCommandKeys.WARM_REQUEST;
 
 	private final FrontCacheEngine frontCacheEngine;
 	private final RequestContext context;
@@ -76,6 +80,12 @@ public class FC_Total extends FcCommand<Object> {
 	 */
 	static String commandKeyFor(RequestContext context) {
 
+		// Checked first. A warm request is top-level by construction (the warmer sends no request id),
+		// and counting it as Input-Request would read a warm run as a traffic spike and take bulkhead
+		// permits from real visitors - the Include-Request argument again.
+		if (context.isWarmRequest())
+			return COMMAND_KEY_WARM_REQUEST;
+
 		String requestType = context.getRequestType();
 
 		if (FCHeaders.COMPONENT_INCLUDE.equals(requestType) || FCHeaders.COMPONENT_ASYNC_INCLUDE.equals(requestType))
@@ -99,6 +109,10 @@ public class FC_Total extends FcCommand<Object> {
 		try {
 			context.setFallbackUsed(FallbackLogger.failureType(getExecutionEvents()));
 			WebResponse webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), url);
+
+			if (context.isWarmRequest() && !httpResponse.isCommitted())
+				httpResponse.setHeader(FCHeaders.X_FRONTCACHE_WARM_RESULT, WarmRequest.RESULT_FALLBACK);
+
 			if (null != webResponse)
 			{
 				FCUtils.applyFallbackHeaders(httpResponse, webResponse);

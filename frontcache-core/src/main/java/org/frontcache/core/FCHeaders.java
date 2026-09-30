@@ -98,6 +98,28 @@ public class FCHeaders {
      */
     public static final String X_FRONTCACHE_CLIENT_TYPE = "x-frontcache-client-type";
 
+    /**
+     * The cache warmer's credential on a warm request - see {@code org.frontcache.warmer.WarmRequest}.
+     *
+     * Every header whose name starts with this one is dropped by {@code FCUtils.isIncludedHeader}, so
+     * none of them reaches the origin. That drop is load-bearing: the token in the origin app's
+     * access log would let whoever reads that log skip the guard rules and force refreshes.
+     */
+    public static final String X_FRONTCACHE_WARM = "x-frontcache-warm";
+
+    /** {@code fill} | {@code refresh} - honoured only beside a valid {@link #X_FRONTCACHE_WARM}. */
+    public static final String X_FRONTCACHE_WARM_MODE = "x-frontcache-warm-mode";
+
+    /** {@code bot} | {@code guest} - honoured only beside a valid {@link #X_FRONTCACHE_WARM}. */
+    public static final String X_FRONTCACHE_WARM_CLIENT_TYPE = "x-frontcache-warm-client-type";
+
+    /**
+     * Response header on a warm request only: {@code stored} | {@code fresh} | {@code not-cacheable}
+     * | {@code fallback}. Without it the warmer sees a status code, and "200, stored" and "200, not
+     * cacheable" look the same.
+     */
+    public static final String X_FRONTCACHE_WARM_RESULT = "x-frontcache-warm-result";
+
     // Standard forwarding headers. X_FORWARDED_PROTO is READ (from a trusted peer only - see
     // ClientIpResolver.isTrustedPeer) to recover the scheme the client actually used, which a
     // TLS-terminating proxy in front of us has already stripped. X_FORWARDED_HOST is WRITTEN, to

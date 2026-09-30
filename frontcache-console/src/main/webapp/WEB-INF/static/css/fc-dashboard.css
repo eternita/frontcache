@@ -91,12 +91,14 @@
 
 /* custom left-to-right order of the circuit cards (lower number = further left):
 
-     Input-Request, Include-Request, Cache-Hit, Cache-Miss, Cache-Bypass
+     Input-Request, Include-Request, Warm-Request, Cache-Hit, Cache-Miss, Cache-Bypass
 
    which is the path a request takes - in at the front door, look in cache, go to the origin.
    Include-Request sits beside Input-Request because they are the two front-door circuits and
-   an operator reads them together. Commands not listed here keep .fc-circuit's order:9 and
-   follow the five, in the alphabetical order fc-dashboard.js inserts them in.
+   an operator reads them together. Warm-Request is the third front-door circuit - the cache
+   warmer's own requests, zero except during a warm run - and so sits beside them. Commands not
+   listed here keep .fc-circuit's order:9 and follow the six, in the alphabetical order
+   fc-dashboard.js inserts them in.
 
    Every superseded spelling is listed beside the name that replaced it. The console is
    deployed separately from the fleet and reads a MIXED one, so a node that has not upgraded
@@ -108,13 +110,14 @@
 .fc-dashboard .fc-circuit[data-command="Input-Requests"]      { order: 1; }
 .fc-dashboard .fc-circuit[data-command="Include-Request"]     { order: 2; }
 .fc-dashboard .fc-circuit[data-command="Include-Requests"]    { order: 2; }
-.fc-dashboard .fc-circuit[data-command="Cache-Hit"]           { order: 3; }
-.fc-dashboard .fc-circuit[data-command="Cache-Hits"]          { order: 3; }
-.fc-dashboard .fc-circuit[data-command="Cache-Miss"]          { order: 4; }
-.fc-dashboard .fc-circuit[data-command="Cache-Origin-filter"] { order: 4; }
-.fc-dashboard .fc-circuit[data-command="Cache-Origin-http"]   { order: 4; }
-.fc-dashboard .fc-circuit[data-command="Cache-Bypass"]        { order: 5; }
-.fc-dashboard .fc-circuit[data-command="Origin-Hits"]         { order: 5; }
+.fc-dashboard .fc-circuit[data-command="Warm-Request"]        { order: 3; }
+.fc-dashboard .fc-circuit[data-command="Cache-Hit"]           { order: 4; }
+.fc-dashboard .fc-circuit[data-command="Cache-Hits"]          { order: 4; }
+.fc-dashboard .fc-circuit[data-command="Cache-Miss"]          { order: 5; }
+.fc-dashboard .fc-circuit[data-command="Cache-Origin-filter"] { order: 5; }
+.fc-dashboard .fc-circuit[data-command="Cache-Origin-http"]   { order: 5; }
+.fc-dashboard .fc-circuit[data-command="Cache-Bypass"]        { order: 6; }
+.fc-dashboard .fc-circuit[data-command="Origin-Hits"]         { order: 6; }
 
 /* the bubble + sparkline sit behind the numbers */
 .fc-dashboard .fc-circuit-chart {

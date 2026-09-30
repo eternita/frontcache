@@ -92,6 +92,50 @@ public class CommandKeyInheritanceTest {
 	}
 
 	/**
+	 * The cache warmer's requests go on their own circuit, checked before the include branch. Without
+	 * it a warm run reads as a traffic spike on the headline number and takes Input-Request's bulkhead
+	 * permits away from real visitors.
+	 */
+	@Test
+	public void aWarmRequestIsCountedAsWarmRequest()
+	{
+		RequestContext warm = contextOfType(FCHeaders.COMPONENT_TOPLEVEL);
+		warm.setWarmRequest(org.frontcache.warmer.WarmRequest.MODE_FILL);
+		assertEquals(FC_Total.COMMAND_KEY_WARM_REQUEST, FC_Total.commandKeyFor(warm));
+		assertEquals("Warm-Request", FC_Total.COMMAND_KEY_WARM_REQUEST);
+	}
+
+	/**
+	 * Warm-Request is new, not a rename - so on an un-edited file it must inherit what a warm request
+	 * ran under before the key existed, all the way down the chain to the pre-2.9.0 spelling. Landing
+	 * on the built-in timeout=1000 would make every page slower than a second fail to warm.
+	 */
+	@Test
+	public void warmRequestInheritsInputRequestThroughTheWholeChain()
+	{
+		FcCommandConfig warm = new FcResilienceConfig(propertiesWithoutIncludeStanza())
+				.forCommand(FcCommandKeys.WARM_REQUEST, null);
+
+		assertEquals(Isolation.SEMAPHORE, warm.getIsolation());
+		assertEquals("must not fall back to the built-in 1000ms", 20000, warm.getTimeoutMs());
+		assertEquals("must not fall back to the built-in 10 permits", 500, warm.getSemaphoreMaxConcurrentRequests());
+
+		FcCommandConfig current = new FcResilienceConfig(currentProperties()).forCommand(FcCommandKeys.WARM_REQUEST, null);
+		assertEquals(20000, current.getTimeoutMs());
+	}
+
+	@Test
+	public void anExplicitWarmRequestStanzaWins()
+	{
+		Properties props = currentProperties();
+		props.setProperty("resilience.command.Warm-Request.execution.isolation.semaphore.maxConcurrentRequests", "8");
+
+		FcCommandConfig warm = new FcResilienceConfig(props).forCommand(FcCommandKeys.WARM_REQUEST, null);
+		assertEquals(8, warm.getSemaphoreMaxConcurrentRequests());
+		assertEquals("what it did not set is still inherited", 20000, warm.getTimeoutMs());
+	}
+
+	/**
 	 * A context that never went through {@code init()} cannot happen for a real request, but the
 	 * conservative answer matters: an unknown request stays visible in the headline number instead of
 	 * being filed away as an include.
