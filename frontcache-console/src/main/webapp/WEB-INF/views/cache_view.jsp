@@ -26,6 +26,10 @@
   <button type="submit" name="viewCache" class="btn btn-success">View cache</button>
   </form:form>
 
+  <c:if test="${not empty edgeError}">
+      <div class="alert alert-danger" style="margin-top: 15px;"><c:out value="${edgeError}"/></div>
+  </c:if>
+
   <c:choose>
     <c:when test="${null != webResponse}">
 

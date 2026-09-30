@@ -424,6 +424,22 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	}
 
 	@Override
+	public List<String> getCachedKeys(int limit) {
+		List<String> keys = new ArrayList<String>();
+
+		for (Object key : ehCache.getKeys())
+		{
+			if (keys.size() >= limit)
+				return keys;
+			keys.add(key.toString());
+		}
+
+		keys.addAll(luceneIndexManager.getKeys(limit - keys.size()));
+
+		return keys;
+	}
+
+	@Override
 	public void patch() {
 		// TODO Auto-generated method stub
 	}

@@ -41,10 +41,10 @@
 </form:form>
 
 <c:if test="${not empty replicationMessage}">
-    <div class="alert alert-info" style="margin-top: 15px;">${replicationMessage}</div>
+    <div class="alert alert-info" style="margin-top: 15px;"><c:out value="${replicationMessage}"/></div>
 </c:if>
 <c:if test="${not empty replicationError}">
-    <div class="alert alert-danger" style="margin-top: 15px;">${replicationError}</div>
+    <div class="alert alert-danger" style="margin-top: 15px;"><c:out value="${replicationError}"/></div>
 </c:if>
 
 <c:if test="${replicationStatus != null}">

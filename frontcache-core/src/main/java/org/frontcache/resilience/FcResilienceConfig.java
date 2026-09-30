@@ -96,6 +96,9 @@ public class FcResilienceConfig {
 		Map<String, String> m = new HashMap<String, String>();
 		// the split: an include's tuning comes from client traffic's unless stated otherwise
 		m.put(FC_Total.COMMAND_KEY_INCLUDE_REQUEST, FC_Total.COMMAND_KEY_INPUT_REQUEST);
+		// the same for the cache warmer's requests: they ran as Input-Request before the key existed,
+		// so that is the tuning an un-edited file gives them
+		m.put(FC_Total.COMMAND_KEY_WARM_REQUEST, FC_Total.COMMAND_KEY_INPUT_REQUEST);
 		// the renames: each new key ends its chain at its own pre-2.9.0 name
 		for (Map.Entry<String, String> renamed : FcCommandKeys.LEGACY_COMMAND_KEYS.entrySet())
 			if (!m.containsKey(renamed.getKey()))

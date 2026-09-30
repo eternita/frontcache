@@ -6,5 +6,6 @@
   <!--
   <li role="presentation" class="${activeCache == 'replication' ? 'active' : ''}"><a href="cache-replication">Cache Replication</a></li>
   -->
+  <li role="presentation" class="${activeCache == 'warmer' ? 'active' : ''}"><a href="cache-warmer">Cache Warmer</a></li>
   <li role="presentation" class="${activeCache == 'other' ? 'active' : ''}"><a href="cache-other">Other</a></li>
 </ul>

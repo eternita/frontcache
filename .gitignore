@@ -26,3 +26,10 @@
 /frontcache-tests/FRONTCACHE_HOME_FILTER/conf/*.backup-*
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/conf/*.backup-*
 /_ignored/
+
+# The cache warmer's run state and failed-entry lists are written at runtime into the e2e homes'
+# warmer/ dirs, which are checked in (they hold warmer.sh)
+/frontcache-tests/FRONTCACHE_HOME_FILTER/warmer/.state/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/warmer/.state/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/warmer/*.failed-*.txt
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/warmer/*.failed-*.txt

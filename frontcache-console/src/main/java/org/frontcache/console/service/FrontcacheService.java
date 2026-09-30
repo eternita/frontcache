@@ -25,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.EdgeConfigFile;
+import org.frontcache.console.model.EdgeWarmer;
 import org.frontcache.console.model.VisitorTypesConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.GuardRulesConfig;
@@ -36,6 +37,7 @@ import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.ConfigFile;
 import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
+import org.frontcache.io.WarmerStatusActionResponse;
 import org.frontcache.replication.CacheReplicator;
 import org.frontcache.replication.ReplicationProgressListener;
 import org.frontcache.replication.ReplicationResult;
@@ -232,6 +234,7 @@ public class FrontcacheService {
 		{
 			logger.info(" -- Console authentication is ON for user '{}'", user);
 			logger.info(" -- Config editing is {}", isConfigEditingEnabled() ? "ON" : "OFF (config-editing = false)");
+			logger.info(" -- Cache warmer control is {}", isCacheWarmerEnabled() ? "ON" : "OFF (cache-warmer = false)");
 
 			if (SHIPPED_DEFAULT_PASSWORD.equals(password))
 				logger.warn("Console authentication is ON, but the password is still the shipped "
@@ -246,7 +249,8 @@ public class FrontcacheService {
 		logger.warn("Console authentication is OFF - no 'user'/'password' in frontcache-console.conf."
 				+ " Anyone who can reach this port can invalidate the cache of every configured node."
 				+ " Add:   user = admin / password = <choose one>");
-		logger.warn("Config editing is therefore OFF too - the Configs screens stay read-only. An"
+		logger.warn("Config editing and cache warmer control are therefore OFF too - the Configs screens"
+				+ " stay read-only and the Cache Warmer screen can watch a run but not start one. An"
 				+ " unauthenticated console is a monitoring tool; it is not a fleet configuration tool.");
 	}
 
@@ -575,6 +579,145 @@ public class FrontcacheService {
 	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
 	private static final String CONFIG_EDITING_KEY = "config-editing";
 
+	/** HOCON key under frontcache.console: the Cache Warmer screen's buttons that start or write. */
+	private static final String CACHE_WARMER_KEY = "cache-warmer";
+
+	/**
+	 * Whether the Cache Warmer screen offers the controls that start, change or stop a run, and that
+	 * write, upload, copy or delete a URI list. With it off the screen still shows lists, previews and
+	 * progress.
+	 *
+	 * <b>Off when the console has no credentials, whatever the property says</b> - the
+	 * {@link #isConfigEditingEnabled()} rule, for a sharper reason: a warm run is thousands of origin
+	 * renders ordered by one click, and an unauthenticated console answers anyone who can reach its
+	 * port. The node refuses an un-keyed start on its own side too ({@code ApiKey.isAuthorizedToWrite}).
+	 */
+	public boolean isCacheWarmerEnabled() {
+		return cacheWarmerEnabled(fcConsoleConfig, isAuthEnabled());
+	}
+
+	/** The decision half of {@link #isCacheWarmerEnabled()}, testable without a config file. */
+	static boolean cacheWarmerEnabled(Config config, boolean authEnabled) {
+
+		if (!authEnabled)
+			return false;
+
+		if (null != config && config.hasPath(CACHE_WARMER_KEY))
+			return config.getBoolean(CACHE_WARMER_KEY);
+
+		return true;
+	}
+
+	/**
+	 * A client for {@code edgeURL} - but only when it is one of this console's configured edges, and
+	 * then built from the CONFIGURED spelling, not the caller's.
+	 *
+	 * Every call a client makes carries the fleet's API key, and on every screen that names one edge -
+	 * Cache View, Invalidation, Other, Replication, Config editing, the Cache Warmer - the edge arrives
+	 * as a request parameter. A client built from whatever URL the request named would send that key to
+	 * any host a caller chooses, which a crafted POST from an authenticated session is enough to do.
+	 * {@code DashboardStreamProxyServlet} only relays edges in the list for the same reason.
+	 *
+	 * The allowlist is the CURRENT edge list, so an edge added at runtime from the Edges page is
+	 * accepted from then on. Matching is by {@link #canonicalEdgeURL}, so the trailing slash does not
+	 * matter; it is never by {@link FrontCacheClient#getName()}.
+	 *
+	 * @return the client, or null when the URL is not a configured edge
+	 */
+	public FrontCacheClient configuredEdgeClient(String edgeURL) {
+
+		String wanted = canonicalEdgeURL(edgeURL);
+		if (null == wanted || wanted.isEmpty())
+			return null;
+
+		for (String configured : frontcacheAgentURLs)
+			if (wanted.equals(canonicalEdgeURL(configured)))
+				return new FrontCacheClient(configured, apiKey);
+
+		return null;
+	}
+
+	/**
+	 * {@link #configuredEdgeClient}, for the methods whose callers show an error rather than test for
+	 * null: every one of them either returns nothing or a string the page renders as a success.
+	 *
+	 * @throws UnknownEdgeException when the URL is not a configured edge - before any client exists
+	 */
+	private FrontCacheClient requireConfiguredEdgeClient(String edgeURL) {
+
+		FrontCacheClient client = configuredEdgeClient(edgeURL);
+		if (null == client)
+			throw new UnknownEdgeException(edgeURL);
+
+		return client;
+	}
+
+	/** One edge's warmer - see {@link EdgeWarmer}. Null when the URL is not a configured edge. */
+	public EdgeWarmer getWarmerStatus(String edgeURL) {
+
+		FrontCacheClient client = configuredEdgeClient(edgeURL);
+		return (null == client) ? null : warmerStatusOf(client);
+	}
+
+	private static EdgeWarmer warmerStatusOf(FrontCacheClient client) {
+
+		EdgeWarmer edge = new EdgeWarmer(client.getFrontCacheURL(), client.getName());
+
+		WarmerStatusActionResponse response = client.getWarmerStatus();
+		if (null == response)
+		{
+			edge.setError("not reachable");
+			return edge;
+		}
+
+		edge.setReachable(true);
+		if (FrontCacheClient.WARMER_UNSUPPORTED.equals(response.getErrorDescription()))
+		{
+			edge.setError(FrontCacheClient.WARMER_UNSUPPORTED);
+			return edge;
+		}
+
+		edge.setSupported(true);
+		edge.setStatus(response.getWarmer());
+		if (null == response.getWarmer())
+			edge.setError(response.getErrorDescription());
+		return edge;
+	}
+
+	/**
+	 * Every edge's warmer, for the screen's edge strip: one status call per edge, fanned out, in the
+	 * console config's edge order. An edge that times out keeps its place and reads as unreachable -
+	 * a missing edge would read as "this node has no warmer", which is a different thing.
+	 */
+	public List<EdgeWarmer> getWarmerEdges() {
+
+		List<FrontCacheClient> fcClients = getFrontCacheAgents();
+
+		List<Future<EdgeWarmer>> futureList = new ArrayList<Future<EdgeWarmer>>();
+		for (FrontCacheClient fcClient : fcClients)
+			futureList.add(executor.submit(() -> warmerStatusOf(fcClient)));
+
+		List<EdgeWarmer> result = new ArrayList<EdgeWarmer>();
+		boolean timeoutReached = false;
+		for (int i = 0; i < futureList.size(); i++)
+		{
+			Future<EdgeWarmer> f = futureList.get(i);
+			FrontCacheClient fcClient = fcClients.get(i);
+			try {
+				result.add(timeoutReached
+						? f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS)
+						: f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS));
+			} catch (TimeoutException | InterruptedException | ExecutionException e) {
+				f.cancel(true);
+				timeoutReached = true;
+				EdgeWarmer unreachable = new EdgeWarmer(fcClient.getFrontCacheURL(), fcClient.getName());
+				unreachable.setError("not reachable");
+				result.add(unreachable);
+			}
+		}
+		return result;
+	}
+
 	/**
 	 * Whether the session cookie carries the {@code Secure} attribute - see
 	 * docs/archive/console-login-ui.md section 4.4.
@@ -747,7 +890,15 @@ public class FrontcacheService {
 			return refused;
 		}
 
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = configuredEdgeClient(edgeURL);
+		if (null == fcClient)
+		{
+			SetConfigActionResponse refused = new SetConfigActionResponse();
+			refused.setFile(configFile.getFileName());
+			refused.refuse(UnknownEdgeException.messageFor(edgeURL));
+			return refused;
+		}
+
 		SetConfigActionResponse response = fcClient.setConfig(configFile, content, baseHash, true);
 
 		if (null == response)
@@ -862,12 +1013,13 @@ public class FrontcacheService {
 		return urls;
 	}
 
+	/** @throws UnknownEdgeException if the URL is not one of this console's edges */
 	public WebResponse getFromCache(String edgeURL, String key)
 	{
 		if (null == key)
 			return null;
 
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		WebResponse webResponse = fcClient.getFromCache(key.trim());
 
 		return webResponse;
@@ -912,8 +1064,9 @@ public class FrontcacheService {
 			frontcacheAgentURLs.remove(edge);
 	}
 
+	/** @throws UnknownEdgeException if the URL is not one of this console's edges */
 	public void invalidateEdge(String edgeURL, String filter) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		fcClient.removeFromCache(filter);
 	}
 
@@ -921,9 +1074,10 @@ public class FrontcacheService {
 	 * Triggers purge of expired entries on the given edge.
 	 *
 	 * @param edgeURL
+	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
 	public void purgeEdge(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		fcClient.purge();
 	}
 
@@ -933,9 +1087,10 @@ public class FrontcacheService {
 	 *
 	 * @param edgeURL
 	 * @return status message returned by the edge, or an error message if the edge is not available
+	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
 	public String dumpKeys(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		DumpKeysActionResponse response = fcClient.dumpKeys();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
@@ -949,9 +1104,10 @@ public class FrontcacheService {
 	 *
 	 * @param edgeURL
 	 * @return status message returned by the edge, or an error message if the edge is not available
+	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
 	public String backupEdge(String edgeURL) {
-		FrontCacheClient fcClient = new FrontCacheClient(edgeURL, apiKey);
+		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
 		BackupActionResponse response = fcClient.backup();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
@@ -972,6 +1128,8 @@ public class FrontcacheService {
 	 * @param targetUrl the target edge URL
 	 * @return the initial ReplicationResult (status RUNNING)
 	 * @throws IllegalStateException if a replication is already in progress
+	 * @throws UnknownEdgeException if either URL is not one of this console's edges
+	 * @throws IllegalArgumentException if both name the same edge
 	 */
 	public ReplicationResult startReplication(String sourceUrl, String targetUrl) {
 		if (activeReplicator != null && activeReplicator.isRunning()) {
@@ -980,8 +1138,13 @@ public class FrontcacheService {
 					+ " to " + activeReplicator.getCurrentResult().getTargetUrl());
 		}
 
-		FrontCacheClient source = new FrontCacheClient(sourceUrl, apiKey);
-		FrontCacheClient target = new FrontCacheClient(targetUrl, apiKey);
+		FrontCacheClient source = requireConfiguredEdgeClient(sourceUrl);
+		FrontCacheClient target = requireConfiguredEdgeClient(targetUrl);
+
+		// Compared on the configured spelling: "http://edge:9080" and "http://edge:9080/" are one edge,
+		// and replicating an edge onto itself would skip every key while reporting success.
+		if (source.getFrontCacheURL().equals(target.getFrontCacheURL()))
+			throw new IllegalArgumentException("Source and target edge must be different");
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
 		activeReplicator = replicator;

@@ -26,6 +26,9 @@ import java.util.Map;
  * <ul>
  * <li>{@code Input-Request} - a request from a client. The dashboard's headline traffic figure.</li>
  * <li>{@code Include-Request} - an include arriving back through this node's own front door.</li>
+ * <li>{@code Warm-Request} - the cache warmer's own request, sent to this node's front door. Reads
+ *     zero except during a warm run, which is the point: warm traffic stays off the headline number
+ *     and off {@code Input-Request}'s bulkhead.</li>
  * <li>{@code Cache-Hit} - a cache lookup. Every lookup, hit or miss, hence the surrounding command.</li>
  * <li>{@code Cache-Miss} - the origin call a cache miss makes.</li>
  * <li>{@code Cache-Bypass} - the origin call a request that never consults the cache makes.</li>
@@ -62,6 +65,17 @@ public class FcCommandKeys {
 
 	/** A Frontcache include arriving back through this node's own front door. */
 	public static final String INCLUDE_REQUEST = "Include-Request";
+
+	/**
+	 * The cache warmer's loopback request - see {@code org.frontcache.warmer.WarmRequest}.
+	 *
+	 * Not a rename, so it has no {@link #LEGACY_COMMAND_KEYS} entry. It inherits
+	 * {@code Input-Request}'s settings instead ({@code FcResilienceConfig}), which is what a warm
+	 * request would have run under before the key existed - without that an un-edited
+	 * resilience.properties would give it the built-in {@code timeout=1000}, and every page slower than
+	 * a second would fail to warm.
+	 */
+	public static final String WARM_REQUEST = "Warm-Request";
 
 	/** A cache lookup - every lookup, whether it hits or misses. */
 	public static final String CACHE_HIT = "Cache-Hit";

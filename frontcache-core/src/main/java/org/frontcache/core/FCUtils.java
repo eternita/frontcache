@@ -1223,7 +1223,11 @@ public class FCUtils {
 				return false;
 
 			default:
-				return true;
+				// The cache warmer's token and run parameters (FCHeaders.X_FRONTCACHE_WARM*). Dropped so
+				// the token never reaches the origin - in its access log it would let whoever reads the
+				// log skip the guard rules and force refreshes. The include fetch copies its headers from
+				// this map, so this one drop covers both paths.
+				return !name.startsWith(FCHeaders.X_FRONTCACHE_WARM);
 		}
 	}
 

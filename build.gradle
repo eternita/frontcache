@@ -399,12 +399,20 @@ project(':frontcache-server') {
 				// 'cache/l2-lucene-index/*' drop a developer's logs and cache index while
 				// keeping the (empty) directories. ReadMe.txt is the stale pre-2.0
 				// Tomcat/Java-8 instructions, superseded by README-INSTALL.md.
+				// warmer/ ships its two files by name and nothing else: it is also where dump-keys and
+				// the cache warmer write URI lists, failed-entry lists and .state/run.json at runtime, so
+				// copying the directory would ship whatever a local run left in it.
 				from('FRONTCACHE_HOME') {
 					into 'FRONTCACHE_HOME'
-					exclude 'ReadMe.txt', 'logs/*', 'cache/l2-lucene-index/*', 'warmer/warmer.sh'
+					exclude 'ReadMe.txt', 'logs/*', 'cache/l2-lucene-index/*', 'warmer/**'
 				}
 				from('FRONTCACHE_HOME/warmer') {
 					into 'FRONTCACHE_HOME/warmer'
+					include 'README.txt'
+				}
+				from('FRONTCACHE_HOME/warmer') {
+					into 'FRONTCACHE_HOME/warmer'
+					include 'warmer.sh'
 					filePermissions { unix('0755') }
 				}
 
@@ -511,11 +519,12 @@ project(':frontcache-console') {
 	// so at lifecycle level, so it is visible in normal build output rather than only under --info.
 	def jsTest = tasks.register('jsTest', Exec) {
 		group = 'verification'
-		description = "Run the realtime monitor's JavaScript tests with node --test"
+		description = "Run the console's JavaScript tests (realtime monitor, cache warmer) with node --test"
 
 		def testDir = file('src/test/js')
 		inputs.dir(testDir)
 		inputs.file('src/main/webapp/WEB-INF/static/js/fc-dashboard.js')
+		inputs.file('src/main/webapp/WEB-INF/static/js/fc-warmer.js')
 		outputs.upToDateWhen { false }
 
 		// The PATH is scanned rather than `which` being run: this is configuration time, on every

@@ -1272,6 +1272,17 @@ public class LuceneIndexManager {
 	 */
 	public List<String> getKeys()
 	{
+		return getKeys(Integer.MAX_VALUE);
+	}
+
+	/**
+	 * At most {@code limit} keys - the same scan as {@link #getKeys()}, stopped early.
+	 */
+	public List<String> getKeys(int limit)
+	{
+		if (0 >= limit)
+			return Collections.emptyList();
+
 		Acquired acquired = null;
 		try {
 			acquired = acquireSearcher();
@@ -1292,7 +1303,7 @@ public class LuceneIndexManager {
 			// only load the URL stored field — skip JSON, BIN, etc.
 			Set<String> urlFieldOnly = Collections.singleton(URL_FIELD);
 
-			int pageSize = 1024;
+			int pageSize = Math.min(1024, limit);
 			Query query = new MatchAllDocsQuery();
 			ScoreDoc lastHit = null;
 
@@ -1311,7 +1322,13 @@ public class LuceneIndexManager {
 						keys.add(url);
 					else
 						logger.error("URL is null for doc id {} (probably corrupted during index time)", hit.doc);
+
+					if (keys.size() >= limit)
+						break;
 				}
+
+				if (keys.size() >= limit)
+					break; // enough
 
 				if (topDocs.scoreDocs.length < pageSize)
 					break; // last page

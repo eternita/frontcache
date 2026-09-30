@@ -11,6 +11,7 @@ package org.frontcache.console.web.controllers;
 import java.util.Set;
 
 import org.frontcache.console.service.FrontcacheService;
+import org.frontcache.console.service.UnknownEdgeException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -42,8 +43,12 @@ public class CacheOtherController {
 	public String dumpKeys(Model model, CacheOtherForm cacheOtherForm) {
 		model.addAttribute("cacheOther", cacheOtherForm);
 
-		String dumpKeysResult = frontcacheService.dumpKeys(cacheOtherForm.getEdge());
-		model.addAttribute("dumpKeysResult", dumpKeysResult);
+		try {
+			String dumpKeysResult = frontcacheService.dumpKeys(cacheOtherForm.getEdge());
+			model.addAttribute("dumpKeysResult", dumpKeysResult);
+		} catch (UnknownEdgeException e) {
+			model.addAttribute("edgeError", e.getMessage());
+		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
@@ -56,8 +61,12 @@ public class CacheOtherController {
 	public String purge(Model model, CacheOtherForm cacheOtherForm) {
 		model.addAttribute("cacheOther", cacheOtherForm);
 
-		frontcacheService.purgeEdge(cacheOtherForm.getEdge());
-		model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheOtherForm.getEdge());
+		try {
+			frontcacheService.purgeEdge(cacheOtherForm.getEdge());
+			model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheOtherForm.getEdge());
+		} catch (UnknownEdgeException e) {
+			model.addAttribute("edgeError", e.getMessage());
+		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);
@@ -70,8 +79,12 @@ public class CacheOtherController {
 	public String backupIndex(Model model, CacheOtherForm cacheOtherForm) {
 		model.addAttribute("cacheOther", cacheOtherForm);
 
-		String backupResult = frontcacheService.backupEdge(cacheOtherForm.getEdge());
-		model.addAttribute("backupResult", backupResult + " on " + cacheOtherForm.getEdge());
+		try {
+			String backupResult = frontcacheService.backupEdge(cacheOtherForm.getEdge());
+			model.addAttribute("backupResult", backupResult + " on " + cacheOtherForm.getEdge());
+		} catch (UnknownEdgeException e) {
+			model.addAttribute("edgeError", e.getMessage());
+		}
 
     	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
     	model.addAttribute("edgeList", agents);

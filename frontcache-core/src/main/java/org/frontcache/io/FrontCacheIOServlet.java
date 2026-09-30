@@ -47,6 +47,9 @@ import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.FcResilienceReload;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
+import org.frontcache.warmer.CacheWarmer;
+import org.frontcache.warmer.WarmerConfig;
+import org.frontcache.warmer.WarmerRunParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -228,6 +231,22 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		case FrontcacheAction.HELP:
 			aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
+			break;
+
+		case FrontcacheAction.WARMER_STATUS:
+		case FrontcacheAction.WARMER_LISTS:
+		case FrontcacheAction.GET_WARMER_LIST:
+		case FrontcacheAction.PUT_WARMER_LIST:
+		case FrontcacheAction.DELETE_WARMER_LIST:
+		case FrontcacheAction.WARMER_PREFLIGHT:
+		case FrontcacheAction.WARMER_START:
+		case FrontcacheAction.WARMER_UPDATE:
+		case FrontcacheAction.WARMER_PAUSE:
+		case FrontcacheAction.WARMER_RESUME:
+		case FrontcacheAction.WARMER_STOP:
+			aResponse = warmer(action, request, response);
+			if (null == aResponse)
+				return; // streamed
 			break;
 
 		default:
@@ -866,6 +885,141 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		BackupActionResponse aResponse = new BackupActionResponse();
 		return aResponse;
+	}
+
+	/**
+	 * The cache warmer's actions - see {@link WarmerActions}, which holds the gates. Parameter
+	 * extraction only, plus the one thing only the request can answer: {@code ApiKey.isAuthorizedToWrite}.
+	 *
+	 * {@code put-warmer-list} carries the list as the request BODY. {@code getParameter} on a
+	 * non-form POST reads the query string only and leaves the body unread, which is what lets it be
+	 * streamed into the store here.
+	 *
+	 * @return the response to write, or null when the answer was streamed ({@code raw=true})
+	 */
+	private ActionResponse warmer(String action, HttpServletRequest req, HttpServletResponse resp) throws IOException
+	{
+		CacheWarmer warmer;
+		try {
+			warmer = CacheWarmer.getInstance();
+		} catch (Exception e) {
+			logger.warn("cache warmer unavailable", e);
+			ActionResponse unavailable = new WarmerStatusActionResponse(action);
+			unavailable.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			unavailable.setErrorDescription("the cache warmer is unavailable on this node: " + e.getMessage());
+			return unavailable;
+		}
+
+		// the default key base follows the scheme the management request arrived with - see
+		// CacheWarmer.defaultKeyBase(WarmerConfig, boolean)
+		return WarmerActions.withRequestDefaults(warmerAction(action, warmer, req, resp), warmer.config(), req.isSecure());
+	}
+
+	private ActionResponse warmerAction(String action, CacheWarmer warmer, HttpServletRequest req, HttpServletResponse resp) throws IOException
+	{
+		boolean authorizedToWrite = ApiKey.isAuthorizedToWrite(req);
+
+		switch (action)
+		{
+		case FrontcacheAction.WARMER_STATUS:
+			return WarmerActions.status(warmer);
+
+		case FrontcacheAction.WARMER_LISTS:
+			return WarmerActions.lists(warmer);
+
+		case FrontcacheAction.GET_WARMER_LIST:
+			if ("true".equalsIgnoreCase(req.getParameter("raw")))
+				return streamWarmerList(warmer, req.getParameter("name"), resp);
+			return WarmerActions.getList(warmer, req.getParameter("name"), req.getParameter("grep"));
+
+		case FrontcacheAction.PUT_WARMER_LIST:
+			return WarmerActions.putList(warmer, req.getParameter("name"), req.getInputStream(),
+					req.getParameter("baseHash"), authorizedToWrite);
+
+		case FrontcacheAction.DELETE_WARMER_LIST:
+			return WarmerActions.deleteList(warmer, req.getParameter("name"), authorizedToWrite);
+
+		case FrontcacheAction.WARMER_UPDATE:
+			try {
+				return WarmerActions.update(warmer, optionalLong(req, "delayMs"), optionalInt(req, "concurrency"),
+						authorizedToWrite);
+			} catch (NumberFormatException e) {
+				return new WarmerStatusActionResponse(action).refuse("delayMs and concurrency must be numbers");
+			}
+
+		case FrontcacheAction.WARMER_PAUSE:
+			return WarmerActions.pause(warmer, authorizedToWrite);
+
+		case FrontcacheAction.WARMER_RESUME:
+			return WarmerActions.resume(warmer, authorizedToWrite);
+
+		case FrontcacheAction.WARMER_STOP:
+			return WarmerActions.stop(warmer, authorizedToWrite);
+
+		default: // preflight and start take the same parameters
+			WarmerRunParams params;
+			try {
+				params = warmRunParams(req, warmer.config());
+			} catch (NumberFormatException e) {
+				if (FrontcacheAction.WARMER_PREFLIGHT.equals(action))
+					return new WarmerPreflightActionResponse(action).refuse("delayMs, concurrency and resumeFromLine must be numbers");
+				return new WarmerStatusActionResponse(action).refuse("delayMs, concurrency and resumeFromLine must be numbers");
+			}
+
+			if (FrontcacheAction.WARMER_PREFLIGHT.equals(action))
+				return WarmerActions.preflight(warmer, params, req.isSecure(), req.getLocalPort(), CacheManager.existingInstance());
+
+			return WarmerActions.start(warmer, params, req.isSecure(), req.getLocalPort(), authorizedToWrite);
+		}
+	}
+
+	private static WarmerRunParams warmRunParams(HttpServletRequest req, WarmerConfig config)
+	{
+		WarmerRunParams params = new WarmerRunParams();
+		params.setList(req.getParameter("list"));
+		params.setMode(req.getParameter("mode"));
+		params.setKeyBase(req.getParameter("keyBase"));
+		params.setClientType(req.getParameter("clientType"));
+
+		Long delayMs = optionalLong(req, "delayMs");
+		params.setDelayMs(null == delayMs ? config.getDefaultDelayMs() : delayMs);
+
+		Integer concurrency = optionalInt(req, "concurrency");
+		params.setConcurrency(null == concurrency ? 1 : concurrency);
+
+		Long resumeFromLine = optionalLong(req, "resumeFromLine");
+		params.setResumeFromLine(null == resumeFromLine ? 0 : resumeFromLine);
+
+		return params;
+	}
+
+	private static Long optionalLong(HttpServletRequest req, String name)
+	{
+		String value = req.getParameter(name);
+		return (null == value || value.trim().isEmpty()) ? null : Long.valueOf(value.trim());
+	}
+
+	private static Integer optionalInt(HttpServletRequest req, String name)
+	{
+		String value = req.getParameter(name);
+		return (null == value || value.trim().isEmpty()) ? null : Integer.valueOf(value.trim());
+	}
+
+	/** {@code get-warmer-list&raw=true}: the file as a download, streamed. A refusal is still JSON. */
+	private ActionResponse streamWarmerList(CacheWarmer warmer, String name, HttpServletResponse resp) throws IOException
+	{
+		String problem = WarmerActions.rawListProblem(warmer, name);
+		if (null != problem)
+			return new WarmerListActionResponse(FrontcacheAction.GET_WARMER_LIST).refuse(problem);
+
+		resp.setContentType("text/plain; charset=UTF-8");
+		// the name is safe to quote as-is: WarmerListStore.NAME admits no quote, space or separator
+		resp.setHeader("Content-Disposition", "attachment; filename=\"" + name + "\"");
+		try (InputStream in = warmer.getStore().openRaw(name); OutputStream out = resp.getOutputStream())
+		{
+			in.transferTo(out);
+		}
+		return null;
 	}
 
 	/**
