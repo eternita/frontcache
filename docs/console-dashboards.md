@@ -1,7 +1,7 @@
 # Frontcache — Console and Dashboards
 
 Notes on the console, and on the four ways to get Frontcache's numbers into software
-you already run. Current as of **2.9.0**.
+you already run. Current as of **2.10.0**.
 
 ![Frontcache console](images/fc-console-screen.png "Frontcache console")
 
@@ -16,7 +16,7 @@ is not deployed into the server — it talks to one or more nodes over the manag
 docker run -d --name frontcache-console --restart unless-stopped \
   -p 127.0.0.1:7080:7080 \
   -e FC_NODES=http://fc-server:9080/ -e FC_API_KEY=YOUR_API_KEY \
-  pavlikovskiy/frontcache-console:2.9.0
+  pavlikovskiy/frontcache-console:2.10.0
 ```
 
 Archive install and the `conf/frontcache-console.conf` form are in
