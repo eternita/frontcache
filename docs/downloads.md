@@ -1,7 +1,7 @@
 # Frontcache — Downloads
 
-Direct links to every published artifact for the two current releases, **2.9.0** (current) and
-**2.8.0** (previous). Everything here is **public read** — no account, no token, no login. This
+Direct links to every published artifact for the two current releases, **2.10.0** (current) and
+**2.9.0** (previous). Everything here is **public read** — no account, no token, no login. This
 page is the link list; [install-guide.md](install-guide.md) is how you actually install each of
 them, and [release-notes/](release-notes/) is what changed between them — read the note for the
 version you are moving to before you move to it.
@@ -26,15 +26,15 @@ images and the bundled-runtime archives carry their own runtime, so those need n
 
 ## Standalone server
 
-| Artifact | 2.9.0 | 2.8.0 | Size |
+| Artifact | 2.10.0 | 2.9.0 | Size |
 | --- | --- | --- | --- |
-| Bundle — needs a JDK 25 on the host | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0.tar.gz) · [.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0.zip) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.8.0/frontcache-server-2.8.0.tar.gz) · [.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.8.0/frontcache-server-2.8.0.zip) | ~37 MB |
-| Bundled runtime — Linux x86-64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-linux-x64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.8.0/frontcache-server-2.8.0-linux-x64.tar.gz) | ~92 MB |
-| Bundled runtime — Linux arm64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-linux-aarch64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.8.0/frontcache-server-2.8.0-linux-aarch64.tar.gz) | ~91 MB |
-| Bundled runtime — macOS arm64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-macos-aarch64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.8.0/frontcache-server-2.8.0-macos-aarch64.tar.gz) | ~86 MB |
-| Installer script — systemd service, JDK and service user included | [-installer.sh](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-installer.sh) | [-installer.sh](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.8.0/frontcache-server-2.8.0-installer.sh) | 27 KB |
-| Compose file | [-compose.yml](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-compose.yml) | [-compose.yml](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.8.0/frontcache-server-2.8.0-compose.yml) | 3 KB |
-| Compose env template | [-env.example](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-env.example) | [-env.example](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.8.0/frontcache-server-2.8.0-env.example) | 2 KB |
+| Bundle — needs a JDK 25 on the host | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.10.0/frontcache-server-2.10.0.tar.gz) · [.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.10.0/frontcache-server-2.10.0.zip) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0.tar.gz) · [.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0.zip) | ~37 MB |
+| Bundled runtime — Linux x86-64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.10.0/frontcache-server-2.10.0-linux-x64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-linux-x64.tar.gz) | ~92 MB |
+| Bundled runtime — Linux arm64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.10.0/frontcache-server-2.10.0-linux-aarch64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-linux-aarch64.tar.gz) | ~91 MB |
+| Bundled runtime — macOS arm64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.10.0/frontcache-server-2.10.0-macos-aarch64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-macos-aarch64.tar.gz) | ~86 MB |
+| Installer script — systemd service, JDK and service user included | [-installer.sh](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.10.0/frontcache-server-2.10.0-installer.sh) | [-installer.sh](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-installer.sh) | 27 KB |
+| Compose file | [-compose.yml](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.10.0/frontcache-server-2.10.0-compose.yml) | [-compose.yml](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-compose.yml) | 3 KB |
+| Compose env template | [-env.example](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.10.0/frontcache-server-2.10.0-env.example) | [-env.example](https://repo.eternita.co/maven2/org/frontcache/frontcache-server/2.9.0/frontcache-server-2.9.0-env.example) | 2 KB |
 
 A bundled-runtime build unpacks to the **same** directory name as the plain bundle with one extra
 `runtime/` directory, and the launcher prefers that runtime over any `JAVA_HOME` on the host — so
@@ -50,12 +50,12 @@ separate, deliberate step: [examples/front-door](../examples/front-door).
 
 ## Console
 
-| Artifact | 2.9.0 | 2.8.0 | Size |
+| Artifact | 2.10.0 | 2.9.0 | Size |
 | --- | --- | --- | --- |
-| Bundle — needs a JDK 25 on the host | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0.tar.gz) · [.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0.zip) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.8.0/frontcache-console-2.8.0.tar.gz) · [.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.8.0/frontcache-console-2.8.0.zip) | ~48 MB |
-| Bundled runtime — Linux x86-64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0-linux-x64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.8.0/frontcache-console-2.8.0-linux-x64.tar.gz) | ~103 MB |
-| Bundled runtime — Linux arm64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0-linux-aarch64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.8.0/frontcache-console-2.8.0-linux-aarch64.tar.gz) | ~102 MB |
-| Bundled runtime — macOS arm64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0-macos-aarch64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.8.0/frontcache-console-2.8.0-macos-aarch64.tar.gz) | ~97 MB |
+| Bundle — needs a JDK 25 on the host | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.10.0/frontcache-console-2.10.0.tar.gz) · [.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.10.0/frontcache-console-2.10.0.zip) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0.tar.gz) · [.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0.zip) | ~48 MB |
+| Bundled runtime — Linux x86-64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.10.0/frontcache-console-2.10.0-linux-x64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0-linux-x64.tar.gz) | ~103 MB |
+| Bundled runtime — Linux arm64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.10.0/frontcache-console-2.10.0-linux-aarch64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0-linux-aarch64.tar.gz) | ~102 MB |
+| Bundled runtime — macOS arm64 | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.10.0/frontcache-console-2.10.0-macos-aarch64.tar.gz) | [.tar.gz](https://repo.eternita.co/maven2/org/frontcache/frontcache-console/2.9.0/frontcache-console-2.9.0-macos-aarch64.tar.gz) | ~97 MB |
 
 The console is a separate process from the server, on **7080**, and it **has no authentication of
 its own** while being able to invalidate cache across your whole fleet. Keep it on loopback or an
@@ -73,16 +73,16 @@ repositories {
     maven { url = 'https://repo.eternita.co/maven2' }
 }
 dependencies {
-    implementation 'org.frontcache:frontcache-core:2.9.0'
-    implementation 'org.frontcache:frontcache-agent:2.9.0'   // optional: invalidate from app code
+    implementation 'org.frontcache:frontcache-core:2.10.0'
+    implementation 'org.frontcache:frontcache-agent:2.10.0'   // optional: invalidate from app code
 }
 ```
 
-| Artifact | Coordinate | 2.9.0 | 2.8.0 |
+| Artifact | Coordinate | 2.10.0 | 2.9.0 |
 | --- | --- | --- | --- |
-| The filter and engine | `org.frontcache:frontcache-core` | [jar](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0.jar) · [pom](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0.pom) · [javadoc](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0-javadoc.jar) | [jar](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.8.0/frontcache-core-2.8.0.jar) · [pom](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.8.0/frontcache-core-2.8.0.pom) · [javadoc](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.8.0/frontcache-core-2.8.0-javadoc.jar) |
-| Invalidation client for Java callers | `org.frontcache:frontcache-agent` | [jar](https://repo.eternita.co/maven2/org/frontcache/frontcache-agent/2.9.0/frontcache-agent-2.9.0.jar) · [pom](https://repo.eternita.co/maven2/org/frontcache/frontcache-agent/2.9.0/frontcache-agent-2.9.0.pom) | [jar](https://repo.eternita.co/maven2/org/frontcache/frontcache-agent/2.8.0/frontcache-agent-2.8.0.jar) · [pom](https://repo.eternita.co/maven2/org/frontcache/frontcache-agent/2.8.0/frontcache-agent-2.8.0.pom) |
-| `FRONTCACHE_HOME` skeleton for filter mode | — | [-home.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0-home.zip) | [-home.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.8.0/frontcache-core-2.8.0-home.zip) |
+| The filter and engine | `org.frontcache:frontcache-core` | [jar](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.10.0/frontcache-core-2.10.0.jar) · [pom](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.10.0/frontcache-core-2.10.0.pom) · [javadoc](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.10.0/frontcache-core-2.10.0-javadoc.jar) | [jar](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0.jar) · [pom](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0.pom) · [javadoc](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0-javadoc.jar) |
+| Invalidation client for Java callers | `org.frontcache:frontcache-agent` | [jar](https://repo.eternita.co/maven2/org/frontcache/frontcache-agent/2.10.0/frontcache-agent-2.10.0.jar) · [pom](https://repo.eternita.co/maven2/org/frontcache/frontcache-agent/2.10.0/frontcache-agent-2.10.0.pom) | [jar](https://repo.eternita.co/maven2/org/frontcache/frontcache-agent/2.9.0/frontcache-agent-2.9.0.jar) · [pom](https://repo.eternita.co/maven2/org/frontcache/frontcache-agent/2.9.0/frontcache-agent-2.9.0.pom) |
+| `FRONTCACHE_HOME` skeleton for filter mode | — | [-home.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.10.0/frontcache-core-2.10.0-home.zip) | [-home.zip](https://repo.eternita.co/maven2/org/frontcache/frontcache-core/2.9.0/frontcache-core-2.9.0-home.zip) |
 
 The `-home.zip` is not optional reading material: Frontcache takes its configuration from a
 `FRONTCACHE_HOME` directory, not from your app's config, and that zip is the filter-mode skeleton
@@ -102,17 +102,17 @@ Multi-arch (amd64 + arm64), each with a `HEALTHCHECK`.
 
 | Image | Pull | Tags |
 | --- | --- | --- |
-| Server — plain HTTP on **9080**, no TLS | `pavlikovskiy/frontcache-server:2.9.0` · `:2.8.0` | [Docker Hub](https://hub.docker.com/r/pavlikovskiy/frontcache-server/tags) |
-| Console — **7080** | `pavlikovskiy/frontcache-console:2.9.0` · `:2.8.0` | [Docker Hub](https://hub.docker.com/r/pavlikovskiy/frontcache-console/tags) |
+| Server — plain HTTP on **9080**, no TLS | `pavlikovskiy/frontcache-server:2.10.0` · `:2.9.0` | [Docker Hub](https://hub.docker.com/r/pavlikovskiy/frontcache-server/tags) |
+| Console — **7080** | `pavlikovskiy/frontcache-console:2.10.0` · `:2.9.0` | [Docker Hub](https://hub.docker.com/r/pavlikovskiy/frontcache-console/tags) |
 
 ```sh
 docker run -d --name frontcache -p 9080:9080 \
   -e ORIGIN_HOST=origin.example.com \
-  pavlikovskiy/frontcache-server:2.9.0
+  pavlikovskiy/frontcache-server:2.10.0
 ```
 
-**Pin the exact version.** `2.9`, `2.8` and `latest` all exist and `latest` currently points at
-2.9.0; naming a floating tag in production is how you get surprised.
+**Pin the exact version.** `2.10`, `2.9` and `latest` all exist and `latest` currently points at
+2.10.0; naming a floating tag in production is how you get surprised.
 
 **The `-slim` distinction is gone.** Through 2.5.1 the plain `frontcache-server` tag was
 nginx + Frontcache on 80/443 and `-slim` was Frontcache alone. From 2.6.0 there is one image and
@@ -124,7 +124,7 @@ still on Docker Hub for that transition and there is no 2.7, 2.8 or 2.9 equivale
 Every artifact above has a `.sha256` beside it — the same URL with `.sha256` appended.
 
 ```sh
-V=2.9.0
+V=2.10.0
 BASE=https://repo.eternita.co/maven2/org/frontcache/frontcache-server/$V
 
 curl -fLO $BASE/frontcache-server-$V.tar.gz
@@ -140,7 +140,7 @@ Never `curl | sudo bash`.
 
 ## Which version
 
-**2.9.0** is current and is what a new install should take. **2.8.0** is the previous release and
+**2.10.0** is current and is what a new install should take. **2.9.0** is the previous release and
 is still published for a rollback or a pinned fleet.
 
 Upgrading between the two is the ordinary path — unpack beside the old version, copy your `conf/`
