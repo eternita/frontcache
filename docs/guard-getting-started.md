@@ -162,6 +162,10 @@ rate:<limit>/<window> [bucket=<name>] [scope=<toplevel|all>]
 It is true once **one client IP** has sent `<limit>` requests inside the current
 `<window>`, and for every further request until the window rolls over.
 
+A step-by-step walkthrough of this predicate — motivation, a worked scenario per abuse shape,
+and a five-minute version you can run locally — is in
+[rate-limit-howto.md](rate-limit-howto.md). This section is the reference.
+
 | Field | Meaning | Default |
 | --- | --- | --- |
 | `<limit>` | requests one IP may send inside a window, integer > 0 | — |

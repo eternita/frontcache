@@ -4,7 +4,7 @@ Frontcache writes four logs under `FRONTCACHE_HOME/logs/`, one line per request 
 
 | File | What it holds |
 | --- | --- |
-| `frontcache-requests.log` | every request and every `<fc:include>` fragment — cache status, latency, bytes, client, bot flag |
+| `frontcache-requests.log` | every request and every `<fc:include>` fragment — cache status, latency, bytes, client, client type and the `bots.conf` rule behind it |
 | `error.log` | errors, with stack traces |
 | `fallback.log` | every circuit-breaker fallback that was served, and where it came from |
 | `frontcache-failed-requests.log` | guard-rule rejections, redirects and dry-run matches, plus requests that completed through a fallback |
@@ -114,8 +114,15 @@ indices, sincedb and pulled files consistent.
   includes run ~99% from cache, toplevels far less); toplevel requests by FC node and requests by
   country. The by-node bar counts **toplevels only**, so it reads as pages served per node rather
   than being dominated by each page's includes.
-- **Top-N tables** — 20 slowest URLs (by median latency) and 20 hottest URLs (with a cache-hits
-  column).
+- **Top-N tables** — 20 slowest URLs (by median latency), 20 hottest URLs (with a cache-hits
+  column), and client types with the `bots.conf` rule that decided each one.
+
+The client-type table is the dashboard reading of `client_type_rule` (Frontcache 2.10.0 and
+later): `bot` and `guest` broken down by the **rule that decided it** — `bingbot`, `Yahoo! Slurp`,
+the built-in `no-user-agent` / `default`, or `propagated` for an include whose client type came
+from a trusted peer. It is the console's **Visitor Types** Hits column seen from the log side, and
+a zero-toplevel row is normally `propagated` (includes only). Requests logged by a pre-2.10.0 node
+carry no rule and are not in it.
 
 The data view backing this dashboard is
 `frontcache-*,-frontcache-errors-*,-frontcache-fallbacks-*,-frontcache-rejected-*`: the bare
@@ -161,6 +168,10 @@ rule name**, so a new rule appears in every panel without touching the dashboard
   events by FC node, by domain, by country, and by HTTP status sent.
 - **Top-N tables** — top 20 client IPs (with per-reason columns and distinct-URL count), top 20
   URLs, top 10 user agents.
+- **Client-type table** — guard rule × the `bots.conf` rule that decided the client type. This is
+  the one to read when a rule matches on `client-type:bot`: `reject_reason` says which guard rule
+  acted, `client_type_rule` says which `bots.conf` line put the request in that bucket, which is
+  the line to edit when the verdict is wrong. Needs Frontcache 2.10.0 or later on the node.
 - **Dry-run table** — what a rule *would* have caught, by rule, with distinct client IPs and
   URLs. This is the rollout tool: ship a rule as `dry-run`, watch this panel against real
   traffic, then let it act.
@@ -177,8 +188,17 @@ a scanner walking the node by IP shows up the same way under `ip-access`.
 `request_type` (`toplevel` / `include` / `include-async`), `is_cacheable` (`cacheable` /
 `direct`), `is_cached` (`from-cache` / `dynamic` / `dynamic-soft`), `hystrix_error` (`success` /
 `error`), `runtime_millis`, `length_bytes` (`-1` when unknown), `url`, `clientip`, `server`,
-`browserBot` (`bot` / `guest`), `agent`, plus flat `geoip.*` from the client IP (Logstash's
-bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
+`browserBot` (`bot` / `guest`), `client_type_rule`, `agent`, plus flat `geoip.*` from the client
+IP (Logstash's bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
+
+`client_type_rule` is the `conf/bots.conf` rule that decided `browserBot` — a rule name, a bare
+keyword line (`bingbot`, `Yahoo! Slurp`), the built-in `no-user-agent` / `default`, or
+`propagated` when the client type was adopted from a trusted peer. **Frontcache 2.10.0 inserted it
+after the client type rather than appending it**, so the user agent — and, in the failed-requests
+log, the reason and the HTTP status — moved right by one. Both pipelines therefore carry **two**
+grok patterns and try the 2.10.0 layout first: rolled archives pulled off a host span the upgrade,
+and the legacy pattern would otherwise read the rule column as the user agent on every line.
+Documents parsed from a pre-2.10.0 line simply have no `client_type_rule` field.
 
 **Error logs** (`error*.log`) — each ERROR entry is multi-line (header + stack trace); a
 multiline codec joins them so one error is one document, with the full trace in `msg`. Grok
@@ -193,9 +213,11 @@ date for the current day's `error.log`, which has no date in its name.
 `from file`), `fallback_details`, `fallback_url`.
 
 **Rejected/failed request logs** (`frontcache-failed-requests*.log`) — the same columns as the
-request log plus a trailing quoted reason, so everything above (including `geoip.*`) plus
-`reject_reason`, `http_status` and `failure_type`. The file holds two kinds of line, which
-`failure_type` separates:
+request log plus a trailing quoted reason, so everything above (including `geoip.*` and
+`client_type_rule`) plus `reject_reason`, `http_status` and `failure_type`. The two rule names on
+a line answer different questions: `reject_reason` is the **guard** rule that acted,
+`client_type_rule` is the **bots.conf** rule behind the client type it may have matched on.
+The file holds two kinds of line, which `failure_type` separates:
 
 | `failure_type` | Written by | `is_cached` | `reject_reason` values | `http_status` |
 | --- | --- | --- | --- | --- |
@@ -302,6 +324,9 @@ because it does.
 | duplicate events after re-pulling | the drop zone was emptied while the sincedb volume was kept; `./stop-fc-elk.sh -v` and start over |
 | dashboards missing after a `-v` | run `./start-fc-elk.sh`, which re-imports them; a bare `docker compose up` does not |
 | a map panel is empty | the index template was not applied before ingest, so `geoip.location` is not a `geo_point`; re-run `./start-fc-elk.sh`, then re-index (`-v`) |
+| the client-type-rule tables are empty | the nodes predate Frontcache 2.10.0, which is where the column was added — everything else on the dashboards still works |
+| ... or the nodes are on 2.10.0 but the field is missing | a running Logstash keeps the pipeline it started with: `docker compose restart logstash` picks up the new grok. Lines already read keep their old shape (sincedb remembers the offset), so re-index with `./stop-fc-elk.sh -v` and re-pull to backfill |
+| a client-type-rule table errors with a field conflict | `client_type_rule` was indexed before this version of the template, so it was mapped dynamically as `text` in an older daily index; re-run `./start-fc-elk.sh` to apply the template, then re-index (`-v`) |
 
 ---
 
