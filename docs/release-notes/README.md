@@ -8,6 +8,7 @@ do, and what deliberately kept its old name so you do not have to do anything.
 
 | Release | What is in it | Do you have to do anything? |
 | --- | --- | --- |
+| **[2.10.0](2.10.0.md)** | A **cache warmer** on the node, run from the console's new **Cache → Cache Warmer** screen; the realtime monitor shows a **cluster's total rate** on every card; the request log **names the `bots.conf` rule** behind each client type; the per-platform bundles report **JVM CPU** again; the console acts only on **its own edges** | **No, unless you parse the request logs by position.** One column is inserted after the client type, so the user-agent and everything after it move right by one. No cache flush, no config change on any node |
 | **[2.9.0](2.9.0.md)** | The management API's key is renamed `site-key` → `api-key`; the **console authenticates**; `conf/bots.conf` takes **rules**, not just keywords; **a TTL per visitor type**; includes are fetched from the **origin**, not back through the edge | **Yes, and two of them are silent.** Rename `front-cache.site-key` to `front-cache.api-key` on every node and **flush the cache once**. The console fails loudly until its `siteKey` becomes `apiKey`; a node with the old key name just runs with no key at all. Pages using `browser` as a client type need `guest` |
 | **[2.8.0](2.8.0.md)** | Apache HttpClient 5; **per-IP rate limiting** as a guard rule; **combining `<fc:include>` fragments into one origin call** | Drop-in for a stock deployment. Two behaviour changes apply to everyone (guard rejections now send `Cache-Control: no-store`; a bypassed response in filter mode keeps its status). One source edit per method if you implement `CacheProcessor`, `IncludeProcessor` or `FallbackResolver` |
 | **[2.7.0](2.7.0.md)** | The Hystrix *names* are gone — package, config file and endpoint; cache metrics in the export; the console's realtime monitor is Frontcache's own code; the dashboard stream no longer costs a thread per viewer | One config file to edit by hand (`conf/fc-logback.xml`), two lines if you maintain your own `web.xml`, and one method signature if you wrote your own `FallbackResolver` |
@@ -16,7 +17,7 @@ do, and what deliberately kept its old name so you do not have to do anything.
 ## Upgrading across several releases
 
 Upgrade in order and read each note; nothing here supports skipping a step blind, because each
-release's grace periods are written against the one before it. Two in particular:
+release's grace periods are written against the one before it. In particular:
 
 - **2.6.x → 2.7.0** keeps `conf/hystrix.properties` working for **one release** (with a `WARN`).
   Rename it to `resilience.properties` only once you no longer intend to roll back.
@@ -27,6 +28,8 @@ release's grace periods are written against the one before it. Two in particular
 - **2.8.x → 2.9.0 needs one cache flush**, because the stored client type was renamed `browser` →
   `guest` and existing L2 entries carry the old key. Without it those URLs call the origin every
   time and are never re-cached.
+- **2.9.x → 2.10.0 needs nothing on the wire or in the cache** — nodes and console upgrade in either
+  order. Check any positional parser of `logs/frontcache-requests.log` first.
 
 What kept its pre-2.7 name indefinitely — `/hystrix.stream`, the `hystrix.command.*` /
 `hystrix.threadpool.*` property prefixes, and the JSON type literals the dashboard dispatches on —

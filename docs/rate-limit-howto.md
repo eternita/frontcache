@@ -4,7 +4,7 @@ A walk from "we are being hammered by one address" to a rule that stops it, with
 request-by-request behaviour of each rule spelled out, and a five-minute version you can run
 on your laptop (§5).
 
-Per-IP rate limiting shipped in **2.8.0** and everything here is current as of 2.9.0. It is a
+Per-IP rate limiting shipped in **2.8.0** and everything here is current as of 2.10.0. It is a
 single condition — `rate:100/10s` — usable in any guard rule, so nothing else about guard
 rules changes. [guard-getting-started.md](guard-getting-started.md) is the reference for the
 rest of the grammar; this page is the tutorial for this one predicate.
