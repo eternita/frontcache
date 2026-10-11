@@ -36,6 +36,7 @@ import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.core5.http.io.entity.InputStreamEntity;
 import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
 import org.frontcache.FrontCacheEngine;
+import org.frontcache.core.EdgeToken;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
@@ -287,6 +288,10 @@ public class FC_BypassCache extends FcCommand<Object> {
 
 		try {
 			httpRequest.setHeaders(FCUtils.convertHeaders(headers));
+
+			// The one origin call that carries no x-frontcache-request-id, so without the token a
+			// bypassed POST from the edge looks exactly like a direct client to the next node.
+			EdgeToken.stamp(httpRequest, httpHost.getHostName());
 
 			if (passthroughEncoding)
 			{

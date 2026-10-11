@@ -265,7 +265,11 @@ public class GuardRuleParser {
 		for (int i = schemeEnd; i < target.length(); i++)
 		{
 			char c = target.charAt(i);
-			if ('/' == c || '?' == c || '#' == c)
+			// '${' too: no hostname contains it, and 'https://www.example.com${uri}${query}' - the
+			// target that sends a request to the same path on another host - was otherwise read as a
+			// host named 'www.example.com${uri}${query}' and refused. Whatever the placeholders expand
+			// to, GuardRuleEngine.sanitizeTarget re-checks the host of the expanded target.
+			if ('/' == c || '?' == c || '#' == c || ('$' == c && i + 1 < target.length() && '{' == target.charAt(i + 1)))
 			{
 				hostEnd = i;
 				break;
