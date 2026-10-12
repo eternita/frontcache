@@ -79,6 +79,9 @@ import org.frontcache.resilience.FC_Total;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
+import org.frontcache.license.FcLicense;
+import org.frontcache.license.LicenseMonitor;
+import org.frontcache.license.ProFeature;
 import org.frontcache.metrics.FcMetricsExport;
 import org.frontcache.reqlog.RequestLogger;
 import org.frontcache.warmer.WarmRequest;
@@ -666,10 +669,17 @@ public class FrontCacheEngine {
 		});
 		t.start();
 
+		// The license and the instance's usage log - docs/ip-protection-proposal.md sections 5.2 and 5.4.
+		// Before metrics export so the Pro-feature report below reads a checked license. Nothing it
+		// concludes reaches the request path, and it never throws.
+		LicenseMonitor.start(getPublicDomain());
+
 		// Prometheus / OTLP export. A no-op unless front-cache.metrics.export says otherwise, which is
 		// why this is called unconditionally: the node's lifecycle owner is the right place to start a
 		// background push loop, and gating the call here would just duplicate the config read.
 		FcMetricsExport.start();
+		if (FcMetricsExport.isEnabled())
+			FcLicense.reportUseOf(ProFeature.METRICS_EXPORT);
 
 		return;
 	}
@@ -807,6 +817,8 @@ public class FrontCacheEngine {
 
 
 	private void stop() {
+
+		LicenseMonitor.stop();
 
 		FCConfig.destroy();
 

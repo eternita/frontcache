@@ -21,6 +21,9 @@ import org.frontcache.cache.CacheStats;
 import org.frontcache.cache.FcCacheMetrics;
 import org.frontcache.guard.GuardAction;
 import org.frontcache.include.combine.FcCombineMetrics;
+import org.frontcache.license.FcLicense;
+import org.frontcache.license.License;
+import org.frontcache.license.LicenseState;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEngine;
 import org.frontcache.guard.ratelimit.GuardRateLimiterRegistry;
@@ -204,7 +207,44 @@ public class FcMetricsExport {
 		bindCombineMetrics();
 		bindGuardMetrics();
 		bindWarmerMetrics();
+		bindLicenseMetrics();
 		bindJvmMetrics();
+	}
+
+	private boolean licenseBound = false;
+
+	/**
+	 * The license state - docs/ip-protection-proposal.md section 5.2: one series per state, 1 for the
+	 * current one, so {@code frontcache_license_state{state="valid"} == 0} is an alert, and
+	 * {@code updates.until} so a renewal can be alerted on before it is due.
+	 *
+	 * Both read {@link FcLicense#current()} at scrape time - a volatile read of a value the license monitor
+	 * re-checks every minute, so a renewed license dropped into conf/ shows up without a restart.
+	 * {@code updates.until} is NaN with no license: "no date" is not the epoch.
+	 *
+	 * {@code state} is a fixed set of six ({@link LicenseState}) - no license id or licensee label, which
+	 * would put customer names into every Prometheus server this node is scraped by.
+	 */
+	private synchronized void bindLicenseMetrics()
+	{
+		if (licenseBound)
+			return;
+		licenseBound = true;
+
+		for (final LicenseState state : LicenseState.values())
+			Gauge.builder("license.state", () -> (FcLicense.current().getState() == state) ? 1 : 0)
+					.description("1 for this node's current license state, 0 for the others")
+					.tags(Tags.of("state", state.id()))
+					.register(registry);
+
+		Gauge.builder("license.updates.until.timestamp", () -> {
+					License license = FcLicense.current().getLicense();
+					return (null == license) ? Double.NaN
+							: license.getUpdatesUntil().atStartOfDay(java.time.ZoneOffset.UTC).toEpochSecond();
+				})
+				.description("The license's updates-until date as a Unix timestamp; NaN with no license")
+				.baseUnit("seconds")
+				.register(registry);
 	}
 
 	private boolean warmerBound = false;

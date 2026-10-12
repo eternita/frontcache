@@ -71,7 +71,9 @@ import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.GetGuardRulesActionResponse;
 import org.frontcache.io.GetGuardConfigActionResponse;
 import org.frontcache.io.GetResilienceConfigActionResponse;
+import org.frontcache.io.LicenseActionResponse;
 import org.frontcache.io.NodeStatsActionResponse;
+import org.frontcache.io.UsageReportActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
 import org.frontcache.io.WarmerListActionResponse;
 import org.frontcache.io.WarmerListsActionResponse;
@@ -1090,6 +1092,72 @@ public class FrontCacheClient {
 		unsupported.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 		unsupported.setErrorDescription(WARMER_UNSUPPORTED);
 		return unsupported;
+	}
+
+	// ---- licensing - docs/ip-protection-proposal.md sections 5.2 and 5.4 ----
+
+	/**
+	 * The edge's license state, Pro features in use, build and instance id.
+	 *
+	 * @return the answer; {@link LicenseActionResponse#unsupported()} for a node that predates licensing
+	 *         (it answers with a ping, which must not read as "Community"); null when the edge could not
+	 *         be reached
+	 */
+	public LicenseActionResponse getLicense()
+	{
+		return licenseCall(FrontcacheAction.GET_LICENSE);
+	}
+
+	/** Has the edge re-read its license file now. Same return contract as {@link #getLicense()}. */
+	public LicenseActionResponse reloadLicense()
+	{
+		return licenseCall(FrontcacheAction.RELOAD_LICENSE);
+	}
+
+	private LicenseActionResponse licenseCall(String action)
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", action));
+
+		String responseStr = null;
+		try {
+			responseStr = requestFrontCache(urlParameters);
+			LicenseActionResponse response = jsonMapper.readValue(responseStr.getBytes(), LicenseActionResponse.class);
+			return FrontcacheAction.PING.equals(response.getAction()) ? LicenseActionResponse.unsupported() : response;
+
+		} catch (Exception e) {
+			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
+		}
+
+		return null;
+	}
+
+	/**
+	 * The edge's own usage log as intervals.
+	 *
+	 * @param from yyyy-MM, or null for the node's default (twelve months back)
+	 * @param to   yyyy-MM, or null for the current month
+	 * @return the answer; {@link UsageReportActionResponse#unsupported()} for a node that predates it; null
+	 *         when the edge could not be reached
+	 */
+	public UsageReportActionResponse getUsageReport(String from, String to)
+	{
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_USAGE_REPORT));
+		addIfSet(urlParameters, "from", from);
+		addIfSet(urlParameters, "to", to);
+
+		String responseStr = null;
+		try {
+			responseStr = requestFrontCache(urlParameters);
+			UsageReportActionResponse response = jsonMapper.readValue(responseStr.getBytes(), UsageReportActionResponse.class);
+			return FrontcacheAction.PING.equals(response.getAction()) ? UsageReportActionResponse.unsupported() : response;
+
+		} catch (Exception e) {
+			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
+		}
+
+		return null;
 	}
 
 	/**

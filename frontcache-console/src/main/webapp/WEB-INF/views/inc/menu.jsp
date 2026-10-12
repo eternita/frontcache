@@ -7,6 +7,7 @@
 <c:set var="uri" value="${empty requestScope['jakarta.servlet.forward.request_uri'] ? pageContext.request.requestURI : requestScope['jakarta.servlet.forward.request_uri']}"/>
 <c:choose>
 	<c:when test="${fn:contains(uri, 'realtime')}"><c:set var="topActive" value="realtime"/></c:when>
+	<c:when test="${fn:contains(uri, 'license')}"><c:set var="topActive" value="license"/></c:when>
 	<%-- save-config is in this list because the Configs screens render their POST result in place
 	     rather than redirecting (as cache-invalidation does), so the forward URI is /save-config and
 	     the top menu would otherwise lose its highlight on exactly the page that just did something. --%>
@@ -48,6 +49,7 @@
                 <li><a href="guard-rules" class="${topActive == 'guard' ? 'active-top' : ''}">Guard </a></li>
                 <li><a href="visitor-types" class="${topActive == 'visitor' ? 'active-top' : ''}">Visitor Types </a></li>
 				<li><a href="edges" class="${topActive == 'edges' ? 'active-top' : ''}">Edges </a></li>
+				<li><a href="license" class="${topActive == 'license' ? 'active-top' : ''}">License </a></li>
 			</ul>
 			<%-- Who is signed in, and the only way to stop being signed in - see
 			     docs/archive/console-login-ui.md section 8.

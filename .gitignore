@@ -33,3 +33,16 @@
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/warmer/.state/
 /frontcache-tests/FRONTCACHE_HOME_FILTER/warmer/*.failed-*.txt
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/warmer/*.failed-*.txt
+
+# Licensing runtime state (docs/ip-protection-proposal.md): a node's instance id and usage log under
+# FRONTCACHE_HOME/usage, and the console's usage log. Never checked in - an instance id in git would be
+# cloned into every checkout.
+/frontcache-server/FRONTCACHE_HOME/usage/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/usage/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/usage/
+/frontcache-core/src/test/resources/fallback-home/usage/
+/frontcache-console/usage/
+# License files and signing keys. The private signing key must never be anywhere near a repository.
+frontcache.license
+*.signing-key
+*.signing-key.pem
