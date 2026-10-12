@@ -1222,6 +1222,12 @@ public class FCUtils {
 			case "x-frontcache-client-type":
 				return false;
 
+			// Dropped for the same reason: it is the chain's shared secret (FCHeaders.X_FRONTCACHE_EDGE_TOKEN).
+			// A node sends its own value - EdgeToken.stamp, on the outgoing request - or none, so a
+			// client's copy goes no further than the first Frontcache it reaches.
+			case "x-frontcache-edge-token":
+				return false;
+
 			default:
 				// The cache warmer's token and run parameters (FCHeaders.X_FRONTCACHE_WARM*). Dropped so
 				// the token never reaches the origin - in its access log it would let whoever reads the

@@ -19,6 +19,7 @@ import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.frontcache.core.EdgeToken;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.FrontCacheException;
@@ -74,6 +75,10 @@ public class FC_ThroughCache_HttpClient extends FcCommand<WebResponse> {
 			// buildRequestHeaders() normalizes this too; setting it here makes the cacheable origin
 			// call self-contained, independent of the inbound headers.
 			httpRequest.setHeader(FCHeaders.ACCEPT_ENCODING, "gzip");
+
+			// page misses, include misses and a filter-mode node's own include fetch all come through
+			// here - see EdgeToken, which sends it to the origin host only
+			EdgeToken.stamp(httpRequest, httpHost.getHostName());
 
 			// executeOpen(), not execute(): the execute() overload returning an open response is
 			// deprecated in 5.3 and this one is its replacement.

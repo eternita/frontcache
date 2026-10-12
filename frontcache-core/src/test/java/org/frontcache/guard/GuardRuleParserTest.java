@@ -135,6 +135,27 @@ public class GuardRuleParserTest {
 				+ "&from=www.example-site.com/en/ccc/va/v.htm?a=1", target);
 	}
 
+	/**
+	 * "Same path, other host" - what a second layer sends a client that reached it directly. The host
+	 * is followed by a placeholder rather than a '/', and was read as 'www.example-site.com${uri}${query}'
+	 * and refused (docs/direct-access-restriction-proposal.md).
+	 */
+	@Test
+	public void aPlaceholderRightAfterTheHostEndsTheHost() {
+		GuardRule rule = parser.parse("direct | uri~^/en/ ; method:GET | redirect:301 https://www.example-site.com${uri}${query}");
+
+		assertEquals("https://www.example-site.com/en/search.htm?a=1",
+				rule.getAction().resolveTarget(context("https://origin.example-site.com/en/search.htm?a=1")));
+	}
+
+	@Test
+	public void aPlaceholderAfterTheHostDoesNotExcuseADisallowedHost() {
+		assertRejected("direct | uri~^/en/ | redirect:301 https://evil.example.com${uri}");
+		assertRejected("direct | uri~^/en/ | redirect:301 https://www.example-site.com.evil.example.com${uri}");
+		// a target whose whole host is a placeholder is still refused here - there is no host to check
+		assertRejected("direct | uri~^/en/ | redirect:301 https://${host}${uri}");
+	}
+
 	@Test
 	public void unparseableLineNeverEscapesAsSomethingElse() {
 		// every rejection is a GuardConfigException so the engine can skip exactly one line

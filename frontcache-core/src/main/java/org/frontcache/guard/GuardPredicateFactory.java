@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.frontcache.FCConfig;
 import org.frontcache.core.Cidr;
+import org.frontcache.core.EdgeToken;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
 import org.frontcache.guard.ratelimit.RateLimitPredicate;
@@ -43,6 +44,7 @@ import org.frontcache.guard.ratelimit.RateLimitSpec;
  *   [!] cookie:&lt;name&gt;
  *   [!] header:&lt;name&gt;[~&lt;regex&gt;]
  *   [!] request-type:&lt;toplevel|include|include-async&gt;
+ *   [!] edge-token                        (carries this node's front-cache.edge-token; guard-rules.conf only)
  *       rate:&lt;limit&gt;/&lt;window&gt; [bucket=&lt;name&gt;] [scope=&lt;toplevel|all&gt;]   (never negated)
  *
  * Regexes are compiled once, here, and matched with find() semantics - the same behaviour as
@@ -88,6 +90,8 @@ public class GuardPredicateFactory {
 	private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GuardPredicateFactory.class);
 
 	private static final Pattern IPV4 = Pattern.compile("^\\d{1,3}(?:\\.\\d{1,3}){3}$");
+
+	private static final String EDGE_TOKEN = "edge-token";
 
 	private GuardPredicateFactory() {
 	}
@@ -149,6 +153,11 @@ public class GuardPredicateFactory {
 
 	private static GuardPredicate parsePositive(String expr, Scope scope)
 	{
+		// The one predicate that takes no argument: it asks about the hop, not about the request's
+		// content. Checked first, so the type:value / type~regex parsing below never sees it.
+		if (EDGE_TOKEN.equals(expr) || expr.startsWith(EDGE_TOKEN + ":") || expr.startsWith(EDGE_TOKEN + "~"))
+			return parseEdgeToken(expr, scope);
+
 		int tilde = expr.indexOf('~');
 		int colon = expr.indexOf(':');
 
@@ -299,6 +308,41 @@ public class GuardPredicateFactory {
 		default:
 			throw new GuardConfigException("unknown predicate '" + type + "' in '" + expr + "'");
 		}
+	}
+
+	/**
+	 * {@code edge-token}: the request carried this node's {@code front-cache.edge-token}, i.e. it came
+	 * from a Frontcache of the same chain rather than straight from a client. Written negated on a
+	 * second-layer node - {@code !edge-token} is "reached me directly". See {@link EdgeToken}.
+	 *
+	 * Refused, so the rule is skipped with an ERROR like any other unparseable rule, in two cases:
+	 *
+	 * <ul>
+	 * <li>On a node with no token. {@code !edge-token} would then match EVERY request - the edge's
+	 *     included - and a rule meant to send direct traffic back to the main route would send all of
+	 *     it, which on a second layer is a redirect loop through the edge. Refusing is also what makes
+	 *     the console's Save refuse such a file, since {@code ConfigFileValidator} parses through
+	 *     here.</li>
+	 * <li>In bots.conf. The token identifies the hop, not the visitor, and the client type is about
+	 *     the visitor - an edge's request is classified on what the edge propagates, not on the fact
+	 *     that it came from an edge.</li>
+	 * </ul>
+	 */
+	private static GuardPredicate parseEdgeToken(String expr, Scope scope)
+	{
+		if (!EDGE_TOKEN.equals(expr))
+			throw new GuardConfigException("'" + expr + "' takes no argument - write '" + EDGE_TOKEN + "' or '!"
+					+ EDGE_TOKEN + "'");
+
+		if (Scope.BOTS == scope)
+			throw new GuardConfigException("'" + expr + "' cannot be used in " + scope.getFile()
+					+ " - it identifies the hop a request came through, not the visitor; put it in guard-rules.conf");
+
+		if (!EdgeToken.isConfigured())
+			throw new GuardConfigException("'" + expr + "' needs " + EdgeToken.EDGE_TOKEN_PROPERTY + " in frontcache.properties"
+					+ " - without a token no request carries one, so '!" + EDGE_TOKEN + "' would match every request");
+
+		return simplePredicate(expr, ctx -> ctx.isEdgeTokenValid());
 	}
 
 	/**

@@ -81,6 +81,11 @@ public class ApacheFcHttpClient implements FcHttpClient {
 		try {
 			HttpHost httpHost = FCUtils.getHttpHost(new URL(urlStr));
 
+			// A fallback's init URL is fetched at startup, and when it names the origin a second layer
+			// enforcing edge-token would otherwise refuse it. Any other host gets nothing - see
+			// EdgeToken.stamp.
+			EdgeToken.stamp(httpRequest, httpHost.getHostName());
+
 			// executeOpen(), not execute(): the execute() overload returning an open response is
 			// deprecated in 5.3, executeOpen() is its non-deprecated replacement. Same everywhere in
 			// the codebase - see FC_BypassCache, which needs an open response it can close from

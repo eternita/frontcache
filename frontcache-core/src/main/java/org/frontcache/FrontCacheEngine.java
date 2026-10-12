@@ -62,6 +62,7 @@ import org.frontcache.bots.BotRule;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.ClientIpResolver;
+import org.frontcache.core.EdgeToken;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.guard.GuardAction;
 import org.frontcache.guard.GuardOutcome;
@@ -509,6 +510,8 @@ public class FrontCacheEngine {
 				+ " (http " + originHttpPort + " / https " + originHttpsPort + ")");
 
 		loadPublicIdentityConfig();
+
+		EdgeToken.logConfiguration(logger);
 
 		return;
 	}
@@ -994,6 +997,10 @@ public class FrontCacheEngine {
 
         context.setRequestId(requestId);
         context.setRequestType(requestType);
+
+        // Did this come from a Frontcache of the same chain? Before the guard rules, whose edge-token
+        // predicate reads it, and on the request thread, while the header is still readable.
+        context.setEdgeTokenValid(EdgeToken.isValid(servletRequest));
 
         // Resolved here, on the request thread, for two reasons: it is a 13-header scan that every log
         // line and the origin call would otherwise repeat, and it is the only point at which the answer

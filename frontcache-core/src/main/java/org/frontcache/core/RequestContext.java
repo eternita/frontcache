@@ -659,6 +659,22 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
         return getBoolean("RequestFromFrontcache", false);
     }
 
+    /**
+     * The request carried this node's {@code front-cache.edge-token} - it came from a Frontcache of
+     * the same chain, not straight from a client. Decided once, in {@code FrontCacheEngine.init()},
+     * and read by the {@code edge-token} guard predicate.
+     *
+     * Unlike {@link #getRequestFromFrontcache()}, which only says a request-id header was present,
+     * this cannot be claimed by a client - see {@code EdgeToken}.
+     */
+    public void setEdgeTokenValid(boolean valid) {
+        set("EdgeTokenValid", valid);
+    }
+
+    public boolean isEdgeTokenValid() {
+        return getBoolean("EdgeTokenValid", false);
+    }
+
 
 	public String getCurrentRequestURL() {
 		return (String) get("currentRequestURL");

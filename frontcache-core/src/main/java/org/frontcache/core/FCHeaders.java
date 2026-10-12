@@ -128,6 +128,16 @@ public class FCHeaders {
      */
     public static final String X_FRONTCACHE_WARM_KEY = "x-frontcache-warm-key";
 
+    /**
+     * The chain's shared secret, on every origin call a node with {@code front-cache.edge-token}
+     * makes - see {@code org.frontcache.core.EdgeToken}. Read by the {@code edge-token} guard
+     * predicate on the node that receives it.
+     *
+     * Dropped by {@code FCUtils.isIncludedHeader}, like {@link #X_FRONTCACHE_CLIENT_TYPE}: a node
+     * sends its own value or none, so a client's copy is never relayed onward by us.
+     */
+    public static final String X_FRONTCACHE_EDGE_TOKEN = "x-frontcache-edge-token";
+
     // Standard forwarding headers. X_FORWARDED_PROTO is READ (from a trusted peer only - see
     // ClientIpResolver.isTrustedPeer) to recover the scheme the client actually used, which a
     // TLS-terminating proxy in front of us has already stripped. X_FORWARDED_HOST is WRITTEN, to
