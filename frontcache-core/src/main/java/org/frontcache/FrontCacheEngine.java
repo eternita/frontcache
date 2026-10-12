@@ -319,20 +319,28 @@ public class FrontCacheEngine {
 	// synchronized on the same monitor as getFrontCache() so a shutdown/reload can't interleave with
 	// a lazy init and leave two engines (and two Lucene writers) alive.
 	public static void destroy() {
+		destroy(true);
+	}
+
+	private static void destroy(boolean shutdown) {
 		synchronized (FrontCacheEngine.class) {
 			if (null != instance) {
-				instance.stop();
+				instance.stop(shutdown);
 				instance = null;
 			}
 		}
 	}
 
 	/**
+	 * Rebuilds the engine - the {@code reload} management action.
 	 *
+	 * It re-reads what the engine owns (guard-rules.conf, fallbacks.conf, the HTTP client) and bots.conf,
+	 * and nothing FCConfig holds: frontcache.properties and dynamic-urls.conf are read once, by FCConfig's
+	 * static initializer. The cache and include processors are kept - see {@link #stop(boolean)}.
 	 */
 	public static void reload() {
 
-		destroy();
+		destroy(false);
 
 		// The guard rules and the fallback resolver are rebuilt with the engine that owns them; the
 		// bot classifier is a process-wide singleton (like ClientIpResolver, and for the same reason -
@@ -816,11 +824,19 @@ public class FrontCacheEngine {
 	}
 
 
-	private void stop() {
+	/**
+	 * @param shutdown true when the process is going away; false when {@link #reload()} is about to build
+	 *        a replacement engine
+	 */
+	private void stop(boolean shutdown) {
 
 		LicenseMonitor.stop();
 
-		FCConfig.destroy();
+		// FCConfig is deliberately NOT torn down here. It used to be (FCConfig.destroy() nulled the
+		// properties and emptied dynamic-urls.conf), but FCConfig is initialized by its static
+		// initializer and nowhere else, so the engine reload() builds next - and BotClassifier.reload()
+		// before it - dereferenced a null config: the reload action took the node down. FCConfig is
+		// process-wide config, like BotClassifier, and outlives any one engine. FrontCacheEngineReloadTest.
 
 		FallbackResolverFactory.destroy();
 
@@ -837,6 +853,14 @@ public class FrontCacheEngine {
 		httpClient = null;
 		fcHttpClient = null;
 		connectionManager = null;
+
+		// The cache and include processors are JVM-wide singletons: CacheManager and
+		// IncludeProcessorManager hand the SAME instance to the engine reload() builds next, so
+		// destroying them here on a reload gave that engine a disposed Ehcache, a closed Lucene writer and
+		// shut-down executors. They are built from FCConfig, which a reload does not re-read, so there is
+		// nothing a rebuild could apply - a reload keeps them (and the L1 cache with them).
+		if (!shutdown)
+			return;
 
 		if (null != includeProcessor)
 			includeProcessor.destroy();

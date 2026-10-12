@@ -108,12 +108,6 @@ public class FCConfig {
 		return org.frontcache.bots.BotClassifier.getInstance().getKeywords();
 	}
 
-    public static void destroy()
-    {
-    	config = null;
-    	dynamicURLPatterns = Collections.emptySet();
-    }
-
     public static String getProperty(String key, String defaultValue)
     {
         return (null != config.getProperty(key)) ? config.getProperty(key) : defaultValue;
