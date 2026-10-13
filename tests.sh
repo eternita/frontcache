@@ -24,6 +24,9 @@ rm -f "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/conf/*.backup-*
 # the cache warmer's checkpoint and failed-entry lists, and any list a warmer test left behind
 rm -rf "$TESTS_DIR"/FRONTCACHE_HOME_FILTER/warmer/.state "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/warmer/.state
 rm -f "$TESTS_DIR"/FRONTCACHE_HOME_FILTER/warmer/e2e-warm*.txt "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/warmer/e2e-warm*.txt
+# the licensing usage log (FRONTCACHE_HOME/usage/usage-*.log) - the instance id is kept, so a node stays one
+# instance across runs, which is what it is
+rm -f "$TESTS_DIR"/FRONTCACHE_HOME_FILTER/usage/usage-*.log "$TESTS_DIR"/FRONTCACHE_HOME_STANDALONE/usage/usage-*.log
 # end cleanup cache dirs & logs
 
 # stop gradle daemons

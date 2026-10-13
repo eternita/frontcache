@@ -163,6 +163,21 @@ public abstract class FrontcacheAction {
 	/** Lets in-flight requests finish, closes the failed list, writes the checkpoint. */
 	public static final String WARMER_STOP = "warmer-stop";
 
+	// ---- licensing - see docs/ip-protection-proposal.md sections 5.2 and 5.4 ----
+	//
+	// None of these changes how a request is served. A node that predates them answers with a ping;
+	// FrontCacheClient reports that as "unsupported" rather than as a Community node, because a node that
+	// cannot say is not the same as a node that says it has no license.
+
+	/** This node's license state, the Pro features it uses, its build, and its instance id. */
+	public static final String GET_LICENSE = "get-license";
+
+	/** Re-reads the license file now. The node also notices a changed file by itself within a minute. */
+	public static final String RELOAD_LICENSE = "reload-license";
+
+	/** This node's own usage log as intervals: {@code from} and {@code to} as yyyy-MM, default the last 12 months. */
+	public static final String GET_USAGE_REPORT = "get-usage-report";
+
 	public static final String PATCH = "patch";
 
 	public static final String PURGE = "purge";
@@ -210,6 +225,9 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.WARMER_PAUSE, "pause the running warm run. Requires a configured API key");
 		actionsDescriptionMap.put(FrontcacheAction.WARMER_RESUME, "resume a paused warm run. Requires a configured API key");
 		actionsDescriptionMap.put(FrontcacheAction.WARMER_STOP, "stop the warm run, keeping a checkpoint to resume from. Requires a configured API key");
+		actionsDescriptionMap.put(FrontcacheAction.GET_LICENSE, "license state (community|valid|nonprod|invalid|site-mismatch|updates-ended), licensed and in-use Pro features, build version and release date, instance id and mode");
+		actionsDescriptionMap.put(FrontcacheAction.RELOAD_LICENSE, "re-read the license file (conf/frontcache.license, -Dfrontcache.license or $FRONTCACHE_LICENSE) now");
+		actionsDescriptionMap.put(FrontcacheAction.GET_USAGE_REPORT, "this node's usage log as intervals; accepts 'from' and 'to' (yyyy-MM, default: the last 12 months)");
 		actionsDescriptionMap.put(FrontcacheAction.PURGE, "purge expired entries from the cache (keeps non-expired and cache-forever entries)");
 		actionsDescriptionMap.put(FrontcacheAction.BACKUP_INDEX, "backup the L2 (Lucene) index to a zip archive at the edge (l2-lucene-index.backup-{yyyyMMdd_HHmmss}.zip)");
 		actionsDescriptionMap.put(FrontcacheAction.PING, "ping for GSLB");

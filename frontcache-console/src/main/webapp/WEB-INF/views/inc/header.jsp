@@ -28,3 +28,11 @@
 		<div id="mainWrapper">
 		<%@ include file="/WEB-INF/views/inc/menu.jsp"%>
 		<div class="container">
+		<%-- License problems only - an invalid / other-site / older-than-the-build license, or a node count
+		     over the tolerance. From the license service's last poll, never a fan-out; see LicenseSummary
+		     for why an unlicensed Pro feature is not bannered here. --%>
+		<c:forEach var="banner" items="${licenseSummary.banners}">
+			<div class="alert alert-${banner.level}" role="alert" style="margin-top: 10px;">
+				<c:out value="${banner.text}"/> <a href="license" class="alert-link">License</a>
+			</div>
+		</c:forEach>

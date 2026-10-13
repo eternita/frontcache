@@ -58,6 +58,9 @@ public class FrontcacheService {
 
 	private Config fcConsoleConfig = null;
 
+	/** The frontcache-console.conf this console was started with, or null - the usage log's default home. */
+	private File consoleConfigFile = null;
+
 	private static final Logger logger = LoggerFactory.getLogger(FrontcacheService.class);
 
 	private ObjectMapper jsonMapper = new ObjectMapper();
@@ -130,6 +133,7 @@ public class FrontcacheService {
 			}
 
 			fcConsoleConfig = ConfigFactory.parseFile(configFile).getConfig("frontcache").getConfig("console");
+			consoleConfigFile = configFile.getAbsoluteFile();
 
 		} catch (Exception e) {
 			logger.error("Console frontcacheAgentURLs are not loaded from " + frontcacheConsoleConfPath);
@@ -744,6 +748,39 @@ public class FrontcacheService {
 
 	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
 	private static final String SESSION_COOKIE_SECURE_KEY = "session-cookie-secure";
+
+	// ---- licensing - see LicenseService ------------------------------------------------------
+
+	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
+	private static final String USAGE_DIR_KEY = "usage-dir";
+
+	/**
+	 * Where the console keeps its usage log ({@code console-usage-YYYY-MM.log}): {@code usage-dir}, else
+	 * {@code usage/} beside the directory holding frontcache-console.conf - {@code conf/../usage} in the
+	 * bundle, which is the console's home. Null when the console was started without a config file, and
+	 * then the node count is kept in memory only.
+	 */
+	public File getUsageDir() {
+		return usageDir(fcConsoleConfig, consoleConfigFile);
+	}
+
+	/** The decision half of {@link #getUsageDir()}, testable without a config file. */
+	static File usageDir(Config config, File configFile) {
+
+		if (null != config && config.hasPath(USAGE_DIR_KEY) && !config.getString(USAGE_DIR_KEY).isBlank())
+			return new File(config.getString(USAGE_DIR_KEY).trim());
+
+		if (null == configFile || null == configFile.getParentFile())
+			return null;
+
+		File home = configFile.getParentFile().getParentFile();
+		return (null == home) ? new File(configFile.getParentFile(), "usage") : new File(home, "usage");
+	}
+
+	/** Whether the realtime page aggregates any cluster - the Pro "cluster view". */
+	public boolean isClusterViewConfigured() {
+		return !clusterByEdgeURL.isEmpty();
+	}
 
 	// ---- clusters ------------------------------------------------------------------------------
 

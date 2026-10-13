@@ -16,6 +16,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -44,6 +46,11 @@ import org.frontcache.core.ApiKey;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
+import org.frontcache.license.FcLicense;
+import org.frontcache.license.LicenseMonitor;
+import org.frontcache.license.LicenseStatus;
+import org.frontcache.license.UsageInterval;
+import org.frontcache.license.UsageLog;
 import org.frontcache.resilience.FcResilienceReload;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
@@ -217,6 +224,18 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = reloadDynamicURLs(request);
 			break;
 
+		case FrontcacheAction.GET_LICENSE:
+			aResponse = licenseResponse(FrontcacheAction.GET_LICENSE, FcLicense.current());
+			break;
+
+		case FrontcacheAction.RELOAD_LICENSE:
+			aResponse = licenseResponse(FrontcacheAction.RELOAD_LICENSE, FcLicense.reload());
+			break;
+
+		case FrontcacheAction.GET_USAGE_REPORT:
+			aResponse = getUsageReport(request);
+			break;
+
 		case FrontcacheAction.PATCH:
 			aResponse = patch(request);
 			break;
@@ -317,6 +336,52 @@ public class FrontCacheIOServlet extends HttpServlet {
 		CacheStats cacheStats = (null == processor) ? CacheStats.NOT_TRACKED : processor.getCacheStats();
 
 		return new NodeStatsActionResponse(cacheStats, FcNodeStats.current());
+	}
+
+	/**
+	 * {@code get-license} / {@code reload-license} - see {@link LicenseActionResponse}.
+	 *
+	 * The engine is asked for its domain through {@link FrontCacheEngine#existingInstance()}: answering a
+	 * console's poll must not be what builds an engine, the {@code get-node-stats} rule.
+	 */
+	private ActionResponse licenseResponse(String action, LicenseStatus status)
+	{
+		FrontCacheEngine engine = FrontCacheEngine.existingInstance();
+
+		return new LicenseActionResponse(action, status, FcLicense.featuresInUse(), LicenseMonitor.instance(),
+				(null == engine) ? null : engine.getPublicDomain());
+	}
+
+	/**
+	 * {@code get-usage-report} - this node's usage log as intervals, {@code from}..{@code to} (yyyy-MM),
+	 * the last twelve months by default. Twenty-four at most: the log keeps {@link UsageLog#KEEP_MONTHS}.
+	 */
+	private ActionResponse getUsageReport(HttpServletRequest req)
+	{
+		YearMonth now = YearMonth.now(ZoneOffset.UTC);
+		YearMonth to = parseMonth(req.getParameter("to"), now);
+		YearMonth from = parseMonth(req.getParameter("from"), to.minusMonths(11));
+
+		if (from.isAfter(to))
+			from = to;
+		if (from.isBefore(to.minusMonths(UsageLog.KEEP_MONTHS - 1)))
+			from = to.minusMonths(UsageLog.KEEP_MONTHS - 1);
+
+		List<UsageInterval> intervals = LicenseMonitor.usageIntervals(from, to);
+
+		return new UsageReportActionResponse(from.toString(), to.toString(), LicenseMonitor.instance().getId(),
+				intervals);
+	}
+
+	private static YearMonth parseMonth(String value, YearMonth fallback)
+	{
+		if (null == value || value.isBlank())
+			return fallback;
+		try {
+			return YearMonth.parse(value.trim());
+		} catch (Exception e) {
+			return fallback;
+		}
 	}
 
 	/**

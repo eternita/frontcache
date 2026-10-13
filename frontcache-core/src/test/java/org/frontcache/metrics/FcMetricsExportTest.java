@@ -196,6 +196,30 @@ public class FcMetricsExportTest {
 	}
 
 	/**
+	 * One {@code frontcache_license_state} series per state, exactly one of them at 1, and no label that
+	 * could carry a customer's name - docs/ip-protection-proposal.md section 5.2. A unit-test JVM has no
+	 * license file, so the state at 1 is community.
+	 */
+	@Test
+	public void licenseStateIsOneSeriesPerStateWithTheCurrentOneAtOne()
+	{
+		enable("prometheus");
+
+		String scrape = FcMetricsExport.scrape();
+		int ones = 0;
+		for (org.frontcache.license.LicenseState state : org.frontcache.license.LicenseState.values())
+		{
+			String series = "frontcache_license_state{state=\"" + state.id() + "\"}";
+			assertTrue(series + " missing from\n" + scrape, scrape.contains(series));
+			if (scrape.contains(series + " 1.0"))
+				ones++;
+		}
+		assertEquals(1, ones);
+		assertTrue(scrape, scrape.contains("frontcache_license_state{state=\"community\"} 1.0"));
+		assertTrue(scrape, scrape.contains("frontcache_license_updates_until_timestamp_seconds NaN"));
+	}
+
+	/**
 	 * The cardinality guard. {@code RequestLogger} has URL-level data and labelling with it would be
 	 * tempting; on a page cache the URL space is unbounded by construction, so a per-URL label is not an
 	 * observability feature but a way to take down a Prometheus server. Asserted as an allowlist of tag

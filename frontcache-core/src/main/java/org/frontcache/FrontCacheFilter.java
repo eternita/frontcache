@@ -19,6 +19,8 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.frontcache.license.NodeInstance;
+
 
 /**
  *
@@ -31,6 +33,10 @@ public class FrontCacheFilter implements Filter {
 
 	@Override
 	public void init(FilterConfig arg0) throws ServletException {
+
+		// before the engine exists, so the instance's first usage record already says how it is
+		// deployed - a node in filter mode is one application replica (ip-protection-proposal 4.2)
+		NodeInstance.markMode(NodeInstance.Mode.FILTER);
 
 		fcEngine = FrontCacheEngine.getFrontCache();
 
