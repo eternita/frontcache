@@ -1,0 +1,6 @@
+Copyright ${year} ${holder}. All rights reserved.
+
+This file is part of Frontcache Pro. It is proprietary software and is NOT
+licensed under the Apache License: it is licensed only under the Frontcache
+Pro License Agreement (LICENSE-PRO), and may be used, copied, modified or
+distributed only as that agreement allows.

@@ -74,6 +74,12 @@ It can invalidate cache across a fleet; keep it on loopback either way.
 A `HEALTHCHECK` GETs `/login` — the one path served without a credential, so it works whether or not
 a login is configured.
 
-## Licence
+## License
 
-https://www.eternita.co/frontcache-license.html
+Frontcache is licensed under the Apache License 2.0. Each image carries the distribution's `LICENSE`,
+`NOTICE` and `THIRD-PARTY-NOTICES.txt` under `/opt/frontcache-server/` (server) and
+`/opt/frontcache-console/` (console). The base image, `eclipse-temurin`, and the packages it installs
+are under their own licenses.
+
+Frontcache Pro — the cache warmer, the cluster view and, to come, RBAC, SSO and an audit log — is
+available under a commercial license: https://www.eternita.co/frontcache-license.html

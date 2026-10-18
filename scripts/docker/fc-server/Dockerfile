@@ -19,6 +19,10 @@ ARG FRONTCACHE_VERSION=2.5.0
 FROM eclipse-temurin:25-jdk
 ARG FRONTCACHE_VERSION
 
+# What the Frontcache layers are licensed under (the base image's own are its own). The distribution's
+# LICENSE, NOTICE and THIRD-PARTY-NOTICES.txt arrive with the archive below.
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
 # curl backs the HEALTHCHECK below and makes the container debuggable from inside.
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl \

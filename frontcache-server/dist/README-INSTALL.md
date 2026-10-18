@@ -146,5 +146,7 @@ for new properties. The `cache/` directory is pure cache and can be discarded at
 
 Console (realtime stats, cache management) ships separately as `frontcache-console-<version>.zip`.
 
-Licensing: https://www.eternita.co/frontcache-license.html
+License: Apache-2.0 - see LICENSE, NOTICE and THIRD-PARTY-NOTICES.txt in this bundle.
+Frontcache Pro (the cache warmer, the cluster view and, to come, RBAC, SSO and an audit log) is
+available under a commercial license: https://www.eternita.co/frontcache-license.html
 Docs: https://github.com/eternita/frontcache/wiki

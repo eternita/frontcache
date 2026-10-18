@@ -1,21 +1,24 @@
 plugins {
-	id 'com.github.hierynomus.license' version '0.16.1'
+	id 'com.github.hierynomus.license' version '0.16.1' apply false
+	id 'com.github.jk1.dependency-license-report' version '3.1.4' apply false
 }
 
 // Jetty 12 (Jakarta EE10).
 ext.jettyVersion = '12.0.38'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
                                // stay on the 12.0.x (Jakarta EE10 / Servlet 6.0) line - 12.1.x moves to EE11
 
-license {
-    ignoreFailures = true
-    strictCheck = true
-    include '**/*.java'
-    mapping {
-        java = 'SLASHSTAR_STYLE'
-    }
-}
-
-//build.dependsOn licenseFormat
+// ---- licensing paperwork ------------------------------------------------------
+// docs/ip-protection-apache-core-and-prop-pro-proposal.md section 7.2 (phase P3). Everything is Apache-2.0
+// (LICENSE, NOTICE) except these modules, which are proprietary (LICENSE-PRO). The list decides each
+// module's per-file header, what its jar carries as META-INF/LICENSE, and nothing else.
+ext.proprietaryModules = ['frontcache-pro-license', 'frontcache-pro', 'frontcache-pro-console',
+                          'frontcache-pro-tests', 'frontcache-license-tool'] as Set
+// What the per-file headers say. Changing either is this edit plus `./gradlew licenseFormat`: the check
+// is strict, so the old header then fails `check` until the sweep has run.
+ext.copyrightHolder = 'Eternita'
+ext.copyrightYear   = [core: '2015', pro: '2026']   // first publication: Frontcache 2015, Frontcache Pro 2026
+// What the POMs say (SPDX id as the name, as Maven Central asks).
+ext.pomLicense = [name: 'Apache-2.0', url: 'https://www.apache.org/licenses/LICENSE-2.0.txt']
 
 // Single source of truth for the project version (see version.properties). It cannot live
 // in gradle.properties - that file is git-ignored (see .gitignore), so it would not be
@@ -127,6 +130,55 @@ subprojects {
 
 	// Also emit the report for a bare `gradlew :module:test`, not only via check/build.
 	test.finalizedBy jacocoTestReport
+
+	// ---- per-file license headers (section 7.2) ----------------------------------
+	// licenseMain / licenseTest / licenseTestFixtures check every source set, `license` runs them all and
+	// `check` runs `license`, so a file with a missing or wrong header fails the build. `licenseFormat`
+	// writes the header. Strict: the header must match the template exactly, so a core file carrying the
+	// Pro header (or the reverse) fails as surely as one carrying none.
+	//
+	// Our own JavaScript and stylesheets are checked too (fc-*.js, fc-*.css, the JS tests); the vendored
+	// Bootstrap and jQuery keep their authors' headers and are listed in NOTICE. JSPs are NOT checked:
+	// a JSP comment's line break is response output, and the e2e suite asserts the bytes of its pages.
+	def proprietary = project.name in rootProject.proprietaryModules
+	apply plugin: 'com.github.hierynomus.license'
+	license {
+		header = rootProject.file(proprietary ? 'gradle/license/HEADER-PRO.txt' : 'gradle/license/HEADER-APACHE-2.0.txt')
+		ext.holder = rootProject.copyrightHolder
+		ext.year = rootProject.copyrightYear[proprietary ? 'pro' : 'core']
+		ignoreFailures = false
+		strictCheck = true
+		encoding = 'UTF-8'
+		includes(['**/*.java', '**/fc-*.js', '**/fc-*.css', '**/*.test.js', '**/*harness.js'])
+		mapping {
+			java = 'SLASHSTAR_STYLE'
+			js = 'SLASHSTAR_STYLE'
+			css = 'SLASHSTAR_STYLE'
+		}
+	}
+	// What no source set holds: a war's src/main/webapp, and the node --test JavaScript under src/test/js.
+	def looseSources = files(
+		fileTree('src/main/webapp') { include '**/fc-*.js', '**/fc-*.css' },
+		fileTree('src/test/js'))
+	tasks.register('licenseLooseFiles', com.hierynomus.gradle.license.tasks.LicenseCheck) {
+		description = 'Scanning license on webapp and JavaScript test files'
+		source = looseSources
+	}
+	tasks.register('licenseFormatLooseFiles', com.hierynomus.gradle.license.tasks.LicenseFormat) {
+		description = 'Applying license on webapp and JavaScript test files'
+		source = looseSources
+	}
+
+	// Every jar says what it is licensed under, beside its classes.
+	tasks.named('jar', Jar) {
+		metaInf {
+			if (proprietary) {
+				from(rootProject.file('LICENSE-PRO')) { rename { 'LICENSE' } }
+			} else {
+				from(rootProject.file('LICENSE'), rootProject.file('NOTICE'))
+			}
+		}
+	}
 }
 
 
@@ -193,8 +245,9 @@ configure([project(':frontcache-core'), project(':frontcache-agent')]) {
 					url = 'https://github.com/eternita/frontcache'
 					licenses {
 						license {
-							name = 'Frontcache license'
-							url  = 'https://www.eternita.co/frontcache-license.html'
+							name = rootProject.pomLicense.name
+							url  = rootProject.pomLicense.url
+							distribution = 'repo'
 						}
 					}
 					developers {
@@ -290,7 +343,7 @@ project(':frontcache-core') {
 			from('src/dist/frontcache.properties') { into 'conf' }
 		}
 		from('src/dist/README-FILTER.md')
-		from(rootProject.file('LICENSE'))
+		from(rootProject.file('LICENSE'), rootProject.file('NOTICE'))
 	}
 
 	// Attached to the existing library publication, so `./gradlew publish` ships it with the jar.
@@ -787,10 +840,31 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 		? ['server/frontcache-base/webapps/ROOT.war', 'server/bin/frontcache', 'bin/frontcache',
 		   'server/frontcache-base/etc/keystore', 'FRONTCACHE_HOME/conf/frontcache.properties',
 		   'FRONTCACHE_HOME/conf/fc-logback.xml', 'FRONTCACHE_HOME/conf/guard-rules.conf',
-		   'README-INSTALL.md', 'LICENSE']
+		   'README-INSTALL.md', 'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.txt']
 		: ['webapps/ROOT.war', 'bin/frontcache-console', 'conf/frontcache-console.conf',
-		   'conf/fc-logback.xml', 'README-INSTALL.md', 'LICENSE']
+		   'conf/fc-logback.xml', 'README-INSTALL.md', 'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.txt']
 	def forbidden = ['.DS_Store', '._', 'frontcache-console.war', '.log', 'l2-lucene-index/', 'instance.id', 'frontcache.license']
+
+	// ---- third-party licenses (section 7.2) ---------------------------------------
+	// THIRD-PARTY-NOTICES.txt at the bundle's root lists every library the bundle carries - the war's
+	// WEB-INF/lib (runtimeClasspath) and the launcher's lib/ (provided) - with the licenses its POM and
+	// manifest declare and the LICENSE / NOTICE files inside its jar, which is what redistributing an
+	// Apache-2.0 library asks of us. checkLicense fails `check`, and the bundle, when a library offers none
+	// of the licenses in gradle/license/allowed-licenses.json: a new dependency, or a version that changed
+	// its license, is a decision for a person, not something to find out from a customer's audit. A library
+	// under several licenses passes on any one of them (Jetty: EPL-2.0 or Apache-2.0).
+	apply plugin: 'com.github.jk1.dependency-license-report'
+	licenseReport {
+		configurations = ['runtimeClasspath', 'provided']
+		renderers = [new com.github.jk1.license.render.TextReportRenderer('THIRD-PARTY-NOTICES.txt')]
+		filters = [new com.github.jk1.license.filter.LicenseBundleNormalizer()]
+		allowedLicensesFile = rootProject.file('gradle/license/allowed-licenses.json')
+	}
+	tasks.named('check') { dependsOn 'checkLicense' }
+	distributions.main.contents {
+		from(rootProject.file('NOTICE'))
+		from(tasks.named('generateLicenseReport')) { include 'THIRD-PARTY-NOTICES.txt' }
+	}
 
 	// A Community bundle carries no Pro code (docs/ip-protection-apache-core-and-prop-pro-proposal.md,
 	// phase P2): no class, services file, view or script of a frontcache-pro* module, at any depth - in the
@@ -824,6 +898,7 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 	def verifyDist = tasks.register('verifyDist') {
 		group = 'distribution'
 		description = 'Assert the distribution archive is complete and carries no build/runtime leftovers'
+		dependsOn 'checkLicense'   // a bundle carrying a library under a license nobody accepted is not complete
 		inputs.file(zipFile)
 		outputs.upToDateWhen { false }
 		def archive = zipFile
@@ -1054,8 +1129,9 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 					url = 'https://github.com/eternita/frontcache'
 					licenses {
 						license {
-							name = 'Frontcache license'
-							url  = 'https://www.eternita.co/frontcache-license.html'
+							name = rootProject.pomLicense.name
+							url  = rootProject.pomLicense.url
+							distribution = 'repo'
 						}
 					}
 					scm {

@@ -131,5 +131,8 @@ fragments should report as coming from cache. Logs are under `logs/`.
 
 ---
 
-Licensing: https://www.eternita.co/frontcache-license.html
+License: Apache-2.0 - see LICENSE and NOTICE in this archive. frontcache-core's dependencies come
+from Maven Central with your application's, under their own licenses.
+Frontcache Pro (the cache warmer, the cluster view and, to come, RBAC, SSO and an audit log) is
+available under a commercial license: https://www.eternita.co/frontcache-license.html
 Docs: https://github.com/eternita/frontcache/wiki
