@@ -25,13 +25,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import org.junit.Assume;
 import org.junit.Test;
 
 /**
  * The console's half of the boundary in docs/ip-protection-apache-core-and-prop-pro-proposal.md section
- * 5.4 - frontcache-core's {@code CoreBoundaryTest} is the node's. No core console class, JSP or script may
- * name what moves to the Pro console plugin in phase P2, nor a Pro class of frontcache-core. Until P2 both
- * halves live in this source tree, and this is what keeps the move a file move.
+ * 5.4 - frontcache-core's {@code CoreBoundaryTest} is the node's. Since phase P2 the Pro console plugin is
+ * frontcache-pro-console, which compiles against this module and never the other way round. What the
+ * compiler cannot see is what this test is for: a Pro class, view, script or services file put back into
+ * this module (D4 kept the package names, so it compiles), and a core JSP, script or stylesheet naming a
+ * Pro screen - that is text, and fails only when the page renders.
  *
  * Pro code reaches the core only through {@code org.frontcache.console.plugin}; the core reaches Pro code
  * not at all.
@@ -40,6 +43,9 @@ public class ConsoleBoundaryTest {
 
 	private static final Path JAVA = Paths.get("src/main/java");
 	private static final Path WEB = Paths.get("src/main/webapp/WEB-INF");
+
+	/** The Pro console plugin's sources, beside this module in the private repository. */
+	private static final Path PRO_JAVA = Paths.get("../frontcache-pro-console/src/main/java");
 
 	/** Console classes that move to the Pro console plugin. */
 	private static final Set<String> PRO_CONSOLE_CLASSES = Set.of(
@@ -72,22 +78,32 @@ public class ConsoleBoundaryTest {
 			"licenseSummary", "cache-warmer", "fc-warmer", "fc-dashboard-cluster", "ClusterRates",
 			"href=\"license\"", "warmerControl");
 
+	/** P2 moved every one of them to frontcache-pro-console; one that is back is Pro code in the core. */
+	@Test
+	public void noProClassViewOrScriptIsInTheCore() throws IOException {
+
+		List<String> back = new ArrayList<String>();
+		for (String fqn : sources(JAVA).keySet())
+			if (isPro(fqn))
+				back.add(fqn);
+		for (String rel : PRO_WEB_FILES)
+			if (Files.exists(WEB.resolve(rel)))
+				back.add("WEB-INF/" + rel);
+		if (Files.exists(Paths.get("src/main/resources/META-INF/services/" + ConsolePlugin.class.getName())))
+			back.add("META-INF/services/" + ConsolePlugin.class.getName());
+
+		assertTrue("Pro console code in frontcache-console - it belongs in frontcache-pro-console:\n  "
+				+ String.join("\n  ", back), back.isEmpty());
+	}
+
 	@Test
 	public void noCoreConsoleClassNamesAProClass() throws IOException {
 
-		Map<String, Path> all = new TreeMap<String, Path>();
-		try (Stream<Path> files = Files.walk(JAVA)) {
-			files.filter(p -> p.toString().endsWith(".java")).forEach(p -> {
-				String rel = JAVA.relativize(p).toString();
-				all.put(rel.substring(0, rel.length() - 5).replace('/', '.').replace('\\', '.'), p);
-			});
-		}
+		Map<String, Path> all = sources(JAVA);
 		assertTrue("no sources under " + JAVA.toAbsolutePath(), all.size() > 10);
 
-		Set<String> pro = new TreeSet<String>();
-		for (String fqn : all.keySet())
-			if (isPro(fqn))
-				pro.add(fqn);
+		Assume.assumeTrue("no Pro console plugin beside the console", Files.isDirectory(PRO_JAVA));
+		Set<String> pro = new TreeSet<String>(sources(PRO_JAVA).keySet());
 		assertTrue("the Pro set is what this test was written against: " + pro, pro.containsAll(PRO_CONSOLE_CLASSES));
 
 		List<String> violations = new ArrayList<String>();
@@ -144,6 +160,17 @@ public class ConsoleBoundaryTest {
 
 		assertTrue("Core pages name a Pro screen - render it from fcPlugins / consoleNotices instead:\n  "
 				+ String.join("\n  ", violations), violations.isEmpty());
+	}
+
+	private static Map<String, Path> sources(Path root) throws IOException {
+		Map<String, Path> all = new TreeMap<String, Path>();
+		try (Stream<Path> files = Files.walk(root)) {
+			files.filter(p -> p.toString().endsWith(".java")).forEach(p -> {
+				String rel = root.relativize(p).toString();
+				all.put(rel.substring(0, rel.length() - 5).replace('/', '.').replace('\\', '.'), p);
+			});
+		}
+		return all;
 	}
 
 	private static boolean isPro(String fqn) {

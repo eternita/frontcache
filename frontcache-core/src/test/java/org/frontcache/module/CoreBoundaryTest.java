@@ -1,5 +1,6 @@
 package org.frontcache.module;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -17,13 +18,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import org.junit.Assume;
 import org.junit.Test;
 
 /**
- * The boundary of docs/ip-protection-apache-core-and-prop-pro-proposal.md section 5.4: no core class may
- * name a class that moves to the Pro modules in phase P2. Until P2 both halves live in this source tree,
- * so nothing but this test stops a core change from quietly reaching back into Pro code - and once the
- * split happens, such a reference is a core that no longer compiles.
+ * The boundary of docs/ip-protection-apache-core-and-prop-pro-proposal.md section 5.4. Since phase P2 the
+ * Pro classes are in their own modules (frontcache-pro-license, frontcache-pro), which compile against the
+ * core and never the other way round - so a core class naming one no longer compiles. What is left for this
+ * test is what the compiler cannot see: a Pro class, or the module's services file, put back into the core
+ * (D4 kept the package names, so a file dropped into org.frontcache.license or .warmer compiles fine), and
+ * a core class naming a Pro class from the same split package.
  *
  * {@link #ALLOWED} listed the references P1 had not rewired yet; it is empty now, and an entry that no
  * longer matches anything fails the test too, so a fix cannot leave its permission behind.
@@ -31,6 +35,11 @@ import org.junit.Test;
 public class CoreBoundaryTest {
 
 	private static final Path SOURCES = Paths.get("src/main/java");
+
+	/** The Pro modules' sources, beside this module in the private repository (section 5.1). */
+	private static final List<Path> PRO_SOURCES = List.of(
+			Paths.get("../frontcache-pro-license/src/main/java"),
+			Paths.get("../frontcache-pro/src/main/java"));
 
 	/** Packages that move to Pro whole, and the classes in them that stay. */
 	private static final Map<String, Set<String>> PRO_PACKAGES = Map.of(
@@ -55,14 +64,31 @@ public class CoreBoundaryTest {
 	 */
 	private static final Map<String, Set<String>> ALLOWED = Map.of();
 
+	/** P2 moved every one of them out; one that is back is Pro code in the Apache core. */
+	@Test
+	public void noProClassIsInTheCore() throws IOException {
+
+		List<String> back = new ArrayList<>();
+		for (String fqn : sources(SOURCES).keySet())
+			if (isPro(fqn))
+				back.add(fqn);
+
+		assertTrue("Pro classes in frontcache-core - they belong in frontcache-pro / frontcache-pro-license:\n  "
+				+ String.join("\n  ", back), back.isEmpty());
+		assertFalse("the Pro module's services file is in frontcache-core - it is frontcache-pro's",
+				Files.exists(Paths.get("src/main/resources/META-INF/services/" + FrontcacheModule.class.getName())));
+	}
+
 	@Test
 	public void noCoreClassNamesAProClass() throws IOException {
 
-		Map<String, Path> all = sources();
+		Map<String, Path> all = sources(SOURCES);
 		Set<String> pro = new TreeSet<>();
-		for (String fqn : all.keySet())
-			if (isPro(fqn))
-				pro.add(fqn);
+		for (Path dir : PRO_SOURCES)
+			if (Files.isDirectory(dir))
+				pro.addAll(sources(dir).keySet());
+		Assume.assumeFalse("no Pro module beside the core", pro.isEmpty());
+		assertTrue("the Pro set is what this test was written against: " + pro, pro.stream().allMatch(CoreBoundaryTest::isPro));
 
 		List<String> violations = new ArrayList<>();
 		Map<String, Set<String>> found = new TreeMap<>();
@@ -105,7 +131,7 @@ public class CoreBoundaryTest {
 	@Test
 	public void theServicesFileIsTheOnlyPlaceTheProModuleIsNamed() throws IOException {
 
-		Map<String, Path> all = sources();
+		Map<String, Path> all = sources(SOURCES);
 		for (Map.Entry<String, Path> e : all.entrySet())
 		{
 			if (isPro(e.getKey()))
@@ -134,17 +160,17 @@ public class CoreBoundaryTest {
 				&& Pattern.compile("\\b" + Pattern.quote(simpleName(proClass)) + "\\b").matcher(code).find();
 	}
 
-	private static Map<String, Path> sources() throws IOException {
+	private static Map<String, Path> sources(Path root) throws IOException {
 
 		Map<String, Path> byName = new TreeMap<>();
-		try (Stream<Path> files = Files.walk(SOURCES)) {
+		try (Stream<Path> files = Files.walk(root)) {
 			files.filter(p -> p.toString().endsWith(".java")).forEach(p -> {
-				String relative = SOURCES.relativize(p).toString();
+				String relative = root.relativize(p).toString();
 				String fqn = relative.substring(0, relative.length() - ".java".length()).replace('/', '.').replace('\\', '.');
 				byName.put(fqn, p);
 			});
 		}
-		assertTrue("no sources under " + SOURCES.toAbsolutePath(), !byName.isEmpty());
+		assertTrue("no sources under " + root.toAbsolutePath(), !byName.isEmpty());
 		return byName;
 	}
 

@@ -228,6 +228,16 @@ configure([project(':frontcache-core'), project(':frontcache-agent')]) {
 
 project(':frontcache-core') {
 
+	// StubNode - a scripted management endpoint for the client's fallback tests - is shared with the Pro
+	// module's tests (ProFrontCacheClient's fallbacks moved there in P2). Test fixtures are a build-time
+	// convenience only, never part of the published artifact.
+	apply plugin: 'java-test-fixtures'
+	components.java.withVariantsFromConfiguration(configurations.testFixturesApiElements) { skip() }
+	components.java.withVariantsFromConfiguration(configurations.testFixturesRuntimeElements) { skip() }
+	// the plugin rebuilds the test source set's class paths, dropping what subprojects {} added to them
+	sourceSets.test.compileClasspath += configurations.provided
+	sourceSets.test.runtimeClasspath += configurations.provided
+
 	// ---- build-info.properties ------------------------------------------------
 	// The version and release date as org.frontcache.license.BuildInfo reads them at runtime. Generated
 	// rather than checked in so version.properties stays the only place either is written.
@@ -564,13 +574,11 @@ project(':frontcache-console') {
 	// so at lifecycle level, so it is visible in normal build output rather than only under --info.
 	def jsTest = tasks.register('jsTest', Exec) {
 		group = 'verification'
-		description = "Run the console's JavaScript tests (realtime monitor, cache warmer) with node --test"
+		description = "Run the console's JavaScript tests (the realtime monitor with no plugin) with node --test"
 
 		def testDir = file('src/test/js')
 		inputs.dir(testDir)
 		inputs.file('src/main/webapp/WEB-INF/static/js/fc-dashboard.js')
-		inputs.file('src/main/webapp/WEB-INF/static/js/fc-dashboard-cluster.js')
-		inputs.file('src/main/webapp/WEB-INF/static/js/fc-warmer.js')
 		outputs.upToDateWhen { false }
 
 		// The PATH is scanned rather than `which` being run: this is configuration time, on every
@@ -613,7 +621,12 @@ project(':frontcache-license-tool') {
 	apply plugin: 'application'
 
 	dependencies {
+		implementation project(':frontcache-pro-license')
+		// UsageLog (the true-up report reads the nodes' and consoles' usage logs) is the node module's;
+		// frontcache-pro only compiles against the core, so the core comes along for its runtime libraries
+		implementation project(':frontcache-pro')
 		implementation project(':frontcache-core')
+		testImplementation testFixtures(project(':frontcache-pro-license'))
 	}
 
 	application {
@@ -623,6 +636,123 @@ project(':frontcache-license-tool') {
 	// `run` resolves relative paths against the module directory, which is never what was meant
 	tasks.named('run', JavaExec) {
 		workingDir = rootProject.projectDir
+	}
+}
+
+// ---- the Pro modules -----------------------------------------------------------
+// docs/ip-protection-apache-core-and-prop-pro-proposal.md section 5.1 (phase P2). Proprietary, not
+// published yet (section 6, phase P5), and in no Community bundle: the core, frontcache-server,
+// frontcache-console and frontcache-tests depend on none of them, and verifyDist fails a bundle that
+// carries a Pro class. A Pro node or console is the Community one plus these jars - on the class path
+// beside frontcache-core, or in the war's WEB-INF/lib - found through META-INF/services.
+//
+// Package names did not move (D4), so org.frontcache.license, .warmer and .io are split across the core
+// jar and these. Legal on a class path (no JPMS); it does mean a Pro class can reach a package-private
+// member of a core class in the same package, which works only while both are loaded by one class loader -
+// true of every layout here (one war, or one launcher class path).
+
+// The license file and the usage-log records: what the CRM signs and counts with (ip-protection-followup.md
+// item 9). No servlet, cache or HTTP dependency - the logging facade and Jackson's annotations only.
+project(':frontcache-pro-license') {
+	apply plugin: 'java-test-fixtures'   // TestLicenses: frontcache-pro and the license tool sign with it too
+
+	dependencies {
+		implementation 'org.slf4j:slf4j-api:2.0.17'
+		implementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'
+	}
+}
+
+// The node module: ProModule (org.frontcache.module SPI), licensing and the usage log, the cache warmer's
+// orchestration, the Pro management actions and responses, ProFrontCacheClient.
+project(':frontcache-pro') {
+	dependencies {
+		api project(':frontcache-pro-license')
+
+		// compileOnly: the server's war, or the customer's app in filter mode, provides the core - this jar
+		// must never bring a second copy of it
+		compileOnly project(':frontcache-core')
+		provided    'jakarta.servlet:jakarta.servlet-api:6.0.0'
+
+		testImplementation project(':frontcache-core')
+		testImplementation testFixtures(project(':frontcache-core'))
+		testImplementation testFixtures(project(':frontcache-pro-license'))
+		testImplementation 'org.mockito:mockito-core:5.23.0'
+	}
+
+	test {
+		// what these tests ran with while they were frontcache-core's - see the core's test block
+		systemProperty 'frontcache.home', rootProject.file('frontcache-core/src/test/resources/fallback-home').absolutePath
+	}
+}
+
+// The console plugin: the License and Cache Warmer screens and the cluster rate (section 4.5). Its JSPs are
+// under META-INF/resources/WEB-INF/views and its scripts and stylesheet under META-INF/resources/static,
+// which is the console's classpath static location (WebMVCConfig: "/**").
+project(':frontcache-pro-console') {
+	def springVersion = project(':frontcache-console').springVersion
+
+	dependencies {
+		implementation project(':frontcache-pro')   // ProFrontCacheClient and the Pro response types
+
+		compileOnly project(':frontcache-console')
+		compileOnly project(':frontcache-core')
+		compileOnly "org.springframework:spring-context:${springVersion}"
+		compileOnly "org.springframework:spring-webmvc:${springVersion}"
+		compileOnly 'com.typesafe:config:1.4.9'
+		provided    'jakarta.servlet:jakarta.servlet-api:6.0.0'
+
+		testImplementation project(':frontcache-console')
+		testImplementation project(':frontcache-core')
+		testImplementation "org.springframework:spring-context:${springVersion}"
+		testImplementation "org.springframework:spring-webmvc:${springVersion}"
+		testImplementation "org.springframework:spring-test:${springVersion}"
+		testImplementation 'com.typesafe:config:1.4.9'
+		testImplementation 'org.mockito:mockito-core:5.23.0'
+	}
+
+	// The cache warmer's and the cluster rate's JavaScript tests - see :frontcache-console:jsTest, which
+	// they used to be part of. fc-dashboard-cluster.js plugs into the core's fc-dashboard.js, so the
+	// cluster tests load both, in page order.
+	def jsTest = tasks.register('jsTest', Exec) {
+		group = 'verification'
+		description = "Run the Pro console plugin's JavaScript tests (cache warmer, cluster rate) with node --test"
+
+		inputs.dir(file('src/test/js'))
+		inputs.dir(file('src/main/resources/META-INF/resources/static/js'))
+		inputs.file(project(':frontcache-console').file('src/main/webapp/WEB-INF/static/js/fc-dashboard.js'))
+		outputs.upToDateWhen { false }
+
+		def nodeExe = System.getProperty('os.name').toLowerCase().contains('windows') ? 'node.exe' : 'node'
+		def nodePath = (System.getenv('PATH') ?: '').split(File.pathSeparator)
+				.collect { new File(it, nodeExe) }
+				.find { it.isFile() && it.canExecute() }
+
+		enabled = nodePath != null
+		if (nodePath == null)
+			logger.lifecycle(":${project.name}:jsTest SKIPPED - node is not on the PATH")
+
+		commandLine(['sh', '-c', "'${nodePath ?: 'node'}' --test src/test/js/*.test.js"])
+		workingDir = projectDir
+	}
+	tasks.named('check') { dependsOn jsTest }
+
+	// The console with the Pro plugin, on embedded Jetty 12 - :frontcache-console:appRun plus this jar.
+	// The plugin is on the CONTAINER class path here (appRun serves the exploded webapp, so WEB-INF/lib is
+	// empty), and Jetty reads META-INF/resources - the plugin's JSPs - only from container jars matching
+	// its scan pattern; frontcache.jetty.container-jars adds this one. A bundle puts the jar in
+	// WEB-INF/lib instead, where no pattern is needed.
+	tasks.register('appRun', JavaExec) {
+		group = 'application'
+		description = 'Run the Frontcache console with the Pro plugin on embedded Jetty 12'
+		def console = project(':frontcache-console')
+		mainClass = 'org.frontcache.console.ConsoleJettyServer'
+		classpath = console.sourceSets.main.runtimeClasspath + console.configurations.provided +
+				files(tasks.named('jar')) + configurations.runtimeClasspath
+		systemProperty 'frontcache.jetty.port', '7080'
+		systemProperty 'frontcache.jetty.webapp', "${console.projectDir}/src/main/webapp"
+		systemProperty 'frontcache.jetty.container-jars', '.*/frontcache-pro-console-[^/]*\\.jar$'
+		systemProperty 'org.frontcache.console.config', "${console.projectDir}/config/frontcache-console.conf"
+		systemProperty 'logback.configurationFile', "${console.projectDir}/config/fc-logback.xml"
 	}
 }
 
@@ -662,6 +792,35 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 		   'conf/fc-logback.xml', 'README-INSTALL.md', 'LICENSE']
 	def forbidden = ['.DS_Store', '._', 'frontcache-console.war', '.log', 'l2-lucene-index/', 'instance.id', 'frontcache.license']
 
+	// A Community bundle carries no Pro code (docs/ip-protection-apache-core-and-prop-pro-proposal.md,
+	// phase P2): no class, services file, view or script of a frontcache-pro* module, at any depth - in the
+	// war, in a jar in the war, in the launcher's lib/. The set is read from the Pro modules' SOURCES, so
+	// checking it never builds them; the fixed patterns are for a checkout that has no Pro module (the
+	// public repository, after P4), where the set is otherwise empty.
+	def rootDirPath = rootDir.toPath()
+	def proEntries = {
+		def names = [] as Set
+		['frontcache-pro-license', 'frontcache-pro', 'frontcache-pro-console'].each { m ->
+			def java = rootDirPath.resolve("${m}/src/main/java").toFile()
+			if (java.isDirectory())
+				java.eachFileRecurse(groovy.io.FileType.FILES) { f ->
+					if (f.name.endsWith('.java'))
+						names << java.toPath().relativize(f.toPath()).toString().replace('\\', '/').replaceAll(/\.java$/, '')
+				}
+			def res = rootDirPath.resolve("${m}/src/main/resources").toFile()
+			if (res.isDirectory())
+				res.eachFileRecurse(groovy.io.FileType.FILES) { f ->
+					// META-INF/resources/x is served as x, so in a war it may sit at x
+					names << res.toPath().relativize(f.toPath()).toString().replace('\\', '/').replaceFirst(/^META-INF\/resources\//, '')
+				}
+		}
+		names
+	}
+	def proPatterns = [~/^org\/frontcache\/pro\//, ~/^org\/frontcache\/console\/pro\//,
+			~/^org\/frontcache\/license\/(?!BuildInfo[.$])/, ~/^org\/frontcache\/warmer\/(?!WarmRequest[.$])/,
+			~/^META-INF\/services\/org\.frontcache\.(module\.FrontcacheModule|console\.plugin\.ConsolePlugin)$/,
+			~/(^|\/)frontcache-pro[^\/]*\.jar$/]
+
 	def verifyDist = tasks.register('verifyDist') {
 		group = 'distribution'
 		description = 'Assert the distribution archive is complete and carries no build/runtime leftovers'
@@ -699,10 +858,39 @@ configure([project(':frontcache-server'), project(':frontcache-console')]) {
 			def war = sizes.find { it.key.endsWith('ROOT.war') }
 			if (war && war.value < 100_000) problems << "${war.key} is only ${war.value} bytes - war looks empty"
 
+			def pro = proEntries()
+			def isPro = { String name ->
+				def n = name.replaceFirst(/^WEB-INF\/classes\//, '')
+				def cls = n.endsWith('.class') ? n.replaceAll(/(\$[^\/]*)?\.class$/, '') : null
+				(cls != null && pro.contains(cls)) || (cls == null && pro.contains(n)) || proPatterns.any { n =~ it }
+			}
+			def proFound = []
+			def scan
+			scan = { String where, InputStream ins ->
+				def zin = new java.util.zip.ZipInputStream(ins)
+				def e
+				while ((e = zin.getNextEntry()) != null) {
+					if (e.isDirectory()) continue
+					if (isPro(e.name)) proFound << "${where}!/${e.name}"
+					else if (e.name.endsWith('.jar') || e.name.endsWith('.war'))
+						scan("${where}!/${e.name}", new java.io.ByteArrayInputStream(zin.readAllBytes()))
+				}
+			}
+			new java.util.zip.ZipFile(file).withCloseable { zf ->
+				for (entry in zf.entries()) {
+					def rel = entry.name.substring(prefix.length())
+					if (entry.isDirectory()) continue
+					if (isPro(rel)) proFound << rel
+					else if (rel.endsWith('.jar') || rel.endsWith('.war'))
+						zf.getInputStream(entry).withCloseable { scan(rel, it) }
+				}
+			}
+			if (proFound) problems << "Pro code in a Community bundle: ${proFound.take(10)}${proFound.size() > 10 ? " and ${proFound.size() - 10} more" : ''}"
+
 			if (problems) {
 				throw new GradleException("${file.name} failed verification:\n  - " + problems.join('\n  - '))
 			}
-			logger.lifecycle("verifyDist: ${file.name} OK (${sizes.size()} entries, ${jars.size()} launcher jars)")
+			logger.lifecycle("verifyDist: ${file.name} OK (${sizes.size()} entries, ${jars.size()} launcher jars, no Pro code among ${pro.size()} Pro names)")
 		}
 	}
 	tasks.named('distZip') { finalizedBy verifyDist }

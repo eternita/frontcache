@@ -46,3 +46,6 @@
 frontcache.license
 *.signing-key
 *.signing-key.pem
+
+# The Pro e2e console usage log (frontcache-pro-tests/console/conf/../usage)
+/frontcache-pro-tests/console/usage/

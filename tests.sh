@@ -38,13 +38,16 @@ rm -f "$TESTS_DIR"/FRONTCACHE_HOME_FILTER/usage/usage-*.log "$TESTS_DIR"/FRONTCA
 # then leaves the server JVM running in the background.
 ./gradlew :frontcache-tests:clean :frontcache-tests:startWebfilterFrontcache
 ./gradlew :frontcache-tests:startStandaloneFrontcache
+# The Community console (:7090), which CommunityEditionTests checks for Pro screens. Not 7080: that is
+# where a developer's own console usually runs.
+./gradlew :frontcache-tests:startConsole
 
 ./gradlew :frontcache-tests:end2endTests
 
 # Stop the servers with SIGTERM first so their JVM shutdown hooks run — that is what
 # flushes each one's jacoco .exec file. SIGKILL only as a fallback for a hung JVM.
 echo "Stopping embedded Jetty servers ..."
-for port in 9080 8080; do
+for port in 9080 8080 7090; do
 	pids=$(lsof -ti tcp:$port)
 	[ -n "$pids" ] || continue
 	echo "$pids" | xargs kill 2>/dev/null
@@ -65,7 +68,7 @@ while [ $i -lt 20 ]; do
 	sleep 1
 	i=$((i + 1))
 done
-for port in 9080 8080; do
+for port in 9080 8080 7090; do
 	pids=$(lsof -ti tcp:$port)
 	[ -n "$pids" ] || continue
 	echo "$pids" | xargs kill -9 2>/dev/null

@@ -15,50 +15,25 @@
 
 apply plugin: 'war'
 
-// Spawns a (long-running) server process and blocks only until it prints its
-// "ready" line, then keeps draining its stdout on a daemon thread so its pipe
-// buffer never fills and hangs it mid-test.
-class ExecWait extends DefaultTask {
-	@Internal String command
-	@Internal String ready
-	@Internal String directory
-
-	@TaskAction
-	def spawnProcess() {
-
-		ProcessBuilder builder = new ProcessBuilder(command.split(' '))
-		builder.redirectErrorStream(true)
-		builder.directory(new File(directory))
-		Process process = builder.start()
-
-		InputStream stdout = process.getInputStream()
-		BufferedReader reader = new BufferedReader(new InputStreamReader(stdout))
-
-		def line
-		while ((line = reader.readLine()) != null) {
-			println line
-			if (line.contains(ready)) {
-				println "$command is ready"
-				break
-			}
-		}
-
-		Thread.startDaemon {
-			def l
-			while ((l = reader.readLine()) != null) {
-				println l
-			}
-		}
-	}
-}
+// The base test classes (src/testFixtures - TestsBase and the *Tests the two node packages extend), TestConfig
+// and the FrontcacheStandaloneServer launcher are this project's TEST FIXTURES, so frontcache-pro-tests can
+// run the same topology and extend the same base classes with the Pro jars on both nodes
+// (docs/ip-protection-apache-core-and-prop-pro-proposal.md section 5.4). src/main is only what the
+// webapps need - the combine servlets. ExecWait is in buildSrc, shared with frontcache-pro-tests.
+apply plugin: 'java-test-fixtures'
 
 sourceSets {
 	integrationTest {
 		java.srcDir file('src/test-integration/java')
 		resources.srcDir file('src/test-integration/resources')
-		compileClasspath = sourceSets.main.output + configurations.testRuntimeClasspath + configurations.provided
+		compileClasspath = sourceSets.main.output + sourceSets.testFixtures.output + configurations.testRuntimeClasspath + configurations.provided
 		runtimeClasspath = output + compileClasspath
 	}
+}
+
+configurations {
+	// the console the Community e2e checks for Pro screens (consoleJetty below)
+	e2eConsole
 }
 
 dependencies {
@@ -72,14 +47,25 @@ dependencies {
 	implementation 'org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1'
 	implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0'
 
+	// the fixtures' API is what a suite extending them compiles against
+	testFixturesApi project(':frontcache-core')
+	testFixturesApi project(':frontcache-agent')
+	testFixturesApi('org.htmlunit:htmlunit:4.21.0') {
+		exclude group: 'org.eclipse.jetty'
+		exclude group: 'org.eclipse.jetty.websocket'
+	}
+	testFixturesApi 'junit:junit:4.13.2'
+	testFixturesCompileOnly "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+	testFixturesCompileOnly "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+
+	e2eConsole project(':frontcache-console')
+
 	// Embedded Jetty 12 launcher deps (compile + launcher runtime; not bundled in the war)
 	provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
 	provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
 	provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
 	provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
 
-	// src/main/java holds the shared test base classes, so junit is a compile dep here
-	provided 'junit:junit:4.13.2'
 }
 
 def integrationTest = tasks.register('integrationTest', Test) {
@@ -99,7 +85,7 @@ def integrationTest = tasks.register('integrationTest', Test) {
 // FC standalone (:9080) — embedded Jetty 12 serving the reverse-proxy webapp
 tasks.register('standaloneJetty', JavaExec) {
 	mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
-	classpath = sourceSets.main.runtimeClasspath + configurations.provided
+	classpath = sourceSets.testFixtures.runtimeClasspath + configurations.provided
 	systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/test-integration/webapp"
 	systemProperty 'frontcache.jetty.port', '9080'
 	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_STANDALONE"
@@ -109,7 +95,7 @@ tasks.register('standaloneJetty', JavaExec) {
 // FC webfilter + web app (:8080) — embedded Jetty 12 serving the main webapp
 tasks.register('webfilterJetty', JavaExec) {
 	mainClass = 'org.frontcache.tests.FrontcacheStandaloneServer'
-	classpath = sourceSets.main.runtimeClasspath + configurations.provided
+	classpath = sourceSets.testFixtures.runtimeClasspath + configurations.provided
 	systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
 	systemProperty 'frontcache.jetty.port', '8080'
 	systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME_FILTER"
@@ -124,6 +110,25 @@ tasks.register('startStandaloneFrontcache', ExecWait) {
 
 tasks.register('startWebfilterFrontcache', ExecWait) {
 	command = './gradlew :frontcache-tests:webfilterJetty'
+	ready = 'has been started successfully'
+	directory = rootDir.absolutePath
+}
+
+// The console (:7090 - not 7080, where a developer's own console usually runs) on the Community war's
+// class path, pointed at the two nodes. The suite checks it shows no Pro screen: no plugin, no License
+// tab, no Cache Warmer entry (CommunityEditionTests).
+tasks.register('consoleJetty', JavaExec) {
+	def console = project(':frontcache-console')
+	mainClass = 'org.frontcache.console.ConsoleJettyServer'
+	classpath = configurations.e2eConsole + configurations.provided
+	systemProperty 'frontcache.jetty.port', '7090'
+	systemProperty 'frontcache.jetty.webapp', "${console.projectDir}/src/main/webapp"
+	systemProperty 'org.frontcache.console.config', "${projectDir}/console/conf/frontcache-console.conf"
+	systemProperty 'logback.configurationFile', "${console.projectDir}/config/fc-logback.xml"
+}
+
+tasks.register('startConsole', ExecWait) {
+	command = './gradlew :frontcache-tests:consoleJetty'
 	ready = 'has been started successfully'
 	directory = rootDir.absolutePath
 }

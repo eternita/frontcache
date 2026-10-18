@@ -1,2 +1,6 @@
 rootProject.name = 'frontcache'
 include 'frontcache-core', 'frontcache-server', 'frontcache-agent', 'frontcache-console', 'frontcache-tests', 'frontcache-license-tool'
+
+// The proprietary Pro modules (docs/ip-protection-apache-core-and-prop-pro-proposal.md section 5.1). They
+// depend on the core; the core, its bundles and the Community e2e depend on none of them.
+include 'frontcache-pro-license', 'frontcache-pro', 'frontcache-pro-console', 'frontcache-pro-tests'

@@ -47,6 +47,12 @@ public class ConsoleJettyServer {
 		// the exploded webapp (appRun) WEB-INF/lib is empty, so spring-webmvc (which
 		// carries META-INF/spring-form.tld + spring.tld) is a container-classpath jar
 		// too and must be listed here or the Spring form taglib URI won't resolve.
+		//
+		// frontcache.jetty.container-jars adds to the pattern: a console plugin jar on the container class
+		// path (a plugin's dev run, which serves the exploded webapp) carries its JSPs under
+		// META-INF/resources, and Jetty serves those only from a jar the pattern names. A plugin jar in
+		// the war's WEB-INF/lib needs nothing - Jetty scans every one of those.
+		String extraJars = System.getProperty("frontcache.jetty.container-jars", "").trim();
 		webapp.addConfiguration(new AnnotationConfiguration());
 		webapp.setAttribute(MetaInfConfiguration.CONTAINER_JAR_PATTERN,
 				".*/jakarta\\.servlet\\.jsp\\.jstl-.*\\.jar$|"
@@ -55,7 +61,8 @@ public class ConsoleJettyServer {
 				+ ".*/org\\.mortbay\\.jasper\\..*\\.jar$|"
 				+ ".*/jetty-ee10-glassfish-jstl-.*\\.jar$|"
 				+ ".*/spring-webmvc-.*\\.jar$|"
-				+ ".*/taglibs.*\\.jar$");
+				+ ".*/taglibs.*\\.jar$"
+				+ (extraJars.isEmpty() ? "" : "|" + extraJars));
 
 		server.setHandler(webapp);
 		server.start();

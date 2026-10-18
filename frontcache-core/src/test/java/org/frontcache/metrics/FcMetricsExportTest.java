@@ -196,27 +196,20 @@ public class FcMetricsExportTest {
 	}
 
 	/**
-	 * One {@code frontcache_license_state} series per state, exactly one of them at 1, and no label that
-	 * could carry a customer's name - docs/ip-protection-proposal.md section 5.2. A unit-test JVM has no
-	 * license file, so the state at 1 is community.
+	 * No module, no module series. The license and cache-warmer series are the Pro module's (bound through
+	 * {@code FrontcacheModule.bindMeters}, docs/ip-protection-apache-core-and-prop-pro-proposal.md section
+	 * 4.3) and frontcache-pro's {@code ProMetersTest} asserts them; this module's test class path has no
+	 * Pro jar, which is a Community node.
 	 */
 	@Test
-	public void licenseStateIsOneSeriesPerStateWithTheCurrentOneAtOne()
+	public void aNodeWithNoModuleExportsNoModuleSeries()
 	{
 		enable("prometheus");
 
 		String scrape = FcMetricsExport.scrape();
-		int ones = 0;
-		for (org.frontcache.license.LicenseState state : org.frontcache.license.LicenseState.values())
-		{
-			String series = "frontcache_license_state{state=\"" + state.id() + "\"}";
-			assertTrue(series + " missing from\n" + scrape, scrape.contains(series));
-			if (scrape.contains(series + " 1.0"))
-				ones++;
-		}
-		assertEquals(1, ones);
-		assertTrue(scrape, scrape.contains("frontcache_license_state{state=\"community\"} 1.0"));
-		assertTrue(scrape, scrape.contains("frontcache_license_updates_until_timestamp_seconds NaN"));
+		assertTrue(scrape, scrape.contains("frontcache_"));
+		assertFalse(scrape, scrape.contains("frontcache_license_"));
+		assertFalse(scrape, scrape.contains("frontcache_warmer_"));
 	}
 
 	/**
