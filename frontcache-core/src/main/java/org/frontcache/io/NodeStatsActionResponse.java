@@ -8,6 +8,9 @@
  */
 package org.frontcache.io;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.frontcache.cache.CacheStats;
 import org.frontcache.core.FcNodeStats;
 
@@ -46,6 +49,8 @@ public class NodeStatsActionResponse extends ActionResponse {
 	private long heapMaxBytes = FcNodeStats.UNKNOWN;
 	private double cpuProcessLoad = FcNodeStats.UNKNOWN_LOAD;
 	private long uptimeMillis = FcNodeStats.UNKNOWN;
+
+	private List<String> modules = new ArrayList<>();
 
 	public NodeStatsActionResponse() { // for JSON mapper
 
@@ -167,6 +172,19 @@ public class NodeStatsActionResponse extends ActionResponse {
 
 	public void setUptimeMillis(long uptimeMillis) {
 		this.uptimeMillis = uptimeMillis;
+	}
+
+	/**
+	 * The ids of the modules this node runs ({@code ["pro"]} with the Pro jar) - see
+	 * {@code org.frontcache.module.FrontcacheModule}. Empty on a Community node, and absent from a node
+	 * that predates modules, which a reader gets as empty too.
+	 */
+	public List<String> getModules() {
+		return modules;
+	}
+
+	public void setModules(List<String> modules) {
+		this.modules = (null == modules) ? new ArrayList<>() : modules;
 	}
 
 }

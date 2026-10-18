@@ -10,6 +10,9 @@ package org.frontcache.console.config;
 
 import jakarta.servlet.ServletContext;
 
+import org.frontcache.console.plugin.ConsoleNoticesAdvice;
+import org.frontcache.console.plugin.ConsolePluginWebImports;
+import org.frontcache.console.plugin.ConsolePlugins;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
@@ -18,6 +21,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.web.context.ServletContextAware;
 import org.springframework.web.servlet.ViewResolver;
@@ -31,6 +35,9 @@ import org.springframework.web.servlet.view.JstlView;
 
 @Configuration
 @EnableWebMvc
+// Console plugins' controllers and advice, and the advice that renders their notices on every page -
+// see org.frontcache.console.plugin.ConsolePlugin
+@Import({ ConsolePluginWebImports.class, ConsoleNoticesAdvice.class })
 public class WebMVCConfig implements WebMvcConfigurer, ServletContextAware, ApplicationContextAware {
 
 	private static final Logger LOG = LoggerFactory.getLogger(WebMVCConfig.class);
@@ -44,6 +51,10 @@ public class WebMVCConfig implements WebMvcConfigurer, ServletContextAware, Appl
 	@Override
 	public void setServletContext(ServletContext servletContext) {
 		this.servletContext = servletContext;
+
+		// what the JSPs render from the plugins - menu entries, realtime-page scripts, stylesheets - as
+		// an application attribute: constant for the process, so no page pays for it per request
+		servletContext.setAttribute("fcPlugins", ConsolePlugins.view());
 	}
 
     @Override

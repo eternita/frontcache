@@ -569,6 +569,7 @@ project(':frontcache-console') {
 		def testDir = file('src/test/js')
 		inputs.dir(testDir)
 		inputs.file('src/main/webapp/WEB-INF/static/js/fc-dashboard.js')
+		inputs.file('src/main/webapp/WEB-INF/static/js/fc-dashboard-cluster.js')
 		inputs.file('src/main/webapp/WEB-INF/static/js/fc-warmer.js')
 		outputs.upToDateWhen { false }
 

@@ -6,6 +6,9 @@
   <!--
   <li role="presentation" class="${activeCache == 'replication' ? 'active' : ''}"><a href="cache-replication">Cache Replication</a></li>
   -->
-  <li role="presentation" class="${activeCache == 'warmer' ? 'active' : ''}"><a href="cache-warmer">Cache Warmer</a></li>
+  <%-- a console plugin's cache screens - org.frontcache.console.plugin.NavEntry, section "cache" --%>
+  <c:forEach var="nav" items="${fcPlugins.cacheNav}">
+  <li role="presentation" class="${activeCache == nav.id ? 'active' : ''}"><a href="<c:out value='${nav.href}'/>"><c:out value="${nav.label}"/></a></li>
+  </c:forEach>
   <li role="presentation" class="${activeCache == 'other' ? 'active' : ''}"><a href="cache-other">Other</a></li>
 </ul>

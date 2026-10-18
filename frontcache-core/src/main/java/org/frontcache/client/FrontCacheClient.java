@@ -71,15 +71,8 @@ import org.frontcache.io.GetFromCacheActionResponse;
 import org.frontcache.io.GetGuardRulesActionResponse;
 import org.frontcache.io.GetGuardConfigActionResponse;
 import org.frontcache.io.GetResilienceConfigActionResponse;
-import org.frontcache.io.LicenseActionResponse;
 import org.frontcache.io.NodeStatsActionResponse;
-import org.frontcache.io.UsageReportActionResponse;
 import org.frontcache.io.PutToCacheActionResponse;
-import org.frontcache.io.WarmerListActionResponse;
-import org.frontcache.io.WarmerListsActionResponse;
-import org.frontcache.io.WarmerPreflightActionResponse;
-import org.frontcache.io.WarmerStatusActionResponse;
-import org.frontcache.warmer.WarmerRunParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -893,271 +886,110 @@ public class FrontCacheClient {
 		return null;
 	}
 
-	// ---- the cache warmer -----------------------------------------------------------------------
+	// ---- generic management calls - for modules (docs/ip-protection-apache-core-and-prop-pro-proposal.md 4.4) ----
 
 	/**
-	 * The {@code errorDescription} of every warmer call made to a node that does not know the action.
+	 * One management call, answered as JSON. The action is {@code params.get("action")}.
 	 *
-	 * Such a node answers with a ping, which parses into any response class with
-	 * {@code responseStatus=OK} - so without this, a start sent to an older node would be reported as a
-	 * run that started. Reporting a run that never began is the worst outcome available here, and a
-	 * mixed fleet is the normal state.
-	 */
-	public static final String WARMER_UNSUPPORTED = "this node predates the cache warmer";
-
-	public WarmerStatusActionResponse getWarmerStatus()
-	{
-		return warmerCall(params(FrontcacheAction.WARMER_STATUS), WarmerStatusActionResponse.class);
-	}
-
-	public WarmerListsActionResponse getWarmerLists()
-	{
-		return warmerCall(params(FrontcacheAction.WARMER_LISTS), WarmerListsActionResponse.class);
-	}
-
-	/** @param grep a search, or null */
-	public WarmerListActionResponse getWarmerList(String name, String grep)
-	{
-		List<NameValuePair> p = params(FrontcacheAction.GET_WARMER_LIST);
-		p.add(new BasicNameValuePair("name", name));
-		if (null != grep && !grep.isEmpty())
-			p.add(new BasicNameValuePair("grep", grep));
-		return warmerCall(p, WarmerListActionResponse.class);
-	}
-
-	/**
-	 * Streams a whole list into {@code os} ({@code raw=true}) - never through memory, so a 64 MB list
-	 * can pass through the console to a browser.
+	 * <b>A node that does not know the action answers a ping</b>, which parses into any response class
+	 * with {@code responseStatus=OK} - so a caller must check {@link #isPing} before reading the answer
+	 * as a success. That is how a module's client tells "this node has no such action" (a Community node,
+	 * or one that predates it) from an answer.
 	 *
-	 * @return null on success, otherwise why not
+	 * @return the answer, or null when the node could not be reached or did not answer JSON
 	 */
-	public String downloadWarmerList(String name, OutputStream os)
+	public <T extends ActionResponse> T call(Map<String, String> params, Class<T> type)
 	{
-		List<NameValuePair> p = params(FrontcacheAction.GET_WARMER_LIST);
-		p.add(new BasicNameValuePair("name", name));
-		p.add(new BasicNameValuePair("raw", "true"));
-
-		HttpPost post = new HttpPost(frontCacheURI);
-		if (null != apiKey)
-			post.addHeader("Authorization", "Bearer " + apiKey);
-		post.setEntity(new UrlEncodedFormEntity(p));
-
-		try (ClassicHttpResponse response = client.executeOpen(null, post, null))
-		{
-			org.apache.hc.core5.http.Header contentType = response.getFirstHeader("Content-Type");
-			if (null == contentType || !contentType.getValue().startsWith("text/plain"))
-			{
-				// a refusal, or a ping from a node that predates the action - both are JSON
-				String body = org.apache.hc.core5.http.io.entity.EntityUtils.toString(response.getEntity());
-				WarmerListActionResponse refusal = jsonMapper.readValue(body, WarmerListActionResponse.class);
-				if (FrontcacheAction.PING.equals(refusal.getAction()))
-					return WARMER_UNSUPPORTED;
-				return (null != refusal.getErrorDescription()) ? refusal.getErrorDescription() : "unexpected response";
-			}
-			response.getEntity().getContent().transferTo(os);
-			return null;
+		String responseStr = null;
+		try {
+			responseStr = requestFrontCache(toPairs(params));
+			return jsonMapper.readValue(responseStr.getBytes(), type);
 		} catch (Exception e) {
-			logger.error("Can't download warmer list " + name + " from " + getFrontCacheURL(), e);
-			return "can't download " + name + ": " + e.getMessage();
+			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
 		}
+		return null;
 	}
 
 	/**
-	 * Creates or replaces a list. The list goes as the request BODY, with the parameters in the query
-	 * string: Jetty refuses a form body over 200,000 bytes (on the console's container and the node's),
-	 * and a list will reach that - the config files never have.
+	 * A management call whose payload is the request BODY, with the parameters in the query string.
+	 * Jetty refuses a form body over 200,000 bytes (on the console's container and the node's), so a
+	 * large payload cannot be a form field.
 	 *
 	 * @param length the body's length, or -1 to send it chunked
-	 * @param baseHash the hash the list had when it was read, or null to skip the concurrency check
+	 * @return as {@link #call}
 	 */
-	public WarmerListActionResponse putWarmerList(String name, InputStream body, long length, String baseHash)
+	public <T extends ActionResponse> T callWithBody(Map<String, String> queryParams, InputStream body, long length,
+			String contentType, Class<T> type)
 	{
 		try {
-			org.apache.hc.core5.net.URIBuilder uri = new org.apache.hc.core5.net.URIBuilder(frontCacheURI)
-					.addParameter("action", FrontcacheAction.PUT_WARMER_LIST)
-					.addParameter("name", name);
-			if (null != baseHash && !baseHash.trim().isEmpty())
-				uri.addParameter("baseHash", baseHash.trim());
+			org.apache.hc.core5.net.URIBuilder uri = new org.apache.hc.core5.net.URIBuilder(frontCacheURI);
+			for (Map.Entry<String, String> p : queryParams.entrySet())
+				uri.addParameter(p.getKey(), p.getValue());
 
 			HttpPost post = new HttpPost(uri.build());
 			if (null != apiKey)
 				post.addHeader("Authorization", "Bearer " + apiKey);
 			post.setEntity(new org.apache.hc.core5.http.io.entity.InputStreamEntity(body, length,
-					org.apache.hc.core5.http.ContentType.create("text/plain", java.nio.charset.StandardCharsets.UTF_8)));
+					org.apache.hc.core5.http.ContentType.parse(contentType)));
 
 			String responseStr;
 			try (ClassicHttpResponse response = client.executeOpen(null, post, null))
 			{
 				responseStr = org.apache.hc.core5.http.io.entity.EntityUtils.toString(response.getEntity());
 			}
-			return unlessPing(jsonMapper.readValue(responseStr, WarmerListActionResponse.class), WarmerListActionResponse.class);
+			return jsonMapper.readValue(responseStr, type);
 		} catch (Exception e) {
-			logger.error("Can't put warmer list " + name + " to " + getFrontCacheURL(), e);
+			logger.error("Can't send " + queryParams.get("action") + " to " + getFrontCacheURL(), e);
 			return null;
 		}
 	}
 
-	public WarmerListActionResponse deleteWarmerList(String name)
-	{
-		List<NameValuePair> p = params(FrontcacheAction.DELETE_WARMER_LIST);
-		p.add(new BasicNameValuePair("name", name));
-		return warmerCall(p, WarmerListActionResponse.class);
-	}
-
-	public WarmerPreflightActionResponse warmerPreflight(WarmerRunParams run)
-	{
-		return warmerCall(runParams(FrontcacheAction.WARMER_PREFLIGHT, run), WarmerPreflightActionResponse.class);
-	}
-
-	public WarmerStatusActionResponse warmerStart(WarmerRunParams run)
-	{
-		return warmerCall(runParams(FrontcacheAction.WARMER_START, run), WarmerStatusActionResponse.class);
-	}
-
-	/** A null leaves that setting as it is. */
-	public WarmerStatusActionResponse warmerUpdate(Long delayMs, Integer concurrency)
-	{
-		List<NameValuePair> p = params(FrontcacheAction.WARMER_UPDATE);
-		if (null != delayMs)
-			p.add(new BasicNameValuePair("delayMs", delayMs.toString()));
-		if (null != concurrency)
-			p.add(new BasicNameValuePair("concurrency", concurrency.toString()));
-		return warmerCall(p, WarmerStatusActionResponse.class);
-	}
-
-	public WarmerStatusActionResponse warmerPause()
-	{
-		return warmerCall(params(FrontcacheAction.WARMER_PAUSE), WarmerStatusActionResponse.class);
-	}
-
-	public WarmerStatusActionResponse warmerResume()
-	{
-		return warmerCall(params(FrontcacheAction.WARMER_RESUME), WarmerStatusActionResponse.class);
-	}
-
-	public WarmerStatusActionResponse warmerStop()
-	{
-		return warmerCall(params(FrontcacheAction.WARMER_STOP), WarmerStatusActionResponse.class);
-	}
-
-	private static List<NameValuePair> params(String action)
-	{
-		List<NameValuePair> p = new ArrayList<NameValuePair>();
-		p.add(new BasicNameValuePair("action", action));
-		return p;
-	}
-
-	private static List<NameValuePair> runParams(String action, WarmerRunParams run)
-	{
-		List<NameValuePair> p = params(action);
-		if (null == run)
-			return p;
-		addIfSet(p, "list", run.getList());
-		addIfSet(p, "mode", run.getMode());
-		addIfSet(p, "keyBase", run.getKeyBase());
-		addIfSet(p, "clientType", run.getClientType());
-		p.add(new BasicNameValuePair("delayMs", Long.toString(run.getDelayMs())));
-		p.add(new BasicNameValuePair("concurrency", Integer.toString(run.getConcurrency())));
-		if (0 < run.getResumeFromLine())
-			p.add(new BasicNameValuePair("resumeFromLine", Long.toString(run.getResumeFromLine())));
-		return p;
-	}
-
-	private static void addIfSet(List<NameValuePair> p, String name, String value)
-	{
-		if (null != value && !value.isEmpty())
-			p.add(new BasicNameValuePair(name, value));
-	}
-
-	/** @return the response, a {@link #WARMER_UNSUPPORTED} refusal, or null when the edge could not be reached */
-	private <T extends ActionResponse> T warmerCall(List<NameValuePair> urlParameters, Class<T> type)
-	{
-		String responseStr = null;
-		try {
-			responseStr = requestFrontCache(urlParameters);
-			return unlessPing(jsonMapper.readValue(responseStr.getBytes(), type), type);
-		} catch (Exception e) {
-			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
-		}
-		return null;
-	}
-
-	private <T extends ActionResponse> T unlessPing(T response, Class<T> type) throws ReflectiveOperationException
-	{
-		if (!FrontcacheAction.PING.equals(response.getAction()))
-			return response;
-
-		logger.debug(getFrontCacheURL() + " does not know the cache warmer's actions - it predates them");
-		T unsupported = type.getDeclaredConstructor().newInstance();
-		unsupported.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-		unsupported.setErrorDescription(WARMER_UNSUPPORTED);
-		return unsupported;
-	}
-
-	// ---- licensing - docs/ip-protection-proposal.md sections 5.2 and 5.4 ----
-
 	/**
-	 * The edge's license state, Pro features in use, build and instance id.
+	 * A management call whose answer may be a raw body: streamed into {@code os} - never through
+	 * memory - when its {@code Content-Type} starts with {@code rawContentTypePrefix}, otherwise read as
+	 * JSON (a refusal, or a ping from a node that does not know the action).
 	 *
-	 * @return the answer; {@link LicenseActionResponse#unsupported()} for a node that predates licensing
-	 *         (it answers with a ping, which must not read as "Community"); null when the edge could not
-	 *         be reached
+	 * @return null when the body was streamed, otherwise the JSON answer
+	 * @throws IOException when the node could not be reached or the answer could not be read
 	 */
-	public LicenseActionResponse getLicense()
+	public <T extends ActionResponse> T callStreaming(Map<String, String> params, String rawContentTypePrefix,
+			OutputStream os, Class<T> type) throws IOException
 	{
-		return licenseCall(FrontcacheAction.GET_LICENSE);
-	}
+		HttpPost post = new HttpPost(frontCacheURI);
+		if (null != apiKey)
+			post.addHeader("Authorization", "Bearer " + apiKey);
+		post.setEntity(new UrlEncodedFormEntity(toPairs(params)));
 
-	/** Has the edge re-read its license file now. Same return contract as {@link #getLicense()}. */
-	public LicenseActionResponse reloadLicense()
-	{
-		return licenseCall(FrontcacheAction.RELOAD_LICENSE);
-	}
-
-	private LicenseActionResponse licenseCall(String action)
-	{
-		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", action));
-
-		String responseStr = null;
-		try {
-			responseStr = requestFrontCache(urlParameters);
-			LicenseActionResponse response = jsonMapper.readValue(responseStr.getBytes(), LicenseActionResponse.class);
-			return FrontcacheAction.PING.equals(response.getAction()) ? LicenseActionResponse.unsupported() : response;
-
-		} catch (Exception e) {
-			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
+		try (ClassicHttpResponse response = client.executeOpen(null, post, null))
+		{
+			org.apache.hc.core5.http.Header contentType = response.getFirstHeader("Content-Type");
+			if (null == contentType || !contentType.getValue().startsWith(rawContentTypePrefix))
+			{
+				String body;
+				try {
+					body = org.apache.hc.core5.http.io.entity.EntityUtils.toString(response.getEntity());
+				} catch (org.apache.hc.core5.http.ParseException e) {
+					throw new IOException(e);
+				}
+				return jsonMapper.readValue(body, type);
+			}
+			response.getEntity().getContent().transferTo(os);
+			return null;
 		}
-
-		return null;
 	}
 
-	/**
-	 * The edge's own usage log as intervals.
-	 *
-	 * @param from yyyy-MM, or null for the node's default (twelve months back)
-	 * @param to   yyyy-MM, or null for the current month
-	 * @return the answer; {@link UsageReportActionResponse#unsupported()} for a node that predates it; null
-	 *         when the edge could not be reached
-	 */
-	public UsageReportActionResponse getUsageReport(String from, String to)
+	/** Whether {@code response} is the ping a node answers an action it does not know with. */
+	public static boolean isPing(ActionResponse response)
 	{
-		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_USAGE_REPORT));
-		addIfSet(urlParameters, "from", from);
-		addIfSet(urlParameters, "to", to);
+		return null != response && FrontcacheAction.PING.equals(response.getAction());
+	}
 
-		String responseStr = null;
-		try {
-			responseStr = requestFrontCache(urlParameters);
-			UsageReportActionResponse response = jsonMapper.readValue(responseStr.getBytes(), UsageReportActionResponse.class);
-			return FrontcacheAction.PING.equals(response.getAction()) ? UsageReportActionResponse.unsupported() : response;
-
-		} catch (Exception e) {
-			logger.error("Can't parse response. JSON format is expected for " + responseStr, e);
-		}
-
-		return null;
+	private static List<NameValuePair> toPairs(Map<String, String> params)
+	{
+		List<NameValuePair> pairs = new ArrayList<NameValuePair>();
+		for (Map.Entry<String, String> p : params.entrySet())
+			pairs.add(new BasicNameValuePair(p.getKey(), p.getValue()));
+		return pairs;
 	}
 
 	/**

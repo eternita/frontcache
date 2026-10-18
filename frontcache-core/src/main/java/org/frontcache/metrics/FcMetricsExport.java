@@ -21,9 +21,6 @@ import org.frontcache.cache.CacheStats;
 import org.frontcache.cache.FcCacheMetrics;
 import org.frontcache.guard.GuardAction;
 import org.frontcache.include.combine.FcCombineMetrics;
-import org.frontcache.license.FcLicense;
-import org.frontcache.license.License;
-import org.frontcache.license.LicenseState;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEngine;
 import org.frontcache.guard.ratelimit.GuardRateLimiterRegistry;
@@ -31,7 +28,7 @@ import org.frontcache.guard.ratelimit.WindowLimiter;
 import org.frontcache.resilience.FcCommandMetrics;
 import org.frontcache.resilience.FcEventType;
 import org.frontcache.resilience.FcThreadPools;
-import org.frontcache.warmer.CacheWarmer;
+import org.frontcache.module.FrontcacheModules;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -206,74 +203,11 @@ public class FcMetricsExport {
 		bindCacheMetrics();
 		bindCombineMetrics();
 		bindGuardMetrics();
-		bindWarmerMetrics();
-		bindLicenseMetrics();
 		bindJvmMetrics();
-	}
 
-	private boolean licenseBound = false;
-
-	/**
-	 * The license state - docs/ip-protection-proposal.md section 5.2: one series per state, 1 for the
-	 * current one, so {@code frontcache_license_state{state="valid"} == 0} is an alert, and
-	 * {@code updates.until} so a renewal can be alerted on before it is due.
-	 *
-	 * Both read {@link FcLicense#current()} at scrape time - a volatile read of a value the license monitor
-	 * re-checks every minute, so a renewed license dropped into conf/ shows up without a restart.
-	 * {@code updates.until} is NaN with no license: "no date" is not the epoch.
-	 *
-	 * {@code state} is a fixed set of six ({@link LicenseState}) - no license id or licensee label, which
-	 * would put customer names into every Prometheus server this node is scraped by.
-	 */
-	private synchronized void bindLicenseMetrics()
-	{
-		if (licenseBound)
-			return;
-		licenseBound = true;
-
-		for (final LicenseState state : LicenseState.values())
-			Gauge.builder("license.state", () -> (FcLicense.current().getState() == state) ? 1 : 0)
-					.description("1 for this node's current license state, 0 for the others")
-					.tags(Tags.of("state", state.id()))
-					.register(registry);
-
-		Gauge.builder("license.updates.until.timestamp", () -> {
-					License license = FcLicense.current().getLicense();
-					return (null == license) ? Double.NaN
-							: license.getUpdatesUntil().atStartOfDay(java.time.ZoneOffset.UTC).toEpochSecond();
-				})
-				.description("The license's updates-until date as a Unix timestamp; NaN with no license")
-				.baseUnit("seconds")
-				.register(registry);
-	}
-
-	private boolean warmerBound = false;
-
-	/**
-	 * The cache warmer: entries by what happened to them, and whether a run is going.
-	 *
-	 * Bound unconditionally, like the combine counters - the counts are static on {@code CacheWarmer}
-	 * and need no warmer instance, and a scrape must not create one (it resolves FRONTCACHE_HOME/warmer).
-	 * No list-name or URL label: {@code result} is the fixed set {@link CacheWarmer#RESULTS}.
-	 */
-	private synchronized void bindWarmerMetrics()
-	{
-		if (warmerBound)
-			return;
-		warmerBound = true;
-
-		for (final String result : CacheWarmer.RESULTS)
-			FunctionCounter.builder("warmer.entries", result, r -> CacheWarmer.entriesTotal(r))
-					.description("URI-list entries the cache warmer finished, by result, since JVM start")
-					.tags(Tags.of("result", result))
-					.register(registry);
-
-		Gauge.builder("warmer.running", () -> {
-					CacheWarmer warmer = CacheWarmer.existingInstance();
-					return (null != warmer && warmer.isRunning()) ? 1 : 0;
-				})
-				.description("1 while a cache warm run is in progress (running, paused or stopping)")
-				.register(registry);
+		// what a module (the Pro jar's license and warmer series) adds - after the core's own, so a
+		// module can never be what a core series' name or description is decided by
+		FrontcacheModules.bindMeters(registry);
 	}
 
 	/**

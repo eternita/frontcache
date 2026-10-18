@@ -25,11 +25,11 @@ import java.util.concurrent.TimeoutException;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.model.EdgeConfigFile;
-import org.frontcache.console.model.EdgeWarmer;
 import org.frontcache.console.model.VisitorTypesConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.GuardRulesConfig;
 import org.frontcache.console.model.DashboardStream;
+import org.frontcache.console.plugin.ConsolePlugins;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
@@ -37,7 +37,6 @@ import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.ConfigFile;
 import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
-import org.frontcache.io.WarmerStatusActionResponse;
 import org.frontcache.replication.CacheReplicator;
 import org.frontcache.replication.ReplicationProgressListener;
 import org.frontcache.replication.ReplicationResult;
@@ -66,15 +65,6 @@ public class FrontcacheService {
 	private ObjectMapper jsonMapper = new ObjectMapper();
 
 	private Set<String> frontcacheAgentURLs = new LinkedHashSet<String>();
-
-	/**
-	 * Canonical edge URL -> the cluster it belongs to, from {@code frontcache.console.clusters}.
-	 *
-	 * Empty on every config file written before that key existed, which is what makes the realtime
-	 * page render exactly as it did: no cluster, no aggregate panel. See
-	 * docs/archive/circuit-cluster-proposal.md section 4.
-	 */
-	private Map<String, String> clusterByEdgeURL = new LinkedHashMap<String, String>();
 
 	private String apiKey = "default-api-key";
 
@@ -149,11 +139,11 @@ public class FrontcacheService {
 		apiKey = fcConsoleConfig.getString("apiKey");
 		logger.info(" -- Loading apiKey {} from console config", apiKey);
 
-		clusterByEdgeURL = parseClusters(fcConsoleConfig, frontcacheAgentURLs);
-		for (Map.Entry<String, String> member : clusterByEdgeURL.entrySet())
-			logger.info(" -- Edge {} is in cluster '{}'", member.getKey(), member.getValue());
-
 		readCredentials();
+
+		// a key only a console plugin reads, set on a console without that plugin, warns rather than
+		// being silently ignored
+		ConsolePlugins.warnUnclaimedKeys(fcConsoleConfig);
 	}
 
 	/**
@@ -238,7 +228,6 @@ public class FrontcacheService {
 		{
 			logger.info(" -- Console authentication is ON for user '{}'", user);
 			logger.info(" -- Config editing is {}", isConfigEditingEnabled() ? "ON" : "OFF (config-editing = false)");
-			logger.info(" -- Cache warmer control is {}", isCacheWarmerEnabled() ? "ON" : "OFF (cache-warmer = false)");
 
 			if (SHIPPED_DEFAULT_PASSWORD.equals(password))
 				logger.warn("Console authentication is ON, but the password is still the shipped "
@@ -253,8 +242,8 @@ public class FrontcacheService {
 		logger.warn("Console authentication is OFF - no 'user'/'password' in frontcache-console.conf."
 				+ " Anyone who can reach this port can invalidate the cache of every configured node."
 				+ " Add:   user = admin / password = <choose one>");
-		logger.warn("Config editing and cache warmer control are therefore OFF too - the Configs screens"
-				+ " stay read-only and the Cache Warmer screen can watch a run but not start one. An"
+		// a console plugin's write controls say so themselves (the Pro plugin's WarmerService)
+		logger.warn("Config editing is therefore OFF too - the Configs screens stay read-only. An"
 				+ " unauthenticated console is a monitoring tool; it is not a fleet configuration tool.");
 	}
 
@@ -583,35 +572,6 @@ public class FrontcacheService {
 	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
 	private static final String CONFIG_EDITING_KEY = "config-editing";
 
-	/** HOCON key under frontcache.console: the Cache Warmer screen's buttons that start or write. */
-	private static final String CACHE_WARMER_KEY = "cache-warmer";
-
-	/**
-	 * Whether the Cache Warmer screen offers the controls that start, change or stop a run, and that
-	 * write, upload, copy or delete a URI list. With it off the screen still shows lists, previews and
-	 * progress.
-	 *
-	 * <b>Off when the console has no credentials, whatever the property says</b> - the
-	 * {@link #isConfigEditingEnabled()} rule, for a sharper reason: a warm run is thousands of origin
-	 * renders ordered by one click, and an unauthenticated console answers anyone who can reach its
-	 * port. The node refuses an un-keyed start on its own side too ({@code ApiKey.isAuthorizedToWrite}).
-	 */
-	public boolean isCacheWarmerEnabled() {
-		return cacheWarmerEnabled(fcConsoleConfig, isAuthEnabled());
-	}
-
-	/** The decision half of {@link #isCacheWarmerEnabled()}, testable without a config file. */
-	static boolean cacheWarmerEnabled(Config config, boolean authEnabled) {
-
-		if (!authEnabled)
-			return false;
-
-		if (null != config && config.hasPath(CACHE_WARMER_KEY))
-			return config.getBoolean(CACHE_WARMER_KEY);
-
-		return true;
-	}
-
 	/**
 	 * A client for {@code edgeURL} - but only when it is one of this console's configured edges, and
 	 * then built from the CONFIGURED spelling, not the caller's.
@@ -656,72 +616,6 @@ public class FrontcacheService {
 		return client;
 	}
 
-	/** One edge's warmer - see {@link EdgeWarmer}. Null when the URL is not a configured edge. */
-	public EdgeWarmer getWarmerStatus(String edgeURL) {
-
-		FrontCacheClient client = configuredEdgeClient(edgeURL);
-		return (null == client) ? null : warmerStatusOf(client);
-	}
-
-	private static EdgeWarmer warmerStatusOf(FrontCacheClient client) {
-
-		EdgeWarmer edge = new EdgeWarmer(client.getFrontCacheURL(), client.getName());
-
-		WarmerStatusActionResponse response = client.getWarmerStatus();
-		if (null == response)
-		{
-			edge.setError("not reachable");
-			return edge;
-		}
-
-		edge.setReachable(true);
-		if (FrontCacheClient.WARMER_UNSUPPORTED.equals(response.getErrorDescription()))
-		{
-			edge.setError(FrontCacheClient.WARMER_UNSUPPORTED);
-			return edge;
-		}
-
-		edge.setSupported(true);
-		edge.setStatus(response.getWarmer());
-		if (null == response.getWarmer())
-			edge.setError(response.getErrorDescription());
-		return edge;
-	}
-
-	/**
-	 * Every edge's warmer, for the screen's edge strip: one status call per edge, fanned out, in the
-	 * console config's edge order. An edge that times out keeps its place and reads as unreachable -
-	 * a missing edge would read as "this node has no warmer", which is a different thing.
-	 */
-	public List<EdgeWarmer> getWarmerEdges() {
-
-		List<FrontCacheClient> fcClients = getFrontCacheAgents();
-
-		List<Future<EdgeWarmer>> futureList = new ArrayList<Future<EdgeWarmer>>();
-		for (FrontCacheClient fcClient : fcClients)
-			futureList.add(executor.submit(() -> warmerStatusOf(fcClient)));
-
-		List<EdgeWarmer> result = new ArrayList<EdgeWarmer>();
-		boolean timeoutReached = false;
-		for (int i = 0; i < futureList.size(); i++)
-		{
-			Future<EdgeWarmer> f = futureList.get(i);
-			FrontCacheClient fcClient = fcClients.get(i);
-			try {
-				result.add(timeoutReached
-						? f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS)
-						: f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS));
-			} catch (TimeoutException | InterruptedException | ExecutionException e) {
-				f.cancel(true);
-				timeoutReached = true;
-				EdgeWarmer unreachable = new EdgeWarmer(fcClient.getFrontCacheURL(), fcClient.getName());
-				unreachable.setError("not reachable");
-				result.add(unreachable);
-			}
-		}
-		return result;
-	}
-
 	/**
 	 * Whether the session cookie carries the {@code Secure} attribute - see
 	 * docs/archive/console-login-ui.md section 4.4.
@@ -749,50 +643,28 @@ public class FrontcacheService {
 	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
 	private static final String SESSION_COOKIE_SECURE_KEY = "session-cookie-secure";
 
-	// ---- licensing - see LicenseService ------------------------------------------------------
-
-	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
-	private static final String USAGE_DIR_KEY = "usage-dir";
+	// ---- for console plugins ----------------------------------------------------------------------
 
 	/**
-	 * Where the console keeps its usage log ({@code console-usage-YYYY-MM.log}): {@code usage-dir}, else
-	 * {@code usage/} beside the directory holding frontcache-console.conf - {@code conf/../usage} in the
-	 * bundle, which is the console's home. Null when the console was started without a config file, and
-	 * then the node count is kept in memory only.
+	 * The {@code frontcache.console} block of frontcache-console.conf, or null when the console was
+	 * started without one. For a console plugin's beans, which read their own keys from it - through
+	 * {@code hasPath}, like every key added after the first release.
 	 */
-	public File getUsageDir() {
-		return usageDir(fcConsoleConfig, consoleConfigFile);
+	public Config getConsoleConfig() {
+		return fcConsoleConfig;
 	}
 
-	/** The decision half of {@link #getUsageDir()}, testable without a config file. */
-	static File usageDir(Config config, File configFile) {
-
-		if (null != config && config.hasPath(USAGE_DIR_KEY) && !config.getString(USAGE_DIR_KEY).isBlank())
-			return new File(config.getString(USAGE_DIR_KEY).trim());
-
-		if (null == configFile || null == configFile.getParentFile())
-			return null;
-
-		File home = configFile.getParentFile().getParentFile();
-		return (null == home) ? new File(configFile.getParentFile(), "usage") : new File(home, "usage");
+	/** The frontcache-console.conf this console was started with, or null. */
+	public File getConsoleConfigFile() {
+		return consoleConfigFile;
 	}
-
-	/** Whether the realtime page aggregates any cluster - the Pro "cluster view". */
-	public boolean isClusterViewConfigured() {
-		return !clusterByEdgeURL.isEmpty();
-	}
-
-	// ---- clusters ------------------------------------------------------------------------------
-
-	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
-	private static final String CLUSTERS_KEY = "clusters";
 
 	/**
 	 * An edge URL as it is compared, keyed and handed to the page.
 	 *
-	 * <b>The trailing slash is the whole reason this exists.</b> {@link #getDashboardStreams} appends
+	 * <b>The trailing slash is the whole reason this exists.</b> {@link #getDashboardStreamList} appends
 	 * one, so the stream list carries {@code https://fc-edge.example.com:443/} while {@code urls} - and
-	 * therefore anything an operator copies out of it into {@code clusters} - says
+	 * therefore anything an operator copies out of it into the Pro plugin's {@code clusters} - says
 	 * {@code https://fc-edge.example.com:443}. Comparing the two raw forms makes every cluster come out
 	 * empty on a config file that reads perfectly correctly, with nothing to say so.
 	 *
@@ -801,7 +673,7 @@ public class FrontcacheService {
 	 * - the e2e topology - are the same string. See {@code EdgeConfigFile}, where keying a fan-out by
 	 * it used to drop a tab.
 	 */
-	static String canonicalEdgeURL(String edgeURL) {
+	public static String canonicalEdgeURL(String edgeURL) {
 
 		if (null == edgeURL)
 			return null;
@@ -811,101 +683,6 @@ public class FrontcacheService {
 			return canonical;
 
 		return canonical.endsWith("/") ? canonical : canonical + "/";
-	}
-
-	/**
-	 * {@code clusters { "Edge layer" = [url, url, url] }} -> canonical edge URL -> cluster name.
-	 *
-	 * Read through {@code hasPath}, like every other key added after the first release: absent means
-	 * no clusters, which is every existing config file and is not an error.
-	 *
-	 * <b>Nothing here refuses to start.</b> The console is a monitoring tool and an upgrade must not
-	 * take it offline, so each way of getting this wrong is a WARN and a documented resolution - warn,
-	 * not info, because the shipped fc-logback.xml filters stdout at WARN and an info line would leave
-	 * the operator of a silently-empty cluster with nothing at all:
-	 *
-	 * <ul>
-	 * <li>a member that is not in {@code urls} is kept in the map but never rendered, since the page
-	 *     only groups edges the console actually lists - so it also picks up its cluster if it is added
-	 *     later on the Edges page;</li>
-	 * <li>a URL named by two clusters keeps the FIRST, the same resolution a duplicate client type in a
-	 *     {@code maxage} takes;</li>
-	 * <li>a cluster whose value is not a list, or whose name is blank, is skipped whole.</li>
-	 * </ul>
-	 *
-	 * A cluster that ends up with fewer than two live members is not decided here - it depends on the
-	 * edge list, which changes at runtime. {@link #getDashboardStreams} makes that call.
-	 *
-	 * @param knownEdgeURLs the configured edges, for the "not in urls" warning only
-	 */
-	static Map<String, String> parseClusters(Config config, Collection<String> knownEdgeURLs) {
-
-		Map<String, String> clusters = new LinkedHashMap<String, String>();
-
-		if (null == config || !config.hasPath(CLUSTERS_KEY))
-			return clusters;
-
-		Set<String> known = new LinkedHashSet<String>();
-		if (null != knownEdgeURLs)
-			for (String edgeURL : knownEdgeURLs)
-				known.add(canonicalEdgeURL(edgeURL));
-
-		ConfigObject configured;
-		try {
-			configured = config.getObject(CLUSTERS_KEY);
-		} catch (ConfigException e) {
-			logger.warn("frontcache-console.conf: 'clusters' is not a block of <name> = [url, ...] - "
-					+ "no clusters are configured ({})", e.getMessage());
-			return clusters;
-		}
-
-		for (Map.Entry<String, ConfigValue> entry : configured.entrySet())
-		{
-			String clusterName = null == entry.getKey() ? "" : entry.getKey().trim();
-
-			if (clusterName.isEmpty())
-			{
-				logger.warn("frontcache-console.conf: a cluster with a blank name is skipped");
-				continue;
-			}
-
-			Object value = entry.getValue().unwrapped();
-			if (!(value instanceof List))
-			{
-				logger.warn("frontcache-console.conf: cluster '{}' is not a list of edge urls - skipped",
-						clusterName);
-				continue;
-			}
-
-			for (Object member : (List<?>) value)
-			{
-				String memberURL = canonicalEdgeURL(null == member ? null : member.toString());
-
-				if (null == memberURL || memberURL.isEmpty())
-				{
-					logger.warn("frontcache-console.conf: cluster '{}' names an empty edge url - skipped",
-							clusterName);
-					continue;
-				}
-
-				String claimedBy = clusters.get(memberURL);
-				if (null != claimedBy)
-				{
-					logger.warn("frontcache-console.conf: edge {} is in both cluster '{}' and cluster "
-							+ "'{}' - keeping '{}'", memberURL, claimedBy, clusterName, claimedBy);
-					continue;
-				}
-
-				if (!known.contains(memberURL))
-					logger.warn("frontcache-console.conf: cluster '{}' names {}, which is not in 'urls'"
-							+ " - it is ignored unless that edge is added on the Edges page",
-							clusterName, memberURL);
-
-				clusters.put(memberURL, clusterName);
-			}
-		}
-
-		return clusters;
 	}
 
 	/**
@@ -985,54 +762,23 @@ public class FrontcacheService {
 	}
 
 	/**
-	 * The edges the realtime page subscribes to, as JSON.
+	 * The edges the realtime page subscribes to: names and edge URLs only - the page hands an edge URL
+	 * back to {@code DashboardStreamProxyServlet}, which is where the stream path and the API key live.
 	 *
-	 * Only names, edge URLs and cluster names - the page hands an edge URL back to
-	 * {@code DashboardStreamProxyServlet}, which is where the stream path and the API key live.
-	 *
-	 * Membership is resolved HERE rather than at startup, because the edge list changes at runtime
-	 * from the Edges page. Which also settles the one-member case: a cluster the current edge list
-	 * leaves with fewer than two members is reported as no cluster at all, since its "Cluster:" line
-	 * would repeat the "Host:" line above it - the very thing this feature exists to stop. See
-	 * docs/archive/circuit-cluster-proposal.md section 4.3.
+	 * Every stream's {@code cluster} is null here; a console plugin's
+	 * {@link org.frontcache.console.plugin.DashboardStreamContributor} fills it in (the Pro cluster rate).
 	 */
-	public String getDashboardStreams()
+	public List<DashboardStream> getDashboardStreamList()
 	{
-		// [{"name":"My Super App","url":"http://sg.example.com/","cluster":"Edge layer"}, ... ]
-
 		List<DashboardStream> streams = new ArrayList<DashboardStream>();
-
-		Map<String, Integer> membersPerCluster = new LinkedHashMap<String, Integer>();
-
 		for (FrontCacheClient fcClient : getFrontCacheAgents())
-		{
-			String fcURL = canonicalEdgeURL(fcClient.getFrontCacheURL());
+			streams.add(new DashboardStream(fcClient.getName(), canonicalEdgeURL(fcClient.getFrontCacheURL()), null));
+		return streams;
+	}
 
-			String cluster = clusterByEdgeURL.get(fcURL);
-			if (null != cluster)
-			{
-				Integer members = membersPerCluster.get(cluster);
-				membersPerCluster.put(cluster, null == members ? 1 : members.intValue() + 1);
-			}
-
-			streams.add(new DashboardStream(fcClient.getName(), fcURL, cluster));
-		}
-
-		for (DashboardStream stream : streams)
-		{
-			String cluster = stream.getCluster();
-			if (null == cluster)
-				continue;
-
-			Integer members = membersPerCluster.get(cluster);
-			if (null != members && members.intValue() < 2)
-			{
-				logger.info(" -- Cluster '{}' has one configured edge in this console's edge list, so its"
-						+ " members show no cluster rate", cluster);
-				stream.setCluster(null);
-			}
-		}
-
+	/** {@code [{"name":"My Super App","url":"http://sg.example.com/","cluster":"Edge layer"}, ... ]} for the page. */
+	public String toJson(List<DashboardStream> streams)
+	{
 		try {
 			return jsonMapper.writeValueAsString(streams);
 		} catch (JsonProcessingException e) {
@@ -1040,6 +786,7 @@ public class FrontcacheService {
 			return "[]";
 		}
 	}
+
 
 
 	public Set<String> getFrontCacheAgentURLs()
@@ -1063,7 +810,8 @@ public class FrontcacheService {
 	}
 
 
-	private List<FrontCacheClient> getFrontCacheAgents()
+	/** A client for every configured edge, in the console config's order - for a plugin's fan-out too. */
+	public List<FrontCacheClient> getFrontCacheAgents()
 	{
 		return getFrontCacheAgents(false);
 	}

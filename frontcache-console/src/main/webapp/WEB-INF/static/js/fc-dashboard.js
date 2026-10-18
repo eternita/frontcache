@@ -68,172 +68,51 @@ var FcDashboard = (function () {
 		return value < min ? min : (value > max ? max : value);
 	}
 
-	// ---- cluster request rate ------------------------------------------------------------------
+	// ---- cluster request rate: a plugin's ---------------------------------------------------------
 	//
-	// One number per command: what the whole cluster is taking, shown on every member's own card
-	// beside that member's rate. The page already holds an open EventSource per edge, so this costs
-	// no connection and no request to the fleet - the frames are here.
-	// See docs/archive/circuit-cluster-proposal.md.
+	// The arithmetic behind the "Cluster:" line on a card is the Pro console plugin's
+	// (its realtime-page script, loaded after this file - docs/ip-protection-apache-core-and-prop-pro-proposal.md
+	// section 4.5). It installs a factory here; with none, every stream renders as an unclustered one,
+	// which is exactly what a console with no frontcache.console.clusters renders.
+	//
+	// What the factory returns is rendered, not computed, by this file, so its shape is the contract:
+	//   name, members (edge urls)          - the panel note and the tooltip
+	//   subscribe(listener)                - called whenever any member reports
+	//   accept(memberUrl, frame)           - every frame of every member
+	//   drop(memberUrl, commandName)       - a member's command went away
+	//   ratePerSecond(commandName)         - the total, or null when nothing live reports it
+	//   reporting(commandName)             - how many members are counted, for the tooltip
+	//   canonicalCommand(commandName)      - optional: the command's current spelling, for the tooltip
+
+	var clusterFactory = null;
 
 	/**
-	 * How long a member's last frame for a command still counts.
+	 * Groups the streams by their cluster and builds one shared object per cluster - or nothing at all
+	 * when no plugin installed a factory. Pure: no DOM, so the "no plugin" path is testable.
 	 *
-	 * Ten node ticks (the node publishes every 500 ms - FcSampleSseServlet's
-	 * DEFAULT_PAUSE_POLLER_THREAD_DELAY_IN_MS). Without an expiry a node that goes away leaves its
-	 * last frame in the cluster total for as long as the page is open, so every surviving member's
-	 * card would keep claiming traffic from a dead region. With it the cluster figure FALLS when a
-	 * member drops out, which is the correct answer and is what that member's own panel switching to
-	 * "retrying ..." explains.
+	 * @return cluster name -> what the factory built
 	 */
-	var MEMBER_STALE_MS = 5000;
+	function clustersOf(streams) {
 
-	/**
-	 * Pre-2.9.0 command key -> the key that replaced it. Mirrors FcCommandKeys.LEGACY_COMMAND_KEYS.
-	 *
-	 * The console reads a MIXED fleet, so mid-upgrade one member emits Input-Request and another
-	 * Input-Requests. Without canonicalizing, those are two separate cluster totals and each member's
-	 * card shows a figure covering only the half of the fleet that spells the command its way.
-	 *
-	 * Cache-Miss is two legacy keys folding into ONE, and on a pre-2.9.0 filter-mode node both are
-	 * live at once (the filter chain serves the page's origin call, HTTP serves its includes) - so one
-	 * member can contribute two frames to one command, and for a request rate both of them count.
-	 *
-	 * This is the map's third copy: FcCommandKeys, the `order` block in fc-dashboard.css, and here.
-	 * Worth saying out loud; the CSS copy is the precedent, and the alternative is a wire addition to
-	 * carry six rows.
-	 */
-	var CANONICAL_COMMAND = {
-		"Input-Requests": "Input-Request",
-		"Include-Requests": "Include-Request",
-		"Cache-Hits": "Cache-Hit",
-		"Cache-Origin-http": "Cache-Miss",
-		"Cache-Origin-filter": "Cache-Miss",
-		"Origin-Hits": "Cache-Bypass"
-	};
+		var clusters = {};
+		if (!clusterFactory || !streams)
+			return clusters;
 
-	function canonicalCommand(name) {
-		return CANONICAL_COMMAND[name] || name;
-	}
-
-	var WINDOW_KEY = "propertyValue_metricsRollingStatisticalWindowInMilliseconds";
-	var DEFAULT_WINDOW_MS = 10000;
-
-	/**
-	 * The request rate of a group of edges, per command.
-	 *
-	 * Members' frames are simply added up, and the reason that is sound is worth being explicit
-	 * about: requestCount is a windowed count over the node's own rolling window (10 s by default),
-	 * not a delta since its last frame. So adding frames that arrived at different moments
-	 * double-counts nothing, and the most a member can contribute is one 500 ms tick of staleness
-	 * inside a twenty-tick window.
-	 *
-	 * Each member is converted to a rate against ITS OWN window before being added, so a fleet whose
-	 * nodes disagree on resilience.command.<key>.metrics.rollingStats.timeInMilliseconds still gets
-	 * the right answer - there is no shared divisor to get wrong.
-	 */
-	function ClusterRates(name, memberUrls) {
-
-		this.name = name;
-		this.members = memberUrls;
-
-		// canonical command -> contribution key -> {rate, at}
-		this.contributions = {};
-
-		this.listeners = [];
-	}
-
-	/**
-	 * Called whenever any member reports, so every member's panel shows the same total.
-	 *
-	 * Without this each card only refreshed its cluster line when its OWN node's frame arrived, and
-	 * since the members publish on their own clocks the three panels showed three figures for the one
-	 * quantity - a couple of percent apart, which reads as an arithmetic bug rather than as the
-	 * half-second of skew it is.
-	 */
-	ClusterRates.prototype.subscribe = function (listener) {
-		this.listeners.push(listener);
-	};
-
-	ClusterRates.prototype.publish = function () {
-		this.listeners.forEach(function (listener) { listener(); });
-	};
-
-	ClusterRates.prototype.accept = function (memberUrl, frame) {
-
-		var command = canonicalCommand(frame.name);
-		var count = num(frame, "requestCount");
-
-		if (count === null)
-			return;
-
-		if (!this.contributions[command])
-			this.contributions[command] = {};
-
-		// Keyed by member AND by the key as it arrived, so a pre-2.9.0 filter node's Cache-Origin-http
-		// and Cache-Origin-filter are two contributions to Cache-Miss rather than one overwriting the
-		// other.
-		this.contributions[command][memberUrl + " " + frame.name] = {
-			rate: Math.max(0, count) / ((num(frame, WINDOW_KEY) || DEFAULT_WINDOW_MS) / 1000),
-			at: Date.now()
-		};
-
-		this.publish();
-	};
-
-	ClusterRates.prototype.drop = function (memberUrl, commandName) {
-
-		var contributions = this.contributions[canonicalCommand(commandName)];
-
-		if (contributions) {
-			delete contributions[memberUrl + " " + commandName];
-			this.publish();
-		}
-	};
-
-	/**
-	 * The cluster's rate for one command, or null when nothing live reports it.
-	 *
-	 * Stale contributions are pruned here rather than on a timer: this is called as each frame
-	 * arrives, which is twice a second per member, so there is nothing a timer would notice sooner.
-	 */
-	ClusterRates.prototype.ratePerSecond = function (commandName) {
-
-		var contributions = this.contributions[canonicalCommand(commandName)];
-
-		if (!contributions)
-			return null;
-
-		var now = Date.now();
-		var total = null;
-
-		for (var key in contributions)
-			if (contributions.hasOwnProperty(key)) {
-				if (now - contributions[key].at > MEMBER_STALE_MS)
-					delete contributions[key];
-				else
-					total = (total || 0) + contributions[key].rate;
-			}
-
-		return total;
-	};
-
-	/** How many members are currently counted towards a command - for the line's tooltip. */
-	ClusterRates.prototype.reporting = function (commandName) {
-
-		var contributions = this.contributions[canonicalCommand(commandName)];
-
-		if (!contributions)
-			return 0;
-
-		var now = Date.now();
 		var members = {};
+		streams.forEach(function (stream) {
+			if (!stream.cluster)
+				return;
+			if (!members[stream.cluster])
+				members[stream.cluster] = [];
+			members[stream.cluster].push(stream.url);
+		});
 
-		for (var key in contributions)
-			if (contributions.hasOwnProperty(key) && now - contributions[key].at <= MEMBER_STALE_MS)
-				members[key.substring(0, key.indexOf(" "))] = true;
+		for (var name in members)
+			if (members.hasOwnProperty(name))
+				clusters[name] = clusterFactory(name, members[name]);
 
-		return Object.keys(members).length;
-	};
+		return clusters;
+	}
 
 
 	// ---- colour ramps --------------------------------------------------------------------------
@@ -346,7 +225,7 @@ var FcDashboard = (function () {
 	}
 
 	/**
-	 * @param cluster the ClusterRates this edge belongs to, or null. The rate is read here rather
+	 * @param cluster the shared cluster object (a plugin's - see clustersOf) this edge belongs to, or null. The rate is read here rather
 	 *                than passed in as a number so the line and its tooltip agree on how many
 	 *                members are being counted.
 	 */
@@ -507,7 +386,8 @@ var FcDashboard = (function () {
 
 		node.title = "Total request rate per second across cluster \u201c" + cluster.name + "\u201d - "
 				+ cluster.reporting(commandName) + " of " + cluster.members.length
-				+ " node(s) currently reporting " + canonicalCommand(commandName) + ":\n"
+				+ " node(s) currently reporting "
+				+ (cluster.canonicalCommand ? cluster.canonicalCommand(commandName) : commandName) + ":\n"
 				+ cluster.members.map(hostOf).join("\n");
 
 		var valueNode = el("span", "fc-value", round1(value));
@@ -593,7 +473,7 @@ var FcDashboard = (function () {
 	/**
 	 * A row of circuit cards, keyed by command name. Owns the cards' lifecycle and nothing else.
 	 *
-	 * @param cluster the ClusterRates the panel's edge belongs to, or null - handed to every card so
+	 * @param cluster the shared cluster object the panel's edge belongs to, or null - handed to every card so
 	 *                it can show what the whole cluster is taking beside what this node is taking.
 	 */
 	function CircuitBoard(cluster) {
@@ -685,7 +565,7 @@ var FcDashboard = (function () {
 	// ---- one edge's stream ---------------------------------------------------------------------
 
 	/**
-	 * @param cluster the ClusterRates shared with this edge's peers, or null. Every frame is rendered
+	 * @param cluster the cluster object shared with this edge's peers, or null. Every frame is rendered
 	 *                on this panel AND added to that - one EventSource either way, since the frames a
 	 *                cluster total needs are the ones this panel is already receiving.
 	 */
@@ -843,7 +723,7 @@ var FcDashboard = (function () {
 		 *                   config that predates frontcache.console.clusters.
 		 *
 		 * One panel per edge, in the console's edge order, exactly as before - a cluster adds a line
-		 * to its members' cards and no panel of its own. Members of one cluster share a ClusterRates,
+		 * to its members' cards and no panel of its own. Members of one cluster share one cluster object,
 		 * which is the only thing on the page that knows two edges belong together.
 		 */
 		attach: function (container, streams) {
@@ -853,30 +733,28 @@ var FcDashboard = (function () {
 				return;
 			}
 
-			var clusters = {};
+			var clusters = clustersOf(streams);
 
 			streams.forEach(function (stream) {
-				if (!stream.cluster)
-					return;
-				if (!clusters[stream.cluster])
-					clusters[stream.cluster] = [];
-				clusters[stream.cluster].push(stream.url);
+				new StreamPanel(container, stream, (stream.cluster && clusters[stream.cluster]) || null);
 			});
+		},
 
-			for (var name in clusters)
-				if (clusters.hasOwnProperty(name))
-					clusters[name] = new ClusterRates(name, clusters[name]);
-
-			streams.forEach(function (stream) {
-				new StreamPanel(container, stream, stream.cluster ? clusters[stream.cluster] : null);
-			});
+		/**
+		 * The hook a console plugin installs the cluster arithmetic through - see the comment above
+		 * clustersOf. Called by the plugin's script as it loads, before attach.
+		 *
+		 * @param factory function (name, memberUrls) -> the object a cluster's members share
+		 */
+		setClusterFactory: function (factory) {
+			clusterFactory = factory;
 		},
 
 		// exposed for the console's own tests, not for page code
 		_internals: {
 			num: num, ramp: ramp, bubbleRadius: bubbleRadius, addCommas: addCommas,
-			ClusterRates: ClusterRates, canonicalCommand: canonicalCommand,
-			MEMBER_STALE_MS: MEMBER_STALE_MS
+			clustersOf: clustersOf,
+			resetClusterFactory: function () { clusterFactory = null; }
 		}
 	};
 

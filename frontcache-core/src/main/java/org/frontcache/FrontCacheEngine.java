@@ -79,11 +79,10 @@ import org.frontcache.resilience.FC_Total;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
-import org.frontcache.license.FcLicense;
-import org.frontcache.license.LicenseMonitor;
-import org.frontcache.license.ProFeature;
 import org.frontcache.metrics.FcMetricsExport;
 import org.frontcache.reqlog.RequestLogger;
+import org.frontcache.module.CoreModuleContext;
+import org.frontcache.module.FrontcacheModules;
 import org.frontcache.warmer.WarmRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -677,17 +676,16 @@ public class FrontCacheEngine {
 		});
 		t.start();
 
-		// The license and the instance's usage log - docs/ip-protection-proposal.md sections 5.2 and 5.4.
-		// Before metrics export so the Pro-feature report below reads a checked license. Nothing it
-		// concludes reaches the request path, and it never throws.
-		LicenseMonitor.start(getPublicDomain());
+		// Modules from their own jars (the Pro module: licensing, the warmer's orchestration) -
+		// docs/ip-protection-apache-core-and-prop-pro-proposal.md section 4.1. After the cache and
+		// before metrics export, so a module's meters bind to a started module. Never on the request
+		// path, and a module that throws is dropped rather than stopping the node.
+		FrontcacheModules.start(new CoreModuleContext(getPublicDomain()));
 
 		// Prometheus / OTLP export. A no-op unless front-cache.metrics.export says otherwise, which is
 		// why this is called unconditionally: the node's lifecycle owner is the right place to start a
 		// background push loop, and gating the call here would just duplicate the config read.
 		FcMetricsExport.start();
-		if (FcMetricsExport.isEnabled())
-			FcLicense.reportUseOf(ProFeature.METRICS_EXPORT);
 
 		return;
 	}
@@ -830,7 +828,7 @@ public class FrontCacheEngine {
 	 */
 	private void stop(boolean shutdown) {
 
-		LicenseMonitor.stop();
+		FrontcacheModules.stop(shutdown);
 
 		// FCConfig is deliberately NOT torn down here. It used to be (FCConfig.destroy() nulled the
 		// properties and emptied dynamic-urls.conf), but FCConfig is initialized by its static

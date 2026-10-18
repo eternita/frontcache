@@ -5,9 +5,15 @@
      Spring forwards to the JSP, so request.requestURI is the JSP path; the original
      client URL (e.g. /cache-view) is preserved in the standard forward request attribute. -->
 <c:set var="uri" value="${empty requestScope['jakarta.servlet.forward.request_uri'] ? pageContext.request.requestURI : requestScope['jakarta.servlet.forward.request_uri']}"/>
+<%-- a console plugin's tabs first (fcPlugins - org.frontcache.console.plugin.ConsolePlugins.View), then the core's --%>
+<c:forEach var="nav" items="${fcPlugins.topNav}">
+	<c:forEach var="match" items="${nav.activeWhen}">
+		<c:if test="${empty topActive and fn:contains(uri, match)}"><c:set var="topActive" value="${nav.id}"/></c:if>
+	</c:forEach>
+</c:forEach>
+<c:if test="${empty topActive}">
 <c:choose>
 	<c:when test="${fn:contains(uri, 'realtime')}"><c:set var="topActive" value="realtime"/></c:when>
-	<c:when test="${fn:contains(uri, 'license')}"><c:set var="topActive" value="license"/></c:when>
 	<%-- save-config is in this list because the Configs screens render their POST result in place
 	     rather than redirecting (as cache-invalidation does), so the forward URI is /save-config and
 	     the top menu would otherwise lose its highlight on exactly the page that just did something. --%>
@@ -17,6 +23,7 @@
 	<c:when test="${fn:contains(uri, 'visitor-types')}"><c:set var="topActive" value="visitor"/></c:when>
 	<c:when test="${fn:contains(uri, 'edges')}"><c:set var="topActive" value="edges"/></c:when>
 </c:choose>
+</c:if>
 
 <style>
 	#top .navbar-nav > li > a.active-top { font-weight: bold; text-decoration: underline; }
@@ -49,7 +56,9 @@
                 <li><a href="guard-rules" class="${topActive == 'guard' ? 'active-top' : ''}">Guard </a></li>
                 <li><a href="visitor-types" class="${topActive == 'visitor' ? 'active-top' : ''}">Visitor Types </a></li>
 				<li><a href="edges" class="${topActive == 'edges' ? 'active-top' : ''}">Edges </a></li>
-				<li><a href="license" class="${topActive == 'license' ? 'active-top' : ''}">License </a></li>
+				<c:forEach var="nav" items="${fcPlugins.topNav}">
+				<li><a href="<c:out value='${nav.href}'/>" class="${topActive == nav.id ? 'active-top' : ''}"><c:out value="${nav.label}"/> </a></li>
+				</c:forEach>
 			</ul>
 			<%-- Who is signed in, and the only way to stop being signed in - see
 			     docs/archive/console-login-ui.md section 8.

@@ -16,8 +16,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -46,17 +44,12 @@ import org.frontcache.core.ApiKey;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
-import org.frontcache.license.FcLicense;
-import org.frontcache.license.LicenseMonitor;
-import org.frontcache.license.LicenseStatus;
-import org.frontcache.license.UsageInterval;
-import org.frontcache.license.UsageLog;
+import org.frontcache.module.FrontcacheModules;
+import org.frontcache.module.ManagementAction;
+import org.frontcache.module.ManagementRequest;
 import org.frontcache.resilience.FcResilienceReload;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
-import org.frontcache.warmer.CacheWarmer;
-import org.frontcache.warmer.WarmerConfig;
-import org.frontcache.warmer.WarmerRunParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -224,18 +217,6 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = reloadDynamicURLs(request);
 			break;
 
-		case FrontcacheAction.GET_LICENSE:
-			aResponse = licenseResponse(FrontcacheAction.GET_LICENSE, FcLicense.current());
-			break;
-
-		case FrontcacheAction.RELOAD_LICENSE:
-			aResponse = licenseResponse(FrontcacheAction.RELOAD_LICENSE, FcLicense.reload());
-			break;
-
-		case FrontcacheAction.GET_USAGE_REPORT:
-			aResponse = getUsageReport(request);
-			break;
-
 		case FrontcacheAction.PATCH:
 			aResponse = patch(request);
 			break;
@@ -249,26 +230,22 @@ public class FrontCacheIOServlet extends HttpServlet {
 			break;
 
 		case FrontcacheAction.HELP:
-			aResponse = new HelpActionResponse(FrontcacheAction.actionsDescriptionMap);
-			break;
-
-		case FrontcacheAction.WARMER_STATUS:
-		case FrontcacheAction.WARMER_LISTS:
-		case FrontcacheAction.GET_WARMER_LIST:
-		case FrontcacheAction.PUT_WARMER_LIST:
-		case FrontcacheAction.DELETE_WARMER_LIST:
-		case FrontcacheAction.WARMER_PREFLIGHT:
-		case FrontcacheAction.WARMER_START:
-		case FrontcacheAction.WARMER_UPDATE:
-		case FrontcacheAction.WARMER_PAUSE:
-		case FrontcacheAction.WARMER_RESUME:
-		case FrontcacheAction.WARMER_STOP:
-			aResponse = warmer(action, request, response);
-			if (null == aResponse)
-				return; // streamed
+			aResponse = new HelpActionResponse(helpDescriptions());
 			break;
 
 		default:
+			// A module's action (the Pro jar's license and warmer actions) - consulted only after every
+			// name the core owns, so a module can never shadow one. No module answering it means the
+			// ping below: the "unknown action" contract, which a console already reads as "this node
+			// does not have it" (docs/ip-protection-apache-core-and-prop-pro-proposal.md section 3.1).
+			ManagementAction moduleAction = FrontcacheModules.managementAction(action);
+			if (null != moduleAction)
+			{
+				aResponse = moduleAction.handle(new ServletManagementRequest(action, request, response));
+				if (null == aResponse)
+					return; // streamed
+				break;
+			}
 			aResponse = new PingActionResponse();
 		}
 		response.getOutputStream().write(jsonMapper.writeValueAsBytes(aResponse));
@@ -335,53 +312,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 		CacheProcessor processor = CacheManager.existingInstance();
 		CacheStats cacheStats = (null == processor) ? CacheStats.NOT_TRACKED : processor.getCacheStats();
 
-		return new NodeStatsActionResponse(cacheStats, FcNodeStats.current());
-	}
-
-	/**
-	 * {@code get-license} / {@code reload-license} - see {@link LicenseActionResponse}.
-	 *
-	 * The engine is asked for its domain through {@link FrontCacheEngine#existingInstance()}: answering a
-	 * console's poll must not be what builds an engine, the {@code get-node-stats} rule.
-	 */
-	private ActionResponse licenseResponse(String action, LicenseStatus status)
-	{
-		FrontCacheEngine engine = FrontCacheEngine.existingInstance();
-
-		return new LicenseActionResponse(action, status, FcLicense.featuresInUse(), LicenseMonitor.instance(),
-				(null == engine) ? null : engine.getPublicDomain());
-	}
-
-	/**
-	 * {@code get-usage-report} - this node's usage log as intervals, {@code from}..{@code to} (yyyy-MM),
-	 * the last twelve months by default. Twenty-four at most: the log keeps {@link UsageLog#KEEP_MONTHS}.
-	 */
-	private ActionResponse getUsageReport(HttpServletRequest req)
-	{
-		YearMonth now = YearMonth.now(ZoneOffset.UTC);
-		YearMonth to = parseMonth(req.getParameter("to"), now);
-		YearMonth from = parseMonth(req.getParameter("from"), to.minusMonths(11));
-
-		if (from.isAfter(to))
-			from = to;
-		if (from.isBefore(to.minusMonths(UsageLog.KEEP_MONTHS - 1)))
-			from = to.minusMonths(UsageLog.KEEP_MONTHS - 1);
-
-		List<UsageInterval> intervals = LicenseMonitor.usageIntervals(from, to);
-
-		return new UsageReportActionResponse(from.toString(), to.toString(), LicenseMonitor.instance().getId(),
-				intervals);
-	}
-
-	private static YearMonth parseMonth(String value, YearMonth fallback)
-	{
-		if (null == value || value.isBlank())
-			return fallback;
-		try {
-			return YearMonth.parse(value.trim());
-		} catch (Exception e) {
-			return fallback;
-		}
+		NodeStatsActionResponse stats = new NodeStatsActionResponse(cacheStats, FcNodeStats.current());
+		stats.setModules(FrontcacheModules.ids());
+		return stats;
 	}
 
 	/**
@@ -952,139 +885,65 @@ public class FrontCacheIOServlet extends HttpServlet {
 		return aResponse;
 	}
 
-	/**
-	 * The cache warmer's actions - see {@link WarmerActions}, which holds the gates. Parameter
-	 * extraction only, plus the one thing only the request can answer: {@code ApiKey.isAuthorizedToWrite}.
-	 *
-	 * {@code put-warmer-list} carries the list as the request BODY. {@code getParameter} on a
-	 * non-form POST reads the query string only and leaves the body unread, which is what lets it be
-	 * streamed into the store here.
-	 *
-	 * @return the response to write, or null when the answer was streamed ({@code raw=true})
-	 */
-	private ActionResponse warmer(String action, HttpServletRequest req, HttpServletResponse resp) throws IOException
+	/** The core's actions and every started module's, for {@code help}. */
+	private static Map<String, String> helpDescriptions()
 	{
-		CacheWarmer warmer;
-		try {
-			warmer = CacheWarmer.getInstance();
-		} catch (Exception e) {
-			logger.warn("cache warmer unavailable", e);
-			ActionResponse unavailable = new WarmerStatusActionResponse(action);
-			unavailable.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
-			unavailable.setErrorDescription("the cache warmer is unavailable on this node: " + e.getMessage());
-			return unavailable;
-		}
-
-		// the default key base follows the scheme the management request arrived with - see
-		// CacheWarmer.defaultKeyBase(WarmerConfig, boolean)
-		return WarmerActions.withRequestDefaults(warmerAction(action, warmer, req, resp), warmer.config(), req.isSecure());
+		Map<String, String> descriptions = new java.util.TreeMap<>(FrontcacheModules.managementActionDescriptions());
+		descriptions.putAll(FrontcacheAction.actionsDescriptionMap); // the core's description wins a clash
+		return descriptions;
 	}
 
-	private ActionResponse warmerAction(String action, CacheWarmer warmer, HttpServletRequest req, HttpServletResponse resp) throws IOException
+	/** A management call as a {@link ManagementAction} sees it - see {@link ManagementRequest}. */
+	private static final class ServletManagementRequest implements ManagementRequest
 	{
-		boolean authorizedToWrite = ApiKey.isAuthorizedToWrite(req);
+		private final String action;
+		private final HttpServletRequest req;
+		private final HttpServletResponse resp;
 
-		switch (action)
+		ServletManagementRequest(String action, HttpServletRequest req, HttpServletResponse resp)
 		{
-		case FrontcacheAction.WARMER_STATUS:
-			return WarmerActions.status(warmer);
-
-		case FrontcacheAction.WARMER_LISTS:
-			return WarmerActions.lists(warmer);
-
-		case FrontcacheAction.GET_WARMER_LIST:
-			if ("true".equalsIgnoreCase(req.getParameter("raw")))
-				return streamWarmerList(warmer, req.getParameter("name"), resp);
-			return WarmerActions.getList(warmer, req.getParameter("name"), req.getParameter("grep"));
-
-		case FrontcacheAction.PUT_WARMER_LIST:
-			return WarmerActions.putList(warmer, req.getParameter("name"), req.getInputStream(),
-					req.getParameter("baseHash"), authorizedToWrite);
-
-		case FrontcacheAction.DELETE_WARMER_LIST:
-			return WarmerActions.deleteList(warmer, req.getParameter("name"), authorizedToWrite);
-
-		case FrontcacheAction.WARMER_UPDATE:
-			try {
-				return WarmerActions.update(warmer, optionalLong(req, "delayMs"), optionalInt(req, "concurrency"),
-						authorizedToWrite);
-			} catch (NumberFormatException e) {
-				return new WarmerStatusActionResponse(action).refuse("delayMs and concurrency must be numbers");
-			}
-
-		case FrontcacheAction.WARMER_PAUSE:
-			return WarmerActions.pause(warmer, authorizedToWrite);
-
-		case FrontcacheAction.WARMER_RESUME:
-			return WarmerActions.resume(warmer, authorizedToWrite);
-
-		case FrontcacheAction.WARMER_STOP:
-			return WarmerActions.stop(warmer, authorizedToWrite);
-
-		default: // preflight and start take the same parameters
-			WarmerRunParams params;
-			try {
-				params = warmRunParams(req, warmer.config());
-			} catch (NumberFormatException e) {
-				if (FrontcacheAction.WARMER_PREFLIGHT.equals(action))
-					return new WarmerPreflightActionResponse(action).refuse("delayMs, concurrency and resumeFromLine must be numbers");
-				return new WarmerStatusActionResponse(action).refuse("delayMs, concurrency and resumeFromLine must be numbers");
-			}
-
-			if (FrontcacheAction.WARMER_PREFLIGHT.equals(action))
-				return WarmerActions.preflight(warmer, params, req.isSecure(), req.getLocalPort(), CacheManager.existingInstance());
-
-			return WarmerActions.start(warmer, params, req.isSecure(), req.getLocalPort(), authorizedToWrite);
+			this.action = action;
+			this.req = req;
+			this.resp = resp;
 		}
-	}
 
-	private static WarmerRunParams warmRunParams(HttpServletRequest req, WarmerConfig config)
-	{
-		WarmerRunParams params = new WarmerRunParams();
-		params.setList(req.getParameter("list"));
-		params.setMode(req.getParameter("mode"));
-		params.setKeyBase(req.getParameter("keyBase"));
-		params.setClientType(req.getParameter("clientType"));
-
-		Long delayMs = optionalLong(req, "delayMs");
-		params.setDelayMs(null == delayMs ? config.getDefaultDelayMs() : delayMs);
-
-		Integer concurrency = optionalInt(req, "concurrency");
-		params.setConcurrency(null == concurrency ? 1 : concurrency);
-
-		Long resumeFromLine = optionalLong(req, "resumeFromLine");
-		params.setResumeFromLine(null == resumeFromLine ? 0 : resumeFromLine);
-
-		return params;
-	}
-
-	private static Long optionalLong(HttpServletRequest req, String name)
-	{
-		String value = req.getParameter(name);
-		return (null == value || value.trim().isEmpty()) ? null : Long.valueOf(value.trim());
-	}
-
-	private static Integer optionalInt(HttpServletRequest req, String name)
-	{
-		String value = req.getParameter(name);
-		return (null == value || value.trim().isEmpty()) ? null : Integer.valueOf(value.trim());
-	}
-
-	/** {@code get-warmer-list&raw=true}: the file as a download, streamed. A refusal is still JSON. */
-	private ActionResponse streamWarmerList(CacheWarmer warmer, String name, HttpServletResponse resp) throws IOException
-	{
-		String problem = WarmerActions.rawListProblem(warmer, name);
-		if (null != problem)
-			return new WarmerListActionResponse(FrontcacheAction.GET_WARMER_LIST).refuse(problem);
-
-		resp.setContentType("text/plain; charset=UTF-8");
-		// the name is safe to quote as-is: WarmerListStore.NAME admits no quote, space or separator
-		resp.setHeader("Content-Disposition", "attachment; filename=\"" + name + "\"");
-		try (InputStream in = warmer.getStore().openRaw(name); OutputStream out = resp.getOutputStream())
-		{
-			in.transferTo(out);
+		@Override
+		public String action() {
+			return action;
 		}
-		return null;
+
+		@Override
+		public String parameter(String name) {
+			return req.getParameter(name);
+		}
+
+		@Override
+		public InputStream body() throws IOException {
+			return req.getInputStream();
+		}
+
+		@Override
+		public boolean isSecure() {
+			return req.isSecure();
+		}
+
+		@Override
+		public int localPort() {
+			return req.getLocalPort();
+		}
+
+		@Override
+		public boolean isAuthorizedToWrite() {
+			return ApiKey.isAuthorizedToWrite(req);
+		}
+
+		@Override
+		public OutputStream openRawOutput(String contentType, String fileName) throws IOException {
+			resp.setContentType(contentType);
+			if (null != fileName)
+				resp.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
+			return resp.getOutputStream();
+		}
 	}
 
 	/**

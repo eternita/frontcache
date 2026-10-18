@@ -17,6 +17,10 @@
 	<link href="<c:url value='/static/css/fc-dashboard.css' />" rel="stylesheet"></link>
 	<link href="<c:url value='/static/css/fc-edges-status.css' />" rel="stylesheet"></link>
 	<script src="<c:url value='/static/js/fc-dashboard.js' />"></script>
+	<%-- a console plugin's realtime-page scripts (the Pro cluster rate) - after fc-dashboard.js, before attach --%>
+	<c:forEach var="script" items="${fcPlugins.dashboardScripts}">
+	<script src="<c:url value='/${script}' />"></script>
+	</c:forEach>
 </head>
 
 <body>

@@ -12,8 +12,12 @@ import java.util.List;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.frontcache.console.model.DashboardStream;
 import org.frontcache.console.model.FrontCacheStatus;
+import org.frontcache.console.plugin.DashboardStreamContributor;
 import org.frontcache.console.service.FrontcacheService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -24,8 +28,14 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 public class IndexController {
 
+	private static final Logger logger = LoggerFactory.getLogger(IndexController.class);
+
 	@Autowired
 	private FrontcacheService frontcacheService;
+
+	/** Console plugins' additions to the realtime page's edge list - none on a Community console. */
+	@Autowired(required = false)
+	private List<DashboardStreamContributor> streamContributors = List.of();
 
 	@RequestMapping(value = {"/", "/index"}, method = RequestMethod.GET)
 	public String index(HttpServletRequest request) {
@@ -58,7 +68,17 @@ public class IndexController {
 		// /edges-status.json a moment after the page paints; see inc/edges_status_stacked.jsp.
 		model.put("edges", frontcacheService.getEdgeList());
 
-		model.put("dashboardStreams", frontcacheService.getDashboardStreams());
+		// a console plugin fills in what the core does not know - the Pro cluster membership
+		List<DashboardStream> streams = frontcacheService.getDashboardStreamList();
+		for (DashboardStreamContributor contributor : streamContributors)
+		{
+			try {
+				contributor.contribute(streams);
+			} catch (RuntimeException e) {
+				logger.warn("A dashboard stream contributor failed - the realtime page renders without it", e);
+			}
+		}
+		model.put("dashboardStreams", frontcacheService.toJson(streams));
 
 		return "realtime";
 	}

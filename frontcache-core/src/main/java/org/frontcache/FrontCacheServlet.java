@@ -18,7 +18,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.frontcache.license.NodeInstance;
+import org.frontcache.module.FrontcacheModules;
+import org.frontcache.module.NodeMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,9 +38,9 @@ public class FrontCacheServlet extends HttpServlet {
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
 
-		// before the engine exists, so the instance's first usage record already says how it is
-		// deployed - a node in filter mode is one application replica (ip-protection-proposal 4.2)
-		NodeInstance.markMode(NodeInstance.Mode.STANDALONE);
+		// before the engine exists, so a module learns how the node is deployed before it starts (the
+		// Pro module's first usage record then says so - a node in filter mode is one application replica)
+		FrontcacheModules.modeKnown(NodeMode.STANDALONE);
 
 		fcEngine = FrontCacheEngine.getFrontCache();
 

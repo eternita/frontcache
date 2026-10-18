@@ -10,6 +10,9 @@
         http://www.springframework.org/schema/context 
         http://www.springframework.org/schema/context/spring-context.xsd ">
  
+	<!-- Console plugins' controllers come in through WebMVCConfig's @Import. A plugin class that also
+	     sits in a scanned package is still ONE bean: Spring keeps the scanned definition and ignores the
+	     import of a class it already has (ConsolePluginWiringTest). -->
 	<context:component-scan base-package="org.frontcache.console.config" />
 	<context:component-scan base-package="org.frontcache.console.web.controllers" />
 

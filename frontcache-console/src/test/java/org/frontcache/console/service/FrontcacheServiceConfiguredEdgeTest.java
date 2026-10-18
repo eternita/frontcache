@@ -141,4 +141,16 @@ public class FrontcacheServiceConfiguredEdgeTest {
 		assertTrue(response.getErrorDescription(), response.getErrorDescription().contains("not one of this console's edges"));
 		assertNothingConnected();
 	}
+
+	// ---- the canonical form itself -------------------------------------------------------------
+
+	@Test
+	public void canonicalEdgeURL() {
+		assertEquals("http://a/", FrontcacheService.canonicalEdgeURL("http://a"));
+		assertEquals("http://a/", FrontcacheService.canonicalEdgeURL("http://a/"));
+		assertEquals("http://a/", FrontcacheService.canonicalEdgeURL(" http://a "));
+		assertEquals("http://a/b/", FrontcacheService.canonicalEdgeURL("http://a/b"));
+		assertEquals("", FrontcacheService.canonicalEdgeURL("   "));
+		assertNull(FrontcacheService.canonicalEdgeURL(null));
+	}
 }

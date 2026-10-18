@@ -9,5 +9,9 @@
  
 	<context:component-scan base-package="org.frontcache.console.service" />
 	<context:component-scan base-package="org.frontcache.console.dao" />
+
+	<!-- Console plugins' root-context beans (services) - org.frontcache.console.plugin.ConsolePlugin.
+	     A plugin class that is also scanned above stays one bean - see ConsolePluginWiringTest. -->
+	<bean class="org.frontcache.console.plugin.ConsolePluginRootConfig"/>
 	
 </beans>

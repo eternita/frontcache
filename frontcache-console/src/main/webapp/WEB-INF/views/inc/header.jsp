@@ -20,19 +20,20 @@
 		<link href="<c:url value='/static/css/fc-edges-status.css' />" rel="stylesheet"></link>
 		<%-- the Configs screens' editor (inc/config_file_editor.jsp) --%>
 		<link href="<c:url value='/static/css/fc-config-editor.css' />" rel="stylesheet"></link>
-		<%-- the Cache Warmer screen (cache_warmer.jsp) --%>
-		<link href="<c:url value='/static/css/fc-warmer.css' />" rel="stylesheet"></link>
+		<%-- a console plugin's stylesheets - org.frontcache.console.plugin.ConsolePlugin#stylesheets --%>
+		<c:forEach var="css" items="${fcPlugins.stylesheets}">
+		<link href="<c:url value='/${css}' />" rel="stylesheet"></link>
+		</c:forEach>
 		<link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/4.2.0/css/font-awesome.css" /></head>
 
 	<body>
 		<div id="mainWrapper">
 		<%@ include file="/WEB-INF/views/inc/menu.jsp"%>
 		<div class="container">
-		<%-- License problems only - an invalid / other-site / older-than-the-build license, or a node count
-		     over the tolerance. From the license service's last poll, never a fan-out; see LicenseSummary
-		     for why an unlicensed Pro feature is not bannered here. --%>
-		<c:forEach var="banner" items="${licenseSummary.banners}">
+		<%-- Banners from console plugins (org.frontcache.console.plugin.ConsoleNoticeProvider) - from state
+		     they already hold, never a fan-out. None on a Community console. --%>
+		<c:forEach var="banner" items="${consoleNotices.banners}">
 			<div class="alert alert-${banner.level}" role="alert" style="margin-top: 10px;">
-				<c:out value="${banner.text}"/> <a href="license" class="alert-link">License</a>
+				<c:out value="${banner.text}"/><c:if test="${not empty banner.href}"> <a href="<c:out value='${banner.href}'/>" class="alert-link"><c:out value="${banner.linkText}"/></a></c:if>
 			</div>
 		</c:forEach>

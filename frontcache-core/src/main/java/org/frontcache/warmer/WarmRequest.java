@@ -73,8 +73,13 @@ public final class WarmRequest {
 		return hex.toString();
 	}
 
-	/** The token the warmer presents. Package-private: nothing outside the warmer has any use for it. */
-	static String token()
+	/**
+	 * The token the warmer presents. Public so the core can hand it to a module through
+	 * {@code ModuleContext.warmRequestToken()} - the warmer's orchestration is a module's, and a
+	 * package-private accessor would work across jars only while both shared a class loader. Nothing else
+	 * has any use for it, and it must never be logged.
+	 */
+	public static String token()
 	{
 		return TOKEN;
 	}

@@ -32,4 +32,4 @@ global.document = {
 
 eval(fs.readFileSync(SCRIPT, "utf8"));
 
-module.exports = { internals: FcDashboard._internals, warnings };
+module.exports = { internals: FcDashboard._internals, FcDashboard: FcDashboard, warnings };
