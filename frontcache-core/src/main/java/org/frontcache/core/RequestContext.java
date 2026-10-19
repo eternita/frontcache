@@ -1,0 +1,1041 @@
+/*
+ * Copyright 2015 Eternita
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.frontcache.core;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+/**
+ * The Request Context holds request, response,  state information and data to access and share.
+ * The RequestContext lives for the duration of the request and is ThreadLocal.
+ * extensions of RequestContext can be substituted by setting the contextClass.
+ * Most methods here are convenience wrapper methods; the RequestContext is an extension of a ConcurrentHashMap
+ *
+ */
+@SuppressWarnings("serial")
+public class RequestContext extends ConcurrentHashMap<String, Object> {
+
+    private static final Logger logger = LoggerFactory.getLogger(RequestContext.class);
+
+    private static final String FRONTCACHE_REQUEST_TYPE = "frontcacheRequestType"; // { toplevel | include }
+    private static final String FRONTCACHE_REQUEST_ID = "frontcacheRequestID"; //
+
+    private static final String FRONTCACHE_TRACE_HEADERS = "frontcacheTraceHeaders";
+
+    public RequestContext() {
+        super();
+        // Created here (not lazily) so that the copies made by the include processor -
+        // new RequestContext() + putAll(parent) - inherit the *same* buffer instance.
+        put(FRONTCACHE_TRACE_HEADERS, new ConcurrentHashMap<String, String>());
+    }
+
+    /**
+     * Buffer for the X-frontcache-trace-* headers.
+     *
+     * Includes are resolved on the include-processor's worker threads, but HttpServletResponse (and
+     * Jetty's underlying HttpFields) is NOT thread safe - concurrent setHeader() calls corrupt the
+     * field list (NPE in HttpFields$Mutable$Wrapper.put) and a late/timed-out include can hit an
+     * already committed or recycled response. So worker threads only fill this map; the request
+     * thread flushes it onto the response right before the body is written.
+     *
+     * @return the shared (thread safe) trace header buffer of this request
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, String> getTraceHeaders() {
+        return (Map<String, String>) computeIfAbsent(FRONTCACHE_TRACE_HEADERS, k -> new ConcurrentHashMap<String, String>());
+    }
+
+
+    /**
+     * Convenience method to return a boolean value for a given key
+     *
+     * @param key
+     * @return true or false depending what was set. default is false
+     */
+    public boolean getBoolean(String key) {
+        return getBoolean(key, false);
+    }
+
+    /**
+     * Convenience method to return a boolean value for a given key
+     *
+     * @param key
+     * @param defaultResponse
+     * @return true or false depending what was set. default defaultResponse
+     */
+    public boolean getBoolean(String key, boolean defaultResponse) {
+        Boolean b = (Boolean) get(key);
+        if (b != null) {
+            return b.booleanValue();
+        }
+        return defaultResponse;
+    }
+
+    /**
+     * sets a key value to Boolen.TRUE
+     *
+     * @param key
+     */
+    public void set(String key) {
+        put(key, Boolean.TRUE);
+    }
+
+    /**
+     * puts the key, value into the map. a null value will remove the key from the map
+     *
+     * @param key
+     * @param value
+     */
+    public void set(String key, Object value) {
+        if (value != null) put(key, value);
+        else remove(key);
+    }
+
+    /**
+     * @return the HttpServletRequest from the "request" key
+     */
+    public HttpServletRequest getRequest() {
+        return (HttpServletRequest) get("request");
+    }
+
+    /**
+     * sets the HttpServletRequest into the "request" key
+     *
+     * @param request
+     */
+    public void setRequest(HttpServletRequest request) {
+        put("request", request);
+    }
+
+    /**
+     * @return the HttpServletResponse from the "response" key
+     */
+    public HttpServletResponse getResponse() {
+        return (HttpServletResponse) get("response");
+    }
+
+    /**
+     * sets the "response" key to the HttpServletResponse passed in
+     *
+     * @param response
+     */
+    public void setResponse(HttpServletResponse response) {
+        set("response", response);
+    }
+
+    /**
+     * returns a set throwable
+     *
+     * @return a set throwable
+     */
+    public Throwable getThrowable() {
+        return (Throwable) get("throwable");
+
+    }
+
+    /**
+     * sets a throwable
+     *
+     * @param th
+     */
+    public void setThrowable(Throwable th) {
+        put("throwable", th);
+
+    }
+
+    /**
+     * sets frontCacheHost
+     *
+     * @param frontCacheHost a URL
+     */
+    public void setFrontCacheHost(String frontCacheHost) {
+        set("frontCacheHost", frontCacheHost);
+    }
+
+    /**
+     * @return "frontCacheHost" URL
+     */
+    public String getFrontCacheHost() {
+        return (String) get("frontCacheHost");
+    }
+
+    /**
+     *
+     * @param frontCacheProtocol
+     */
+    public void setFrontCacheProtocol(String frontCacheProtocol) {
+        set("frontCacheProtocol", frontCacheProtocol);
+    }
+
+    /**
+     *
+     * @return
+     */
+    public String getFrontCacheProtocol() {
+        return (String) get("frontCacheProtocol");
+    }
+
+    /**
+     * The site's public hostname (front-cache.default-domain), or null when the node has none
+     * configured.
+     *
+     * This is NOT {@link #getFrontCacheHost()} and the two must not be confused - that is the whole
+     * of docs/archive/guard-redirect-url-host-fix.md. getFrontCacheHost() is the Host header as it arrived,
+     * which is what predicates match, what the log lines record and what the cache key is built
+     * from; a node is reachable under several of them (the CDN's, an internal alias, its own name,
+     * a bare IP). This one is the single name we are willing to hand to a browser.
+     *
+     * Null means "not configured" - callers fall back to the arriving host. See
+     * FrontCacheEngine.getPublicDomain(), which is what maps the unset/placeholder property values
+     * onto null.
+     */
+    public void setPublicHost(String publicHost) {
+        set("publicHost", publicHost);
+    }
+
+    /**
+     * @return the site's public hostname, or null when none is configured
+     */
+    public String getPublicHost() {
+        return (String) get("publicHost");
+    }
+
+    /**
+     * The scheme the client actually used, recovered from X-Forwarded-Proto (trusted peers only) or
+     * front-cache.public-scheme.
+     *
+     * Separate from {@link #getFrontCacheProtocol()}, which stays the scheme of the connection as
+     * this process saw it. Behind a TLS-terminating proxy the two differ, and the cache key is built
+     * from the latter - so overloading it would silently re-key the whole cache. Only URLs we emit
+     * to a client read this one.
+     */
+    public void setPublicProtocol(String publicProtocol) {
+        set("publicProtocol", publicProtocol);
+    }
+
+    /**
+     * @return the public scheme, or null when it could not be established (fall back to
+     *         {@link #getFrontCacheProtocol()})
+     */
+    public String getPublicProtocol() {
+        return (String) get("publicProtocol");
+    }
+
+    public void setOriginURL(URL originURL) {
+        set("originURL", originURL);
+    }
+
+    public URL getOriginURL() {
+        return (URL) get("originURL");
+    }
+
+
+    /**
+     * sets the "responseBody" value as a String. This is the response sent back to the client.
+     *
+     * @param body
+     */
+    public void setResponseBody(String body) {
+        set("responseBody", body);
+    }
+
+    /**
+     * @return the String response body to be snt back to the requesting client
+     */
+    public String getResponseBody() {
+        return (String) get("responseBody");
+    }
+
+    /**
+     * sets the InputStream of the response into the responseDataStream
+     *
+     * @param responseDataStream
+     */
+    public void setResponseDataStream(InputStream responseDataStream) {
+        set("responseDataStream", responseDataStream);
+    }
+
+    /**
+     * sets the flag responseGZipped if the response is gzipped
+     *
+     * @param gzipped
+     */
+    public void setResponseGZipped(boolean gzipped) {
+        put("responseGZipped", gzipped);
+    }
+
+    /**
+     * @return true if responseGZipped is true (the response is gzipped)
+     */
+    public boolean getResponseGZipped() {
+        return getBoolean("responseGZipped", true);
+    }
+
+
+    /**
+     * @return the InputStream Response
+     */
+    public InputStream getResponseDataStream() {
+        return (InputStream) get("responseDataStream");
+    }
+
+    /**
+     * returns the response status code. Default is 200
+     *
+     * @return
+     */
+    public int getResponseStatusCode() {
+        return get("responseStatusCode") != null ? (Integer) get("responseStatusCode") : 500;
+    }
+
+
+    /**
+     * Use this instead of response.setStatusCode()
+     *
+     * @param nStatusCode
+     */
+    public void setResponseStatusCode(int nStatusCode) {
+        getResponse().setStatus(nStatusCode);
+        set("responseStatusCode", nStatusCode);
+    }
+
+    /**
+     * the Origin response headers
+     *
+     * @return the List<Pair<String, String>> of headers sent back from the origin
+     */
+    @SuppressWarnings("unchecked")
+	public Map<String, List<String>> getOriginResponseHeaders() {
+        if (get("originResponseHeaders") == null) {
+        	Map<String, List<String>> originResponseHeaders = new HashMap<String, List<String>>();
+            putIfAbsent("originResponseHeaders", originResponseHeaders);
+        }
+        return (Map<String, List<String>>) get("originResponseHeaders");
+    }
+
+    /**
+     * check if response has "Content-Type" header with "text" inside
+     * @return
+     */
+    public boolean isCacheableResponse()
+    {
+    	Map<String, List<String>> originResponseHeaders = getOriginResponseHeaders();
+
+		for (String key : originResponseHeaders.keySet()) {
+			for (String value : originResponseHeaders.get(key)) {
+				if (FCHeaders.CONTENT_TYPE.equals(key)
+						&& -1 < value.indexOf("text"))
+					return true;
+			}
+		}
+    	return false;
+    }
+
+    /**
+     *
+     * @return
+     */
+    public boolean isCacheableRequest()
+    {
+
+    	if ("GET".equals(this.getRequest().getMethod().toUpperCase()))
+    		return true;
+
+    	if ("HEAD".equals(this.getRequest().getMethod().toUpperCase()))
+    		return true;
+
+//    	if (-1 < this.getRequestURI().indexOf("jsessionid="))
+//    		return false;
+
+    	return false;
+    	//bot's send requests without header (accept=text/html) #36
+//        final String requestEncoding = this.getRequest().getHeader(FCHeaders.ACCEPT);
+//        return requestEncoding != null && requestEncoding.toLowerCase().contains("text");
+    }
+
+    /**
+     * adds a header to the origin response headers
+     *
+     * @param name
+     * @param value
+     */
+    public void addOriginResponseHeader(String name, String value) {
+
+    	Map<String, List<String>> originResponseHeaders = getOriginResponseHeaders();
+
+		List<String> hValues = originResponseHeaders.get(name);
+		if(null == hValues)
+		{
+			hValues = new ArrayList<String>();
+			originResponseHeaders.put(name, hValues);
+		}
+		hValues.add(value);
+    }
+
+    /**
+     * returns the content-length of the origin response
+     *
+     * @return the content-length of the origin response
+     */
+    public Long getOriginContentLength() {
+        return (Long) get("originContentLength");
+    }
+
+    /**
+     * sets the content-length from the origin response
+     *
+     * @param v
+     */
+    public void setOriginContentLength(Long v) {
+        set("originContentLength", v);
+    }
+
+    public void setRequestURI(String uri)
+    {
+        set("requestURI", uri);
+    }
+
+    public String getRequestURI()
+    {
+    	return (String) get("requestURI");
+    }
+
+    public void setRequestQueryString(String requestQueryString)
+    {
+        set("requestQueryString", requestQueryString);
+    }
+
+    public String getRequestQueryString()
+    {
+    	return (String) get("requestQueryString");
+    }
+
+    /**
+     * sets the content-length from the origin response
+     *
+     * @param v parses the string into an int
+     */
+    public void setOriginContentLength(String v) {
+        try {
+            final Long i = Long.valueOf(v);
+            set("originContentLength", i);
+        } catch (NumberFormatException e) {
+        	e.printStackTrace();
+        }
+    }
+
+    /**
+     * @return true if the request body is chunked
+     */
+    public boolean isChunkedRequestBody() {
+        final Object v = get("chunkedRequestBody");
+        return (v != null) ? (Boolean) v : false;
+    }
+
+    /**
+     * sets chunkedRequestBody to true
+     */
+    public void setChunkedRequestBody() {
+        this.set("chunkedRequestBody", Boolean.TRUE);
+    }
+
+    /**
+     * @return true is the client request can accept gzip encoding. Checks the "accept-encoding" header
+     */
+    public boolean isGzipRequested() {
+        final String requestEncoding = this.getRequest().getHeader(FCHeaders.ACCEPT_ENCODING);
+        return requestEncoding != null && requestEncoding.toLowerCase().contains("gzip");
+    }
+
+    /**
+     * @return Map<String, List<String>>  of the request Query Parameters
+     */
+    @SuppressWarnings("unchecked")
+	public Map<String, List<String>> getRequestQueryParams() {
+        return (Map<String, List<String>>) get("requestQueryParams");
+    }
+
+    /**
+     * sets the request query params list
+     *
+     * @param qp Map<String, List<String>> qp
+     */
+    public void setRequestQueryParams(Map<String, List<String>> qp) {
+        put("requestQueryParams", qp);
+    }
+
+    public ClassicHttpResponse getHttpClientResponse() {
+        return (ClassicHttpResponse) get("httpClientResponse");
+    }
+
+    public void setHttpClientResponse(ClassicHttpResponse response) {
+    	this.set("httpClientResponse", response);
+    }
+
+    /**
+     * How many of the two parties (the command worker thread that opens the origin response, and
+     * the request thread that streams its body to the client) are done with it.
+     * Not carried over by copy() - a copied context is a fresh exchange.
+     */
+    private final transient AtomicInteger httpClientResponseParties = new AtomicInteger(0);
+
+    /**
+     * Releases the origin response opened by FC_BypassCache, closing it once BOTH parties are done.
+     *
+     * The response is opened on a command worker thread but its body is streamed by the request
+     * thread, so neither thread can close it unilaterally. On a command TIMEOUT the request thread
+     * finishes early (through the fallback) while the worker is still inside httpclient.execute() -
+     * a blocking socket read ignores the interrupt - and then stashes a response nobody is left to
+     * close, leaking the pooled connection permanently (leased entries are never reclaimed by
+     * closeExpiredConnections). Both threads call this in a finally; whichever arrives last does the
+     * close, so the connection is returned exactly once no matter which one wins the race.
+     */
+    public void releaseHttpClientResponse() {
+
+    	if (2 > httpClientResponseParties.incrementAndGet())
+    		return; // the other party is still using the response (or has yet to open it)
+
+    	ClassicHttpResponse response = getHttpClientResponse();
+    	if (null == response)
+    		return; // no origin response was ever opened (filter mode, or the call failed)
+
+    	try {
+    		response.close();
+    	} catch (IOException e) {
+    		logger.error("Can't close origin response for " + get("currentRequestURL"), e);
+    	}
+    }
+
+    /**
+     * The fallback to serve instead of the origin response, parked here by FC_BypassCache.getFallback().
+     *
+     * The fallback is resolved on the command worker thread but written by the request thread, which is the
+     * only thread that may touch the servlet output stream in bypass mode. Writing it from
+     * getFallback() instead raced with the request thread's own writeResponse(): the fallback body
+     * went out first, then addResponseHeaders() stamped the context status over it - which defaults
+     * to 500 - and any origin body that arrived late was appended to it. Whenever the fallback was
+     * smaller than the container's response buffer (32KB in Jetty) the response was not yet committed
+     * when that happened, so the status actually took effect and the client got a 500.
+     */
+    public void setFallbackWebResponse(WebResponse webResponse) {
+        set("fallbackWebResponse", webResponse);
+    }
+
+    public WebResponse getFallbackWebResponse() {
+        return (WebResponse) get("fallbackWebResponse");
+    }
+
+    public void setFrontCacheHttpPort(String frontCacheHttpPort) {
+        set("frontCacheHttpPort", frontCacheHttpPort);
+    }
+
+    public String getFrontCacheHttpPort() {
+        return (String) get("frontCacheHttpPort");
+    }
+
+    public void setFrontCacheHttpsPort(String frontCacheHttpsPort) {
+        set("frontCacheHttpsPort", frontCacheHttpsPort);
+    }
+
+    public String getFrontCacheHttpsPort() {
+        return (String) get("frontCacheHttpsPort");
+    }
+
+    public void setFilterChain(FilterChain filterChain) {
+        set("filterChain", filterChain);
+    }
+
+    public FilterChain getFilterChain() {
+        return (FilterChain) get("filterChain");
+    }
+
+    /**
+     * Check if run as ServletFilter
+     *
+     * @return
+     */
+    public boolean isFilterMode()
+    {
+    	if (null != getFilterChain())
+    		return true;
+
+    	return false;
+    }
+
+    /**
+     *
+     * @param frontCacheId
+     */
+    public void setFrontCacheId(String frontCacheId) {
+        set("frontCacheId", frontCacheId);
+    }
+
+    /**
+     *
+     * @return
+     */
+    public String getFrontCacheId() {
+        return (String) get("frontCacheId");
+    }
+
+    /*
+     * The two context keys below keep their pre-2.7 spelling on purpose, unlike the accessors around
+     * them. They are map keys inside a RequestContext, so nothing outside this process reads them - but
+     * a fallback resolver or include processor compiled against 2.6 and dropped onto 2.7 does, via
+     * get()/set(), and renaming the key would make such a plugin stop seeing the flag rather than fail
+     * to link. See the rename plan in docs/archive/hystrix-to-resilience4j-proposal.md section 8.
+     */
+
+    public void setFallbackUsed() {
+        set("hystrixError", true);
+    }
+
+    public void setFallbackUsed(String reason) {
+        set("hystrixError", true);
+        if (null != reason)
+            set("hystrixErrorReason", reason);
+    }
+
+    public boolean isFallbackUsed() {
+        return getBoolean("hystrixError", false);
+    }
+
+    /**
+     * @return the failure category (short-circuited|timeout|rejected|bad-request|failure) when known,
+     *         otherwise "error". Only meaningful when {@link #isFallbackUsed()} is true.
+     */
+    public String getFallbackReason() {
+        Object reason = get("hystrixErrorReason");
+        return (null != reason) ? reason.toString() : "error";
+    }
+
+    public void setRequestType(String frontcacheRequestType) {
+        set(FRONTCACHE_REQUEST_TYPE, frontcacheRequestType);
+    }
+
+    public String getRequestType() {
+        return (String) get(FRONTCACHE_REQUEST_TYPE);
+    }
+
+    public void setRequestId(String frontcacheRequestId) {
+        set(FRONTCACHE_REQUEST_ID, frontcacheRequestId);
+    }
+
+    public String getRequestId() {
+        return (String) get(FRONTCACHE_REQUEST_ID);
+    }
+
+    public void setRequestFromFrontcache() {
+        set("RequestFromFrontcache", true);
+    }
+
+    public boolean getRequestFromFrontcache() {
+        return getBoolean("RequestFromFrontcache", false);
+    }
+
+    /**
+     * The request carried this node's {@code front-cache.edge-token} - it came from a Frontcache of
+     * the same chain, not straight from a client. Decided once, in {@code FrontCacheEngine.init()},
+     * and read by the {@code edge-token} guard predicate.
+     *
+     * Unlike {@link #getRequestFromFrontcache()}, which only says a request-id header was present,
+     * this cannot be claimed by a client - see {@code EdgeToken}.
+     */
+    public void setEdgeTokenValid(boolean valid) {
+        set("EdgeTokenValid", valid);
+    }
+
+    public boolean isEdgeTokenValid() {
+        return getBoolean("EdgeTokenValid", false);
+    }
+
+
+	public String getCurrentRequestURL() {
+		return (String) get("currentRequestURL");
+	}
+
+
+	public void setCurrentRequestURL(String currentRequestURL) {
+        set("currentRequestURL", currentRequestURL);
+	}
+
+	/**
+	 * Names of the cookies the client sent, parsed once per request and memoized.
+	 *
+	 * Used by the guard rules (org.frontcache.guard), which run on every request before cache and
+	 * origin - so a request pays for cookie parsing only when some rule asks about a cookie, and
+	 * never more than once. Names only: guard rules test presence and must not read, compare or log
+	 * cookie values.
+	 *
+	 * @return cookie names, empty when there is no (or no longer a) usable servlet request
+	 */
+	@SuppressWarnings("unchecked")
+	public Set<String> getCookieNames() {
+
+		Object cached = get("cookieNames");
+		if (null != cached)
+			return (Set<String>) cached;
+
+		Set<String> names = new HashSet<String>();
+		HttpServletRequest request = getRequest();
+		if (null != request)
+		{
+			try {
+				Cookie[] cookies = request.getCookies();
+				if (null != cookies)
+					for (Cookie cookie : cookies)
+						names.add(cookie.getName());
+			} catch (Exception e) {
+				// recycled request (async include resolved after the response completed) - the
+				// cookies are simply unknown by then; treat them as absent rather than failing.
+			}
+		}
+
+		set("cookieNames", names);
+		return names;
+	}
+
+	// bot | guest
+	public String getClientType() {
+		return (String) get("currentClientType");
+	}
+
+	// bot | guest
+	public void setClientType(String currentClientType) {
+        set("currentClientType", currentClientType);
+	}
+
+    private static final String CLIENT_IP = "clientIP";
+
+    /**
+     * The client IP of this request, resolved once.
+     *
+     * {@link FCUtils#getClientIP} walks up to thirteen candidate headers, and it used to be called
+     * afresh for every log line - once per request, again per include, again on the origin call.
+     * Resolving it once per exchange makes those free.
+     *
+     * The engine stamps it in init(), on the request thread while the servlet request is still live,
+     * which is also what makes it CORRECT for work that outlives the request: an async include runs
+     * after the container has recycled the request, where a late resolve can only answer
+     * "unresolved". A context built outside the engine (a copy, a test) resolves lazily here instead.
+     */
+    public String getClientIP() {
+        String clientIP = (String) get(CLIENT_IP);
+        if (null == clientIP) {
+            clientIP = FCUtils.getClientIP(getRequest());
+            set(CLIENT_IP, clientIP);
+        }
+        return clientIP;
+    }
+
+    public void setClientIP(String clientIP) {
+        set(CLIENT_IP, clientIP);
+    }
+
+    private static final String RATE_LIMIT_KEY = "rateLimitKey";
+    private static final String RATE_LIMIT_KEY_NONE = ""; // sentinel: resolved, and there is no answer
+
+    /**
+     * The trustworthy client address, resolved once per request.
+     *
+     * Deliberately NOT {@link #getClientIP()}. That one walks thirteen client-supplied headers and
+     * returns the first non-empty value, which is right for a log column and would let any client
+     * mint itself a fresh counter per request - or claim a crawler's address - by sending its own
+     * X-Forwarded-For. This goes through {@link ClientIpResolver}, which reads a forwarding header
+     * only from a configured trusted proxy and walks it right to left. The two can legitimately
+     * disagree, which is why the guard log line carries this one explicitly.
+     *
+     * Two callers, both of which must never see a spoofable value: the rate limiter's counter key,
+     * and the {@code client-ip:} predicate used by guard rules and by bots.conf classification.
+     *
+     * @return canonical client address, or null when it cannot be established
+     */
+    public String getResolvedClientIP() {
+        String key = (String) get(RATE_LIMIT_KEY);
+        if (null == key) {
+            key = ClientIpResolver.getInstance().resolve(getRequest());
+            // ConcurrentHashMap cannot hold a null, and "unresolved" must not be re-resolved per
+            // predicate, so an empty string stands for "resolved to nothing"
+            set(RATE_LIMIT_KEY, (null != key) ? key : RATE_LIMIT_KEY_NONE);
+        }
+        return RATE_LIMIT_KEY_NONE.equals(key) ? null : key;
+    }
+
+    /**
+     * @return {@link #getResolvedClientIP()} - the name the rate limiter knows it by
+     */
+    public String getRateLimitKey() {
+        return getResolvedClientIP();
+    }
+
+    private static final String USER_AGENT = "userAgent";
+    private static final String USER_AGENT_NONE = ""; // sentinel: read, and there was none
+
+    /**
+     * The User-Agent header, read once per request.
+     *
+     * Memoized for the same reason the cookie names are: bot classification asks several rules for
+     * it on every request, and an async include's servlet request may be recycled by the time one
+     * of them asks - in which case the answer is "no user agent", not an exception.
+     *
+     * @return the header value, or null when there is none (or it is no longer readable)
+     */
+    public String getUserAgent() {
+        String userAgent = (String) get(USER_AGENT);
+        if (null == userAgent) {
+            String value = null;
+            HttpServletRequest request = getRequest();
+            if (null != request) {
+                try {
+                    value = request.getHeader("User-Agent");
+                } catch (Exception e) {
+                    // recycled request - undecidable, treat as absent
+                }
+            }
+            userAgent = (null != value) ? value : USER_AGENT_NONE;
+            set(USER_AGENT, userAgent);
+        }
+        return USER_AGENT_NONE.equals(userAgent) ? null : userAgent;
+    }
+
+    private static final String CLIENT_TYPE_RULE = "clientTypeRule";
+
+    /**
+     * Name of the bots.conf rule that decided {@link #getClientType()}. Kept for diagnostics; the
+     * client type itself is what everything downstream reads.
+     */
+    public String getClientTypeRule() {
+        return (String) get(CLIENT_TYPE_RULE);
+    }
+
+    public void setClientTypeRule(String ruleName) {
+        if (null != ruleName)
+            set(CLIENT_TYPE_RULE, ruleName);
+    }
+
+    private static final String WARM_MODE = "warmMode";
+    private static final String WARM_RESULT = "warmResult";
+
+    /**
+     * Marks this request as the cache warmer's - set by the engine only after the warm token checked
+     * out (see {@code org.frontcache.warmer.WarmRequest}). Nothing a client sends can set it.
+     *
+     * @param mode {@code fill} | {@code refresh}
+     */
+    public void setWarmRequest(String mode) {
+        set(WARM_MODE, mode);
+    }
+
+    public boolean isWarmRequest() {
+        return null != get(WARM_MODE);
+    }
+
+    /** @return {@code fill} | {@code refresh}, or null when this is not a warm request */
+    public String getWarmMode() {
+        return (String) get(WARM_MODE);
+    }
+
+    /**
+     * What the cache processor did with a warm request - reported to the warmer as
+     * {@code x-frontcache-warm-result}. Recorded on warm requests only.
+     */
+    public void setWarmResult(String result) {
+        if (null != result)
+            set(WARM_RESULT, result);
+    }
+
+    public String getWarmResult() {
+        return (String) get(WARM_RESULT);
+    }
+
+    private static final String GUARD_PROBE = "guardProbe";
+
+    /**
+     * Marks a synthetic context built for a load-time guard self-check (redirect-loop detection,
+     * the exemption warnings) rather than for a real request. Predicates with side effects - today,
+     * the rate limiter - must do nothing for one of these.
+     */
+    public void setGuardProbe() {
+        set(GUARD_PROBE);
+    }
+
+    public boolean isGuardProbe() {
+        return getBoolean(GUARD_PROBE);
+    }
+
+    private static final String GUARD_RETRY_AFTER_SECONDS = "guardRetryAfterSeconds";
+
+    /**
+     * Seconds until a rate-limited client's window rolls over, stashed by the rate predicate and
+     * emitted as Retry-After by the guard response.
+     */
+    public void setGuardRetryAfterSeconds(int seconds) {
+        set(GUARD_RETRY_AFTER_SECONDS, Integer.valueOf(seconds));
+    }
+
+    /**
+     * @return the Retry-After value in seconds, or 0 when the matching rule had nothing to say
+     */
+    public int getGuardRetryAfterSeconds() {
+        Integer seconds = (Integer) get(GUARD_RETRY_AFTER_SECONDS);
+        return (null != seconds) ? seconds.intValue() : 0;
+    }
+
+	public RequestContext copy() {
+
+		RequestContext copy = new RequestContext();
+
+		copy.putAll(this);
+		copy.setRequestId(UUID.randomUUID().toString());
+
+		return copy;
+	}
+
+    /**
+     * The site this node serves (front-cache.default-domain), stamped on the context by the engine.
+     * Used for request logging, cache-entry ownership and the command group key.
+     */
+    public void setDomain(String domain) {
+        set("domain", domain);
+    }
+
+    public String getDomain() {
+        return (String) get("domain");
+    }
+
+    public void setLogToHTTPHeaders() {
+        set("LogToHTTPHeaders", true);
+    }
+
+    public boolean getLogToHTTPHeaders() {
+        return getBoolean("LogToHTTPHeaders", false);
+    }
+
+    public void setIncludeLevel(String includeLevel) {
+        set("IncludeLevel", includeLevel);
+    }
+
+    public String getIncludeLevel() {
+        return get("IncludeLevel") != null ? (String) get("IncludeLevel") : "0";
+    }
+
+    public void setToplevelCached() {
+        set("ToplevelCached", true);
+    }
+
+    public boolean isToplevelCached() {
+        return getBoolean("ToplevelCached", false);
+    }
+
+
+	/**
+	 * A bounded, one-line summary for diagnostics - NOT a dump of the map.
+	 *
+	 * This used to be {@code super.toString()} (every entry, including the HttpServletRequest, the
+	 * HttpServletResponse, the open origin ClassicHttpResponse and the whole origin header map) put
+	 * through a freshly-compiled regex to squash newlines.
+	 *
+	 * The reason that mattered is where it is called from: all four command fallbacks log it - so it
+	 * runs on EVERY request precisely when the origin is failing and every request is taking the
+	 * fallback path. The log line meant to help diagnose an outage was amplifying the load during one,
+	 * and it dragged whole request/response objects through their own toString() to do it.
+	 *
+	 * Fixed fields, so there is nothing to escape: none of them can contain a newline, and the URI and
+	 * query string are the only caller-influenced values - they are length-capped rather than
+	 * pattern-matched.
+	 */
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder(160);
+		sb.append("RequestContext: requestId=").append(getRequestId())
+			.append(", type=").append(getRequestType())
+			.append(", includeLevel=").append(getIncludeLevel())
+			.append(", clientType=").append(getClientType())
+			.append(", uri=").append(clip(getRequestURI()))
+			.append(clip(getRequestQueryString()))
+			.append(", fallbackUsed=").append(isFallbackUsed());
+
+		// getFallbackReason() answers "error" rather than null when nothing set one, so it is only
+		// meaningful - and only worth printing - once a fallback has actually fired
+		if (isFallbackUsed())
+			sb.append(", fallbackReason=").append(getFallbackReason());
+
+		return sb.toString();
+	}
+
+	/**
+	 * Makes a caller-supplied value safe to put in a log line: capped in length, and with any CR/LF
+	 * flattened to spaces.
+	 *
+	 * The line-break handling is not cosmetic. This goes into a single log record, and a newline in a
+	 * request URI would let a caller forge additional log entries. The version this replaced got the
+	 * same property by running a regex over the whole rendered string; doing it here means only the
+	 * two caller-influenced fields are scanned, and nothing is allocated unless there is something to
+	 * fix - which is the normal case, since containers reject a raw CR/LF in the request line anyway.
+	 */
+	private static String clip(String value) {
+		if (null == value)
+			return "";
+
+		String capped = (MAX_LOGGED_VALUE_LENGTH >= value.length())
+				? value
+				: value.substring(0, MAX_LOGGED_VALUE_LENGTH) + "...";
+
+		int firstBreak = -1;
+		for (int i = 0; i < capped.length(); i++)
+		{
+			char c = capped.charAt(i);
+			if ('\n' == c || '\r' == c)
+			{
+				firstBreak = i;
+				break;
+			}
+		}
+		if (0 > firstBreak)
+			return capped; // the common case - nothing to rewrite, nothing to allocate
+
+		char[] flattened = capped.toCharArray();
+		for (int i = firstBreak; i < flattened.length; i++)
+			if ('\n' == flattened[i] || '\r' == flattened[i])
+				flattened[i] = ' ';
+
+		return new String(flattened);
+	}
+
+	private static final int MAX_LOGGED_VALUE_LENGTH = 256;
+
+
+}

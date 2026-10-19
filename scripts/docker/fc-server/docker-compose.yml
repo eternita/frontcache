@@ -1,0 +1,67 @@
+# Frontcache stack: the standalone server, plus the console under an opt-in profile.
+#
+# Frontcache alone, plain HTTP on 9080. It does not terminate TLS and has no front door of
+# its own - see examples/front-door in the public repo for a worked nginx one.
+#
+# Both services run PUBLISHED images - the images are built by
+# scripts/docker/build-push-images.sh from the release archives, not by compose. That is
+# what lets a customer run this file with nothing but Docker and a `docker compose pull`.
+# For local development, build them first with `./build-push-images.sh local`, which is
+# what start-fc-server.sh does.
+#
+#   cp .env.example .env && $EDITOR .env
+#   docker compose up -d                      # server only
+#   docker compose --profile console up -d    # server + console
+#
+name: frontcache
+
+services:
+  fc-server:
+    image: "${FC_IMAGE_SERVER:-pavlikovskiy/frontcache-server}:${FC_VERSION:-local}"
+    container_name: fc-server
+    restart: unless-stopped
+    ports:
+      # Plain HTTP. Frontcache does not terminate TLS - put your front door in front of this
+      # port, and publish it on loopback (FC_BIND=127.0.0.1) when you do.
+      - "${FC_BIND:-0.0.0.0}:${FC_HTTP_PORT:-9080}:${FRONTCACHE_HTTP_PORT:-9080}"
+    environment:
+      # The backend. Leave ORIGIN_HOST empty to let the mounted frontcache.properties own the
+      # setting - see seed-conf.sh.
+      ORIGIN_HOST: "${ORIGIN_HOST:-}"
+      FRONTCACHE_HTTP_PORT: "${FRONTCACHE_HTTP_PORT:-9080}"
+    volumes:
+      # conf: a named volume by default; set FC_CONF_DIR=./conf in .env for a host bind
+      # mount instead, which is the production recommendation (inspectable, and it can live
+      # in your own config repo). Either way the entrypoint seeds only MISSING files, so an
+      # image upgrade adds new config without touching what you have edited.
+      - "${FC_CONF_DIR:-fc-conf}:/opt/frontcache-server/FRONTCACHE_HOME/conf"
+      # the L2 Lucene index: pure cache, safe to drop at any time
+      - fc-cache:/opt/frontcache-server/FRONTCACHE_HOME/cache
+      - fc-logs:/opt/frontcache-server/FRONTCACHE_HOME/logs
+
+  fc-console:
+    # opt-in: `docker compose --profile console up -d`
+    profiles: ["console"]
+    image: "${FC_IMAGE_CONSOLE:-pavlikovskiy/frontcache-console}:${FC_VERSION:-local}"
+    container_name: fc-console
+    restart: unless-stopped
+    ports:
+      # Loopback ONLY by default. The console has no authentication of its own and can
+      # invalidate cache across the whole fleet - do not publish it to a public interface.
+      - "${FC_CONSOLE_BIND:-127.0.0.1}:${FC_CONSOLE_PORT:-7080}:7080"
+    environment:
+      # Nodes to monitor, comma-separated. The default reaches the server in this stack over
+      # the compose network. FC_API_KEY must match each node's front-cache.api-key.
+      FC_NODES: "${FC_NODES:-http://fc-server:9080/}"
+      FC_API_KEY: "${FC_API_KEY:-}"
+    volumes:
+      - "${FC_CONSOLE_CONF_DIR:-fc-console-conf}:/opt/frontcache-console/conf"
+    depends_on:
+      fc-server:
+        condition: service_healthy
+
+volumes:
+  fc-conf:
+  fc-cache:
+  fc-logs:
+  fc-console-conf:

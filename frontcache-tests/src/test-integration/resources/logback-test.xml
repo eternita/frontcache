@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+  Logging for the e2e TEST-CLIENT JVM (Gradle's "Test worker" thread).
+
+  This is a separate JVM from the two embedded Jetty servers, which are configured by
+  FRONTCACHE_HOME_{FILTER,STANDALONE}/conf/fc-logback.xml via -Dlogback.configurationFile.
+  The test worker had NO logback configuration on its classpath at all, so logback fell back
+  to its built-in default: a console appender on a root logger at DEBUG. That is where lines
+  like
+
+      [Test worker] DEBUG org.apache.http.wire : http-outgoing-8 >> "Sec-Fetch-User: ?1[CR][LF]"
+
+  came from - Apache HttpClient's wire log, dumping every header of every request HtmlUnit
+  makes, plus HtmlUnit's own DEBUG. Together roughly 40,000 lines per run.
+
+  Root is INFO here. The two libraries below are pinned lower still, because they are noisy
+  even at INFO and neither says anything useful about a Frontcache test:
+
+    org.apache.http  - wire/header dumps and connection-pool bookkeeping
+    org.htmlunit     - JS engine config, window lifecycle, and CSS/JS warnings from pages the
+                       tests deliberately feed it
+
+  To debug one failing test, raise just what you need rather than the root, e.g.
+      <logger name="org.apache.http.wire" level="DEBUG"/>
+-->
+<configuration>
+
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<logger name="org.apache.http" level="WARN" />
+	<logger name="org.htmlunit"    level="WARN" />
+
+	<root level="INFO">
+		<appender-ref ref="STDOUT" />
+	</root>
+
+</configuration>

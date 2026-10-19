@@ -1,0 +1,505 @@
+/*
+ * Copyright 2015 Eternita
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.frontcache.cache.impl;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Properties;
+
+import org.frontcache.FCConfig;
+import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheStats;
+import org.frontcache.cache.FcCacheMetrics;
+import org.frontcache.cache.CacheProcessorBase;
+import org.frontcache.core.FCHeaders;
+import org.frontcache.core.FCUtils;
+import org.frontcache.core.WebResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import net.sf.ehcache.Cache;
+import net.sf.ehcache.CacheManager;
+import net.sf.ehcache.Element;
+
+
+/**
+ * Cache processor based on
+ *
+ * L1 - ehCache.
+ * L2 - Apache Lucene.
+ *
+ */
+public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProcessor {
+
+	private static final Logger logger = LoggerFactory.getLogger(L1L2CacheProcessor.class);
+
+	// L1
+	private static final String DEFAULT_EHCACHE_CONFIG_FILE = "fc-l1-ehcache-config.xml";
+
+	private static final String EHCACHE_CONFIG_FILE_KEY = "front-cache.cache-processor.impl.ehcache-config";
+
+	private static final String FRONT_CACHE = "FRONT_CACHE"; // cache name inside config file (e.g. ehcache-config.xml)
+
+	private CacheManager ehCacheManager = null;
+
+	private Cache ehCache = null;
+
+	/**
+	 * L1's content-byte counter, fed by Ehcache's own event notifications. Created per init() because it
+	 * is bound to one cache instance - see {@link L1ByteCounter} for why the number cannot simply be
+	 * read from Ehcache or counted at the put site.
+	 */
+	private L1ByteCounter l1Bytes = null;
+
+    // L2
+	// Package-private so a test in this package can compare the cheap doc count the metrics gauge uses
+	// against the reader-opening one the management API uses. Nothing outside this package reads it.
+	LuceneIndexManager luceneIndexManager;
+
+	private static String CACHE_BASE_DIR_DEFAULT = "/tmp/cache/";
+
+	private static final String CACHE_BASE_DIR_KEY = "front-cache.cache-processor.impl.cache-dir"; // to override path in configs
+
+	// L2 Lucene merge-policy tuning (optional; sensible defaults in LuceneIndexManager)
+	private static final String L2_MAX_MERGED_SEGMENT_MB_KEY = "front-cache.cache-processor.impl.l2.max-merged-segment-mb";
+	private static final String L2_DELETES_PCT_ALLOWED_KEY = "front-cache.cache-processor.impl.l2.deletes-pct-allowed";
+
+	// L2 Lucene commit / visibility tuning - see LuceneIndexManager.Tuning for what each one trades.
+	private static final String L2_COMMIT_INTERVAL_MS_KEY = "front-cache.cache-processor.impl.l2.commit-interval-ms";
+	private static final String L2_REFRESH_ON_WRITE_KEY = "front-cache.cache-processor.impl.l2.refresh-on-write";
+	private static final String L2_REFRESH_INTERVAL_MS_KEY = "front-cache.cache-processor.impl.l2.refresh-interval-ms";
+
+	private static String CACHE_RELATIVE_DIR = "cache/l2-lucene-index/";
+
+	private static String INDEX_BASE_DIR = CACHE_BASE_DIR_DEFAULT + CACHE_RELATIVE_DIR;
+
+
+	@Override
+	public void init(Properties properties) {
+
+		Objects.requireNonNull(properties, "Properties should not be null");
+		super.init(properties);
+
+		// L1 - ehCache
+		String ehCacheConfigFile = properties.getProperty(EHCACHE_CONFIG_FILE_KEY);
+		if (null == ehCacheConfigFile)
+		{
+			logger.info("L1 cache: default ehCache config is used: " + DEFAULT_EHCACHE_CONFIG_FILE);
+			ehCacheConfigFile = DEFAULT_EHCACHE_CONFIG_FILE;
+		}
+
+		logger.info("Loading " + ehCacheConfigFile);
+		InputStream is = null;
+		if (null != ehCacheConfigFile)
+		{
+			try {
+				is = FCConfig.getConfigInputStream(ehCacheConfigFile);
+			} catch (Throwable t) {
+				t.printStackTrace();
+			}
+		}
+
+		if (null != is)
+			ehCacheManager = CacheManager.create(is);
+		else
+			ehCacheManager = CacheManager.create();
+
+
+		if (null != is)
+		{
+			try {
+				is.close();
+			} catch (IOException e) {		}
+		}
+
+        ehCache = ehCacheManager.getCache(FRONT_CACHE);
+        if (null == ehCache)
+        {
+        	ehCacheManager.addCache(FRONT_CACHE);
+            ehCache = ehCacheManager.getCache(FRONT_CACHE);
+        }
+
+        // Registered before anything can be cached, so the counter never starts behind the cache. A
+        // failure here costs one gauge, not the cache - L1 works perfectly well unmeasured.
+        try {
+			L1ByteCounter counter = new L1ByteCounter();
+			ehCache.getCacheEventNotificationService().registerListener(counter);
+			l1Bytes = counter;
+		} catch (Exception e) {
+			logger.warn("Can't register the L1 byte counter - L1 content size will report as unknown", e);
+		}
+
+
+		// L2 - Lucene
+		if (null != properties.getProperty(CACHE_BASE_DIR_KEY))
+		{
+			CACHE_BASE_DIR_DEFAULT = properties.getProperty(CACHE_BASE_DIR_KEY);
+			INDEX_BASE_DIR = CACHE_BASE_DIR_DEFAULT + CACHE_RELATIVE_DIR;
+		} else {
+			// get from FRONTCACHE_HOME
+			String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+			File fsBaseDir = new File(new File(frontcacheHome), CACHE_RELATIVE_DIR);
+
+			INDEX_BASE_DIR = fsBaseDir.getAbsolutePath();
+			if (!INDEX_BASE_DIR.endsWith("/"))
+				INDEX_BASE_DIR += "/";
+
+		}
+
+		double maxMergedSegmentMB = getDoubleProperty(properties, L2_MAX_MERGED_SEGMENT_MB_KEY, LuceneIndexManager.DEFAULT_MAX_MERGED_SEGMENT_MB);
+		double deletesPctAllowed = getDoubleProperty(properties, L2_DELETES_PCT_ALLOWED_KEY, LuceneIndexManager.DEFAULT_DELETES_PCT_ALLOWED);
+
+		LuceneIndexManager.Tuning tuning = new LuceneIndexManager.Tuning(
+				maxMergedSegmentMB,
+				deletesPctAllowed,
+				getLongProperty(properties, L2_COMMIT_INTERVAL_MS_KEY, LuceneIndexManager.Tuning.DEFAULT_COMMIT_INTERVAL_MS),
+				getBooleanProperty(properties, L2_REFRESH_ON_WRITE_KEY, true),
+				getLongProperty(properties, L2_REFRESH_INTERVAL_MS_KEY, LuceneIndexManager.Tuning.DEFAULT_REFRESH_INTERVAL_MS));
+
+		// getInstance(), never new: one manager (hence one IndexWriter) per index dir, so a duplicate
+		// cache processor can't leave a second, permanently lock-starved writer behind.
+		luceneIndexManager = LuceneIndexManager.getInstance(INDEX_BASE_DIR, tuning);
+	}
+
+	/**
+	 * Reads a double-valued property, falling back to the default (with a warning) if it is
+	 * absent or unparseable.
+	 */
+	private double getDoubleProperty(Properties properties, String key, double defaultValue) {
+		String raw = properties.getProperty(key);
+		if (null == raw)
+			return defaultValue;
+		try {
+			return Double.parseDouble(raw.trim());
+		} catch (NumberFormatException e) {
+			logger.warn("Can't parse {}='{}' as a number - using default {}", key, raw, defaultValue);
+			return defaultValue;
+		}
+	}
+
+	/**
+	 * Reads a long-valued property, falling back to the default (with a warning) if it is
+	 * absent or unparseable.
+	 */
+	private long getLongProperty(Properties properties, String key, long defaultValue) {
+		String raw = properties.getProperty(key);
+		if (null == raw)
+			return defaultValue;
+		try {
+			return Long.parseLong(raw.trim());
+		} catch (NumberFormatException e) {
+			logger.warn("Can't parse {}='{}' as a number - using default {}", key, raw, defaultValue);
+			return defaultValue;
+		}
+	}
+
+	/**
+	 * Reads a boolean-valued property. Anything other than an explicit {@code true}/{@code false}
+	 * warns and falls back, rather than silently reading as false the way Boolean.parseBoolean would.
+	 */
+	private boolean getBooleanProperty(Properties properties, String key, boolean defaultValue) {
+		String raw = properties.getProperty(key);
+		if (null == raw)
+			return defaultValue;
+		String value = raw.trim();
+		if ("true".equalsIgnoreCase(value))
+			return true;
+		if ("false".equalsIgnoreCase(value))
+			return false;
+		logger.warn("Can't parse {}='{}' as a boolean - using default {}", key, raw, defaultValue);
+		return defaultValue;
+	}
+
+	@Override
+	public void destroy() {
+		super.destroy();
+
+		logger.info("Running destroy() for ehCache ");
+		try
+		{
+			if (null != ehCache)
+				ehCache.dispose();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+		try
+		{
+			if (null != ehCacheManager)
+				ehCacheManager.shutdown();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+		logger.info("Running destroy() for Lucene");
+		luceneIndexManager.close();
+		return;
+	}
+
+	/**
+	 * Saves web response to cache-file
+	 */
+	@Override
+	public void putToCacheImpl(String url, WebResponse component) {
+
+		// don't cache pure dynamic components
+		if (!FCUtils.isWebComponentSubjectToCache(component.getExpireTimeMap()))
+		{
+			logWithStackTrace("Dynamic response caching " + url + "expireTimeMap shouldn't be like that " + component.getExpireTimeMap());
+			return;
+		}
+
+        // don't cache 0 length content
+        if (null == component.getContent() || 0 == component.getContent().length)
+        {
+            logWithStackTrace("don't cache 0 length content ");
+            return;
+        }
+
+		if (component.getStatusCode() >= 500)
+		{
+			logger.error("Can't cache responses with statusCode 5XX: statusCode:" + component.getStatusCode() + ", url " + component.getUrl());
+			return;
+		}
+
+
+		if (FCHeaders.CACHE_LEVEL_L1.equalsIgnoreCase(component.getCacheLevel()))
+		{
+			ehCache.put(new Element(url, component));
+		} else {
+
+			// L2 (default)
+			try {
+				luceneIndexManager.indexDoc(component);
+			} catch (IOException e) {
+				// concise: LuceneIndexManager.getIndexWriter() already logs a throttled, actionable
+				// ERROR when the writer is unavailable. Logging a full stack per failed write here
+				// previously flooded the log (GBs/day) while the writer was wedged.
+				logger.error("Error during putting response to lucene cache for {}: {}", url, e.toString());
+			}
+		}
+
+		return;
+	}
+
+	/**
+	 * Logs an error message together with a synthetic stack trace, so the call
+	 * site that triggered the skipped caching can be identified in the logs.
+	 */
+	private void logWithStackTrace(String logMessage) {
+		try {
+			throw new Exception("synthetic stack trace");
+		} catch (Exception e) {
+			logger.error(logMessage, e);
+		}
+	}
+
+	/**
+	 * Load web-response from file
+	 */
+	@Override
+	public WebResponse getFromCacheImpl(String url) {
+		logger.debug("Getting from cache {}", url);
+
+		Element el = ehCache.get(url); // check L1 - ehCache
+		if (null != el && null != el.getObjectValue())
+		{
+			FcCacheMetrics.record(FcCacheMetrics.Outcome.HIT_L1);
+			return (WebResponse) el.getObjectValue();
+		}
+
+		// check L2 - Lucene
+		WebResponse webResponse = luceneIndexManager.getResponse(url);
+
+		// Counted here rather than in the caller because this is the only place the TIER is known: one
+		// level up, an L1 hit and an L2 hit are the same non-null return.
+		FcCacheMetrics.recordHitOrMiss(webResponse, FcCacheMetrics.Outcome.HIT_L2);
+
+		return webResponse;
+	}
+
+
+	@Override
+	public void removeFromCache(String filter) {
+		logger.debug("Removing from cache {}", filter);
+
+		{ // remove from ehCache
+			List<Object> removeList = new ArrayList<Object>();
+
+			for(Object key : ehCache.getKeys())
+			{
+				String str = key.toString();
+				if (-1 < str.indexOf(filter))
+					removeList.add(key);
+			}
+
+			for(Object key : removeList)
+				ehCache.remove(key);
+		}
+
+		// remove from Lucene
+		luceneIndexManager.delete(filter);
+	}
+
+	@Override
+	public void removeFromCacheAll() {
+		logger.debug("truncate cache");
+
+		ehCache.removeAll();
+		luceneIndexManager.deleteAll();
+		// Emptying the cache is only ever operator-initiated. L2 writes are committed on a timer
+		// (LuceneIndexManager.Tuning), which is right for a cache entry - it would be re-fetched from
+		// origin - and wrong here: an operator who truncated the cache should not find it restored by
+		// an ungraceful restart moments later.
+		luceneIndexManager.commit();
+	}
+
+
+	@Override
+	public Map<String, String> getCacheStatus() {
+		Map<String, String> status = super.getCacheStatus();
+		status.put("impl", this.getClass().getName());
+		status.put("impl_L1", "EhCache");
+		status.put("impl_L2", "Lucene");
+		status.put(CacheProcessor.CACHED_ENTRIES, "" + (ehCache.getKeys().size() + luceneIndexManager.getIndexSize()));
+		status.put(CacheProcessor.CACHED_ENTRIES + "-L1", "" + ehCache.getKeys().size());
+		status.put(CacheProcessor.CACHED_ENTRIES + "-L2", "" + luceneIndexManager.getIndexSize());
+
+
+		return status;
+	}
+
+
+	/**
+	 * Read from the live Ehcache and the live IndexWriter - no reader opened, no directory rescanned
+	 * beyond a file listing. Every number is defensive: this feeds gauges, and a wedged L2 index must
+	 * degrade to "unknown" rather than break a scrape.
+	 */
+	@Override
+	public CacheStats getCacheStats() {
+
+		long l1Entries = CacheStats.UNKNOWN;
+		long l1Evictions = CacheStats.UNKNOWN;
+		try {
+			l1Entries = ehCache.getSize();
+
+			Long evicted = ehCache.getStatistics().cacheEvictionOperation().count().value();
+			if (null != evicted)
+				l1Evictions = evicted.longValue();
+
+		} catch (Exception e) {
+			logger.debug("Can't read L1 statistics", e);
+		}
+
+		L1ByteCounter counter = l1Bytes;
+		long l1ContentBytes = (null == counter) ? CacheStats.UNKNOWN : counter.bytes();
+
+		return new CacheStats(l1Entries, l1Evictions, l1ContentBytes,
+				luceneIndexManager.getIndexSizeFast(), luceneIndexManager.getIndexDiskBytes());
+	}
+
+	@Override
+	public List<String> getCachedKeys() {
+		List<String> keys = new ArrayList<String>();
+
+		// ehCahce
+		for (Object key : ehCache.getKeys())
+			keys.add(key.toString());
+
+		// Lucene
+		keys.addAll(luceneIndexManager.getKeys());
+
+		return keys;
+	}
+
+	@Override
+	public List<String> getCachedKeys(int limit) {
+		List<String> keys = new ArrayList<String>();
+
+		for (Object key : ehCache.getKeys())
+		{
+			if (keys.size() >= limit)
+				return keys;
+			keys.add(key.toString());
+		}
+
+		keys.addAll(luceneIndexManager.getKeys(limit - keys.size()));
+
+		return keys;
+	}
+
+	@Override
+	public void patch() {
+		// TODO Auto-generated method stub
+	}
+
+	/**
+	 * Removes expired entries from both cache tiers:
+	 * L1 (ehCache) is scanned in-memory; L2 (Lucene) is purged via a range query.
+	 * "Cache forever" entries are never removed.
+	 */
+	@Override
+	public void purge() {
+
+		// L1 - ehCache
+		long now = System.currentTimeMillis();
+		List<Object> removeList = new ArrayList<Object>();
+		for (Object key : ehCache.getKeys())
+		{
+			Element el = ehCache.get(key);
+			if (null == el || null == el.getObjectValue())
+				continue;
+
+			long expireTimeMillis = ((WebResponse) el.getObjectValue()).getExpireTimeMillis();
+			if (CacheProcessor.CACHE_FOREVER == expireTimeMillis)
+				continue;
+
+			if (expireTimeMillis < now)
+				removeList.add(key);
+		}
+
+		for (Object key : removeList)
+			ehCache.remove(key);
+
+		logger.info("purge() removed {} expired entries from L1 (ehCache)", removeList.size());
+
+		// L2 - Lucene
+		luceneIndexManager.deleteExpired();
+		luceneIndexManager.commit(); // maintenance, not the request path - see removeFromCacheAll()
+	}
+
+	/**
+	 * Backs up the L2 (Lucene) index to a sibling directory of the index dir.
+	 * L1 (ehCache) is in-memory and not backed up.
+	 *
+	 * @return the name of the created backup directory
+	 */
+	@Override
+	public String backup() {
+		try {
+			return luceneIndexManager.backup();
+		} catch (IOException e) {
+			logger.error("L2 index backup failed", e);
+			throw new RuntimeException("L2 index backup failed: " + e.getMessage(), e);
+		}
+	}
+}
+

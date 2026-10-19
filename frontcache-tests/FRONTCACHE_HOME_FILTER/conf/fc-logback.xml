@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!-- 
+this config the same as in logback.xml in classpath. Use this one if you want to override default configuration. 
+uncomment it in frontcache.properties:
+
+front-cache.request-logs-config=fc-logback.xml
+-->
+<configuration>
+    
+    <!-- ReguestLoggerFile for REQUEST LOGS ONLY -->
+	<appender name="ReguestLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>TRACE</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+
+		<File>${frontcache.home}/logs/frontcache-requests.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/frontcache-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			  <Pattern>%msg%n</Pattern>
+		</layout>
+	</appender>
+	
+    <!-- FailedRequestLoggerFile for NON-SUCCESSFUL REQUEST LOGS ONLY (short-circuited/timeout/rejected/bad-request/failure) -->
+	<appender name="FailedRequestLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>TRACE</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+
+		<File>${frontcache.home}/logs/frontcache-failed-requests.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/frontcache-failed-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			  <Pattern>%msg%n</Pattern>
+		</layout>
+	</appender>
+
+	<appender name="Error" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>ERROR</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+
+		<File>${frontcache.home}/logs/error.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/error-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			  <Pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>
+		</layout>
+	</appender>
+		
+	<appender name="Info" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>INFO</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+		<File>${frontcache.home}/logs/info.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/info-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<layout class="ch.qos.logback.classic.PatternLayout">
+             <Pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>
+		</layout>
+	</appender>	
+		
+	
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <layout class="ch.qos.logback.classic.PatternLayout">
+      <Pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Pattern>
+    </layout>
+  </appender>
+
+
+
+	<!-- INFO, not logback's default. With no level here the root defaults to DEBUG, which put
+	     every Jetty internal (WriteFlusher, ConcurrentPool, ServletChannelState, ...) on the
+	     console: an e2e run produced ~280k lines, burying the actual test output.
+
+	     Nothing is lost from the log FILES by raising it: the Error and Info appenders use
+	     exact-match LevelFilters (ERROR only / INFO only), so neither ever captured DEBUG.
+	     Raising it at the root is also cheaper than filtering at the appender, because the
+	     events are never created in the first place.
+
+	     To debug a failing test, drop this back to DEBUG (or add a <logger> for just the one
+	     package you care about, which is usually what you actually want). -->
+
+	<!-- ================= Async wrappers for the per-request logs =================
+
+	     These appenders carry one line per REQUEST and one per INCLUDE, at TRACE, which is their
+	     normal traffic rather than a debug setting. As plain RollingFileAppenders they are
+	     SYNCHRONOUS: the write and its flush happened on the Jetty thread that was trying to serve
+	     the response, and every thread logging at once contended on the appender's own lock. Log
+	     rolling - reopening the file, and zipping the previous day's - happened there too.
+
+	     Wrapping them hands the event to a queue and returns; one worker thread does the I/O.
+
+	       discardingThreshold MUST be 0. Logback's default (queueSize/5) drops TRACE/DEBUG/INFO
+	       events once the queue is 80% full - and these logs are ENTIRELY TRACE, so the default
+	       would silently discard request-log lines under exactly the load worth logging.
+
+	       neverBlock stays false, so a saturated queue applies back-pressure instead of losing
+	       lines. This is analytics-grade data; slowing down beats going quiet.
+
+	       includeCallerData stays false. Capturing it would take a stack trace per event, which
+	       costs far more than the write this is removing - and the format uses none of it.
+
+	     immediateFlush is deliberately left ON in the file appenders above. Turning it off buys
+	     more throughput but leaves up to a buffer's worth of lines invisible to anything tailing
+	     or shipping the file, which is not a trade to make silently. Add
+	     <immediateFlush>false</immediateFlush> to an appender if you want it.
+	     ========================================================================== -->
+
+	<appender name="AsyncRequestLogger" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>8192</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+		<includeCallerData>false</includeCallerData>
+		<appender-ref ref="ReguestLoggerFile" />
+	</appender>
+
+	<appender name="AsyncFailedRequestLogger" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>8192</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+		<includeCallerData>false</includeCallerData>
+		<appender-ref ref="FailedRequestLoggerFile" />
+	</appender>
+
+
+	<root level="INFO">
+		<appender-ref ref="Error" />
+		<appender-ref ref="Info" />	
+		<appender-ref ref="STDOUT" />
+	</root>
+
+	<!-- Request logger. additivity="false" keeps these TRACE lines in
+	     logs/frontcache-requests.log and OFF the console.
+
+	     Without it the events still reach the root logger's appenders, STDOUT among them: a
+	     parent's level does not filter an event propagated from a child, because the level
+	     check happens once, at the logger the event was created on. So a root at INFO does
+	     nothing to stop a TRACE line from a logger set to TRACE.
+
+	     Nothing is lost from the other files by cutting propagation - root's Error and Info
+	     appenders use exact-match LevelFilters (ERROR only / INFO only), so neither ever
+	     accepted these TRACE events anyway. -->
+	<logger name="org.frontcache.reqlog.RequestLogger" additivity="false">
+	    <level value="TRACE" />
+		<appender-ref ref="AsyncRequestLogger" />
+	</logger>
+
+	<!-- for non-successful requests only (additivity=false -> kept out of the root/info logs) -->
+	<logger name="frontcache.failed-requests" additivity="false">
+	    <level value="TRACE" />
+		<appender-ref ref="AsyncFailedRequestLogger" />
+	</logger>
+
+
+
+	<!-- Drains the async queues on JVM shutdown. Without it, whatever is still queued when the
+	     process exits is simply lost - which for a per-request log is the tail of the traffic
+	     right before a restart, i.e. the part most likely to be interesting. -->
+	<shutdownHook class="ch.qos.logback.core.hook.DefaultShutdownHook"/>
+
+</configuration>

@@ -1,0 +1,1 @@
+<%@ taglib uri="http://frontcache.org/core" prefix="fc" %><fc:component maxage="0" />c<fc:include url="/common/client-bot-guest/d1.jsp" />

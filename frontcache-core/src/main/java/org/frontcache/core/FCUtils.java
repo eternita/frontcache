@@ -1,0 +1,1346 @@
+/*
+ * Copyright 2015 Eternita
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.frontcache.core;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HeaderElement;
+import org.apache.hc.core5.http.message.MessageSupport;
+import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.client5.http.ConnectionKeepAliveStrategy;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.frontcache.FCConfig;
+import org.frontcache.FrontCacheEngine;
+import org.frontcache.cache.CacheProcessor;
+import org.frontcache.resilience.FC_ThroughCache_HttpClient;
+import org.frontcache.resilience.FC_ThroughCache_WebFilter;
+import org.frontcache.wrapper.FrontCacheHttpResponseWrapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public class FCUtils {
+
+	private FCUtils() {
+	}
+
+	private static Logger logger = LoggerFactory.getLogger(FCUtils.class);
+
+    private static final String[] CLIENT_IP_SOURCE_HEADER_LIST = {
+    		FCHeaders.X_FRONTCACHE_CLIENT_IP,
+            "x-forwarded-for",
+            "X-Forwarded-For",
+            "Proxy-Client-IP",
+            "WL-Proxy-Client-IP",
+            "HTTP_X_FORWARDED_FOR",
+            "HTTP_X_FORWARDED",
+            "HTTP_X_CLUSTER_CLIENT_IP",
+            "HTTP_CLIENT_IP",
+            "HTTP_FORWARDED_FOR",
+            "HTTP_FORWARDED",
+            "HTTP_VIA",
+            "REMOTE_ADDR"
+    };
+
+	public static boolean isWebComponentSubjectToCache(Map<String, Long> expireTimeMap)
+	{
+		if (null == expireTimeMap)
+			return false;
+
+		if (null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST))
+			return false;
+
+		if (0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && 0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST))
+			return false;
+
+		return true;
+	}
+
+	// true - save to cache
+	public static boolean isWebComponentCacheableForClientType(Map<String, Long> expireTimeMap, String clientType)
+	{
+		if (expireTimeMap.isEmpty())
+		{
+			// not a case -> log it
+			logger.error("isWebComponentCacheableForClientType() - expireTimeMap must not be empty for clientType=" + clientType);
+			return false;
+		}
+
+		Long expireTimeMillis = expireTimeMap.get(clientType);
+		if (null == expireTimeMillis)
+		{
+			// not a case -> log it
+			logger.error("isWebComponentCacheableForClientType() - expireTimeMillis must be in expireTimeMap for clientType=" + clientType);
+			return false;
+		}
+
+		if (CacheProcessor.NO_CACHE == expireTimeMillis)
+			return false;
+
+		return true;
+	}
+
+	/**
+	 * Check with current time if expired
+	 *
+	 * @param clientType {bot | guest}
+	 * @return
+	 */
+	public static boolean isWebComponentExpired(Map<String, Long> expireTimeMap, String clientType)
+	{
+		if (expireTimeMap.isEmpty())
+		{
+			// not a case -> log it
+			logger.error("isWebComponentExpired() - expireTimeMap must not be empty for clientType=" + clientType);
+			return true;
+		}
+
+		Long expireTimeMillis = expireTimeMap.get(clientType);
+		if (null == expireTimeMillis)
+		{
+			// not a case -> log it
+			logger.error("isWebComponentExpired() - expireTimeMillis must be in expireTimeMap for clientType=" + clientType);
+			return true;
+		}
+
+		if (CacheProcessor.CACHE_FOREVER == expireTimeMillis)
+			return false;
+
+		if (System.currentTimeMillis() > expireTimeMillis)
+			return true;
+
+		return false;
+	}
+
+
+
+
+	/**
+	 * GET method only for text requests
+	 *
+	 * for cache processor - it can use both (httpClient or filter)
+	 *
+	 * @param urlStr
+	 * @param httpRequest
+	 * @param httpResponse
+	 * @return
+	 */
+	public static WebResponse dynamicCall(String urlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) throws FrontCacheException
+    {
+		// add include-level header - to trace include tree
+		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_INCLUDE_LEVEL, "" + context.getIncludeLevel());
+
+		// add request-id header - to distinguish if sent by frontcache or not (for include processing)
+		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
+
+		// The filter-mode / standalone split lives in the FcHttpClient implementation now - reaching
+		// the origin through the app's own filter chain is just another origin transport.
+		return client.fetch(urlStr, requestHeaders, context);
+    }
+
+	/**
+	 * for includes ONLY - they allways use httpClient
+	 */
+	public static WebResponse includeDynamicCallHttpClient(String urlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) throws FrontCacheException
+    {
+		// add request-id header - to trace include tree
+		addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_REQUEST_ID, context.getRequestId());
+
+		// add header with client IP - unless it was already resolved on the request thread (async
+		// includes pre-resolve it there, before the servlet request is recycled; see
+		// ConcurrentIncludeProcessor.parseIncludes). The context caches the value the engine stamped
+		// in init(), so this is a map read rather than another 13-header scan, and it is still the
+		// right answer on a worker thread whose servlet request has been recycled.
+		if (!requestHeaders.containsKey(FCHeaders.X_FRONTCACHE_CLIENT_IP))
+			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_IP, context.getClientIP());
+
+		// The client type the PAGE was classified as, so a fragment is not re-classified on its own
+		// evidence - which for a client-ip: or cookie: rule in bots.conf is different evidence. Read
+		// back by propagatedClientType() below, from a trusted peer only. Always set here
+		// (rather than only when absent): buildRequestHeaders drops any inbound value, so anything
+		// still in the map at this point is one WE put there for an earlier hop.
+		String clientType = context.getClientType();
+		if (null != clientType)
+		{
+			requestHeaders.remove(FCHeaders.X_FRONTCACHE_CLIENT_TYPE);
+			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_TYPE, clientType);
+		}
+
+		return client.fetchOverHttp(urlStr, requestHeaders, context);
+    }
+
+	/**
+	 * The client type decided for the PAGE this request is a fragment of, when it can be believed.
+	 *
+	 * An {@code <fc:include>} re-entering a Frontcache is classified independently of the page that
+	 * holds it. With a User-Agent-only bots.conf the two agree by accident - the UA survives the hop.
+	 * They stop agreeing the moment a rule reads anything else: a {@code client-ip:} rule sees the
+	 * sibling node's address rather than the visitor's, and a {@code cookie:} rule sees no cookies at
+	 * all once the servlet request behind an async include has been recycled. Page and fragments then
+	 * read different branches of the same WebResponse's expireTimeMap, and the fragments quietly stop
+	 * being cached - with nothing in the log but a client-type column that disagrees between the two
+	 * lines.
+	 *
+	 * Three conditions, all required, none of them optional:
+	 *
+	 * <ul>
+	 * <li><b>the peer is trusted</b> ({@code front-cache.client-ip.trusted-proxies}). FCUtils
+	 *     forwards every header it does not blacklist, so without this a client could simply send
+	 *     the header and choose its own cache behaviour. Unset by default, which means propagation
+	 *     is OFF by default and classification falls back to the rules - the safe direction;</li>
+	 * <li><b>the request arrived as an include</b> (it carried a Frontcache request id). A top-level
+	 *     request is a client's, and a client's claim about this is worth nothing;</li>
+	 * <li><b>the value is a client type this node knows.</b> Anything else is ignored rather than
+	 *     stored - an unknown client type would key nothing in expireTimeMap.</li>
+	 * </ul>
+	 *
+	 * Note for whoever configures the proxy: a trusted proxy that passes client headers through
+	 * verbatim (nginx does, by default) should strip {@code X-Frontcache-Client-Type} - exactly as it
+	 * should already be stripping {@code X-Frontcache-Client-IP}.
+	 *
+	 * These requests are decided BEFORE the rules run, so no bots.conf rule counts a hit for them.
+	 * That is the intended accounting, and the same reason the rate limiter's {@code scope=toplevel}
+	 * exists: the visitor was already classified once, when their page was requested, and counting
+	 * their fragments would count them again once per fragment.
+	 *
+	 * @return the propagated client type, or null when this request must be classified on its own
+	 */
+	public static String propagatedClientType(RequestContext context)
+	{
+		if (!context.getRequestFromFrontcache())
+			return null;
+
+		HttpServletRequest request = context.getRequest();
+		if (null == request)
+			return null;
+
+		String value;
+		try {
+			value = request.getHeader(FCHeaders.X_FRONTCACHE_CLIENT_TYPE);
+		} catch (Exception e) {
+			return null; // recycled request - undecidable
+		}
+
+		if (null == value)
+			return null;
+
+		if (!ClientIpResolver.getInstance().isTrustedPeer(request))
+		{
+			if (logger.isDebugEnabled())
+				logger.debug("Ignoring " + FCHeaders.X_FRONTCACHE_CLIENT_TYPE + " from an untrusted peer - classifying"
+						+ " this request on its own. Set " + ClientIpResolver.TRUSTED_PROXIES_PROPERTY
+						+ " if the peer really is a Frontcache node or a proxy you control.");
+			return null;
+		}
+
+		String clientType = value.trim();
+		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(clientType) || FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equals(clientType))
+			return clientType;
+
+		logger.warn("Ignoring unknown client type '" + clientType + "' in " + FCHeaders.X_FRONTCACHE_CLIENT_TYPE
+				+ " - expected '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '" + FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'");
+		return null;
+	}
+
+	public static String getClientIP(HttpServletRequest request) {
+		// request may be null or a container-recycled servlet request: async includes are resolved in
+		// a background thread after the top-level response has completed, so the original request is
+		// gone by then. Reading a header off it would throw (NPE / "request does not exist") - which
+		// used to abort the whole include before the origin call even ran (100k+ NPEs/day on
+		// coin-visit-counter). The client IP is a best-effort header, so degrade to "unresolved"
+		// instead of failing the include.
+		if (null == request)
+			return "unresolved";
+		try {
+			for (String header : CLIENT_IP_SOURCE_HEADER_LIST) {
+				String ip = request.getHeader(header);
+				if (ip != null && ip.length() != 0 && !"unknown".equalsIgnoreCase(ip)) {
+					return ip;
+				}
+			}
+			return request.getRemoteAddr();
+		} catch (Exception ex) {
+			logger.info("Can't resolve client IP from request (likely recycled): " + ex);
+		}
+		return "unresolved";
+	}
+
+	/**
+	 * Detects a structurally-invalid request query string whose parameter <em>names</em> carry the
+	 * HTML-entity artifact {@code amp;} (raw, or percent-encoded as {@code amp%3B}).
+	 * <p>
+	 * A broken crawler that fails to decode {@code &amp;} in the origin's hrefs turns a real
+	 * parameter such as {@code &pagingPage_ci=2} into a bogus parameter named
+	 * {@code amp;pagingPage_ci}, and the {@code amp;} prefix compounds ({@code amp;amp;...}) on every
+	 * crawl hop. These are never legitimate parameters; worse, each unique permutation is a distinct
+	 * cache key, so left unchecked they all miss the cache and flood the origin (~26% of prod traffic
+	 * on fc-ap). Such requests are rejected with 400 before reaching cache or origin.
+	 *
+	 * @param queryString raw request query string, optionally starting with '?'; may be null/empty
+	 * @return true if any parameter name is or starts with {@code amp;}
+	 */
+	public static boolean hasMalformedQueryParams(String queryString)
+	{
+		if (null == queryString || queryString.isEmpty())
+			return false;
+
+		// strip the leading '?' (getRequestQueryString() prefixes one)
+		String qs = ('?' == queryString.charAt(0)) ? queryString.substring(1) : queryString;
+
+		for (String pair : qs.split("&"))
+		{
+			if (pair.isEmpty())
+				continue;
+
+			int eq = pair.indexOf('=');
+			String rawName = (-1 < eq) ? pair.substring(0, eq) : pair;
+
+			String name;
+			try {
+				name = URLDecoder.decode(rawName, "UTF-8"); // amp%3B... -> amp;...
+			} catch (Exception e) {
+				name = rawName; // not valid percent-encoding: check the raw form
+			}
+
+			if (name.startsWith("amp;"))
+				return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Helper to work with Map<String, List<String>>
+	 *
+	 * @param requestHeaders
+	 * @param key
+	 * @param name
+	 */
+	private static void addHeader(Map<String, List<String>> requestHeaders, String key, String name)
+	{
+		requestHeaders.put(key, Arrays.asList(new String[]{name}));
+		return;
+	}
+
+
+	/**
+	 * is used in ServletFilter mode
+	 *
+	 * @param url
+	 * @param originWrappedResponse
+	 * @return
+	 * @throws FrontCacheException
+	 * @throws IOException
+	 */
+	public static WebResponse httpResponse2WebComponent(String url, FrontCacheHttpResponseWrapper originWrappedResponse, RequestContext context) throws FrontCacheException, IOException
+	{
+		WebResponse webResponse = null;
+
+		String contentType = originWrappedResponse.getContentType();
+		String dataStr = originWrappedResponse.getContentString();
+		byte[] data = null;
+		if (null != dataStr)
+			data = dataStr.getBytes();
+		else
+			logger.info(url + " has response with no data");
+
+
+		if (null == contentType || -1 == contentType.indexOf("text"))
+		{
+			contentType = "text"; //
+		}
+
+		webResponse = parseWebComponent(url, data, FCUtils.revertHeaders(originWrappedResponse));
+
+		webResponse.setStatusCode(originWrappedResponse.getStatus());
+
+		// get headers
+		// case-insensitive: HTTP header names are case-insensitive (RFC 7230) and
+		// intermediaries (e.g. Cloudflare) may re-case them - so component directives
+		// like x-frontcache-component-maxage must resolve regardless of wire casing
+    	Map<String, List<String>> headers = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
+		for (String headerName : originWrappedResponse.getHeaderNames())
+		if (isIncludedHeaderToResponse(headerName))
+		{
+			List<String> hValues = headers.get(headerName);
+			if(null == hValues)
+			{
+				hValues = new ArrayList<String>();
+				headers.put(headerName, hValues);
+			}
+			hValues.add(originWrappedResponse.getHeader(headerName));
+		}
+		webResponse.setHeaders(headers);
+
+		// filter may not set up content type yet -> check and setup
+		if (null != dataStr && null == headers.get(FCHeaders.CONTENT_TYPE))
+		{
+			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType);
+		}
+
+		if (null != headers.get(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED))
+			context.setFallbackUsed();
+
+		return webResponse;
+	}
+
+	/** Read buffer for pulling an origin body. 4000 bytes was under one TCP window's worth per read. */
+	private static final int ORIGIN_READ_BUFFER_SIZE = 16 * 1024;
+
+	/** Fallback capacity when the origin declares no usable Content-Length. */
+	private static final int ORIGIN_BODY_DEFAULT_CAPACITY = 16 * 1024;
+
+	/**
+	 * Initial capacity for the buffer collecting an origin body.
+	 *
+	 * Capped, because Content-Length is attacker-influenced in the general case and a declared
+	 * multi-gigabyte length must not become a multi-gigabyte allocation up front - the buffer still
+	 * grows to fit a genuinely large body, just from a sane starting point.
+	 */
+	private static final int ORIGIN_BODY_MAX_PREALLOC = 8 * 1024 * 1024;
+
+	private static int originBodyCapacity(HttpEntity entity)
+	{
+		if (null == entity)
+			return 32; // no body coming - do not allocate for one
+
+		long contentLength = entity.getContentLength(); // -1 when unknown (e.g. chunked)
+		if (0 < contentLength && contentLength <= ORIGIN_BODY_MAX_PREALLOC)
+			return (int) contentLength;
+
+		return ORIGIN_BODY_DEFAULT_CAPACITY;
+	}
+
+	public static WebResponse httpResponse2WebComponent(String url, ClassicHttpResponse response, RequestContext context) throws FrontCacheException, IOException
+	{
+
+
+		int httpResponseCode = response.getCode();
+
+
+		String contentType = "";
+		Header contentTypeHeader = response.getFirstHeader(FCHeaders.CONTENT_TYPE);
+		if (null != contentTypeHeader)
+			contentType = contentTypeHeader.getValue();
+
+		WebResponse webResponse = null;
+
+		byte[] respData = null;
+		// entity is null for bodyless responses (e.g. 304 Not Modified from a conditional request,
+		// or 204 No Content). Guard it - dereferencing getContent() on null NPEs, which would escape
+		// run() as a command FAILURE and serve a fallback instead of relaying the bodyless response.
+		HttpEntity entity = response.getEntity();
+		// Sized from Content-Length when the origin gives a usable one. The default ByteArrayOutputStream
+		// starts at 32 bytes and doubles, so a 200 KB page used to take ~13 reallocations, each copying
+		// everything accumulated so far - roughly 400 KB of copying to collect 200 KB.
+		ByteArrayOutputStream baos = new ByteArrayOutputStream(originBodyCapacity(entity));
+		if (null != entity)
+		{
+			InputStream is = entity.getContent();
+			try {
+				int bytesRead = 0;
+				byte[] byteBuffer = new byte[ORIGIN_READ_BUFFER_SIZE];
+				while ((bytesRead = is.read(byteBuffer)) != -1) {
+					baos.write(byteBuffer, 0, bytesRead);
+				}
+			} catch (Exception e) {
+				// Deliberately still swallowed: a failed/truncated read degrades to whatever was read,
+				// exactly as before. Caching a truncated page is a real problem, but it is a behaviour
+				// question, not a performance one - see the perf proposal, section 4.5.
+				e.printStackTrace();
+			}
+		}
+		respData = baos.toByteArray(); // empty byte[] when there is no entity
+
+		Map<String, List<String>> headers = revertHeaders(response.getHeaders());
+		webResponse = parseWebComponent(url, respData, headers);
+
+		webResponse.setHeaders(headers);
+		webResponse.setStatusCode(httpResponseCode);
+		if (null == headers.get(FCHeaders.CONTENT_TYPE))
+			webResponse.addHeader(FCHeaders.CONTENT_TYPE, contentType);
+
+		if (httpResponseCode < 200 || httpResponseCode > 499) // 2XX - OK, 3XX - REDIRECTS, 4XX - client error (e.g. page not found)
+		{
+//			logger.error(new String(respData));
+			// error
+			throw new FrontCacheException("Wrong response code " + httpResponseCode + " for " + url);
+		}
+
+		// process redirects
+		Header locationHeader = response.getFirstHeader("Location");
+		if (null != locationHeader)
+		{
+			String originLocation = locationHeader.getValue();
+
+			String fcLocation = transformRedirectURL(originLocation, context);
+			webResponse.getHeaders().remove("Location");
+			webResponse.addHeader("Location", fcLocation);
+		}
+
+		Header fallbackUsedHeader = response.getFirstHeader(FCHeaders.X_FRONTCACHE_FALLBACK_IS_USED);
+		if (null != fallbackUsedHeader)
+			context.setFallbackUsed();
+
+		return webResponse;
+	}
+
+	/**
+	 * Rewrites a Location the origin sent so it names this site rather than the origin.
+	 *
+	 * The origin's Location is treated as a path and query with a scheme hint: its host is always
+	 * discarded (the origin knows itself by an internal name - the app sees {@code Host:
+	 * origin.example.com} because buildRequestHeaders drops the client's Host) and its port always
+	 * comes from our own config.
+	 *
+	 * Three things changed here in docs/archive/guard-redirect-url-host-fix.md, all of them silent before:
+	 *
+	 * <ul>
+	 * <li>the substituted host is the site's public name, not the Host this request arrived under -
+	 *     same distinction as GuardAction.publicHost, same reason;</li>
+	 * <li>the port is omitted when it is the default for the scheme. It used to be appended
+	 *     unconditionally, so every app redirect on a normal deployment went out as
+	 *     {@code https://www.example.com:443/...};</li>
+	 * <li>an absolute origin-host URL sitting INSIDE the query string (a {@code return=} /
+	 *     {@code next=} parameter) is rebased too. Rewriting only the outer host is what let the
+	 *     origin's name reach browsers through the one part of the Location nobody was looking at.</li>
+	 * </ul>
+	 */
+	public static String transformRedirectURL(String originLocation, RequestContext context)
+	{
+		String protocol = getRequestProtocol(originLocation);
+
+		if ("".equals(protocol)) // originLocation is relative path, so protocol is undefined
+			protocol = publicProtocol(context);
+		else if (null != FCConfig.getProperty("front-cache.public-scheme"))
+			// The operator has stated what scheme this site is served on. The origin's own scheme
+			// describes the internal leg (typically plaintext, behind our own TLS termination), so an
+			// explicit declaration outranks it. Without one, the origin's hint stands - as before.
+			protocol = publicProtocol(context);
+
+		boolean secure = "https".equalsIgnoreCase(protocol);
+
+		String host = publicHost(context);
+		String port = secure ? context.getFrontCacheHttpsPort() : context.getFrontCacheHttpPort();
+		String portSuffix = defaultPort(secure, port) ? "" : ":" + port;
+
+		String uri = rebaseOriginURLsInQuery(buildRequestURI(originLocation), context, secure, host, portSuffix);
+
+		return (secure ? "https" : "http") + "://" + host + portSuffix + uri;
+	}
+
+	/**
+	 * The hostname to put in a URL we hand to a client: the site's public name
+	 * (front-cache.default-domain) when the node has one, else the Host this request arrived under.
+	 *
+	 * @see org.frontcache.core.RequestContext#getPublicHost()
+	 */
+	private static String publicHost(RequestContext context)
+	{
+		String publicHost = context.getPublicHost();
+		if (null != publicHost && 0 < publicHost.length())
+			return publicHost;
+
+		String arrivingHost = context.getFrontCacheHost();
+		return (null != arrivingHost) ? arrivingHost : "";
+	}
+
+	/**
+	 * The scheme a client used, falling back to the scheme of the connection this process accepted.
+	 *
+	 * @see org.frontcache.core.RequestContext#getPublicProtocol()
+	 */
+	private static String publicProtocol(RequestContext context)
+	{
+		String publicProtocol = context.getPublicProtocol();
+		if (null != publicProtocol && 0 < publicProtocol.length())
+			return publicProtocol;
+
+		return context.getFrontCacheProtocol();
+	}
+
+	private static boolean defaultPort(boolean secure, String port)
+	{
+		if (null == port || 0 == port.trim().length())
+			return true;
+
+		return secure ? "443".equals(port.trim()) : "80".equals(port.trim());
+	}
+
+	/**
+	 * Rebases absolute URLs pointing at the ORIGIN that appear as query-parameter values, onto this
+	 * site. Deliberately narrow: only the configured origin host is touched, so a parameter
+	 * legitimately carrying a third-party URL (an OAuth callback, an image proxy source) is left
+	 * exactly as it was.
+	 *
+	 * @param uri  path and query, already normalised by buildRequestURI
+	 * @return the same string when nothing matched, which is the overwhelmingly common case
+	 */
+	private static String rebaseOriginURLsInQuery(String uri, RequestContext context, boolean secure,
+			String host, String portSuffix)
+	{
+		if (null == uri)
+			return uri;
+
+		int queryIdx = uri.indexOf('?');
+		if (-1 == queryIdx)
+			return uri;
+
+		URL originURL = context.getOriginURL();
+		if (null == originURL)
+			return uri;
+
+		String originHost = originURL.getHost();
+		if (null == originHost || 0 == originHost.length() || originHost.equalsIgnoreCase(host))
+			return uri;
+
+		String publicBase = (secure ? "https" : "http") + "://" + host + portSuffix;
+
+		StringBuilder sb = new StringBuilder(uri.length());
+		sb.append(uri, 0, queryIdx + 1);
+
+		boolean changed = false;
+		String[] pairs = uri.substring(queryIdx + 1).split("&", -1);
+
+		for (int i = 0; i < pairs.length; i++)
+		{
+			String pair = pairs[i];
+			int eq = pair.indexOf('=');
+
+			if (-1 < eq)
+			{
+				String name = pair.substring(0, eq);
+				String rawValue = pair.substring(eq + 1);
+
+				try {
+					String decoded = URLDecoder.decode(rawValue, "UTF-8");
+					String rebased = rebaseOrigin(decoded, originHost, publicBase);
+
+					if (null != rebased)
+					{
+						pair = name + "=" + URLEncoder.encode(rebased, "UTF-8");
+						changed = true;
+					}
+				} catch (Exception e) {
+					// malformed %-escape - leave the parameter exactly as it arrived
+				}
+			}
+
+			if (0 < i)
+				sb.append('&');
+			sb.append(pair);
+		}
+
+		return changed ? sb.toString() : uri;
+	}
+
+	/**
+	 * @return {@code value} with its origin-host prefix swapped for {@code publicBase}, or null when
+	 *         it is not an absolute URL on the origin host
+	 */
+	private static String rebaseOrigin(String value, String originHost, String publicBase)
+	{
+		if (null == value)
+			return null;
+
+		String lower = value.toLowerCase();
+		int schemeEnd;
+		if (lower.startsWith("http://"))
+			schemeEnd = 7;
+		else if (lower.startsWith("https://"))
+			schemeEnd = 8;
+		else
+			return null;
+
+		int authorityEnd = value.length();
+		for (int i = schemeEnd; i < value.length(); i++)
+		{
+			char c = value.charAt(i);
+			if ('/' == c || '?' == c || '#' == c)
+			{
+				authorityEnd = i;
+				break;
+			}
+		}
+
+		String authority = value.substring(schemeEnd, authorityEnd);
+		int portIdx = authority.lastIndexOf(':');
+		String hostOnly = (-1 < portIdx && -1 == authority.indexOf(']')) ? authority.substring(0, portIdx) : authority;
+
+		if (!originHost.equalsIgnoreCase(hostOnly))
+			return null;
+
+		return publicBase + value.substring(authorityEnd);
+	}
+
+
+
+    /**
+     * revert header from HttpClient format (call to origin) to Map
+     *
+     * @param headers
+     * @return
+     */
+    public static Map<String, List<String>> revertHeaders(Header[] headers) {
+    	// case-insensitive map - HTTP header names are case-insensitive (RFC 7230);
+    	// intermediaries (e.g. Cloudflare) may re-case them, so x-frontcache-* directives
+    	// must resolve regardless of wire casing
+    	Map<String, List<String>> map = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
+		for (Header header : headers) {
+			String name = header.getName();
+
+			if (isIncludedHeaderToResponse(name))
+			{
+				List<String> hValues = map.get(name);
+				if(null == hValues)
+				{
+					hValues = new ArrayList<String>();
+					map.put(name, hValues);
+				}
+				hValues.add(header.getValue());
+			}
+		}
+		return map;
+	}
+
+    public static Map<String, List<String>> revertHeaders(HttpServletResponse response) {
+    	// case-insensitive map - see revertHeaders(Header[]) above
+    	Map<String, List<String>> map = new TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
+		for (String name : response.getHeaderNames())
+		{
+			if (isIncludedHeaderToResponse(name))
+			{
+				List<String> hValues = map.get(name);
+				if(null == hValues)
+				{
+					hValues = new ArrayList<String>();
+					map.put(name, hValues);
+				}
+				hValues.add(response.getHeader(name));
+			}
+		}
+		return map;
+	}
+
+	private static boolean isIncludedHeaderToResponse(String headerName) {
+		String name = headerName.toLowerCase();
+
+		switch (name) {
+			case "content-length": // do not use 'content-length' because 'transfer-encoding' is used
+			case "transfer-encoding": // put it here to avoid duplicates
+				return false;
+			default:
+				return true;
+		}
+	}
+
+	public static Header[] convertHeaders(Map<String, List<String>> headers) {
+		List<Header> list = new ArrayList<>();
+		for (String name : headers.keySet()) {
+			for (String value : headers.get(name)) {
+				list.add(new BasicHeader(name, value));
+			}
+		}
+		return list.toArray(new BasicHeader[0]);
+	}
+
+	/**
+	 *
+	 * @param request
+	 * @return
+	 */
+	public static String getRequestURL(HttpServletRequest request)
+	{
+        String requestURL = request.getRequestURL().toString();
+
+        if ("GET".equals(request.getMethod()))
+        {
+        	// add parameters for storing
+        	// POST method parameters are not stored because they can be huge (e.g. file upload)
+        	//
+        	// Asked via getQueryString(), not getParameterMap(). The latter makes the container parse
+        	// and materialise the entire parameter map, solely to learn whether the query string is
+        	// empty - which getQueryString() answers on its own.
+        	String queryString = request.getQueryString();
+        	if (null != queryString && !queryString.isEmpty())
+        		requestURL = requestURL + "?" + queryString;
+        }
+        return requestURL;
+	}
+
+    /**
+     * return true if the client requested gzip content
+     *
+     * @param contentEncoding
+     * @return true if the content-encoding containg gzip
+     */
+    public static boolean isGzipped(String contentEncoding) {
+        return contentEncoding.contains("gzip");
+    }
+
+	/**
+	 * wrap String to WebResponse.
+	 * Check for header - extract caching options.
+	 *
+	 * @param contentStr
+	 * @return
+	 */
+	private static final WebResponse parseWebComponent (String urlStr, byte[] content, Map<String, List<String>> headers) // , String contentType
+	{
+		String cacheMaxAgeSecStr = null;
+		String refreshTypeStr = null;
+		String cacheLevelStr = null;
+		byte[] outContentBody = content;
+
+		Collection<String> collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_MAX_AGE);
+		if (null != collStr && !collStr.isEmpty())
+			cacheMaxAgeSecStr = collStr.iterator().next();
+
+		collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_REFRESH_TYPE);
+		if (null != collStr && !collStr.isEmpty())
+			refreshTypeStr = collStr.iterator().next();
+
+		collStr = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_CACHE_LEVEL);
+		if (null != collStr && !collStr.isEmpty())
+			cacheLevelStr = collStr.iterator().next();
+
+		WebResponse component = new WebResponse(urlStr, outContentBody, cacheMaxAgeSecStr, refreshTypeStr);
+
+		if (null != cacheLevelStr)
+			component.setCacheLevel(cacheLevelStr);
+
+		// set invalidation tags
+		Collection<String> tagsList = headers.get(FCHeaders.X_FRONTCACHE_COMPONENT_TAGS);
+		if (null != tagsList)
+			for (String tagsStr : tagsList)
+				component.addTags(Arrays.asList(tagsStr.split(FCHeaders.COMPONENT_TAGS_SEPARATOR)));
+
+		return component;
+	}
+
+	/**
+	 * Builds a {@link WebResponse} from a body and a header map, applying the same
+	 * {@code x-frontcache-component-*} reading every origin response goes through.
+	 *
+	 * The public door onto {@link #parseWebComponent}, for the one caller that has a fragment and its
+	 * headers but no HTTP response to hand: the include processor unpacking a combined response
+	 * (docs/archive/combine-reduce-proposal.md section 6). Routing it here rather than letting that code
+	 * assemble a WebResponse itself is what keeps maxAge, tags, refresh type and cache level meaning
+	 * exactly the same for a combined member as for a single include - the invariant in section 4.2,
+	 * which is silent when broken.
+	 *
+	 * @param headers the part's headers; a case-insensitive map is expected (header names are
+	 *                case-insensitive per RFC 7230) and is what the caller is given
+	 */
+	public static WebResponse buildWebComponent(String url, byte[] content, Map<String, List<String>> headers)
+	{
+		WebResponse webResponse = parseWebComponent(url, content, headers);
+		webResponse.setHeaders(headers);
+
+		return webResponse;
+	}
+
+	public static long maxAgeStr2Int(String maxAgeStr)
+	{
+		try
+		{
+			int multiplyPrefix = 1;
+			if ("forever".equalsIgnoreCase(maxAgeStr.trim())) // forever
+			{
+				return CacheProcessor.CACHE_FOREVER;
+			} else if (maxAgeStr.endsWith("d")) { // days
+				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+				multiplyPrefix = 86400; // 24 * 60 * 60
+			} else if (maxAgeStr.endsWith("h")) { // hours
+				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+				multiplyPrefix = 3600; // 60 * 60
+			} else if (maxAgeStr.endsWith("m")) { // minutes
+				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+				multiplyPrefix = 60;
+			} else if (maxAgeStr.endsWith("s")) { // seconds
+				maxAgeStr = maxAgeStr.substring(0, maxAgeStr.length() - 1);
+				multiplyPrefix = 1;
+			} else {
+				// seconds
+			}
+
+			return multiplyPrefix * Integer.parseInt(maxAgeStr); // time to live in cache in seconds
+		} catch (Exception e) {
+			// WARN, not INFO: every path into here defaults an absent value to "0", so an unparseable
+			// TTL is always a config error, and it fails by taking the page OUT of cache. That is
+			// also what a maxage="bot:30d, guest:1d" page hitting a pre-list node looks like - the
+			// node splits on the first colon and tries to parse "30d, guest:1d" - and at INFO it
+			// showed up only as an origin-load spike on the very pages the split was meant to help.
+			logger.warn("can't parse component maxage - '" + maxAgeStr + "' - NOT cached (NO_CACHE)");
+			return CacheProcessor.NO_CACHE;
+		}
+	}
+
+	public static String buildRequestURI(HttpServletRequest request) {
+		String uri = request.getRequestURI();
+		return uri;
+	}
+
+
+	/**
+	 * http://localhost:8080/coin_instance_details.htm? -> /coin_instance_details.htm?
+	 *
+	 * @param urlStr
+	 * @return
+	 */
+	public static String buildRequestURI(String urlStr) {
+
+		String outStr = urlStr;
+		int idx = urlStr.indexOf("//");
+		if (-1 < idx)
+		{
+			idx = urlStr.indexOf("/", idx + "//".length());
+			if (-1 < idx)
+				outStr = urlStr.substring(idx);
+		}
+
+		idx = outStr.indexOf("?"); // has params
+		if (-1 < idx)
+		{
+			String uri = outStr.substring(0, idx + 1);
+			String queryParams = outStr.substring(idx + 1);
+
+			// encode / decode params
+			try {
+				Map<String, List<String>> parameterMap = splitQueryParameters(queryParams);
+
+				StringBuilder queryParamsSB = new StringBuilder(queryParams.length() + 16);
+
+				for (String key : parameterMap.keySet())
+				{
+					for (String value : parameterMap.get(key))
+					{
+						if (null != value)
+						{
+							if (queryParamsSB.length() > 1)
+								queryParamsSB.append("&");
+
+							queryParamsSB.append(key).append("=").append(URLEncoder.encode(value, "UTF-8"));
+						}
+					}
+				}
+
+				queryParams = queryParamsSB.toString();
+			} catch (Exception e) {
+				logger.error("error buildRequestURI for " + urlStr, e);
+			}
+
+			outStr = uri + queryParams;
+		}
+
+		return outStr;
+	}
+
+
+	/**
+	 * The URL a request for {@code urlStr} will actually be made with: scheme and host untouched,
+	 * path and query normalised exactly as {@link #buildRequestURI(String)} normalises them for the
+	 * wire.
+	 *
+	 * <b>This is the only correct cache key for a URL that is fetched through buildRequestURI</b>,
+	 * and the two must not be allowed to drift apart. buildRequestURI re-serializes the query and
+	 * silently drops any parameter with no value - {@code splitQueryParameters} maps {@code id=} to
+	 * a null value, because its guard is {@code pair.length() > idx + 1}, which for {@code "id="} is
+	 * {@code 3 > 3}. So a URL keyed raw and fetched normalised is a cache entry that can never be
+	 * read back:
+	 *
+	 * <pre>
+	 *   probe   ?locale=zh&amp;id=   miss - nothing is ever stored under this
+	 *   fetch   ?locale=zh         the empty parameter is gone by the time it reaches the wire
+	 *   store   ?locale=zh         what the serving node receives, and stores
+	 *   probe   ?locale=zh&amp;id=   miss again, for the life of the entry
+	 * </pre>
+	 *
+	 * That loop ran in production: 33 fragment URLs generating 608 origin fetches a second, each
+	 * one re-fetching a fragment that was already cached, unexpired and cacheable - because the key
+	 * being looked up had never existed. See docs/archive/input-request-count-fix.md section 3.
+	 *
+	 * Idempotent: canonicalizing an already-canonical URL returns it unchanged, so it is safe to
+	 * apply on a path that may already have applied it.
+	 */
+	public static String canonicalizeURL(String urlStr) {
+
+		if (null == urlStr)
+			return null;
+
+		String uri = buildRequestURI(urlStr);
+
+		// buildRequestURI returns everything from the first '/' after the '//', so put the
+		// scheme+host back in front of it. When there is no scheme+host it already returned the
+		// whole thing.
+		int schemeIdx = urlStr.indexOf("//");
+		if (-1 < schemeIdx)
+		{
+			int pathIdx = urlStr.indexOf("/", schemeIdx + "//".length());
+			if (-1 < pathIdx)
+				return urlStr.substring(0, pathIdx) + uri;
+		}
+
+		return uri;
+	}
+
+	/**
+	 * The same path and query, addressed at a different {@code scheme://host[:port]}.
+	 *
+	 * This is what splits an include's two jobs apart (docs/archive/include-fetch-fix.md section 5). A
+	 * cache-missing {@code <fc:include>} is keyed on the public URL and fetched from
+	 * {@code front-cache.origin-host}; the two differ only in the base, so the fetch URL is derived
+	 * from the public one rather than re-concatenated from the tag - re-concatenating would give a
+	 * second string to keep in step with {@link #canonicalizeURL}, and that drift is what section 2
+	 * of docs/archive/input-request-count-fix.md was.
+	 *
+	 * The base is expected without a trailing slash, which is what {@code FrontCacheEngine.makeURL}
+	 * and {@code URL.toString()} produce for a host-only URL.
+	 *
+	 * @param urlStr absolute URL, or a path (which is returned appended to the base)
+	 * @param baseURL {@code scheme://host[:port]}
+	 */
+	public static String rebaseURL(String urlStr, String baseURL) {
+
+		if (null == urlStr || null == baseURL)
+			return urlStr;
+
+		int schemeIdx = urlStr.indexOf("//");
+		if (-1 == schemeIdx)
+			return baseURL + urlStr; // already a path
+
+		int pathIdx = urlStr.indexOf("/", schemeIdx + "//".length());
+		if (-1 == pathIdx)
+			return baseURL + "/"; // scheme + host, nothing else
+
+		return baseURL + urlStr.substring(pathIdx);
+	}
+
+	public static Map<String, List<String>> splitQueryParameters(String paramsStr) throws UnsupportedEncodingException {
+		final Map<String, List<String>> queryPairs = new LinkedHashMap<String, List<String>>();
+		final String[] pairs = paramsStr.split("&");
+		for (String pair : pairs) {
+			final int idx = pair.indexOf("=");
+			final String key = idx > 0 ? URLDecoder.decode(pair.substring(0, idx), "UTF-8") : pair;
+			if (!queryPairs.containsKey(key)) {
+				queryPairs.put(key, new LinkedList<String>());
+			}
+			final String value = idx > 0 && pair.length() > idx + 1
+					? URLDecoder.decode(pair.substring(idx + 1), "UTF-8") : null;
+			queryPairs.get(key).add(value);
+		}
+		return queryPairs;
+	}
+
+	/**
+	 * http://localhost:8080/coin_instance_details.htm? -> http
+	 * @param urlStr
+	 * @return
+	 */
+	private static String getRequestProtocol(String urlStr) {
+
+		int idx = urlStr.indexOf(":");
+		if (-1 < idx)
+			return urlStr.substring(0, idx);
+
+		return ""; // default
+	}
+
+	/**
+	 * The keep-alive strategy shared by the engine's origin client and FrontCacheClient: honour the
+	 * origin's own {@code Keep-Alive: timeout=N}, defaulting to 10s when it does not say.
+	 *
+	 * Extracted during the HttpClient 5 migration - the same anonymous class was pasted into
+	 * FrontCacheEngine and FrontCacheClient (and into FrontCacheAgent, which cannot share it because
+	 * the agent must not depend on frontcache-core). 5.x also replaced the hand-rolled
+	 * BasicHeaderElementIterator with MessageSupport.iterate().
+	 */
+	public static ConnectionKeepAliveStrategy keepAliveStrategy() {
+		return (response, context) -> {
+			Iterator<HeaderElement> it = MessageSupport.iterate(response, HttpHeaders.KEEP_ALIVE);
+			while (it.hasNext()) {
+				HeaderElement he = it.next();
+				String param = he.getName();
+				String value = he.getValue();
+				if (null != value && param.equalsIgnoreCase("timeout")) {
+					try {
+						return TimeValue.ofSeconds(Long.parseLong(value));
+					} catch (NumberFormatException e) {
+						break; // origin sent a non-numeric timeout - fall through to the default
+					}
+				}
+			}
+			return TimeValue.ofSeconds(10);
+		};
+	}
+
+	public static HttpHost getHttpHost(URL host) {
+		// HttpClient 5 reordered these: 4.5 was (hostname, port, scheme), 5.x is (scheme, hostname,
+		// port). Same arity, so the only thing that caught it was the type change.
+		HttpHost httpHost = new HttpHost(host.getProtocol(), host.getHost(), host.getPort());
+		return httpHost;
+	}
+
+	public static Map<String, List<String>> buildRequestHeaders(HttpServletRequest request) {
+		return buildRequestHeaders(request, true);
+	}
+
+	/**
+	 * @param normalizeAcceptEncoding true to replace the client's Accept-Encoding with {@code gzip}
+	 *        (what every cacheable path wants - see below); false to forward the client's own, which
+	 *        only the bypass path does, and only when encoding passthrough is enabled
+	 */
+	public static Map<String, List<String>> buildRequestHeaders(HttpServletRequest request, boolean normalizeAcceptEncoding) {
+
+		Map<String, List<String>> headers = new HashMap<String, List<String>>();
+		Enumeration<String> headerNames = request.getHeaderNames();
+		if (headerNames != null) {
+			while (headerNames.hasMoreElements()) {
+				String name = headerNames.nextElement();
+				if (isIncludedHeader(name)) {
+					Enumeration<String> values = request.getHeaders(name);
+					while (values.hasMoreElements()) {
+						String value = values.nextElement();
+
+						List<String> hValues = headers.get(name);
+						if(null == hValues)
+						{
+							hValues = new ArrayList<String>();
+							headers.put(name, hValues);
+						}
+						hValues.add(value);
+					}
+				}
+			}
+		}
+
+		// Normalize the encoding we advertise to the origin to gzip only.
+		// Our HttpClient transparently decodes gzip/deflate but NOT brotli (br) or zstd - if the
+		// origin returned br we would cache that blob and serve it to clients that never requested
+		// it (ignoring Vary), and the include processor couldn't parse the compressed body.
+		// Forcing gzip means FC always holds plaintext; compression to the client is (re)applied
+		// at the edge (nginx / CDN).
+		if (normalizeAcceptEncoding)
+		{
+			headers.keySet().removeIf(name -> FCHeaders.ACCEPT_ENCODING.equalsIgnoreCase(name));
+			headers.put(FCHeaders.ACCEPT_ENCODING, new ArrayList<String>(Arrays.asList("gzip")));
+		}
+
+		return headers;
+	}
+
+	/**
+	 * Adds X-Forwarded-Host / X-Forwarded-Proto naming the public site to an origin call, when
+	 * front-cache.origin.forward-public-host is on.
+	 *
+	 * The origin cannot otherwise know what the visitor typed: {@link #isIncludedHeader} drops the
+	 * client's Host (it has to - the connection is to the origin, not to the site), so the app sees
+	 * {@code Host: origin.example.com} and every absolute URL it builds names the origin. Apps work
+	 * around that one entry point at a time; these two headers let the app's own framework
+	 * (Spring's ForwardedHeaderFilter, Rails' trusted proxies, …) get it right everywhere at once.
+	 *
+	 * Off by default, because switching it on changes every absolute URL an app so configured emits.
+	 * Adds nothing when the node names no public host - a made-up value here would be worse than the
+	 * origin host the app already has.
+	 */
+	public static void addPublicForwardedHeaders(Map<String, List<String>> headers, RequestContext context)
+	{
+		if (null == headers || null == context)
+			return;
+
+		// Read from config rather than from FrontCacheEngine.getFrontCache(): this runs on the origin
+		// path of every request, and reaching for the singleton would boot a whole engine anywhere
+		// the origin path is exercised without one. The engine parses the same key at startup, to log
+		// the decision once.
+		if (!"true".equalsIgnoreCase(FCConfig.getProperty(FrontCacheEngine.FORWARD_PUBLIC_HOST_KEY, "false")))
+			return;
+
+		String publicHost = context.getPublicHost();
+		if (null == publicHost || 0 == publicHost.length())
+			return;
+
+		headers.put(FCHeaders.X_FORWARDED_HOST, Arrays.asList(new String[]{ publicHost }));
+
+		String publicProtocol = publicProtocol(context);
+		if (null != publicProtocol && 0 < publicProtocol.length())
+			headers.put(FCHeaders.X_FORWARDED_PROTO, Arrays.asList(new String[]{ publicProtocol }));
+
+		return;
+	}
+
+	private static boolean isIncludedHeader(String headerName) {
+		String name = headerName.toLowerCase();
+
+		switch (name) {
+			case "host":
+			case "connection":
+			case "content-length":
+			case "content-encoding":
+			case "server":
+			case "transfer-encoding":
+				return false;
+
+			// Dropped, not forwarded: this one is Frontcache telling Frontcache how a request was
+			// already classified (FCHeaders.X_FRONTCACHE_CLIENT_TYPE), and it is honoured from a
+			// trusted peer. A client that sent it would otherwise have it relayed onwards BY us, with
+			// our address as the peer - i.e. it would pick its own client type. The include path puts
+			// the real value back in FCUtils.includeDynamicCallHttpClient, after this filter has run.
+			case "x-frontcache-client-type":
+				return false;
+
+			// Dropped for the same reason: it is the chain's shared secret (FCHeaders.X_FRONTCACHE_EDGE_TOKEN).
+			// A node sends its own value - EdgeToken.stamp, on the outgoing request - or none, so a
+			// client's copy goes no further than the first Frontcache it reaches.
+			case "x-frontcache-edge-token":
+				return false;
+
+			default:
+				// The cache warmer's token and run parameters (FCHeaders.X_FRONTCACHE_WARM*). Dropped so
+				// the token never reaches the origin - in its access log it would let whoever reads the
+				// log skip the guard rules and force refreshes. The include fetch copies its headers from
+				// this map, so this one drop covers both paths.
+				return !name.startsWith(FCHeaders.X_FRONTCACHE_WARM);
+		}
+	}
+
+
+	/**
+	 * Size of the copy buffer used to stream an origin body to the client. Fixed, and large enough
+	 * that a typical page moves in a handful of writes.
+	 */
+	private static final int STREAM_COPY_BUFFER_SIZE = 16 * 1024;
+
+	/**
+	 * Streams {@code in} to {@code out}. Neither is closed or flushed here - every caller already does
+	 * that in a {@code finally}.
+	 *
+	 * The previous version had three problems, all of them on the path that streams a bypassed origin
+	 * response to the client:
+	 *
+	 * <ul>
+	 * <li>it called {@code out.flush()} after EVERY chunk, so a 5 MB download meant thousands of
+	 *     flushes - a write syscall each, and a chunked-transfer boundary on the wire;</li>
+	 * <li>the buffer started at 1 KB and DOUBLED every time a read filled it, with no ceiling -
+	 *     allocating and abandoning 2 KB, 4 KB, ... up to megabytes while streaming from a fast
+	 *     origin;</li>
+	 * <li>it caught IOException INSIDE the loop and printed a stack trace. A client disconnect
+	 *     (broken pipe) was therefore swallowed, and the loop kept pulling the whole origin body into
+	 *     a socket nobody was listening to, printing a trace per kilobyte.</li>
+	 * </ul>
+	 *
+	 * The IOException now propagates: the callers' {@code finally} blocks release the pooled origin
+	 * connection, and a disconnected client should end the transfer rather than be written to 5000
+	 * more times.
+	 */
+	public static void writeResponse(InputStream in, OutputStream out) throws IOException {
+		byte[] buffer = new byte[STREAM_COPY_BUFFER_SIZE];
+		int bytesRead;
+		while (-1 != (bytesRead = in.read(buffer)))
+			out.write(buffer, 0, bytesRead);
+	}
+
+	/**
+	 * The domain a metrics-stream subscriber is allowed to see, from its api-key header.
+	 *
+	 * A matching API key resolves to this node's domain; anything else resolves to DEFAULT_DOMAIN,
+	 * which matches no command group - so an unauthenticated subscriber sees an empty stream.
+	 */
+	/**
+	 * True when the request carries this node's management API key.
+	 *
+	 * Replaces {@code getDomainFromSiteKeyHeader()}, which answered a different question than its one
+	 * caller asked. It returned the literal {@code "default-domain"} for an unauthorized request, and
+	 * since that string matches no command group the metrics stream answered with 200 plus an endless
+	 * run of empty frames - an authorization failure dressed up as an empty success. The stream now
+	 * refuses with 401 (proposal section 14.6), and it no longer needs a domain at all: the {@code group}
+	 * field of each frame comes from the metrics object that owns it.
+	 */
+	/**
+	 * Reads the credential through {@link ApiKey#presented} - so the stream accepts
+	 * {@code Authorization: Bearer <api-key>} like everything else, and the deprecated
+	 * {@code x-frontcache-site-key} for as long as that is accepted anywhere.
+	 *
+	 * The DECISION stays here and stays stricter than {@link ApiKey#isAuthorized}: a node with no API
+	 * key configured refuses the stream, where it would allow a management call. That difference is
+	 * long-standing and deliberate - see the ApiKey javadoc - so unifying the header did not unify it.
+	 */
+	public static boolean isAuthorizedApiKeyHeader(HttpServletRequest request) {
+		String apiKey = ApiKey.presented(request);
+
+		return FrontCacheEngine.getFrontCache().isNodeApiKey(apiKey);
+	}
+
+	/**
+	 * Apply a fallback {@link WebResponse}'s status code and headers (content type plus the
+	 * non-cacheable Cache-Control/Pragma markers) to the servlet response.
+	 *
+	 * Used by the commands that stream the fallback body directly, so that the 503 status
+	 * and no-store headers set on the fallback actually reach the client / downstream caches.
+	 * Must be called before the body is written.
+	 *
+	 * @param servletResponse target response
+	 * @param webResponse fallback response carrying status and headers
+	 */
+	public static void applyFallbackHeaders(HttpServletResponse servletResponse, WebResponse webResponse)
+	{
+		if (null == webResponse)
+			return;
+
+		servletResponse.setStatus(webResponse.getStatusCode());
+
+		String contentType = webResponse.getHeader(FCHeaders.CONTENT_TYPE);
+		if (null != contentType)
+			servletResponse.setContentType(contentType);
+
+		String cacheControl = webResponse.getHeader(FCHeaders.CACHE_CONTROL);
+		if (null != cacheControl)
+			servletResponse.setHeader(FCHeaders.CACHE_CONTROL, cacheControl);
+
+		String pragma = webResponse.getHeader(FCHeaders.PRAGMA);
+		if (null != pragma)
+			servletResponse.setHeader(FCHeaders.PRAGMA, pragma);
+	}
+
+
+}

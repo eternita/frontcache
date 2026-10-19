@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+	xmlns:web="https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+	version="6.0" xmlns="https://jakarta.ee/xml/ns/jakartaee">
+
+	<display-name>front-cache-filter-tests</display-name>
+	<description>Front Cache tests (filter mode)</description>
+
+	<filter>
+		<description>Front Cache Filter</description>
+		<filter-name>FrontCacheFilter</filter-name>
+		<filter-class>org.frontcache.FrontCacheFilter</filter-class>
+	</filter>
+
+	<filter-mapping>
+		<filter-name>FrontCacheFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+
+
+	<servlet>
+		<servlet-name>FrontCacheIOServlet</servlet-name>
+		<servlet-class>org.frontcache.io.FrontCacheIOServlet</servlet-class>
+	</servlet>
+
+	<servlet-mapping>
+		<servlet-name>FrontCacheIOServlet</servlet-name>
+		<url-pattern>/frontcache-io</url-pattern>
+	</servlet-mapping>
+
+
+	<!--
+		combine-and-reduce (docs/archive/combine-reduce-proposal.md). One servlet behind four paths: the
+		conforming endpoint plus three misbehaving ones the edge has to survive. A servlet rather
+		than a JSP because the envelope goes out through the output stream, which a JSP has already
+		claimed for its own writer.
+	-->
+	<servlet>
+		<servlet-name>CombineCellServlet</servlet-name>
+		<servlet-class>org.frontcache.tests.combine.CombineCellServlet</servlet-class>
+	</servlet>
+
+	<servlet-mapping>
+		<servlet-name>CombineCellServlet</servlet-name>
+		<url-pattern>/common/combine/cell</url-pattern>
+		<url-pattern>/common/combine/cell-unsupported</url-pattern>
+		<url-pattern>/common/combine/cell-unsupported2</url-pattern>
+		<url-pattern>/common/combine/cell-short</url-pattern>
+		<url-pattern>/common/combine/cell-shuffled</url-pattern>
+	</servlet-mapping>
+
+	<servlet>
+		<servlet-name>CombineCountersServlet</servlet-name>
+		<servlet-class>org.frontcache.tests.combine.CombineCountersServlet</servlet-class>
+	</servlet>
+
+	<servlet-mapping>
+		<servlet-name>CombineCountersServlet</servlet-name>
+		<url-pattern>/common/combine/counters</url-pattern>
+	</servlet-mapping>
+
+</web-app>

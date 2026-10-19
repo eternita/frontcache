@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+this config the same as in logback.xml in classpath. Use this one if you want to override default configuration.
+uncomment it in frontcache.properties:
+
+front-cache.request-logs-config=fc-logback.xml
+-->
+<configuration>
+
+    <!-- ReguestLoggerFile for REQUEST LOGS ONLY -->
+	<appender name="ReguestLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>TRACE</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+
+		<File>${frontcache.home}/logs/frontcache-requests.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/frontcache-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<encoder>
+			  <pattern>%msg%n</pattern>
+		</encoder>
+	</appender>
+
+    <!-- FailedRequestLoggerFile for NON-SUCCESSFUL REQUEST LOGS ONLY (short-circuited/timeout/rejected/bad-request/failure) -->
+	<appender name="FailedRequestLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>TRACE</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+
+		<File>${frontcache.home}/logs/frontcache-failed-requests.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/frontcache-failed-requests-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<encoder>
+			  <pattern>%msg%n</pattern>
+		</encoder>
+	</appender>
+
+    <!-- FallbackLoggerFile for FALLBACK LOGS ONLY -->
+    <appender name="FallbackLoggerFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>TRACE</level>
+            <OnMatch>NEUTRAL</OnMatch>
+            <OnMismatch>DENY</OnMismatch>
+        </filter>
+
+        <File>${frontcache.home}/logs/fallback.log</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>${frontcache.home}/logs/fallback-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+        </rollingPolicy>
+        <encoder>
+              <pattern>%msg%n</pattern>
+        </encoder>
+    </appender>
+
+
+    <!-- HttpPoolFile for the HTTP (origin) CONNECTION POOL SNAPSHOT ONLY - one line every 5 min -->
+    <appender name="HttpPoolFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <File>${frontcache.home}/logs/http-pool.info</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>${frontcache.home}/logs/http-pool-%d{yyyy-MM-dd}.info.zip</FileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %msg%n</pattern>
+        </encoder>
+    </appender>
+
+
+	<appender name="Error" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<!-- WARN and above. This was LevelFilter(ERROR), which matched ERROR *exactly* - and since no
+		     other appender picks up WARN either, every WARN was silently discarded. That hid the L2
+		     Lucene lock diagnostics ("write lock is stale", "Deleted stale L2 write lock", "recovered
+		     automatically") that explained a 25h production wedge; they survived only in journald. -->
+		<filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+			<level>WARN</level>
+		</filter>
+
+		<File>${frontcache.home}/logs/error.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/error-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<encoder>
+			  <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<appender name="Info" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>INFO</level>
+			<OnMatch>NEUTRAL</OnMatch>
+			<OnMismatch>DENY</OnMismatch>
+		</filter>
+		<File>${frontcache.home}/logs/info.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${frontcache.home}/logs/info-%d{yyyy-MM-dd}.log.zip</FileNamePattern>
+		</rollingPolicy>
+		<encoder>
+             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+
+
+
+	<!-- ================= Async wrappers for the per-request logs =================
+
+	     These appenders carry one line per REQUEST and one per INCLUDE, at TRACE, which is their
+	     normal traffic rather than a debug setting. As plain RollingFileAppenders they are
+	     SYNCHRONOUS: the write and its flush happened on the Jetty thread that was trying to serve
+	     the response, and every thread logging at once contended on the appender's own lock. Log
+	     rolling - reopening the file, and zipping the previous day's - happened there too.
+
+	     Wrapping them hands the event to a queue and returns; one worker thread does the I/O.
+
+	       discardingThreshold MUST be 0. Logback's default (queueSize/5) drops TRACE/DEBUG/INFO
+	       events once the queue is 80% full - and these logs are ENTIRELY TRACE, so the default
+	       would silently discard request-log lines under exactly the load worth logging.
+
+	       neverBlock stays false, so a saturated queue applies back-pressure instead of losing
+	       lines. This is analytics-grade data; slowing down beats going quiet.
+
+	       includeCallerData stays false. Capturing it would take a stack trace per event, which
+	       costs far more than the write this is removing - and the format uses none of it.
+
+	     immediateFlush is deliberately left ON in the file appenders above. Turning it off buys
+	     more throughput but leaves up to a buffer's worth of lines invisible to anything tailing
+	     or shipping the file, which is not a trade to make silently. Add
+	     <immediateFlush>false</immediateFlush> to an appender if you want it.
+	     ========================================================================== -->
+
+	<appender name="AsyncRequestLogger" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>8192</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+		<includeCallerData>false</includeCallerData>
+		<appender-ref ref="ReguestLoggerFile" />
+	</appender>
+
+	<appender name="AsyncFailedRequestLogger" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>8192</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+		<includeCallerData>false</includeCallerData>
+		<appender-ref ref="FailedRequestLoggerFile" />
+	</appender>
+
+	<appender name="AsyncFallbackLogger" class="ch.qos.logback.classic.AsyncAppender">
+		<queueSize>8192</queueSize>
+		<discardingThreshold>0</discardingThreshold>
+		<neverBlock>false</neverBlock>
+		<includeCallerData>false</includeCallerData>
+		<appender-ref ref="FallbackLoggerFile" />
+	</appender>
+
+
+	<root>
+        <level value="INFO" />
+		<appender-ref ref="Error" />
+		<appender-ref ref="Info" />
+		<appender-ref ref="STDOUT" />
+	</root>
+
+	<!-- Request logger. additivity="false" keeps these TRACE lines in
+	     logs/frontcache-requests.log and OFF stdout - otherwise every request is duplicated
+	     into journald / `docker logs` as well as the request log.
+
+	     A parent's level does not filter an event propagated from a child (the level check
+	     happens once, at the logger the event was created on), so the root's INFO level does
+	     nothing to stop a TRACE line from a logger set to TRACE. Cutting propagation is the
+	     only way.
+
+	     Safe with respect to error.log: this logger is used at TRACE and nothing else
+	     (RequestLogger.java has exactly one call, logger.trace), so the Error appender's
+	     WARN ThresholdFilter never accepted these events anyway. -->
+	<logger name="org.frontcache.reqlog.RequestLogger" additivity="false">
+	    <level value="TRACE" />
+		<appender-ref ref="AsyncRequestLogger" />
+	</logger>
+
+	<!-- for non-successful requests only (additivity=false -> kept out of the root/info logs) -->
+	<logger name="frontcache.failed-requests" additivity="false">
+	    <level value="TRACE" />
+		<appender-ref ref="AsyncFailedRequestLogger" />
+	</logger>
+
+    <!-- Fallback logger. Same reasoning as the request logger above: additivity="false" keeps
+         these TRACE lines in logs/fallback.log and off stdout. Also TRACE-only - every call on
+         it (FileBasedFallbackResolver, DefaultFallbackResolver) is fallbackLogger.trace. -->
+    <logger name="org.frontcache.resilience.FallbackLogger" additivity="false">
+        <level value="TRACE" />
+        <appender-ref ref="AsyncFallbackLogger" />
+    </logger>
+
+    <!-- HTTP origin connection pool snapshot, every 5 min (additivity=false -> kept out of info.log;
+         a near-exhausted pool still warns separately into error.log) -->
+    <logger name="frontcache.http-pool" additivity="false">
+        <level value="INFO" />
+        <appender-ref ref="HttpPoolFile" />
+    </logger>
+
+
+	<!-- Drains the async queues on JVM shutdown. Without it, whatever is still queued when the
+	     process exits is simply lost - which for a per-request log is the tail of the traffic
+	     right before a restart, i.e. the part most likely to be interesting. -->
+	<shutdownHook class="ch.qos.logback.core.hook.DefaultShutdownHook"/>
+
+</configuration>

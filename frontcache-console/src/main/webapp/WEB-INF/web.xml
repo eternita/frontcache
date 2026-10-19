@@ -1,0 +1,139 @@
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="https://jakarta.ee/xml/ns/jakartaee" xmlns:web="https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         metadata-complete="false" version="6.0">
+  <display-name>Frontcache Console</display-name>
+
+	<!-- Request encoding, then authentication, then the cross-origin check, in that order: an
+	     unauthenticated caller gets a 401 (or the login page) and learns nothing about the third
+	     filter. See docs/archive/basic-auth-proposal.md and docs/archive/console-login-ui.md.
+
+	     <async-supported> on ALL THREE is load-bearing and silent when missing. DashboardStreamProxyServlet
+	     calls startAsync(), and the container refuses that if ANY filter in the chain for that request
+	     is not async-supported - so the realtime page, and only the realtime page, would break. -->
+
+	<!-- Without this the container decodes POST bodies as ISO-8859-1, and the two forms where that
+	     is invisible are the two that matter: a non-ASCII password WORKS over Basic (the header is
+	     decoded as UTF-8 explicitly) and fails through the login form, with no error anywhere; and
+	     the Configs editor writes the mojibake to a node's disk. See docs/archive/console-login-ui.md
+	     section 7.8 - this is the filter docs/archive/console-edit-configs-proposal.md section 7.7 called
+	     for and which never landed. -->
+	<filter>
+		<filter-name>CharacterEncodingFilter</filter-name>
+		<filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+		<init-param>
+			<param-name>encoding</param-name>
+			<param-value>UTF-8</param-value>
+		</init-param>
+		<init-param>
+			<param-name>forceEncoding</param-name>
+			<param-value>true</param-value>
+		</init-param>
+		<async-supported>true</async-supported>
+	</filter>
+	<filter-mapping>
+		<filter-name>CharacterEncodingFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+
+	<filter>
+		<filter-name>ConsoleAuthFilter</filter-name>
+		<filter-class>org.frontcache.console.web.ConsoleAuthFilter</filter-class>
+		<async-supported>true</async-supported>
+	</filter>
+	<filter-mapping>
+		<filter-name>ConsoleAuthFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+
+	<filter>
+		<filter-name>SameOriginFilter</filter-name>
+		<filter-class>org.frontcache.console.web.SameOriginFilter</filter-class>
+		<async-supported>true</async-supported>
+	</filter>
+	<filter-mapping>
+		<filter-name>SameOriginFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+
+	<!-- Relays an edge's dashboard SSE stream to the browser (the console is a different origin
+	     than the node). Replaced the vendored Netflix ProxyStreamServlet in 2.7. -->
+	<servlet>
+		<servlet-name>DashboardStreamProxyServlet</servlet-name>
+		<servlet-class>org.frontcache.console.web.DashboardStreamProxyServlet</servlet-class>
+		<!-- Required: the relay is non-blocking at both ends, so a dashboard viewer holds no thread
+		     here either. Without this the container refuses startAsync() outright. -->
+		<async-supported>true</async-supported>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>DashboardStreamProxyServlet</servlet-name>
+		<url-pattern>/fc-dashboard-proxy.stream</url-pattern>
+	</servlet-mapping>
+  
+	<!-- For web context -->
+ 	<servlet>
+		<servlet-name>console-dispatcher</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+		<init-param>
+			<param-name>contextConfigLocation</param-name>
+			<param-value>
+			    classpath:/META-INF/spring-mvc-config.xml
+			</param-value>
+		</init-param>
+		<load-on-startup>1</load-on-startup>
+	</servlet>
+
+	<servlet-mapping>
+		<servlet-name>console-dispatcher</servlet-name>
+		<url-pattern>/</url-pattern>
+	</servlet-mapping>
+	
+		
+	<!-- The session the login page establishes. 480 minutes so a dashboard left open through a
+	     shift does not sign itself out; what actually keeps the realtime page alive is
+	     fc-edges-status.js's 10-second poll, which SKIPS while the tab is hidden - so a console
+	     left in a background tab does expire, and that is correct. Do not "fix" it with a hidden
+	     keepalive: that would mean any browser left open anywhere holds an authenticated console
+	     session indefinitely.
+
+	     Sessions are in-memory and not persisted, so a restart signs everyone out - which is how a
+	     changed password takes effect. SameSite and Secure are not expressible here; see
+	     SessionCookieConfigListener. -->
+	<session-config>
+		<session-timeout>480</session-timeout>
+		<cookie-config>
+			<name>FCSESSIONID</name>
+			<http-only>true</http-only>
+			<secure>false</secure>
+		</cookie-config>
+		<!-- Cookie only, and this one is not optional. Without it the container falls back on URL
+		     rewriting until it knows the browser takes cookies, and the first redirect after a
+		     successful login carries ";jsessionid=<the session id>" - into the URL bar, the browser
+		     history, any Referer the page sends and the access log of whatever sits in front. A
+		     browser with cookies disabled then cannot sign in at all, which is the honest outcome:
+		     the alternative is a session id in a shareable URL. -->
+		<tracking-mode>COOKIE</tracking-mode>
+	</session-config>
+
+	<!-- For root context -->
+ 	<listener>
+		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+	</listener>
+
+	<!-- AFTER ContextLoaderListener: listeners are notified in declaration order and this one reads
+	     a Spring bean. -->
+	<listener>
+		<listener-class>org.frontcache.console.web.SessionCookieConfigListener</listener-class>
+	</listener>
+
+	<context-param>
+		<param-name>contextConfigLocation</param-name>
+		<param-value>
+		   classpath:/META-INF/spring-core-config.xml
+		</param-value>
+	</context-param>
+
+
+
+ 		
+</web-app>
