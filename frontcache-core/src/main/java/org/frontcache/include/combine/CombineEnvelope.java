@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * The combined response: one part per requested member, in the order the members were sent.
- * See docs/archive/combine-reduce-proposal.md section 6.
+ * See docs/include-combining.md.
  *
  * <pre>
  * {"v":1,"parts":[{"q":"id=1","status":200,"headers":{...},"body":"..."}, ...]}

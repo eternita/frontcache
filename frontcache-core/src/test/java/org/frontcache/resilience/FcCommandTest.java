@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import org.junit.Test;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 
 /**
- * Behavior of the seam, against the acceptance criteria in proposal section 10.
+ * Behavior of the seam, against the acceptance criteria of the Resilience4j migration.
  *
  * Every test uses its own command key: the Resilience4j registries and {@link FcCommandMetrics} are
  * keyed by that name and shared JVM-wide, exactly as Hystrix's are, so reusing a key would leak circuit
@@ -282,7 +282,7 @@ public class FcCommandTest {
 
 	/**
 	 * The direct regression test for the "in multi threaded environment hystrix does not resolve
-	 * fallback ??" comment in ConcurrentIncludeProcessor (proposal section 6.4). getFallback() is
+	 * fallback ??" comment in ConcurrentIncludeProcessor. getFallback() is
 	 * invoked from execute()'s own catch block, on the calling thread, with no subscription semantics
 	 * in between - so it runs every time, including when many threads fail at once.
 	 */
@@ -343,7 +343,7 @@ public class FcCommandTest {
 		}
 	}
 
-	// ---- the watchdog (section 6.2) ----------------------------------------
+	// ---- the watchdog -----------------------------------------------------
 
 	/**
 	 * The contrast with {@link HystrixSemaphoreTimeoutMeasurementTest}: Hystrix hands the caller a

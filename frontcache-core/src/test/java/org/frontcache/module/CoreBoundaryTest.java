@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,21 +37,21 @@ import org.junit.Assume;
 import org.junit.Test;
 
 /**
- * The boundary of docs/ip-protection-apache-core-and-prop-pro-proposal.md section 5.4. Since phase P2 the
- * Pro classes are in their own modules (frontcache-pro-license, frontcache-pro), which compile against the
- * core and never the other way round - so a core class naming one no longer compiles. What is left for this
- * test is what the compiler cannot see: a Pro class, or the module's services file, put back into the core
- * (D4 kept the package names, so a file dropped into org.frontcache.license or .warmer compiles fine), and
- * a core class naming a Pro class from the same split package.
+ * The boundary between the Apache-2.0 core and the Pro modules. The Pro classes are in their own modules
+ * (frontcache-pro-license, frontcache-pro), which compile against the core and never the other way round -
+ * so a core class naming one no longer compiles. What is left for this test is what the compiler cannot
+ * see: a Pro class, or the module's services file, put back into the core (the Pro modules share the core's
+ * package names, so a file dropped into org.frontcache.license or .warmer compiles fine), and a core class
+ * naming a Pro class from the same split package.
  *
- * {@link #ALLOWED} listed the references P1 had not rewired yet; it is empty now, and an entry that no
- * longer matches anything fails the test too, so a fix cannot leave its permission behind.
+ * {@link #ALLOWED} listed the references not yet rewired through the module SPI; it is empty now, and an
+ * entry that no longer matches anything fails the test too, so a fix cannot leave its permission behind.
  */
 public class CoreBoundaryTest {
 
 	private static final Path SOURCES = Paths.get("src/main/java");
 
-	/** The Pro modules' sources, beside this module in the private repository (section 5.1). */
+	/** The Pro modules' sources, beside this module in the private repository. */
 	private static final List<Path> PRO_SOURCES = List.of(
 			Paths.get("../frontcache-pro-license/src/main/java"),
 			Paths.get("../frontcache-pro/src/main/java"));
@@ -73,13 +73,13 @@ public class CoreBoundaryTest {
 			"org.frontcache.io.UsageReportActionResponse");
 
 	/**
-	 * Core class -> the Pro classes it may still name. Empty since P1 finished (section 10.1):
-	 * FrontCacheClient's warmer and license methods moved to ProFrontCacheClient (section 4.4). Keep it
+	 * Core class -> the Pro classes it may still name. Empty since the module SPI was finished:
+	 * FrontCacheClient's warmer and license methods moved to ProFrontCacheClient. Keep it
 	 * empty - a new entry is a core class reaching into Pro code, which stops compiling at the split.
 	 */
 	private static final Map<String, Set<String>> ALLOWED = Map.of();
 
-	/** P2 moved every one of them out; one that is back is Pro code in the Apache core. */
+	/** Every one of them moved out; one that is back is Pro code in the Apache core. */
 	@Test
 	public void noProClassIsInTheCore() throws IOException {
 
@@ -128,8 +128,7 @@ public class CoreBoundaryTest {
 			}
 		}
 
-		assertTrue("Core classes name Pro classes (docs/ip-protection-apache-core-and-prop-pro-proposal.md 3.1,"
-				+ " principle 5 - go through the org.frontcache.module SPI instead):\n  "
+		assertTrue("Core classes name Pro classes (go through the org.frontcache.module SPI instead):\n  "
 				+ String.join("\n  ", violations), violations.isEmpty());
 
 		List<String> stale = new ArrayList<>();

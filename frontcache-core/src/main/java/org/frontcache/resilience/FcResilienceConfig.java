@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  * {@code FrontcacheConfigBootstrapListener} existed at all: whoever touched Archaius first won, so if
  * the dashboard stream was hit before any page request, every per-command override in the file was
  * silently dropped. Here the file is just a Properties object read at first use. Both workarounds are
- * deleted and that entire class of startup-ordering bug is no longer possible. See proposal section 6.5.
+ * deleted and that entire class of startup-ordering bug is no longer possible.
  *
  * Key resolution: {@code resilience.command.<key>.<prop>}, then {@code hystrix.command.<key>.<prop>},
  * then the same two at {@code default} scope, then the built-in default. The {@code hystrix.*} prefix is
@@ -303,7 +303,7 @@ public class FcResilienceConfig {
 	}
 
 	/**
-	 * The fallback semaphore is parsed and reported but never enforced (proposal section 6.3). Say so
+	 * The fallback semaphore is parsed and reported but never enforced. Say so
 	 * once at startup: an operator who tunes the key would otherwise have no way to find out that
 	 * nothing changed.
 	 */

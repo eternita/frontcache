@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,8 @@ import org.slf4j.LoggerFactory;
  *
  * Every call into a module is wrapped: a module that throws is logged, and one that throws in
  * {@link FrontcacheModule#start} is dropped until the next {@link #start}. Nothing here may stop a node
- * from serving, which is the whole of invariant 1 of docs/ip-protection-proposal.md section 3 once the
- * code that could fail lives in a jar this repository does not build.
+ * from serving - a rule that matters all the more once the code that could fail lives in a jar this
+ * repository does not build.
  */
 public final class FrontcacheModules {
 

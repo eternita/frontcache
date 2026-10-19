@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import java.util.Map;
 import org.junit.Test;
 
 /**
- * The combine wire contract's encoding half (docs/archive/combine-reduce-proposal.md section 5).
+ * The combine wire contract's encoding half (docs/include-combining.md).
  *
  * What these are really pinning is the property the whole encoding exists for: a member's query
  * string travels as a VALUE, so nothing inside it can become part of the combined request's own

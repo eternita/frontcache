@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.Tag;
 
 /**
- * The Prometheus / OTLP exporter (proposal section 7.5).
+ * The Prometheus / OTLP exporter.
  *
  * Three of these matter more than the rest: export is OFF unless asked for, every series is prefixed,
  * and nothing is ever labelled by URL. The first is an upgrade-safety property, the third is the one
@@ -189,7 +189,7 @@ public class FcMetricsExportTest {
 		return found;
 	}
 
-	/** Section 7.5: one prefix for the whole set, so it is findable in a single query. */
+	/** One prefix for the whole set, so it is findable in a single query. */
 	@Test
 	public void everySeriesIsPrefixed()
 	{
@@ -204,9 +204,8 @@ public class FcMetricsExportTest {
 
 	/**
 	 * No module, no module series. The license and cache-warmer series are the Pro module's (bound through
-	 * {@code FrontcacheModule.bindMeters}, docs/ip-protection-apache-core-and-prop-pro-proposal.md section
-	 * 4.3) and frontcache-pro's {@code ProMetersTest} asserts them; this module's test class path has no
-	 * Pro jar, which is a Community node.
+	 * {@code FrontcacheModule.bindMeters}) and frontcache-pro's {@code ProMetersTest} asserts them; this
+	 * module's test class path has no Pro jar, which is a Community node.
 	 */
 	@Test
 	public void aNodeWithNoModuleExportsNoModuleSeries()
@@ -329,7 +328,7 @@ public class FcMetricsExportTest {
 	// ---- combine-and-reduce --------------------------------------------------------------
 
 	/**
-	 * The combine series and their label vocabulary (docs/archive/combine-reduce-proposal.md section 12).
+	 * The combine series and their label vocabulary.
 	 *
 	 * The pair that carries the feature's whole claim is asserted by value, not merely by presence:
 	 * members{result="combined"} over batches{result="ok"} is the average number of fragments one

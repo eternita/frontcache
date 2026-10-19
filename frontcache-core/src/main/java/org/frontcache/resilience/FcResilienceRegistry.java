@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,8 +32,8 @@ import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
  * Registry entries are named by command key alone, which is only correct because one node serves one
  * site. Before multi-domain support was retired, Hystrix's per-commandKey circuit breakers were shared
  * across every domain on an edge - one tenant's failing origin short-circuited every other tenant's
- * healthy one. That fault is now structurally impossible rather than fixed; proposal section 6.6
- * records it, and the composite naming it would need if multi-tenancy ever returns.
+ * healthy one. That fault is now structurally impossible rather than fixed. Should multi-tenancy ever
+ * return, entries would need a composite (domain, command key) name.
  */
 public class FcResilienceRegistry {
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ package org.frontcache.resilience;
  * {@link FcCommand#execute()} when the command failed AND the fallback could not supply a value.
  *
  * Carries the command key and the outcome that caused it so callers can react without string
- * matching - {@code ConcurrentIncludeProcessor} is the one that does (see proposal section 6.4).
+ * matching - {@code ConcurrentIncludeProcessor} is the one that does.
  */
 public class FcCommandException extends RuntimeException {
 

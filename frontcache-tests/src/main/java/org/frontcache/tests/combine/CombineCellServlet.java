@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,8 +37,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * reach this servlet once, not N times. That is the entire feature - a real origin's saving is the
  * batched DB/Solr query behind this counter, which a test webapp has nothing to stand in for.
  *
- * Also serves the two deliberately-broken variants (docs/archive/combine-reduce-proposal.md section 9),
- * selected by path so a test can point a page at one of them:
+ * Also serves the two deliberately-broken variants, selected by path so a test can point a page at one of
+ * them:
  *
  * <ul>
  * <li>{@code /common/combine/cell}             - implements the contract;</li>

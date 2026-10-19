@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import org.junit.Test;
 public class WindowLimiterTest {
 
 	private static final int SLOTS = 4096;
-	private static final long WINDOW = 10000L; // the 10-second slot from the proposal
+	private static final long WINDOW = 10000L; // the 10-second slot the limiter was designed around
 
 	private static long key(String address) {
 		return WindowLimiter.hash("test-bucket", address);

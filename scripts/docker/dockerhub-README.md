@@ -1,7 +1,7 @@
 <!--
 The description shown on Docker Hub for pavlikovskiy/frontcache-server. Docker Hub has no API
-in our release flow, so this is pasted into the repository description by hand - step 9 of
-docs/frontcache-release-steps.md, in the same push as the images.
+in our release flow, so this is pasted into the repository description by hand as a release step,
+in the same push as the images.
 
 Keep it short. It is the page someone reads when they are deciding whether to `docker run`.
 -->

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ import org.junit.Test;
 /**
  * {@code front-cache.edge-token} on the running chain: test -> standalone (:9080) -> filter (:8080)
  * -> app, both nodes configured with {@link EdgeTokens#TEST_EDGE_TOKEN}. See
- * docs/direct-access-restriction-proposal.md and {@code org.frontcache.core.EdgeToken}.
+ * {@code org.frontcache.core.EdgeToken}.
  *
  * Two halves:
  *

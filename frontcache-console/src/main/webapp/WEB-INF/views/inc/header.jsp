@@ -4,7 +4,7 @@
 	// Every page that includes this header is dynamic and behind a login, so none of them may come
 	// back from the browser's cache after a sign-out - which is reachable for the first time now
 	// that there is a sign-out. Static assets under /static are unaffected: they are not served
-	// through a JSP. See docs/archive/console-login-ui.md section 8.
+	// through a JSP.
 	response.setHeader("Cache-Control", "no-store");
 %>
 <html>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
 /**
- * How conf/frontcache-console.conf turns into a login - see docs/archive/basic-auth-proposal.md section 5.
+ * How conf/frontcache-console.conf turns into a login.
  *
  * The first test is the one that matters on an upgrade: a file written before this feature existed
  * has neither key, and must parse to "no authentication" rather than to an exception. Reading these
@@ -147,10 +147,9 @@ public class FrontcacheServiceAuthConfigTest {
 	// ---- the session cookie's Secure attribute -------------------------------------------------
 
 	/**
-	 * Default OFF, and that is the decision rather than an oversight - see
-	 * docs/archive/console-login-ui.md section 4.4. Defaulting it on means the cookie is never sent on the
-	 * plain-HTTP internal consoles that are the common case, and the symptom is a login page that
-	 * accepts the password and returns to the login page.
+	 * Default OFF, and that is the decision rather than an oversight. Defaulting it on means the cookie is
+	 * never sent on the plain-HTTP internal consoles that are the common case, and the symptom is a login
+	 * page that accepts the password and returns to the login page.
 	 */
 	@Test
 	public void theSessionCookieIsNotSecureUnlessTheFileSaysSo() {

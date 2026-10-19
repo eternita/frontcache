@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ import org.slf4j.LoggerFactory;
 public class FrontCacheEngine {
 
 
-	// This node's site. One node serves one site - see docs/archive/multi-domain-retirement-proposal.md.
+	// This node's site. One node serves one site; multi-domain config is retired.
 	private String domain;          // front-cache.default-domain
 	private String apiKey;          // front-cache.api-key
 	private String originHost;      // front-cache.origin-host
@@ -170,7 +170,7 @@ public class FrontCacheEngine {
 
 	// Guard rules run before cache and origin: the two built-in checks above plus whatever
 	// conf/guard-rules.conf adds (reject / redirect / allow). See
-	// docs/frontcache-protection-tech-design.md.
+	// docs/guard-getting-started.md.
 	private GuardRuleEngine guardRuleEngine = null;
 
 	/**
@@ -225,7 +225,7 @@ public class FrontCacheEngine {
 
 	// The FcHttpClient view of the same client. This is what the three reflection-loaded extension
 	// points (CacheProcessor / IncludeProcessor / FallbackResolver) are handed - they no longer see
-	// an Apache type. See docs/archive/httpclient5-upgrade-proposal.md section 5.1.
+	// an Apache type, so an HttpClient upgrade cannot break them.
 	private FcHttpClient fcHttpClient;
 
 	public static boolean debugComments = false; // if true - appends debug comments (for includes) to output
@@ -376,7 +376,7 @@ public class FrontCacheEngine {
 	}
 
 	// Retired multi-domain config. One node serves one site; these keys used to make a node serve
-	// several. See docs/archive/multi-domain-retirement-proposal.md.
+	// several, and a node configured with them refuses to start.
 	private static final String RETIRED_DOMAIN_LIST_KEY = "front-cache.domains";
 	private static final String RETIRED_DOMAIN_KEY_PREFIX = "front-cache.domain.";
 
@@ -475,7 +475,7 @@ public class FrontCacheEngine {
 		  .append("\nown domain with front-cache.default-domain and its origin with front-cache.origin-host")
 		  .append("\n(front-cache.origin-http-port / front-cache.origin-https-port). Per-domain config")
 		  .append("\nfiles move to the top-level conf/bots.conf, conf/dynamic-urls.conf, conf/fallbacks.conf.")
-		  .append("\n\nSee docs/archive/multi-domain-retirement-proposal.md");
+		  .append("\n\nSee docs/release-notes/2.6.0.md");
 
 		return sb.toString();
 	}
@@ -564,7 +564,7 @@ public class FrontCacheEngine {
 					+ " (it is " + ((null == domain) ? "null" : "'" + domain + "'") + ")."
 					+ " Guard-rule ${url} / ${host} and origin-redirect rewriting will echo whatever Host"
 					+ " each request arrives under, which is not always the public one"
-					+ " - see docs/archive/guard-redirect-url-host-fix.md");
+					+ " - see docs/release-notes/2.9.0.md");
 		} else {
 			String scheme = (null != publicScheme) ? publicScheme : "<from X-Forwarded-Proto or the incoming connection>";
 			logger.info("Public identity for emitted URLs (guard-rule ${url} / ${host}, origin-redirect"
@@ -683,10 +683,10 @@ public class FrontCacheEngine {
 		});
 		t.start();
 
-		// Modules from their own jars (the Pro module: licensing, the warmer's orchestration) -
-		// docs/ip-protection-apache-core-and-prop-pro-proposal.md section 4.1. After the cache and
-		// before metrics export, so a module's meters bind to a started module. Never on the request
-		// path, and a module that throws is dropped rather than stopping the node.
+		// Modules from their own jars (the Pro module: licensing, the warmer's orchestration), found
+		// through FrontcacheModule's ServiceLoader. After the cache and before metrics export, so a
+		// module's meters bind to a started module. Never on the request path, and a module that throws is
+		// dropped rather than stopping the node.
 		FrontcacheModules.start(new CoreModuleContext(getPublicDomain()));
 
 		// Prometheus / OTLP export. A no-op unless front-cache.metrics.export says otherwise, which is
@@ -882,7 +882,6 @@ public class FrontCacheEngine {
 		// the connection manager (see newConnectionManager()). RequestConfig.setResponseTimeout is
 		// NOT the old socket timeout - it bounds the wait for the response head, not inactivity on
 		// each read - so mapping onto it would have quietly changed what the config key means.
-		// See docs/archive/httpclient5-upgrade-proposal.md section 4.1.
 		final RequestConfig requestConfig = RequestConfig.custom()
 				// bounded wait for a pooled connection - never block a worker thread indefinitely
 				.setConnectionRequestTimeout(Timeout.ofMilliseconds(fcConnectionRequestTimeout))
@@ -907,7 +906,6 @@ public class FrontCacheEngine {
 				// constructor is (1, TimeValue.ofSeconds(1)) and HttpRequestRetryExec honours that
 				// interval by sleeping, which would park a command worker for a full second before a
 				// retry that is instant on a fresh connection. 4.5's handler retried immediately.
-				// See docs/archive/httpclient5-upgrade-proposal.md section 4.3.1.
 				.setRetryStrategy(new DefaultHttpRequestRetryStrategy(1, TimeValue.ZERO_MILLISECONDS))
 				.setKeepAliveStrategy(keepAliveStrategy)
 				// Frontcache relays the origin's redirect to the client (rewriting Location itself in

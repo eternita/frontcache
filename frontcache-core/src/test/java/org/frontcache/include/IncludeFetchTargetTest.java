@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,16 +64,16 @@ import ch.qos.logback.core.read.ListAppender;
 /**
  * Where a cache-missing {@code <fc:include>} is fetched from, and who caches the answer.
  *
- * See docs/archive/include-fetch-fix.md. One string used to do two jobs: the include's absolute URL was both
- * the cache key and the fetch target, so a miss was fetched from this node's own {@code Host} - back
- * out to the CDN and in at its own front door, which fetched the origin and cached the result on the
- * way through. {@code front-cache.include-fetch-target=origin} splits the two: the key stays the
- * public URL and only the wire URL moves.
+ * One string used to do two jobs: the include's absolute URL was both the cache key and the fetch target,
+ * so a miss was fetched from this node's own {@code Host} - back out to the CDN and in at its own front
+ * door, which fetched the origin and cached the result on the way through.
+ * {@code front-cache.include-fetch-target=origin} splits the two: the key stays the public URL and only the
+ * wire URL moves.
  *
- * Everything here is about a failure that is silent. Section 8 of that document ranks them, and the
- * top three are all "the fetch works, the page renders, and the cache quietly stops working":
- * no {@code putToCache} at all, the key rebased onto the origin host, or the stored response still
- * carrying the origin URL. Each has a test below that fails on it and on nothing else.
+ * Everything here is about a failure that is silent, and the worst three are all "the fetch works, the page
+ * renders, and the cache quietly stops working": no {@code putToCache} at all, the key rebased onto the
+ * origin host, or the stored response still carrying the origin URL. Each has a test below that fails on it
+ * and on nothing else.
  */
 public class IncludeFetchTargetTest {
 
@@ -355,7 +355,7 @@ public class IncludeFetchTargetTest {
 	 * Step 5. {@code CombineProtocol.endpointOf} derives the batch endpoint from a member's URL, so it
 	 * inherits whatever base that member carries. Leave it on the edge base and single includes go to
 	 * the origin while combined ones keep looping back - the same fragment reachable two ways, which
-	 * is how section 2 of docs/archive/input-request-count-fix.md happened.
+	 * is how an include loop once refetched cached fragments (see {@code FCUtils.canonicalizeURL}).
 	 *
 	 * The members are the other half: they must stay keyed on their public URLs, or a combined write
 	 * and a single-include read never meet.

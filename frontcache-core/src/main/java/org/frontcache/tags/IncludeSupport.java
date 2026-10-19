@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public class IncludeSupport extends BodyTagSupport {
 	protected Object ulr; // tag attribute
 	protected Object includeCallType; // tag attribute
 	protected Object includeClientType; // tag attribute
-	protected Object includeCombine; // tag attribute - see docs/archive/combine-reduce-proposal.md
+	protected Object includeCombine; // tag attribute - see docs/include-combining.md
 
 	// *********************************************************************
 	// Construction and initialization

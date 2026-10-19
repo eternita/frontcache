@@ -60,8 +60,7 @@
 				<li><a href="<c:out value='${nav.href}'/>" class="${topActive == nav.id ? 'active-top' : ''}"><c:out value="${nav.label}"/> </a></li>
 				</c:forEach>
 			</ul>
-			<%-- Who is signed in, and the only way to stop being signed in - see
-			     docs/archive/console-login-ui.md section 8.
+			<%-- Who is signed in, and the only way to stop being signed in.
 
 			     Rendered from the session attribute, so the block is absent for exactly the two
 			     cases where it would lie: authentication off (nothing to sign out of) and a

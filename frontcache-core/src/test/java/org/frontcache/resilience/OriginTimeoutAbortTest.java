@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,11 +56,11 @@ import jakarta.servlet.http.HttpServletRequest;
  * {@code FC_ThroughCache_HttpClient.getFallback()}'s {@code pendingRequest.abort()}, an abandoned origin
  * call keeps its pooled connection until the socket timeout expires - another full 10s - which doubles
  * connection occupancy exactly when the origin is slow and the pool is already tight. That is what
- * happened in the August 2026 outage (docs/archive/2026.08.12-fixed-leaks.md), and the abort is the fix
+ * happened in the August 2026 outage, and the abort is the fix
  * that has to survive the library swap verbatim.
  *
- * It is also this suite's stand-in for a load test. Proposal section 14.4 records that no slow-origin
- * environment exists, so section 10's substitute gate for PR 4 is a deterministic assertion instead: a
+ * It is also this suite's stand-in for a load test. No slow-origin environment exists to load-test
+ * against, so the gate is a deterministic assertion instead: a
  * real {@link PoolingHttpClientConnectionManager} against a real socket that accepts and never answers,
  * asserting the lease comes back. That is a stronger check than watching a graph - it fails on the exact
  * condition rather than on a trend - though it deliberately does not claim to cover sustained slowdown at

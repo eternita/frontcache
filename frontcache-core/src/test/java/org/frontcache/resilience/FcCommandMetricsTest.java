@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import org.junit.Test;
  * The rolling-window and latency machinery that produces the dashboard's numbers.
  *
  * These are the fields Resilience4j's own metrics cannot supply - per-event-type rolling counters and
- * latency percentiles - which is why Frontcache owns them (proposal section 7.3).
+ * latency percentiles - which is why Frontcache owns them.
  */
 public class FcCommandMetricsTest {
 

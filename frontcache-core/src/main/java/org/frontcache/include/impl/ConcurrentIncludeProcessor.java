@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 	/** Content type given to a combined part whose own headers name none. */
 	private static final String DEFAULT_PART_CONTENT_TYPE = "text/html;charset=UTF-8";
 
-	// --- combine-and-reduce (docs/archive/combine-reduce-proposal.md) ---------------------------------
+	// --- combine-and-reduce (docs/include-combining.md) ------------------------------------------------
 	// A kill switch, not the default posture: combining only ever acts on includes that carry a
 	// combine="..." attribute, so leaving this true changes nothing for markup that does not ask.
 	private boolean combineEnabled = true;
@@ -169,10 +169,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
         List<Future<?>> futureList = new ArrayList<Future<?>>(includes.size()); // for sync includes
 
-        // Combinable includes are held back rather than submitted: which of them go into a batch
-        // depends on which of them missed the cache, and that is not known yet. See section 4.3 of
-        // docs/archive/combine-reduce-proposal.md - everything else is submitted first, so the non-combinable
-        // includes of a page overlap with the combinables' cache probe instead of queueing behind it.
+        // Combinable includes are held back rather than submitted: which of them go into a batch depends on
+        // which of them missed the cache, and that is not known yet. Everything else is submitted first, so
+        // the non-combinable includes of a page overlap with the combinables' cache probe instead of
+        // queueing behind it.
         List<IncludeResolutionPlaceholder> combinables = null;
 
         for (int i=0; i < includes.size(); i++)
@@ -368,7 +368,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				// trace headers of its own, and the parent's map is only ever read after parse.
 				// The batch endpoint has to be built from the FETCH base, or single includes go to the
 				// origin while combined ones keep looping back - the same fragment reachable two ways,
-				// which is how section 2 of docs/archive/input-request-count-fix.md happened. Members stay
+				// which is how an include loop once refetched cached fragments. Members stay
 				// keyed on their public URLs; only the endpoint moves.
 				CombinedIncludeBatch batch = new CombinedIncludeBatch(
 						group.getKey(),
@@ -507,7 +507,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					// what this fragment is keyed, logged and fallen back on, and the fetch one is what
 					// goes on the wire. The fetch URL is DERIVED from the public one rather than
 					// re-concatenated from the tag, so FCUtils.canonicalizeURL stays the single
-					// normaliser for both - see docs/archive/include-fetch-fix.md section 5.
+					// normaliser for both - see FCUtils.rebaseURL.
 					String publicIncludeURL = hostURL + includeURL;
 					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, publicIncludeURL,
 							FCUtils.rebaseURL(publicIncludeURL, fetchBaseURL),
@@ -698,7 +698,6 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	/**
 	 * One combined origin call: N cache-missing members of one group, asked for and answered together.
-	 * See docs/archive/combine-reduce-proposal.md.
 	 *
 	 * Leaving a member's {@code webResponse} null is a valid outcome and the way every failure here is
 	 * reported: {@link #replaceIncludePlaceholders} resolves a fallback for any sync include still
@@ -760,7 +759,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 			// an entry per subset, every one of them useless on the next request. And the reference
 			// topology has two Frontcache nodes on the path, either of which would store it. This is
 			// the existing signal for exactly that, understood by every node: bypass the cache and
-			// forward. See section 4.1 of the proposal.
+			// forward.
 			requestHeaders.put(FCHeaders.X_FRONTCACHE_DYNAMIC_REQUEST, Arrays.asList(new String[]{"true"}));
 
 			WebResponse envelopeResponse = fetchIncludeFromOrigin(combinedURL, fetchCombinedURL, requestHeaders, client, context,
@@ -879,7 +878,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					return false;
 				}
 
-				// Optional, and verified when present - proposal section 18, decision 1.
+				// Optional, and verified when present.
 				String echo = part.getQ();
 				if (null != echo && !echo.equals(queries.get(i)))
 				{

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Rejects a state-changing request that a browser made from another site - see
- * docs/archive/basic-auth-proposal.md section 8.1.
+ * Rejects a state-changing request that a browser made from another site.
  *
  * <h2>Why this ships with Basic auth rather than after it</h2>
  *

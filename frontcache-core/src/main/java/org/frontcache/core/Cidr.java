@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,9 @@ import java.net.InetAddress;
 /**
  * An address block, compared on raw address bytes so v4 and v6 never match each other.
  *
- * Lived inside {@link ClientIpResolver} as a package-private nested class until a second caller
- * appeared in another package (the {@code client-ip:} rule predicate, shared by guard rules and
- * bots.conf - see docs/archive/dynamic-bots-classification-proposal.md). Promoted rather than copied: one
- * definition of "is this address inside that block", so a fix reaches both callers.
+ * Lived inside {@link ClientIpResolver} as a package-private nested class until a second caller appeared in
+ * another package (the {@code client-ip:} rule predicate, shared by guard rules and bots.conf). Promoted
+ * rather than copied: one definition of "is this address inside that block", so a fix reaches both callers.
  *
  * Never throws. An address or block that cannot be parsed is null, and every caller treats null as
  * "undecidable", not as "matches".

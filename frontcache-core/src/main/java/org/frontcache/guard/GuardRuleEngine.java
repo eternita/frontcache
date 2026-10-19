@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,8 +69,7 @@ public class GuardRuleEngine {
 
 	// "<rule>#<host>" pairs already warned about. The trigger for a bad host is a crawler loop or a
 	// misrouted probe, i.e. thousands of identical requests, so warning per request is how error.log
-	// reaches gigabytes (see docs/archive/input-request-count-fix.md). Capped so a host-rotating client
-	// cannot turn the throttle itself into the leak.
+	// reaches gigabytes. Capped so a host-rotating client cannot turn the throttle itself into the leak.
 	private static final int MAX_REMEMBERED_WARNINGS = 256;
 	private final Set<String> warnedRedirectHosts =
 			Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<String, Boolean>());
@@ -308,9 +307,9 @@ public class GuardRuleEngine {
 	 * front-cache.guard-rules.allowed-redirect-hosts.
 	 *
 	 * This used to also add front-cache.domains. That key is retired (a node configured with it
-	 * refuses to start - see docs/archive/multi-domain-retirement-proposal.md), so the read is gone.
+	 * refuses to start), so the read is gone.
 	 *
-	 * front-cache.default-domain IS included, as of docs/archive/guard-redirect-url-host-fix.md - settling
+	 * front-cache.default-domain IS included, as of 2.9.0 - settling
 	 * the follow-up left open by the multi-domain retirement, where the javadoc here claimed it was
 	 * and the code never did it. It has to be now: ${url} and ${host} emit that hostname, so a rule
 	 * redirecting to your own site would otherwise be refused at load time against an allowlist not
@@ -648,13 +647,13 @@ public class GuardRuleEngine {
 						warnOnce(rule, embeddedHost, "redirect parameter '" + name + "' points at '" + embeddedHost
 								+ "', which is not an allowed redirect host, and front-cache.default-domain names no"
 								+ " public host to put there instead - dropping the parameter."
-								+ " See docs/archive/guard-redirect-url-host-fix.md");
+								+ " See docs/release-notes/2.9.0.md");
 						continue; // drop it
 					}
 
 					warnOnce(rule, embeddedHost, "redirect parameter '" + name + "' points at '" + embeddedHost
 							+ "', which is not an allowed redirect host - rewriting it onto '" + publicDomain + "'."
-							+ " See docs/archive/guard-redirect-url-host-fix.md");
+							+ " See docs/release-notes/2.9.0.md");
 
 					replacement = name + "=" + encode(replaceHost(decoded, embeddedHost, publicDomain));
 				}

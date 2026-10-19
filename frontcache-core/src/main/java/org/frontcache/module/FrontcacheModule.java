@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,7 @@ import java.util.Map;
 
 /**
  * A module that plugs into a node from its own jar - found with {@link java.util.ServiceLoader} through
- * {@code META-INF/services/org.frontcache.module.FrontcacheModule}. See
- * docs/ip-protection-apache-core-and-prop-pro-proposal.md section 4.1.
+ * {@code META-INF/services/org.frontcache.module.FrontcacheModule}.
  *
  * <h2>Never on the request path</h2>
  *

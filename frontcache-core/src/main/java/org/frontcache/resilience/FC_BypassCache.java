@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -223,7 +223,7 @@ public class FC_BypassCache extends FcCommand<Object> {
 	 * where 4.5's (stream, length) constructor did not; forward the client's own, null when it did not
 	 * declare one or could not be parsed. The header itself is still forwarded separately by
 	 * convertHeaders(), and setHeaders() replaces whatever the entity contributed, so the origin sees
-	 * exactly one Content-Type. See docs/archive/httpclient5-upgrade-proposal.md section 4.4.
+	 * exactly one Content-Type.
 	 *
 	 * Only ever called from the POST/PUT/PATCH branches: a GET has no entity, and on that path the
 	 * servlet request may legitimately be null.

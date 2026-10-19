@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 /**
- * Authentication for the whole console - see docs/archive/basic-auth-proposal.md (the credential) and
- * docs/archive/console-login-ui.md (the login screen).
+ * Authentication for the whole console - the credential, and the login screen that presents it.
  *
  * One user, no roles, credentials from conf/frontcache-console.conf. The console can invalidate the
  * cache of every node it knows and holds the api-key that authorizes it, so an unauthenticated
@@ -88,7 +87,7 @@ public class ConsoleAuthFilter implements Filter {
 	public static final String LOGIN_PATH = "/login";
 
 	/**
-	 * The only paths served without a credential - see docs/archive/console-login-ui.md section 6.2.
+	 * The only paths served without a credential.
 	 *
 	 * <b>Exact match, never a prefix, and this is the security-critical line of the change.</b> A
 	 * prefix match on {@code /static/} would be shorter and would also expose every asset the
@@ -97,8 +96,8 @@ public class ConsoleAuthFilter implements Filter {
 	 * {@code addResourceHandler("/**")} to a classpath location, so ANY path no controller claims
 	 * falls through to a resource handler - this set is the only thing standing in front of that.
 	 *
-	 * Adding an exclusion list at all reverses section 9.5 of the Basic-auth proposal ("an
-	 * exclusion list is a thing to get wrong later"). It is forced: a login page that cannot load
+	 * Adding an exclusion list at all reverses a decision the Basic-auth console made on purpose: an
+	 * exclusion list is a thing to get wrong later. It is forced: a login page that cannot load
 	 * its own stylesheet is not a login page. The mitigation is the shape of the list, and the test
 	 * that pins it asserts a NEGATIVE - that /static/js/console.js is not in it - because that is
 	 * the assertion which fails when someone loosens the match.
@@ -211,7 +210,7 @@ public class ConsoleAuthFilter implements Filter {
 
 	/**
 	 * Refuse - as a redirect to the login page for a browser, as a 401 with the Basic challenge for
-	 * everything else. See docs/archive/console-login-ui.md section 5.2.
+	 * everything else.
 	 *
 	 * <b>{@code Accept} chooses the shape of the refusal and never authorizes anything.</b> Both
 	 * misclassifications are visible immediately: a page navigation read as programmatic shows the

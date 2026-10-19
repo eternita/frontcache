@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,7 +154,7 @@ public class FcResilienceConfigTest {
 	}
 
 	/**
-	 * Parsed and reported, never enforced - see proposal section 6.3. The value has to survive parsing
+	 * Parsed and reported, never enforced. The value has to survive parsing
 	 * because the dashboard asserts the field exists.
 	 */
 	@Test

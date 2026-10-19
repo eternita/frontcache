@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,6 @@ import org.frontcache.resilience.FC_ThroughCache_WebFilter;
  * The Apache-backed {@link FcHttpClient}. This class and the resilience commands are the only places
  * in {@code frontcache-core} that know an HTTP library exists - everything else, including all three
  * reflection-loaded extension points, sees only {@link FcHttpClient}.
- *
- * See docs/archive/httpclient5-upgrade-proposal.md section 5.1.
  */
 public class ApacheFcHttpClient implements FcHttpClient {
 

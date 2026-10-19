@@ -7,8 +7,7 @@
      /edges-status.json and refreshes every 10s, INCLUDING the status dot. Rendering the numbers
      server-side meant a fan-out over the whole fleet before the page could paint, so one unreachable
      edge held up a monitoring dashboard; and it meant two implementations of every format, one in
-     DecimalFormat for the first paint and one in JavaScript for every paint after it.
-     See docs/archive/edges-status-realtime-proposal.md sections 5.5 and 8. -->
+     DecimalFormat for the first paint and one in JavaScript for every paint after it. -->
 <h2 style="font-size: 22px;">Edges status</h2>
 <br/>
 

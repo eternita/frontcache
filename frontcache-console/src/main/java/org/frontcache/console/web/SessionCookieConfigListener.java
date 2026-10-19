@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,17 +26,16 @@ import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.SessionCookieConfig;
 
 /**
- * The two session-cookie attributes web.xml cannot express - see docs/archive/console-login-ui.md
- * section 4.4.
+ * The two session-cookie attributes web.xml cannot express.
  *
  * {@code HttpOnly}, the cookie name and the timeout are in web.xml. These two are not:
  *
  * <ul>
  * <li><b>{@code SameSite=Lax}</b> has no web.xml element; {@code SessionCookieConfig.setAttribute}
- *     (Servlet 6.0) is the only way to set it. It is a real gain over Basic, which section 8.1 of
- *     docs/archive/basic-auth-proposal.md had to note was immune to SameSite because Basic credentials are
- *     not cookies. {@code Lax} rather than {@code Strict} so following a bookmark or a link into
- *     the console does not land on the login page while a perfectly good session exists.</li>
+ *     (Servlet 6.0) is the only way to set it. It is a real gain over Basic, which is immune to SameSite
+ *     because Basic credentials are not cookies. {@code Lax} rather than {@code Strict} so following a
+ *     bookmark or a link into the console does not land on the login page while a perfectly good session
+ *     exists.</li>
  * <li><b>{@code Secure}</b> is in web.xml but has to be a decision, not a constant - see
  *     {@link FrontcacheService#isSessionCookieSecure()}.</li>
  * </ul>

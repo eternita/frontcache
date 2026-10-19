@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,7 @@ import java.util.Set;
 
 /**
  * A console plugin from its own jar - found with {@link java.util.ServiceLoader} through
- * {@code META-INF/services/org.frontcache.console.plugin.ConsolePlugin}. See
- * docs/ip-protection-apache-core-and-prop-pro-proposal.md section 4.5.
+ * {@code META-INF/services/org.frontcache.console.plugin.ConsolePlugin}.
  *
  * <h2>What a plugin can and cannot do</h2>
  *
@@ -48,7 +47,7 @@ public interface ConsolePlugin {
 	 * Beans for the root context, the one {@code FrontcacheService} lives in: services. Each class is
 	 * registered with {@code @Import}, so a {@code @Service} or {@code @Configuration} works as written.
 	 *
-	 * A plugin class may share a package the core scans (D4 keeps the packages of moved code). It is
+	 * A plugin class may share a package the core scans (moved code kept its package). It is
 	 * still one bean: Spring keeps the scanned definition and ignores the import of a class it already
 	 * has. {@code ConsolePluginWiringTest} pins that, since a second bean of one type would fail every
 	 * {@code @Autowired} of it as ambiguous - at console startup, not at build time.

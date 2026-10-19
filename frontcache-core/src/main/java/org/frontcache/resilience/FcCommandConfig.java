@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,7 @@ import io.github.resilience4j.timelimiter.TimeLimiterConfig;
  *
  * The Hystrix property names and their semantics are preserved verbatim - the property names outlived
  * the library, and
- * its keys, so an operator's existing tuning carries over untouched. See proposal section 5.1 for the
- * key-by-key mapping.
+ * its keys, so an operator's existing tuning carries over untouched.
  */
 public class FcCommandConfig {
 
@@ -78,7 +77,7 @@ public class FcCommandConfig {
 	/**
 	 * Parsed but NOT enforced - reported on the dashboard only, so an existing resilience.properties
 	 * round-trips and the {@code propertyValue_fallbackIsolationSemaphoreMaxConcurrentRequests} field
-	 * the dashboard asserts keeps carrying the operator's value. See proposal section 6.3.
+	 * the dashboard asserts keeps carrying the operator's value.
 	 */
 	public int getFallbackSemaphoreMaxConcurrentRequests() { return fallbackSemaphoreMaxConcurrentRequests; }
 

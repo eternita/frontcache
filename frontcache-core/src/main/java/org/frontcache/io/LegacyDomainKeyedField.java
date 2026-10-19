@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,8 +32,7 @@ import java.util.Set;
  *
  * Why the map had to go: one node serves one site, so it always held exactly one entry, and the
  * console's JSPs had to switch on the literal {@code "default-domain"} to find it - a domain concept
- * surviving in the wire format after the feature behind it was retired. See
- * docs/archive/multi-domain-retirement-proposal.md section 8.
+ * surviving in the wire format after the feature behind it was retired.
  *
  * The legacy field can be dropped once no supported console predates 2.7.
  */

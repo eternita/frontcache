@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,10 +40,10 @@ import org.slf4j.LoggerFactory;
  * queue", i.e. a SynchronousQueue that rejects rather than buffers. That difference is not cosmetic:
  * a queue in front of a slow origin converts fast rejection (and a fallback) into latency, which is
  * the opposite of what the isolation is for. Owning a plain ThreadPoolExecutor also means the
- * dashboard's thread-pool numbers can be read straight off it. See proposal section 5.2.
+ * dashboard's thread-pool numbers can be read straight off it.
  *
  * Pools are node-level resources, not per-domain ones: {@link #all()} returns every pool with no
- * filtering, which is the fix for the thread-pool panel that has never rendered (section 6.6).
+ * filtering, which is the fix for the thread-pool panel that has never rendered.
  */
 public class FcThreadPools {
 

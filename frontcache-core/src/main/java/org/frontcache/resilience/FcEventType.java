@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,6 @@ package org.frontcache.resilience;
  * {@code RESPONSE_FROM_CACHE} are here for exactly that reason: Frontcache never emits them (it
  * registers no collapsers and does not use request caching), but the dashboard asserts their fields
  * exist, so the emitter needs a counter to read a zero from.
- *
- * See docs/archive/hystrix-to-resilience4j-proposal.md sections 4.1 and 7.3.
  */
 public enum FcEventType {
 
@@ -43,7 +41,6 @@ public enum FcEventType {
 	 * Never emitted. The fallback semaphore is parsed and reported but deliberately not enforced -
 	 * every call that reaches a fallback already holds an Input-Request permit, so this state is
 	 * unreachable. Kept so {@code rollingCountFallbackRejection} has a counter to read 0 from.
-	 * See proposal section 6.3.
 	 */
 	FALLBACK_REJECTION,
 
@@ -66,8 +63,6 @@ public enum FcEventType {
 	 * timeout as a failure, so doing that would move errorPercentage and could open a circuit on a
 	 * request that succeeded. It surfaces as an additional JSON field, which is safe because the
 	 * dashboard asserts key presence and ignores extras.
-	 *
-	 * See proposal section 6.2.
 	 */
 	BUDGET_OVERRUN_OBSERVED;
 

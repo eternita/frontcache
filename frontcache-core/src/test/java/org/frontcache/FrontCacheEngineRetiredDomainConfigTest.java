@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -150,7 +150,7 @@ public class FrontCacheEngineRetiredDomainConfigTest {
 		assertTrue(message, message.contains("one Frontcache node per site"));
 		assertTrue(message, message.contains("front-cache.default-domain"));
 		assertTrue(message, message.contains("front-cache.origin-host"));
-		assertTrue(message, message.contains("docs/archive/multi-domain-retirement-proposal.md"));
+		assertTrue(message, message.contains("docs/release-notes/2.6.0.md"));
 	}
 
 }

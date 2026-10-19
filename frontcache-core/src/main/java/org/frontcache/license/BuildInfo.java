@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,8 +31,7 @@ import org.slf4j.LoggerFactory;
  *
  * It is the half of the perpetual-fallback check that the customer cannot move: a license is valid for a
  * build when the build was released on or before the license's {@code updates-until}. Both sides of that
- * comparison are fixed at signing / build time, so setting the clock back changes nothing - see
- * docs/ip-protection-proposal.md section 5.3.
+ * comparison are fixed at signing / build time, so setting the clock back changes nothing.
  *
  * The date is {@code release-date} from version.properties when it is set (the release cut sets it), and
  * the build day otherwise. A development build therefore carries "today", which is the honest answer: it

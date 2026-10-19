@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 						// path below, and again without a remove. Handed to softInvalidationExecutor, the
 						// warmer would read "fresh" at loopback speed while queueing one background origin
 						// fetch per key - single-flight dedupes a key, not a list - and the delay between
-						// warm calls would pace nothing. See docs/cache-warmer-proposal.md section 6.3.
+						// warm calls would pace nothing.
 						// IncludeProcessorBase.getIncludeFromCache carries the same branch.
 						cachedWebResponse = null;
 					} else {

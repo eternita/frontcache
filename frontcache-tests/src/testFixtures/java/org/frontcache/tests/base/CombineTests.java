@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,10 +36,10 @@ import org.junit.Test;
 import org.htmlunit.html.HtmlPage;
 
 /**
- * Combine-and-reduce, end to end - docs/archive/combine-reduce-proposal.md.
+ * Combine-and-reduce, end to end - docs/include-combining.md.
  *
- * Run in both topologies. The standalone run is the one that matters for section 4.1's second
- * claim: the combined request crosses TWO Frontcache nodes, and neither may cache the envelope.
+ * Run in both topologies. The standalone run is the one that matters most: the combined request
+ * crosses TWO Frontcache nodes, and neither may cache the envelope.
  */
 public abstract class CombineTests extends TestsBase {
 
@@ -61,7 +61,7 @@ public abstract class CombineTests extends TestsBase {
 	// --- the feature ---------------------------------------------------------------------------
 
 	/**
-	 * The number the whole proposal is about: three cache-missing fragments, ONE origin request.
+	 * The number the whole feature is about: three cache-missing fragments, ONE origin request.
 	 */
 	@Test
 	public void threeCombinableIncludesCostOneOriginCall() throws Exception {
@@ -85,7 +85,7 @@ public abstract class CombineTests extends TestsBase {
 	}
 
 	/**
-	 * THE invariant (proposal section 4.2): a combined fetch must leave the cache in the state N
+	 * THE invariant: a combined fetch must leave the cache in the state N
 	 * single fetches would have left it - same keys, same bodies.
 	 *
 	 * Nothing else catches a break here. The fetch URL and the cache key are different strings by
@@ -125,7 +125,7 @@ public abstract class CombineTests extends TestsBase {
 	}
 
 	/**
-	 * Section 4.1: the envelope is marked dynamic so that NO node on the path stores it. Its URL
+	 * The envelope is marked dynamic so that NO node on the path stores it. Its URL
 	 * carries whichever members missed, so caching it would mean one entry per subset - all of them
 	 * useless on the next request.
 	 */
@@ -159,7 +159,7 @@ public abstract class CombineTests extends TestsBase {
 	}
 
 	/**
-	 * The partial-cache case from the proposal's own example: with cell 2 already cached, the batch
+	 * The partial-cache case: with cell 2 already cached, the batch
 	 * carries cells 1 and 3.
 	 *
 	 * A group down to a single missing member is deliberately NOT batched - the origin does the same
@@ -207,7 +207,7 @@ public abstract class CombineTests extends TestsBase {
 	// --- degradation ---------------------------------------------------------------------------
 
 	/**
-	 * Section 9.1. An origin carrying the attribute but not the handler must still render the page -
+	 * An origin carrying the attribute but not the handler must still render the page -
 	 * that is the whole reason the support signal is a response header and not an assumption.
 	 */
 	@Test
@@ -236,7 +236,7 @@ public abstract class CombineTests extends TestsBase {
 	}
 
 	/**
-	 * Section 9.2, the short envelope. A count mismatch means the parts no longer line up with the
+	 * The short envelope. A count mismatch means the parts no longer line up with the
 	 * members, so every member of the batch falls back rather than being spliced one position out.
 	 */
 	@Test
@@ -255,7 +255,7 @@ public abstract class CombineTests extends TestsBase {
 	}
 
 	/**
-	 * Section 6, rule 3 - the {@code q} echo, and the bug class it exists for: an origin that
+	 * The {@code q} echo, and the bug class it exists for: an origin that
 	 * reorders its parts renders a page where every cell shows another cell's content. Nothing about
 	 * that looks like an error, which is why the echo is checked for the whole envelope before any
 	 * part of it is applied.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import org.springframework.ui.ModelMap;
 import jakarta.servlet.http.HttpSession;
 
 /**
- * The console's login screen - see docs/archive/console-login-ui.md.
+ * The console's login screen.
  *
  * Three of these carry more weight than the rest, and all three are silent when they break: the
  * {@code next} validation (an open redirect on a host an operator trusts), the failure branch

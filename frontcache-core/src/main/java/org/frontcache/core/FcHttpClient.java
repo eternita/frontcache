@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,8 +29,7 @@ import java.util.Map;
  * The parameter was only ever threaded through to three leaf calls, and all three mean the same
  * thing - fetch a URL, hand back a {@link WebResponse}. Nothing needed a connection pool, a route
  * planner or an entity. So the SPIs take this instead, and the Apache types stay inside
- * {@link ApacheFcHttpClient} and the resilience commands. See
- * docs/archive/httpclient5-upgrade-proposal.md section 5.1.
+ * {@link ApacheFcHttpClient} and the resilience commands.
  *
  * The three methods are not redundant - each corresponds to one of those leaf uses, and they differ
  * in ways a caller cannot paper over (which transport, whether a circuit breaker is involved, and

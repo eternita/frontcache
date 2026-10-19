@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,8 +115,8 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * is built from the {@code Host} it arrived at. So the moment the fetch is re-addressed from the
 	 * public hostname to {@code origin-host}, that node - us - starts writing the fragment under a
 	 * SECOND key, while this side writes it under the public one. Two entries per fragment: exactly
-	 * the failure this whole change exists to avoid, arriving through a door section 8 of
-	 * docs/archive/include-fetch-fix.md did not know about.
+	 * the failure this whole change exists to avoid, arriving through a door its first version
+	 * did not know about.
 	 *
 	 * It is invisible in the obvious deployment, because {@code origin-host} usually resolves to the
 	 * same name the node is reached at - the two keys coincide and nothing looks wrong. It took
@@ -351,7 +351,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 *
 	 * {@code combine="true"} groups by the include's endpoint alone; any other value adds itself to
 	 * the group key, so one endpoint can serve two logically different sets on the same page without
-	 * their members being merged into one batch. See docs/archive/combine-reduce-proposal.md section 8.
+	 * their members being merged into one batch.
 	 *
 	 * Absent means today's behaviour, unchanged: combining is opt-in per include, because it is a
 	 * contract with the origin rather than a transparent edge optimisation.
@@ -379,7 +379,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	/**
 	 * Resolve one include: from cache when it is there, from the origin when it is not.
 	 *
-	 * The two URLs are the whole of docs/archive/include-fetch-fix.md. {@code publicURL} is this node's own
+	 * There are two URLs, and keeping them apart is the point. {@code publicURL} is this node's own
 	 * address for the fragment and is what the entry is KEYED on - rebasing the key would orphan
 	 * every existing entry and leave two keys per fragment depending on which path filled it.
 	 * {@code fetchURL} is what goes on the wire. They are the same string until
@@ -408,11 +408,10 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * The cache half of {@link #callInclude}: the entry to serve, or null when this include must go
 	 * to the origin.
 	 *
-	 * Split out for the combine path, which has to know which members missed <em>before</em> it can
-	 * decide what goes into a batch (docs/archive/combine-reduce-proposal.md section 4.3). Everything the
-	 * single-include path did on a hit - the client-type cacheability check, soft vs regular
-	 * expiration, both request-log writes - still happens here and only here, so the two paths cannot
-	 * drift on what a hit means.
+	 * Split out for the combine path, which has to know which members missed <em>before</em> it can decide
+	 * what goes into a batch. Everything the single-include path did on a hit - the client-type
+	 * cacheability check, soft vs regular expiration, both request-log writes - still happens here and only
+	 * here, so the two paths cannot drift on what a hit means.
 	 *
 	 * @param start when the include began, so a hit reports the same elapsed time it always did
 	 * @param fetchURL used for one thing only - the soft refresh below, which is a fetch. Everything
@@ -536,8 +535,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	 * it on the way through, and {@code FrontCacheEngine} wrote its request-log line. Fetch the
 	 * origin directly and both of those stop happening - so both are done here instead, and only
 	 * then ({@link #isDirectOriginFetch}). Miss the cache write and every include becomes an
-	 * uncached origin call, forever, with nothing in the logs to say so: failure mode 1 of
-	 * docs/archive/include-fetch-fix.md section 8.
+	 * uncached origin call, forever, with nothing in the logs to say so.
 	 *
 	 * @param publicURL cache key and log line - never the URL this fetched with
 	 * @param fetchURL  what goes on the wire

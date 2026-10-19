@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ public class GuardRuleEngineTest {
 		FCConfig.setProperty("front-cache.guard-rules.allowed-redirect-hosts", "www.example-site.com");
 
 		// This node's own site. Deliberately NOT one of the allowed-redirect-hosts above: as of
-		// docs/archive/guard-redirect-url-host-fix.md it is allowed as a redirect target on its own, which
+		// 2.9.0 it is allowed as a redirect target on its own, which
 		// is what the own-site fixture rule exists to prove. It is also what the runtime sanitizer
 		// rewrites a disallowed embedded host onto.
 		FCConfig.setProperty("front-cache.default-domain", "own.example.com");

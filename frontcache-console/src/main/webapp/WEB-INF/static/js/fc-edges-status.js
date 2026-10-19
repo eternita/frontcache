@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,7 @@
  * Why a poll and not the dashboard SSE stream, which this page already holds open per edge: that
  * stream's JSON is a pinned wire contract read by external Turbine across a mixed fleet, it ticks at
  * 500ms because circuit metrics move that fast, and it only exists on this one page - the same block
- * renders on the cache and config pages. One poll serves all of it. See
- * docs/archive/edges-status-realtime-proposal.md section 4.
+ * renders on the cache and config pages. One poll serves all of it.
  *
  * Formatting lives here and only here. The JSP renders placeholders rather than formatted values, so
  * there is one implementation of "what does 4402341888 look like" rather than one in Java for the
@@ -204,7 +203,7 @@ var FcEdgesStatus = (function () {
 			.then(function (response) {
 				// The session expired while this page was open. Without this the panel just goes
 				// quietly stale - "the numbers stopped updating" - which gets diagnosed as a broken
-				// edge rather than as a sign-out. See docs/archive/console-login-ui.md section 9.
+				// edge rather than as a sign-out.
 				if (401 === response.status)
 					return goToLogin();
 				if (!response.ok)

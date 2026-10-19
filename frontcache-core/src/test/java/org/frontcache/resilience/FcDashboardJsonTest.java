@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,14 +44,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * Values are expected to differ - that is the migration - so only the key sets, the percentile map's
  * shape and the two literal {@code type} strings are contractual. One documented addition is allowed:
- * the watchdog's overrun counter (proposal section 6.2). Extra keys are safe because the dashboard
+ * the watchdog's overrun counter. Extra keys are safe because the dashboard
  * asserts presence and ignores what it does not know; a MISSING key is what blanks the panel.
  */
 public class FcDashboardJsonTest {
 
 	private static final String GOLDEN_FILE = "src/test/resources/dashboard-json-keys.txt";
 
-	/** Added by us, not present in Hystrix's output. Section 6.2. */
+	/** Added by us, not present in Hystrix's output: the watchdog's overrun counter. */
 	private static final String WATCHDOG_FIELD = "rollingCountBudgetOverrunObserved";
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -110,10 +110,10 @@ public class FcDashboardJsonTest {
 	}
 
 	/**
-	 * The direct regression test for section 6.6 defect 1. A thread pool is a node-level resource, so
-	 * its frames are emitted with no group comparison at all - the old code compared the POOL NAME
-	 * against the caller's domain, which is false for every domain that can exist, and the console's
-	 * thread-pool panel has therefore never rendered.
+	 * The direct regression test for the thread-pool panel that never rendered. A thread pool is a
+	 * node-level resource, so its frames are emitted with no group comparison at all - the old code
+	 * compared the POOL NAME against the caller's domain, which is false for every domain that can exist,
+	 * and the console's thread-pool panel has therefore never rendered.
 	 */
 	@Test
 	public void threadPoolFramesAreEmittedAlongsideCommandFrames() throws Exception

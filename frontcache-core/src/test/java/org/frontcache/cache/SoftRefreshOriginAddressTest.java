@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,8 +41,8 @@ import org.junit.Test;
 
 /**
  * What {@code front-cache.origin-host} / {@code front-cache.origin-http-port} actually address in
- * <b>filter mode</b> - the question docs/archive/include-fetch-fix.md section 5, step 6 left open before
- * includes could be pointed at the origin there.
+ * <b>filter mode</b> - the question that had to be settled before includes could be pointed at the
+ * origin there.
  *
  * The shipped properties say those ports are <i>"mandatory for FILTER MODE (used for soft
  * invalidation/refresh)"</i>, and the doubt was that they might be stale: soft refresh goes through

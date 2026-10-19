@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import java.util.List;
  * The combine-and-reduce wire contract, in one place: parameter names, the encoding of a member's
  * query string, and the small URL arithmetic both ends need.
  *
- * See docs/archive/combine-reduce-proposal.md sections 5 and 6. Both halves of the contract live in this
+ * See docs/include-combining.md. Both halves of the contract live in this
  * package so an origin embedding frontcache-core cannot drift from the edge - see
  * {@link CombineRequest} and {@link CombineResponse}, which are the origin's half.
  *
@@ -51,8 +51,8 @@ import java.util.List;
  * Because it is injection-safe by construction: a member's query is a <em>value</em>, never
  * concatenated into the query grammar, so no include URL can smuggle a parameter into the combined
  * request or into a sibling member. It is also the only shape that survives members differing in
- * more than one parameter, or in which parameters they carry at all - see the proposal section 5.1
- * for why {@code ?id=1|2|3} was not taken.
+ * more than one parameter, or in which parameters they carry at all - which is why
+ * {@code ?id=1|2|3} was not taken.
  */
 public final class CombineProtocol {
 
@@ -77,7 +77,7 @@ public final class CombineProtocol {
 	/**
 	 * Response header. Its presence on a 2xx is the ONLY signal that the origin understood the
 	 * request - an origin that does not implement combining answers something else, and the edge
-	 * degrades (proposal section 9.1). A header rather than a media type because {@code x-frontcache-*}
+	 * degrades. A header rather than a media type because {@code x-frontcache-*}
 	 * names are already chosen to survive every intermediary in the deployment (see FCHeaders).
 	 */
 	public static final String HEADER_COMBINE = "x-frontcache-combine";

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * The origin's half of the combine contract: read a combined request.
  *
  * This is not used by the edge. It exists so a JVM origin implements the contract by calling the
- * same code that defines it, rather than by re-reading section 5 of the proposal and getting the
+ * same code that defines it, rather than by re-reading docs/include-combining.md and getting the
  * parameter names nearly right. A non-JVM origin implements about thirty lines - decode n values,
  * batch, emit JSON.
  *
@@ -60,7 +60,7 @@ public final class CombineRequest {
 	/**
 	 * The protocol version the edge is speaking, or -1 when this is not a combined request. An origin
 	 * that only implements version 1 should answer a higher version as it would answer an ordinary
-	 * single request - the edge then degrades correctly (proposal section 9.1) instead of receiving
+	 * single request - the edge then degrades correctly instead of receiving
 	 * an envelope it cannot read.
 	 */
 	public static int version(HttpServletRequest request) {

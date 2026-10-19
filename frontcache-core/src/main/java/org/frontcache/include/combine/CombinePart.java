@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
- * One member's answer inside a {@link CombineEnvelope}. See docs/archive/combine-reduce-proposal.md
- * section 6.
+ * One member's answer inside a {@link CombineEnvelope}.
  *
  * {@code @JsonIgnoreProperties(ignoreUnknown = true)} is not decoration: it is what lets a later
  * protocol version add a field without a flag day between an edge and an origin that upgrade
@@ -36,7 +35,7 @@ public class CombinePart {
 	/**
 	 * Optional echo of the member's decoded query string.
 	 *
-	 * Optional, and verified when present (proposal section 18, decision 1). It costs the origin one
+	 * Optional, and verified when present. It costs the origin one
 	 * field and catches the entire class of "the batch handler reordered its results" bugs, which
 	 * are otherwise invisible: the page renders, with every cell showing another cell's content.
 	 */

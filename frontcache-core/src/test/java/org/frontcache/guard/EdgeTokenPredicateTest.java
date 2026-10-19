@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import org.junit.Test;
 
 /**
  * The {@code edge-token} guard predicate - "this request came from a Frontcache of the same chain".
- * See {@link EdgeToken} and docs/direct-access-restriction-proposal.md.
+ * See {@link EdgeToken}.
  *
  * The load-time refusals are the part worth pinning. On a node with no token {@code !edge-token}
  * matches every request, and on a second layer a rule that redirects every request to the public
@@ -139,9 +139,9 @@ public class EdgeTokenPredicateTest {
 	// ---- in a whole rule, through the engine's validation ------------------------------------
 
 	/**
-	 * The rule docs/direct-access-restriction-proposal.md recommends for a second layer. method:GET is
-	 * what keeps the load-time loop check satisfied - a probe has no servlet request, so it is never a
-	 * GET - and it is what a 301 wants anyway, since a browser re-sends a redirected POST as a GET.
+	 * The rule recommended for a second layer. method:GET is what keeps the load-time loop check satisfied
+	 * - a probe has no servlet request, so it is never a GET - and it is what a 301 wants anyway, since a
+	 * browser re-sends a redirected POST as a GET.
 	 */
 	@Test
 	public void theRecommendedRulesValidate()

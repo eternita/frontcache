@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
  *
  * Written by hand with a StringBuilder rather than through Jackson for one reason: field ORDER is
  * stable and reviewable this way, which makes a diff of an old and a new frame readable during the
- * cut-over. See proposal sections 7.1-7.3.
+ * cut-over.
  */
 public class FcDashboardJson {
 
@@ -58,7 +58,6 @@ public class FcDashboardJson {
 	 * THREAD-isolated command, so there is no per-domain answer to give - the old code compared the pool
 	 * name against the caller's domain, which is false for every domain that can exist, which is why
 	 * the console's thread-pool panel has never rendered.
-	 * Proposal section 6.6, defect 1.
 	 */
 	public static List<String> frames()
 	{
@@ -108,7 +107,6 @@ public class FcDashboardJson {
 		field(json, "rollingCountFallbackMissing", 0);
 		// Always 0, and structurally so: the fallback semaphore is parsed and reported but never
 		// enforced, because a call only reaches its fallback while holding an execution permit.
-		// Proposal section 6.3.
 		field(json, "rollingCountFallbackRejection", metrics.getRollingCount(FcEventType.FALLBACK_REJECTION));
 		field(json, "rollingCountFallbackSuccess", metrics.getRollingCount(FcEventType.FALLBACK_SUCCESS));
 		field(json, "rollingCountResponsesFromCache", metrics.getRollingCount(FcEventType.RESPONSE_FROM_CACHE));
@@ -159,7 +157,7 @@ public class FcDashboardJson {
 		field(json, "reportingHosts", 1);
 		field(json, "threadPool", config.getThreadPoolKey());
 
-		// Not a Hystrix field. The watchdog's overrun counter (proposal section 6.2) - deliberately its
+		// Not a Hystrix field. The watchdog's overrun counter - deliberately its
 		// own key rather than folded into rollingCountTimeout, which would move errorPercentage and
 		// could open a circuit on a request that succeeded. Extra keys are safe: the dashboard asserts
 		// presence and ignores anything it does not know.

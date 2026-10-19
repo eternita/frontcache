@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.WriteListener;
 
 /**
- * The connection half of the async SSE stream (proposal section 7.4 / section 11).
+ * The connection half of the async SSE stream.
  *
  * Moving off the parked-thread model put three things on this class that a blocking loop got for free,
  * and all three fail silently rather than loudly:

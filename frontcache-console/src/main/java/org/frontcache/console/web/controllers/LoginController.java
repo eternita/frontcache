@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,13 +31,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
 /**
- * The console's login screen - see docs/archive/console-login-ui.md.
+ * The console's login screen.
  *
- * The credential is unchanged from 2.9.0: one user, no roles, read from
- * conf/frontcache-console.conf, compared in {@link ConsoleAuthenticator}. What this adds is the
- * page, the session that remembers a successful sign-in, and a logout - which Basic authentication
- * could not have (section 9.3 of docs/archive/basic-auth-proposal.md) because a browser re-sends a cached
- * credential whatever the server does.
+ * The credential is unchanged from 2.9.0: one user, no roles, read from conf/frontcache-console.conf,
+ * compared in {@link ConsoleAuthenticator}. What this adds is the page, the session that remembers a
+ * successful sign-in, and a logout - which Basic authentication could not have, because a browser re-sends
+ * a cached credential whatever the server does.
  */
 @Controller
 public class LoginController {
@@ -163,8 +162,7 @@ public class LoginController {
 	}
 
 	/**
-	 * Validates where a login is allowed to send the browser - see docs/archive/console-login-ui.md
-	 * section 7.6.
+	 * Validates where a login is allowed to send the browser.
 	 *
 	 * {@code next} reaches here from a query parameter and from a form field, so it is caller
 	 * input, and handing it to a redirect unchecked is an open redirect on a host an operator

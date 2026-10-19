@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,11 +39,10 @@ import org.frontcache.core.RequestContext;
  *
  * <h2>What a warm request changes</h2>
  *
- * See docs/cache-warmer-proposal.md section 4.2. In short: the client type is the run's, not
- * {@code bots.conf}'s; the guard rules are skipped; {@code FC_Total} runs under {@code Warm-Request};
- * {@code refresh} mode reads past a cached entry without removing it; a soft refresh and an async
- * include are resolved synchronously, so the warmer's delay paces the origin and not just the front
- * door; and the response carries {@code x-frontcache-warm-result}.
+ * The client type is the run's, not {@code bots.conf}'s; the guard rules are skipped; {@code FC_Total} runs
+ * under {@code Warm-Request}; {@code refresh} mode reads past a cached entry without removing it; a soft
+ * refresh and an async include are resolved synchronously, so the warmer's delay paces the origin and not
+ * just the front door; and the response carries {@code x-frontcache-warm-result}.
  *
  * <h2>The headers must never reach the origin</h2>
  *

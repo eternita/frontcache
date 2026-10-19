@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ import io.micrometer.registry.otlp.OtlpConfig;
  * The SSE stream stays the source of truth for the Hystrix dashboard: Micrometer's model does not carry
  * Hystrix's event taxonomy, so choosing it INSTEAD would mean hand-writing the same JSON from a poorer
  * data model. So {@link FcCommandMetrics} keeps producing the dashboard's numbers and this class exports
- * the same counters through Micrometer. See proposal section 7.5.
+ * the same counters through Micrometer.
  *
  * <h2>Off by default</h2>
  *
@@ -450,7 +450,6 @@ public class FcMetricsExport {
 
 	/**
 	 * Combine-and-reduce: batches, members and envelope errors.
-	 * See docs/archive/combine-reduce-proposal.md section 12.
 	 *
 	 * <h3>The number these exist for</h3>
 	 *

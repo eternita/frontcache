@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -212,10 +212,10 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * The site's public hostname (front-cache.default-domain), or null when the node has none
      * configured.
      *
-     * This is NOT {@link #getFrontCacheHost()} and the two must not be confused - that is the whole
-     * of docs/archive/guard-redirect-url-host-fix.md. getFrontCacheHost() is the Host header as it arrived,
-     * which is what predicates match, what the log lines record and what the cache key is built
-     * from; a node is reachable under several of them (the CDN's, an internal alias, its own name,
+     * This is NOT {@link #getFrontCacheHost()} and the two must not be confused - confusing them put
+     * internal hostnames in browsers' address bars until 2.9.0. getFrontCacheHost() is the Host header
+     * as it arrived, which is what predicates match, what the log lines record and what the cache key
+     * is built from; a node is reachable under several of them (the CDN's, an internal alias, its own name,
      * a bare IP). This one is the single name we are willing to hand to a browser.
      *
      * Null means "not configured" - callers fall back to the arriving host. See
@@ -616,7 +616,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
      * them. They are map keys inside a RequestContext, so nothing outside this process reads them - but
      * a fallback resolver or include processor compiled against 2.6 and dropped onto 2.7 does, via
      * get()/set(), and renaming the key would make such a plugin stop seeing the flag rather than fail
-     * to link. See the rename plan in docs/archive/hystrix-to-resilience4j-proposal.md section 8.
+     * to link.
      */
 
     public void setFallbackUsed() {

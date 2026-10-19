@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,11 +32,10 @@ import org.junit.Test;
 /**
  * A combined part's headers must mean exactly what a single include's response headers mean.
  *
- * This is the readable half of the invariant in docs/archive/combine-reduce-proposal.md section 4.2 - the
- * other half, the cache KEY, is the e2e suite's job. If a part's maxAge, tags, cache level or
- * content type were read even slightly differently from a single include's, the two paths would
- * write entries that disagree about when they expire and what invalidates them, and nothing would
- * throw.
+ * This is the readable half of the invariant that a combined member is cached exactly as the same include
+ * fetched alone - the other half, the cache KEY, is the e2e suite's job. If a part's maxAge, tags, cache
+ * level or content type were read even slightly differently from a single include's, the two paths would
+ * write entries that disagree about when they expire and what invalidates them, and nothing would throw.
  *
  * {@link FCUtils#buildWebComponent} exists so there is only one reading. These pin that it is the
  * same one.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,9 +33,8 @@ import org.springframework.web.context.support.XmlWebApplicationContext;
 
 /**
  * Both Spring contexts of the console, built from the real XML exactly as web.xml builds them, with NO
- * plugin on the class path - the Community console of docs/ip-protection-apache-core-and-prop-pro-proposal.md
- * (principle 3: a missing Pro jar is a non-event). frontcache-pro-console's {@code ConsolePluginWiringTest}
- * is the same two contexts with the Pro plugin.
+ * plugin on the class path - the Community console, where a missing Pro jar is a non-event.
+ * frontcache-pro-console's {@code ConsolePluginWiringTest} is the same two contexts with the Pro plugin.
  *
  * The plugin hooks must all be present and all be empty: no menu entry, script, stylesheet, notice or
  * stream contributor, and no license or warmer bean - the pages render them from these and nothing else.

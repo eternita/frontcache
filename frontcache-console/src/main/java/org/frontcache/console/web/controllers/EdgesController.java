@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ public class EdgesController {
 	 * from any page the operator has open - the browser attaches the console's Basic credentials to
 	 * a cross-site request on its own, and they are not cookies, so SameSite does not stop it.
 	 * SameOriginFilter checks the origin of the POST; the method change is what brings it under that
-	 * check at all. See docs/archive/basic-auth-proposal.md section 8.1.
+	 * check at all.
 	 */
 	@RequestMapping(value = "/add-edge", method = RequestMethod.POST)
 	public String addEdge(HttpServletRequest request) {

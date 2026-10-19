@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,7 +92,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * at once: the endpoint would simply start answering 503 forever after N lifetime connections, which
  * is why {@code StandaloneDashboardStreamTests} asserts a closed connection frees its slot.
  *
- * <h2>Two behavior changes, both from proposal section 14.6</h2>
+ * <h2>Two behavior changes</h2>
  *
  * - A wrong or absent API key gets {@code 401}, where it used to get {@code 200}
  *   and an endless stream of empty frames. The header is this endpoint's only authentication, so an

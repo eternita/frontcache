@@ -2,7 +2,6 @@
 # This is the compatibility contract of the Resilience4j migration: the new emitter must
 # produce exactly these keys, because the vendored dashboard JS throws on a missing one.
 # Regenerate with -Dfc.dashboard.keys.regenerate=true and review the diff - never edit by hand.
-# See docs/archive/hystrix-to-resilience4j-proposal.md section 7.2.
 
 [HystrixCommand]
 currentConcurrentExecutionCount

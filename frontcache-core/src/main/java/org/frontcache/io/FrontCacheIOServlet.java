@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -244,7 +244,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 			// A module's action (the Pro jar's license and warmer actions) - consulted only after every
 			// name the core owns, so a module can never shadow one. No module answering it means the
 			// ping below: the "unknown action" contract, which a console already reads as "this node
-			// does not have it" (docs/ip-protection-apache-core-and-prop-pro-proposal.md section 3.1).
+			// does not have it".
 			ManagementAction moduleAction = FrontcacheModules.managementAction(action);
 			if (null != moduleAction)
 			{

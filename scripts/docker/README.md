@@ -10,8 +10,8 @@ Container images for Frontcache.
   > 80/443, and `-slim` was Frontcache alone. **There is now one image, and it is what `-slim`
   > was.** The nginx front door lives in the public repo's
   > [`examples/front-door`](https://github.com/eternita/frontcache/tree/master/examples/front-door),
-  > which has both a two-container compose stack and a script for a VM. See
-  > [the plan](../../docs/archive/move-out-nginx-plan.md). 2.6.0 was published under the `-slim` names as
+  > which has both a two-container compose stack and a script for a VM. 2.6.0 was published under
+  > the `-slim` names as
   > well, as a compatibility alias; from 2.7.0 only the plain tag is pushed. Nothing was deleted,
   > so every existing `-slim` tag still resolves.
 - **`fc-console/`** — the **Frontcache console** image (realtime stats and cache management,
@@ -27,8 +27,7 @@ Container images for Frontcache.
 > an existing local stack keeps its `fc-elk_es-data` / `fc-elk_ls-data` volumes.
 
 The images are built **from the distribution archives** (`./gradlew dist`), not from the
-working tree, so an image is reproducible from a published artifact — see
-[the distribution proposal](../../docs/archive/frontcache-distribution-proposal.md).
+working tree, so an image is reproducible from a published artifact.
 
 ## Requirements
 
@@ -120,8 +119,7 @@ store, so it goes straight to the registry (`docker login` first). It runs on a 
 single-platform (the host's) and is loaded locally.
 
 Override the namespace with `NS=` (or a whole name with `IMAGE_SERVER=` / `IMAGE_CONSOLE=`).
-The planned move from `pavlikovskiy/*` to `eternita/*` is a
-[follow-up](../../docs/archive/frontcache-distribution-followup.md) — a dual-push during the overlap
+The planned move from `pavlikovskiy/*` to `eternita/*` is a follow-up — a dual-push during the overlap
 is just two runs with different `NS`.
 
 ### Running a published image without compose

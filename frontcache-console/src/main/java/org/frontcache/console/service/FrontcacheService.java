@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,7 +154,7 @@ public class FrontcacheService {
 	}
 
 	/**
-	 * Reads the console's single login - see docs/archive/basic-auth-proposal.md.
+	 * Reads the console's single login.
 	 *
 	 * <b>Every key here is read through hasPath first.</b> {@code Config.getString} throws on a
 	 * missing key, so reading these the way apiKey is read would make every console whose config
@@ -624,8 +624,7 @@ public class FrontcacheService {
 	}
 
 	/**
-	 * Whether the session cookie carries the {@code Secure} attribute - see
-	 * docs/archive/console-login-ui.md section 4.4.
+	 * Whether the session cookie carries the {@code Secure} attribute.
 	 *
 	 * <b>A config key rather than a detection, and it has to be.</b> The attribute is set once per
 	 * servlet context at startup, while whether the browser used HTTPS is a per-request fact

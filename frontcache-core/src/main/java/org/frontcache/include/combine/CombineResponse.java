@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * The origin's half of the combine contract: build and write the response envelope.
- * See docs/archive/combine-reduce-proposal.md section 6.
+ * See docs/include-combining.md.
  *
  * Parts must be added in the order the members arrived - {@code parts[i]} answers
  * {@code fc-part-i}. {@link #writeTo} is what sets the {@code x-frontcache-combine} header, which

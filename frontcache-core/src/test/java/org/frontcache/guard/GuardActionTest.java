@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import org.junit.Test;
 /**
  * What a guard redirect PUTS IN the URL it hands to a browser.
  *
- * The bug this covers (docs/archive/guard-redirect-url-host-fix.md): ${url} was built from the Host header
+ * The bug this covers (fixed in 2.9.0): ${url} was built from the Host header
  * as it arrived, so a node reached under its own name, an internal alias, the origin's name or a
  * bare IP baked that into a {@code return=} parameter and handed it to a visitor. On one edge, one
  * day, 18.9% of the login redirects carried a hostname or scheme the public site does not use.
@@ -62,7 +62,7 @@ public class GuardActionTest {
 		String[] arrivingHosts = {
 				"origin.example-site.com",   // the reported bug - anything resolving the origin name here
 				"direct.example-site.com",   // the internal alias the edge nginx uses for its FC upstream
-				"fc-edge.example-site.com",    // the node's own name - reproduced live, see the doc's §2.3
+				"fc-edge.example-site.com",    // the node's own name - reproduced live
 				"203.0.113.7",        // a bare IP - 1,735 redirects in one day
 		};
 

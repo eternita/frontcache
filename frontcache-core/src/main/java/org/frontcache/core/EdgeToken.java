@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * IP. Traffic that takes that route skips every guard rule and rate limit on the edge, and nothing on
  * the wire said so - the edge's own markers are either forgeable ({@code x-frontcache-request-id},
  * {@code X-Forwarded-Host}) or absent on some of its calls ({@code FC_BypassCache} sends no
- * request-id). See docs/direct-access-restriction-proposal.md §3.
+ * request-id).
  *
  * <h2>One token per chain, sent and accepted by every node</h2>
  *

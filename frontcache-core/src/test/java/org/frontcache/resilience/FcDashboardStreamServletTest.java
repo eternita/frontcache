@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * {@code testOnGetNoApiKeyHeader} was {@code @Ignore}d because there was nothing to assert: the old
  * servlet's 503 branch was unreachable - {@code getDomainFromSiteKeyHeader()} returned the literal
  * "default-domain" for an unauthorized caller rather than nothing, so the request got a 200 and a stream
- * of empty frames. It now asserts the 401 from proposal section 14.6, and the two refusal reasons are
+ * of empty frames. It now asserts the 401, and the two refusal reasons are
  * distinguishable: 401 for authorization, 503 for shutdown and the connection cap.
  */
 public class FcDashboardStreamServletTest {
@@ -141,7 +141,7 @@ public class FcDashboardStreamServletTest {
 	// ---- 2.7: async, and the concurrency cap that now depends on it -----------------------------
 
 	/**
-	 * The point of the async rewrite (proposal section 7.4): {@code doGet} accepts the connection and
+	 * The point of the async rewrite: {@code doGet} accepts the connection and
 	 * <b>returns</b>. Previously it sat in a poll loop for the life of the stream, so five idle
 	 * dashboards meant five container threads doing nothing.
 	 *

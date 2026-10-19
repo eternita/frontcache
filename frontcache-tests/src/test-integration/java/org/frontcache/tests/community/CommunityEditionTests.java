@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,16 +39,15 @@ import org.frontcache.tests.base.TestsBase;
 import org.junit.Test;
 
 /**
- * Principle 3 of docs/ip-protection-apache-core-and-prop-pro-proposal.md section 3.1 - <b>a missing Pro jar
- * is a non-event</b> - on the running Community topology (section 5.4): both nodes and the console run with
- * no Pro jar on their class path.
+ * <b>A missing Pro jar is a non-event</b> - on the running Community topology: both nodes and the console
+ * run with no Pro jar on their class path.
  *
  * <ul>
  * <li>a Pro management action answers a ping, the "unknown action" contract a Pro console already reads
  *     as "not available on this node";</li>
  * <li>the console renders no Pro screen - no License tab, no Cache Warmer entry, no Pro script or
  *     stylesheet - and the Pro URLs are not there at all;</li>
- * <li>metrics export, which D3 kept in the core, still serves - with no Pro series in it.</li>
+ * <li>metrics export, which stays in the core, still serves - with no Pro series in it.</li>
  * </ul>
  *
  * frontcache-pro-tests runs the same topology with the Pro jars, where every one of these is the other way.
@@ -87,7 +86,7 @@ public class CommunityEditionTests extends TestsBase {
 		}
 	}
 
-	/** D3: metrics export is Community. The standalone e2e node exports to Prometheus. */
+	/** Metrics export is Community. The standalone e2e node exports to Prometheus. */
 	@Test
 	public void metricsExportStillServesWithNoProSeries() throws Exception {
 		HttpResponse<String> scrape = http.send(HttpRequest.newBuilder(

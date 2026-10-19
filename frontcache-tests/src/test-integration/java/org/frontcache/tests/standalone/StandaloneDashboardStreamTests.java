@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,12 +48,12 @@ import org.junit.Test;
  * the endpoint was only mapped in the real server webapp, so no test ever opened it. The standalone test
  * webapp now maps it too.
  *
- * Asserted here: an authorized reader gets both frame types - including the thread-pool frames that
- * Hystrix filtered out of existence (proposal section 6.6, defect 1) - an unauthorized reader gets 401
- * rather than an endless stream of empty frames (section 14.6), and BOTH url-patterns behave the same,
- * since the pre-2.7 /hystrix.stream is kept indefinitely for reverse proxies and external Turbine
- * (section 8). The JSON field names and the {@code HystrixCommand} / {@code HystrixThreadPool} type
- * literals are deliberately unchanged - they are the dashboard's wire contract, not internal names.
+ * Asserted here: an authorized reader gets both frame types - including the thread-pool frames that Hystrix
+ * filtered out of existence - an unauthorized reader gets 401 rather than an endless stream of empty
+ * frames, and BOTH url-patterns behave the same, since the pre-2.7 /hystrix.stream is kept indefinitely for
+ * reverse proxies and external Turbine. The JSON field names and the {@code HystrixCommand} /
+ * {@code HystrixThreadPool} type literals are deliberately unchanged - they are the dashboard's wire
+ * contract, not internal names.
  *
  * The concurrency cap is asserted here too, and only became worth asserting in 2.7: the stream moved to
  * Servlet 3.1 async, so the request no longer lives as long as the connection and the slot is released
@@ -295,7 +295,7 @@ public class StandaloneDashboardStreamTests extends TestsBase {
 	}
 
 	/**
-	 * The refusal is a 503 and not a 401: the two mean different things since section 14.6, and an
+	 * The refusal is a 503 and not a 401: the two mean different things since 2.6, and an
 	 * operator seeing "MaxConcurrentConnections" knows to raise the cap rather than fix an API key.
 	 */
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,11 +122,10 @@ public class GuardAction {
 	 * The hostname to PUT IN a URL we hand to a client - the site's public name
 	 * (front-cache.default-domain), not the Host this particular request arrived under.
 	 *
-	 * The two are different questions and conflating them is the bug in
-	 * docs/archive/guard-redirect-url-host-fix.md: a node is reachable under the CDN's name, an internal
-	 * alias, its own hostname and a bare IP, and every one of those used to end up in a browser's
-	 * address bar via ${url}. Predicates (host~, host:ip) still read getFrontCacheHost(), because
-	 * they ask the opposite question - what actually arrived.
+	 * The two are different questions and conflating them was the bug fixed in 2.9.0: a node is reachable
+	 * under the CDN's name, an internal alias, its own hostname and a bare IP, and every one of those used
+	 * to end up in a browser's address bar via ${url}. Predicates (host~, host:ip) still read
+	 * getFrontCacheHost(), because they ask the opposite question - what actually arrived.
 	 *
 	 * Falls back to the arriving host when the node names no public host, which is what a default
 	 * FRONTCACHE_HOME does. Never emits FCConfig.DEFAULT_DOMAIN - see

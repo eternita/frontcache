@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import org.frontcache.guard.ratelimit.RateLimitSpec;
 /**
  * Parses a single predicate expression from guard-rules.conf into a {@link GuardPredicate}.
  *
- * Grammar (see docs/frontcache-protection-tech-design.md):
+ * Grammar (see docs/guard-getting-started.md):
  *
  *   [!] host:ip
  *   [!] host~&lt;regex&gt;
@@ -232,8 +232,7 @@ public class GuardPredicateFactory {
 		{
 			// The bare-keyword form of bots.conf. Case-INSENSITIVE as of 2.9.0: the pre-2.9.0
 			// String.contains() meant a file listing 'Googlebot' did not match 'googlebot/2.1',
-			// which was a latent bug rather than a contract (see
-			// docs/archive/dynamic-bots-classification-proposal.md section 4.2).
+			// which was a latent bug rather than a contract.
 			if (0 == arg.length())
 				throw new GuardConfigException("ua-contains predicate needs a value in '" + expr + "'");
 

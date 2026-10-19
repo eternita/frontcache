@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ public class IncludeTag extends IncludeSupport {
 
    /**
     * {@code combine="true"}, or a group name. Marks this fragment as one the origin can serve
-    * batched with its siblings - see docs/archive/combine-reduce-proposal.md.
+    * batched with its siblings - see docs/include-combining.md.
     */
    public void setCombine(Object combine) {
 	   super.includeCombine = combine;

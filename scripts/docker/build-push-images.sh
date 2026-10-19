@@ -25,8 +25,8 @@
 # The -slim tags up to 2.6.0 still exist and still resolve - nothing was deleted.
 #
 # Env knobs:
-#   NS              registry namespace (default pavlikovskiy - see the follow-up doc for the
-#                   move to eternita; a dual-push is just two runs with different NS)
+#   NS              registry namespace (default pavlikovskiy; for the planned move to eternita a
+#                   dual-push is just two runs with different NS)
 #   IMAGE_SERVER    full server image name, overriding $NS/frontcache-server
 #   IMAGE_CONSOLE   console image name, overriding $NS/frontcache-console
 #   PLATFORMS       push platforms (default linux/amd64,linux/arm64)

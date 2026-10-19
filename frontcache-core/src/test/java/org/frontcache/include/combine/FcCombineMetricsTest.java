@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import org.junit.After;
 import org.junit.Test;
 
 /**
- * The combine counters - docs/archive/combine-reduce-proposal.md section 12.
+ * The combine counters.
  */
 public class FcCombineMetricsTest {
 

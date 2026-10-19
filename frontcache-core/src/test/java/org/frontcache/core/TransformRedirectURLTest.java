@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.junit.Test;
  *
  * The origin sees {@code Host: origin.example.com}, because the client's Host cannot be forwarded
  * on a connection that goes to the origin, so every absolute URL it builds names the origin. This
- * method is what repairs that on the way back, and until docs/archive/guard-redirect-url-host-fix.md it
+ * method is what repairs that on the way back, and until 2.9.0 it
  * repaired only the outer host - leaving the origin's name in any absolute URL inside the query
  * string, which is exactly where a login flow keeps its {@code return=}.
  */

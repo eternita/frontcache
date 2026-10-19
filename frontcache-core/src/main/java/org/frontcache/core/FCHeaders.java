@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ public class FCHeaders {
 
     /**
      * A sync include that was resolved as one member of a combined origin call
-     * (docs/archive/combine-reduce-proposal.md). Its own line in the trace headers carries the BATCH's
+     * (include combining). Its own line in the trace headers carries the BATCH's
      * elapsed time, not a time of its own - so N members of one batch report N identical durations
      * that do not sum to the page time. This marker is what tells a reader of
      * front-cache.log-to-headers why.

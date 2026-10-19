@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * {@link EdgeToken} - how a second-layer node tells its own edge from a client that reached it
- * directly. See docs/direct-access-restriction-proposal.md.
+ * directly.
  *
  * What is worth pinning: an unconfigured node never answers "valid" (a guard rule reading
  * {@code !edge-token} must not open up or close down by accident), rotation accepts both values, and

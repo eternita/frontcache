@@ -6,7 +6,7 @@
 
 	<!-- Request encoding, then authentication, then the cross-origin check, in that order: an
 	     unauthenticated caller gets a 401 (or the login page) and learns nothing about the third
-	     filter. See docs/archive/basic-auth-proposal.md and docs/archive/console-login-ui.md.
+	     filter.
 
 	     <async-supported> on ALL THREE is load-bearing and silent when missing. DashboardStreamProxyServlet
 	     calls startAsync(), and the container refuses that if ANY filter in the chain for that request
@@ -15,9 +15,8 @@
 	<!-- Without this the container decodes POST bodies as ISO-8859-1, and the two forms where that
 	     is invisible are the two that matter: a non-ASCII password WORKS over Basic (the header is
 	     decoded as UTF-8 explicitly) and fails through the login form, with no error anywhere; and
-	     the Configs editor writes the mojibake to a node's disk. See docs/archive/console-login-ui.md
-	     section 7.8 - this is the filter docs/archive/console-edit-configs-proposal.md section 7.7 called
-	     for and which never landed. -->
+	     the Configs editor writes the mojibake to a node's disk. That editor needed this filter from
+	     the start; it only landed with the login form. -->
 	<filter>
 		<filter-name>CharacterEncodingFilter</filter-name>
 		<filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>

@@ -1,7 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core"%>
 <%--
-	The console's login page - see docs/archive/console-login-ui.md section 7.
+	The console's login page.
 
 	This page deliberately does NOT include inc/header.jsp or inc/menu.jsp:
 

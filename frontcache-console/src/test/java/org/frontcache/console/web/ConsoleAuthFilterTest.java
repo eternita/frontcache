@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,7 @@ import org.springframework.mock.web.MockHttpSession;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * The console's single-user login - see docs/archive/basic-auth-proposal.md (the credential) and
- * docs/archive/console-login-ui.md (the login screen).
+ * The console's single-user login - the credential, and the login screen that presents it.
  *
  * Three groups of cases carry the weight here, and each one is silent when it breaks:
  *
@@ -207,7 +206,7 @@ public class ConsoleAuthFilterTest {
 
 	/**
 	 * A config file written before this feature existed has no credentials, and that console keeps
-	 * serving. This is the decision in section 5 of the proposal, and it is the one behaviour here
+	 * serving. This is a decision, not a default, and it is the one behaviour here
 	 * that an operator would notice immediately if it regressed.
 	 */
 	@Test
@@ -259,7 +258,7 @@ public class ConsoleAuthFilterTest {
 	/**
 	 * <b>The filter must never create a session.</b> The console answers whatever can route to its
 	 * port, and getSession(true) here would allocate a session and a timer per scanner probe - with
-	 * no per-IP limit to lean on. See docs/archive/console-login-ui.md section 4.2.
+	 * no per-IP limit to lean on.
 	 */
 	@Test
 	public void aRefusedRequestCreatesNoSession() throws Exception {
@@ -283,8 +282,7 @@ public class ConsoleAuthFilterTest {
 
 	/**
 	 * A page navigation gets the login page, and it must NOT get a WWW-Authenticate header - that
-	 * is what opens the browser's native dialog on top of the page the login screen replaces. See
-	 * docs/archive/console-login-ui.md section 5.2.
+	 * is what opens the browser's native dialog on top of the page the login screen replaces.
 	 */
 	@Test
 	public void aBrowserNavigationIsRedirectedToTheLoginPageWithoutAChallenge() throws Exception {

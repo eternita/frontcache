@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -126,7 +126,7 @@ public class FrontCacheClient {
 
 		// HttpClient 5 moved these off RequestConfig - socket read timeout to SocketConfig, connect
 		// timeout to ConnectionConfig, both on the connection manager. RequestConfig.setResponseTimeout
-		// is NOT the old socket timeout. See docs/archive/httpclient5-upgrade-proposal.md section 4.1.
+		// is NOT the old socket timeout - it bounds the wait for the response head, not each read.
 		connectionManager.setDefaultSocketConfig(SocketConfig.custom()
 				.setSoTimeout(Timeout.ofMilliseconds(CONNECTION_TIMEOUT))
 				.build());
@@ -893,7 +893,7 @@ public class FrontCacheClient {
 		return null;
 	}
 
-	// ---- generic management calls - for modules (docs/ip-protection-apache-core-and-prop-pro-proposal.md 4.4) ----
+	// ---- generic management calls - for modules, whose actions this client does not name ----
 
 	/**
 	 * One management call, answered as JSON. The action is {@code params.get("action")}.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,7 @@ import java.util.Base64;
 import org.frontcache.console.service.FrontcacheService;
 
 /**
- * The console's single credential, and the ONE place it is compared - see
- * docs/archive/console-login-ui.md section 6.3.
+ * The console's single credential, and the ONE place it is compared.
  *
  * Two callers present the same credential in two shapes: {@link ConsoleAuthFilter} reads an
  * {@code Authorization: Basic} header (a script, the container healthcheck, anything automated

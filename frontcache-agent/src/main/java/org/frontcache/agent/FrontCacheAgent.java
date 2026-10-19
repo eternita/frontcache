@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@ public class FrontCacheAgent {
 
 		// HttpClient 5 moved these off RequestConfig - socket read timeout to SocketConfig, connect
 		// timeout to ConnectionConfig, both on the connection manager. RequestConfig.setResponseTimeout
-		// is NOT the old socket timeout. See docs/archive/httpclient5-upgrade-proposal.md section 4.1.
+		// is NOT the old socket timeout - it bounds the wait for the response head, not each read.
 		connectionManager.setDefaultSocketConfig(SocketConfig.custom()
 				.setSoTimeout(Timeout.ofMilliseconds(SOCKET_TIMEOUT))
 				.build());

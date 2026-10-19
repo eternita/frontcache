@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import org.frontcache.guard.ratelimit.RateLimitPredicate;
 /**
  * Parses one line of guard-rules.conf into a {@link GuardRule}.
  *
- * Line format (see docs/frontcache-protection-tech-design.md):
+ * Line format (see docs/guard-getting-started.md):
  *
  *   &lt;name&gt; | &lt;predicate&gt; ; &lt;predicate&gt; ... | &lt;action&gt; [| dry-run]
  *

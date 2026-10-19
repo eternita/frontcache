@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,12 +36,12 @@ import org.junit.Assume;
 import org.junit.Test;
 
 /**
- * The console's half of the boundary in docs/ip-protection-apache-core-and-prop-pro-proposal.md section
- * 5.4 - frontcache-core's {@code CoreBoundaryTest} is the node's. Since phase P2 the Pro console plugin is
- * frontcache-pro-console, which compiles against this module and never the other way round. What the
- * compiler cannot see is what this test is for: a Pro class, view, script or services file put back into
- * this module (D4 kept the package names, so it compiles), and a core JSP, script or stylesheet naming a
- * Pro screen - that is text, and fails only when the page renders.
+ * The console's half of the boundary between the Apache-2.0 core and Pro - frontcache-core's
+ * {@code CoreBoundaryTest} is the node's. The Pro console plugin is frontcache-pro-console, which compiles
+ * against this module and never the other way round. What the compiler cannot see is what this test is for:
+ * a Pro class, view, script or services file put back into this module (the plugin shares the console's
+ * package names, so it compiles), and a core JSP, script or stylesheet naming a Pro screen - that is text,
+ * and fails only when the page renders.
  *
  * Pro code reaches the core only through {@code org.frontcache.console.plugin}; the core reaches Pro code
  * not at all.
@@ -85,7 +85,7 @@ public class ConsoleBoundaryTest {
 			"licenseSummary", "cache-warmer", "fc-warmer", "fc-dashboard-cluster", "ClusterRates",
 			"href=\"license\"", "warmerControl");
 
-	/** P2 moved every one of them to frontcache-pro-console; one that is back is Pro code in the core. */
+	/** Every one of them moved to frontcache-pro-console; one that is back is Pro code in the core. */
 	@Test
 	public void noProClassViewOrScriptIsInTheCore() throws IOException {
 

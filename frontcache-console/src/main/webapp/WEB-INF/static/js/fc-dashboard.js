@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,12 +29,12 @@
  * The console is deployed separately from the nodes it monitors, so this has to read a 2.6 node's
  * frames as well as a 2.7 one's - and 'type':'HystrixCommand' is pinned indefinitely anyway, because
  * an external Hystrix Dashboard or Turbine may be reading the same stream (see
- * docs/archive/hystrix-to-resilience4j-proposal.md sections 7.1 and 8.2). So the field names below are the
+ * docs/console-dashboards.md). So the field names below are the
  * documented contract, deliberately unchanged; only the renderer was replaced.
  *
  * What did change is what happens when a field is absent. The vendored dashboard asserted 36 keys and
  * threw on the first missing one, which blanked the whole panel with nothing but a browser-console
- * error - the failure mode section 7 calls the highest risk of the migration. Nothing here throws: a
+ * error - the highest-risk failure mode of the migration. Nothing here throws: a
  * missing number renders as a dash and the rest of the card still draws.
  * ---------------------------------------------------------------------------------------------
  */
@@ -86,8 +86,8 @@ var FcDashboard = (function () {
 	// ---- cluster request rate: a plugin's ---------------------------------------------------------
 	//
 	// The arithmetic behind the "Cluster:" line on a card is the Pro console plugin's
-	// (its realtime-page script, loaded after this file - docs/ip-protection-apache-core-and-prop-pro-proposal.md
-	// section 4.5). It installs a factory here; with none, every stream renders as an unclustered one,
+	// (its realtime-page script, loaded after this file through the console plugin SPI). It installs a
+	// factory here; with none, every stream renders as an unclustered one,
 	// which is exactly what a console with no frontcache.console.clusters renders.
 	//
 	// What the factory returns is rendered, not computed, by this file, so its shape is the contract:
@@ -641,8 +641,7 @@ var FcDashboard = (function () {
 			// One of the reasons for that error is that the session expired while the page was
 			// open, and EventSource never surfaces it: it does not expose the HTTP status and it
 			// retries a 401 forever, so the page would sit on "retrying ..." for good. Probe a
-			// normal endpoint once per error event to find out. See docs/archive/console-login-ui.md
-			// section 9.
+			// normal endpoint once per error event to find out.
 			probeForSignOut();
 		}, false);
 	};
@@ -697,7 +696,7 @@ var FcDashboard = (function () {
 
 		// Thread-pool frames ride the same stream. The console has not rendered them since the pool
 		// section was commented out; frontcache_threadpool_* in the Prometheus export is where those
-		// numbers live now (docs/archive/hystrix-to-resilience4j-proposal.md section 7.5).
+		// numbers live now.
 		if (!frame || "HystrixCommand" !== frame.type || !frame.name)
 			return;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Combine-and-reduce outcomes, counted per batch and per member.
- * See docs/archive/combine-reduce-proposal.md section 12.
  *
  * <h2>What these are for</h2>
  *

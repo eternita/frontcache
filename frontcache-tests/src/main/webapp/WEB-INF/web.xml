@@ -31,7 +31,7 @@
 
 
 	<!--
-		combine-and-reduce (docs/archive/combine-reduce-proposal.md). One servlet behind four paths: the
+		combine-and-reduce (docs/include-combining.md). One servlet behind four paths: the
 		conforming endpoint plus three misbehaving ones the edge has to survive. A servlet rather
 		than a JSP because the envelope goes out through the output stream, which a JSP has already
 		claimed for its own writer.

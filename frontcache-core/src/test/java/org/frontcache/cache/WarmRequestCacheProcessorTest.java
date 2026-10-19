@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import org.junit.Test;
 
 /**
  * What {@code CacheProcessorBase.processRequest} does differently for the cache warmer's own requests
- * - docs/cache-warmer-proposal.md sections 4.2 and 6.3.
+ * - see {@link WarmRequest}.
  *
  * <h2>Why the soft refresh has to be synchronous</h2>
  *

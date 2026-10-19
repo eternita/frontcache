@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -487,7 +487,7 @@ public class FCUtils {
 			} catch (Exception e) {
 				// Deliberately still swallowed: a failed/truncated read degrades to whatever was read,
 				// exactly as before. Caching a truncated page is a real problem, but it is a behaviour
-				// question, not a performance one - see the perf proposal, section 4.5.
+				// question, not a performance one.
 				e.printStackTrace();
 			}
 		}
@@ -534,7 +534,7 @@ public class FCUtils {
 	 * origin.example.com} because buildRequestHeaders drops the client's Host) and its port always
 	 * comes from our own config.
 	 *
-	 * Three things changed here in docs/archive/guard-redirect-url-host-fix.md, all of them silent before:
+	 * Three things changed here in 2.9.0, all of them silent before:
 	 *
 	 * <ul>
 	 * <li>the substituted host is the site's public name, not the Host this request arrived under -
@@ -865,10 +865,10 @@ public class FCUtils {
 	 *
 	 * The public door onto {@link #parseWebComponent}, for the one caller that has a fragment and its
 	 * headers but no HTTP response to hand: the include processor unpacking a combined response
-	 * (docs/archive/combine-reduce-proposal.md section 6). Routing it here rather than letting that code
+	 * (include combining). Routing it here rather than letting that code
 	 * assemble a WebResponse itself is what keeps maxAge, tags, refresh type and cache level meaning
-	 * exactly the same for a combined member as for a single include - the invariant in section 4.2,
-	 * which is silent when broken.
+	 * exactly the same for a combined member as for a single include - an invariant that is silent
+	 * when broken.
 	 *
 	 * @param headers the part's headers; a case-insensitive map is expected (header names are
 	 *                case-insensitive per RFC 7230) and is what the caller is given
@@ -999,7 +999,7 @@ public class FCUtils {
 	 *
 	 * That loop ran in production: 33 fragment URLs generating 608 origin fetches a second, each
 	 * one re-fetching a fragment that was already cached, unexpired and cacheable - because the key
-	 * being looked up had never existed. See docs/archive/input-request-count-fix.md section 3.
+	 * being looked up had never existed.
 	 *
 	 * Idempotent: canonicalizing an already-canonical URL returns it unchanged, so it is safe to
 	 * apply on a path that may already have applied it.
@@ -1028,12 +1028,12 @@ public class FCUtils {
 	/**
 	 * The same path and query, addressed at a different {@code scheme://host[:port]}.
 	 *
-	 * This is what splits an include's two jobs apart (docs/archive/include-fetch-fix.md section 5). A
-	 * cache-missing {@code <fc:include>} is keyed on the public URL and fetched from
+	 * This is what splits an include's two jobs apart - the URL it is keyed on and the URL it is
+	 * fetched from. A cache-missing {@code <fc:include>} is keyed on the public URL and fetched from
 	 * {@code front-cache.origin-host}; the two differ only in the base, so the fetch URL is derived
 	 * from the public one rather than re-concatenated from the tag - re-concatenating would give a
-	 * second string to keep in step with {@link #canonicalizeURL}, and that drift is what section 2
-	 * of docs/archive/input-request-count-fix.md was.
+	 * second string to keep in step with {@link #canonicalizeURL}, and that drift is the loop its
+	 * javadoc describes.
 	 *
 	 * The base is expected without a trailing slash, which is what {@code FrontCacheEngine.makeURL}
 	 * and {@code URL.toString()} produce for a host-only URL.
@@ -1293,7 +1293,7 @@ public class FCUtils {
 	 * caller asked. It returned the literal {@code "default-domain"} for an unauthorized request, and
 	 * since that string matches no command group the metrics stream answered with 200 plus an endless
 	 * run of empty frames - an authorization failure dressed up as an empty success. The stream now
-	 * refuses with 401 (proposal section 14.6), and it no longer needs a domain at all: the {@code group}
+	 * refuses with 401, and it no longer needs a domain at all: the {@code group}
 	 * field of each frame comes from the metrics object that owns it.
 	 */
 	/**

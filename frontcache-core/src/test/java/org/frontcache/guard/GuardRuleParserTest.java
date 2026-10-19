@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -145,7 +145,7 @@ public class GuardRuleParserTest {
 	/**
 	 * "Same path, other host" - what a second layer sends a client that reached it directly. The host
 	 * is followed by a placeholder rather than a '/', and was read as 'www.example-site.com${uri}${query}'
-	 * and refused (docs/direct-access-restriction-proposal.md).
+	 * and refused.
 	 */
 	@Test
 	public void aPlaceholderRightAfterTheHostEndsTheHost() {

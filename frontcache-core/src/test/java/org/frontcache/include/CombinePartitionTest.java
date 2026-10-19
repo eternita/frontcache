@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,6 @@ import org.junit.Test;
 
 /**
  * Which includes end up in a combined batch, and how a batch is chunked.
- * See docs/archive/combine-reduce-proposal.md sections 8 and 11.
  *
  * These sit on the decision, not on the origin call: everything here runs without a cache, a client
  * or a server. The origin round trip is the e2e suite's job.

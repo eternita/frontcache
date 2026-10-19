@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ import io.github.resilience4j.timelimiter.TimeLimiter;
  * The five commands consume exactly five things from Hystrix: the {@code Setter} chain in the
  * constructor, {@code run()}, {@code getFallback()}, {@code getExecutionEvents()},
  * {@code getFailedExecutionException()} and {@code execute()}. That uniformity is what makes this
- * migration a base-class swap rather than a rewrite - see proposal sections 3.1 and 4.
+ * migration a base-class swap rather than a rewrite.
  *
  * Two behavioral details are preserved deliberately, because getting either wrong would be a silent
  * production change:
@@ -53,8 +53,7 @@ import io.github.resilience4j.timelimiter.TimeLimiter;
  *   there for a timeout so it logs a message without a stack trace.
  * - {@code getFallback()} is invoked from the catch block below, on the calling thread, with no
  *   reactive subscription in between - so it always runs. That is the fix for the "in multi threaded
- *   environment hystrix does not resolve fallback ??" comment in ConcurrentIncludeProcessor
- *   (section 6.4).
+ *   environment hystrix does not resolve fallback ??" comment in ConcurrentIncludeProcessor.
  *
  * An {@link FcBadRequestException} is rethrown to the caller without resolving a fallback and without
  * moving the circuit breaker's failure rate, matching HystrixBadRequestException.
@@ -149,7 +148,7 @@ public abstract class FcCommand<T> {
 	public T execute()
 	{
 		// Only the semaphore path is watched. The thread path has a real TimeLimiter, so watching it too
-		// would report the same overrun twice. See proposal section 6.2.
+		// would report the same overrun twice.
 		long budgetMs = (Isolation.SEMAPHORE == config.getIsolation()) ? config.getTimeoutMs() : 0;
 		FcCommandMetrics.InFlight execution = metrics.markStart(budgetMs, getExecutionDescription());
 		long startNanos = System.nanoTime();

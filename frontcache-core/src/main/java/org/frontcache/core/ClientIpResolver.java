@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * best-effort log column and unusable as a limiter key: every one of those headers is
  * client-supplied, so a client sending "X-Forwarded-For: &lt;random&gt;" on each request would get a
  * fresh counter on each request and defeat the limiter entirely - while passing every test that
- * does not try it. The two resolutions coexist on purpose; see docs/archive/guard-rate-limit-proposal.md §3.
+ * does not try it. The two resolutions coexist on purpose: one for logging, one for limiting.
  *
  * The rules here:
  *

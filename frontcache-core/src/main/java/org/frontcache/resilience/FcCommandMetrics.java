@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,16 +42,15 @@ import org.slf4j.LoggerFactory;
  * successful/not-permitted counts - and no per-event-type rolling counters and no latency
  * percentiles. The dashboard asserts 36 keys and throws on the first missing one, so the counter set
  * has to be shaped like the JSON. That is what this class is: a ring of 1-second buckets of LongAdder
- * per {@link FcEventType} plus an HdrHistogram ring, read as a merged snapshot. See proposal
- * section 7.3.
+ * per {@link FcEventType} plus an HdrHistogram ring, read as a merged snapshot.
  *
  * Keyed by command key alone. One Frontcache node serves one site, so there is exactly one group at
- * runtime and nothing to disambiguate - the composite (domain, commandKey) key an earlier draft of
- * the proposal needed became unnecessary when multi-domain support was retired (section 6.6).
+ * runtime and nothing to disambiguate - the composite (domain, commandKey) key an earlier design
+ * needed became unnecessary when multi-domain support was retired.
  *
  * This class also owns the in-flight registry, which does double duty: it produces
  * currentConcurrentExecutionCount for the dashboard, and it is what the semaphore-path watchdog sweeps
- * (section 6.2). Keeping one registry rather than two means the watchdog costs no per-request
+ * for budget overruns. Keeping one registry rather than two means the watchdog costs no per-request
  * allocation beyond what the concurrency gauge already needs.
  */
 public class FcCommandMetrics {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import org.junit.Test;
 
 /**
  * The memo that stops an origin without a combine handler from costing one wasted request per group
- * on every page view - docs/archive/combine-reduce-proposal.md section 9.1.
+ * on every page view.
  */
 public class CombineUnsupportedMemoTest {
 

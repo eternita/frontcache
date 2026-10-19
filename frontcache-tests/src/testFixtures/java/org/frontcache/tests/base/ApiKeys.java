@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package org.frontcache.tests.base;
 
 /**
  * The node's management-API API key. There is one per node - per-domain API keys went away with
- * multi-domain support (see docs/archive/multi-domain-retirement-proposal.md).
+ * multi-domain support.
  */
 public interface ApiKeys {
 	public static final String TEST_API_KEY_LOCALHOST = "test-api-key-localhost";

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,8 +47,7 @@ import org.mockito.ArgumentCaptor;
  *
  * The bypass path is the one that matters most: it is the only origin call that carries no
  * {@code x-frontcache-request-id}, so without the token an edge's bypassed POST is indistinguishable
- * from a client that went straight to the second layer
- * (docs/direct-access-restriction-proposal.md §3).
+ * from a client that went straight to the second layer.
  *
  * These capture the request actually handed to the origin HttpClient, like
  * {@link OriginAcceptEncodingTest}.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ public final class ConsolePlugins {
 	/**
 	 * Keys under {@code frontcache.console} that only a plugin reads, with what needs them. A console whose
 	 * config sets one that no loaded plugin claims warns once at startup - silently ignoring a configured
-	 * feature is how an operator concludes it is broken (proposal section 9).
+	 * feature is how an operator concludes it is broken.
 	 */
 	static final Map<String, String> PLUGIN_ONLY_KEYS = Map.of(
 			"clusters", "the cluster request rate on the realtime monitor",

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Eternita
+ * Copyright 2018 Eternita
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ public class RateLimitRuleParsingTest {
 		}
 	}
 
-	// ---- the shape from the proposal -----------------------------------------------------------
+	// ---- the shape the feature was designed around ------------------------------------------
 
 	@Test
 	public void limitPerWindowIsParsed() {
