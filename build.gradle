@@ -1,0 +1,1006 @@
+plugins {
+	id 'com.github.hierynomus.license' version '0.16.1' apply false
+	id 'com.github.jk1.dependency-license-report' version '3.1.4' apply false
+}
+
+// Jetty 12 (Jakarta EE10).
+ext.jettyVersion = '12.0.38'   // 12.0.30+ bundles ASM >= 9.9, required to scan Java 25 (class v69) bytecode
+                               // stay on the 12.0.x (Jakarta EE10 / Servlet 6.0) line - 12.1.x moves to EE11
+
+// ---- licensing paperwork ------------------------------------------------------
+// Everything in this repository is Apache-2.0 (LICENSE, NOTICE): every module's per-file header, and what
+// every jar carries in META-INF. The Pro modules are proprietary and live in a separate repository, which
+// builds against this one and applies its own header.
+// What the per-file headers say. Changing either is this edit plus `./gradlew licenseFormat`: the check
+// is strict, so the old header then fails `check` until the sweep has run.
+ext.copyrightHolder = 'Eternita'
+ext.copyrightYear   = '2018'   // first publication
+// What the POMs say (SPDX id as the name, as Maven Central asks).
+ext.pomLicense = [name: 'Apache-2.0', url: 'https://www.apache.org/licenses/LICENSE-2.0.txt']
+
+// Single source of truth for the project version (see version.properties). It cannot live
+// in gradle.properties - that file is git-ignored (see .gitignore), so it would not be
+// checked in. Everything downstream derives from this: Maven coordinates, distribution
+// archive names, Docker tags, the installer's default --version.
+ext.frontcacheVersion = {
+	def props = new Properties()
+	file('version.properties').withInputStream { props.load(it) }
+	def v = props.getProperty('version')
+	if (!v?.trim()) {
+		throw new GradleException("version.properties: 'version' is missing or empty")
+	}
+	v.trim()
+}()
+
+// The release date the license check compares a license's updates-until against. `release-date` in
+// version.properties, set when a release is cut; absent, the build day in UTC - so a development build
+// says "released today", which is the honest answer. Lands in frontcache-core's build-info.properties.
+ext.frontcacheReleaseDate = {
+	def props = new Properties()
+	file('version.properties').withInputStream { props.load(it) }
+	def d = props.getProperty('release-date')?.trim()
+	if (!d) {
+		return java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString()
+	}
+	try {
+		java.time.LocalDate.parse(d)
+	} catch (java.time.format.DateTimeParseException e) {
+		throw new GradleException("version.properties: 'release-date' must be yyyy-MM-dd, got '${d}'")
+	}
+	d
+}()
+
+subprojects {
+	apply plugin: 'java-library' // 'java-library' (not 'java') so 'api' transitive deps are available
+	apply plugin: 'jacoco'
+    version = rootProject.frontcacheVersion
+    group = 'org.frontcache'
+
+	// Build/test with Java 25 via a toolchain, so the JDK launching Gradle is
+	// decoupled from the project's target. Gradle auto-detects the installed
+	// JDK 25 for compilation and test execution. Jetty 12 / Jakarta EE10 require
+	// Java 17 as a baseline; we target the 25 LTS.
+	java {
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(25)
+		}
+	}
+
+	// Emit Java 25 bytecode.
+	tasks.withType(JavaCompile).configureEach {
+		options.release = 25
+	}
+
+	// 'provided' deps (e.g. servlet-api) are on compile & test classpaths but
+	// NOT on runtimeClasspath, so they are excluded from the assembled WAR.
+	configurations {
+		provided
+	}
+
+	sourceSets {
+		main.compileClasspath += configurations.provided
+		test.compileClasspath += configurations.provided
+		test.runtimeClasspath += configurations.provided
+	}
+
+	jacoco.toolVersion = '0.8.15'   // 0.8.13+ understands Java 25 class files
+
+    dependencies {
+		testImplementation 'junit:junit:4.13.2'
+    }
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+
+    // Unit-test coverage. Output mirrors the test reports' unit/integration split
+    // (reports/tests/unit), so this lands in reports/jacoco/unit — the e2e suite's
+    // report is reports/jacoco/integration in frontcache-tests/build.gradle.
+    jacocoTestReport {
+        reports {
+            html.required = true
+            xml.required = true
+            csv.required = false
+            html.outputLocation = layout.buildDirectory.dir('reports/jacoco/unit')
+            xml.outputLocation = layout.buildDirectory.file('reports/jacoco/unit/jacocoTestReport.xml')
+        }
+    }
+	tasks.withType(Test) {
+		testLogging {
+			showStandardStreams = true
+			exceptionFormat = 'full'
+		}
+	}
+
+	test {
+		reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/unit')
+		reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/unit')
+
+		if (System.getProperty('DEBUG', 'false') == 'true') {
+			jvmArgs '-Xdebug',
+				'-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8001'
+		}
+	}
+
+	check.dependsOn jacocoTestReport
+
+	// Also emit the report for a bare `gradlew :module:test`, not only via check/build.
+	test.finalizedBy jacocoTestReport
+
+	// ---- per-file license headers ----------------------------------------------------
+	// licenseMain / licenseTest / licenseTestFixtures check every source set, `license` runs them all and
+	// `check` runs `license`, so a file with a missing or wrong header fails the build. `licenseFormat`
+	// writes the header. Strict: the header must match the template exactly, so a file carrying another
+	// header (the Pro modules', say) fails as surely as one carrying none.
+	//
+	// Our own JavaScript and stylesheets are checked too (fc-*.js, fc-*.css, the JS tests); the vendored
+	// Bootstrap and jQuery keep their authors' headers and are listed in NOTICE. JSPs are NOT checked:
+	// a JSP comment's line break is response output, and the e2e suite asserts the bytes of its pages.
+	apply plugin: 'com.github.hierynomus.license'
+	license {
+		header = rootProject.file('gradle/license/HEADER-APACHE-2.0.txt')
+		ext.holder = rootProject.copyrightHolder
+		ext.year = rootProject.copyrightYear
+		ignoreFailures = false
+		strictCheck = true
+		encoding = 'UTF-8'
+		includes(['**/*.java', '**/fc-*.js', '**/fc-*.css', '**/*.test.js', '**/*harness.js'])
+		mapping {
+			java = 'SLASHSTAR_STYLE'
+			js = 'SLASHSTAR_STYLE'
+			css = 'SLASHSTAR_STYLE'
+		}
+	}
+	// What no source set holds: a war's src/main/webapp, and the node --test JavaScript under src/test/js.
+	def looseSources = files(
+		fileTree('src/main/webapp') { include '**/fc-*.js', '**/fc-*.css' },
+		fileTree('src/test/js'))
+	tasks.register('licenseLooseFiles', com.hierynomus.gradle.license.tasks.LicenseCheck) {
+		description = 'Scanning license on webapp and JavaScript test files'
+		source = looseSources
+	}
+	tasks.register('licenseFormatLooseFiles', com.hierynomus.gradle.license.tasks.LicenseFormat) {
+		description = 'Applying license on webapp and JavaScript test files'
+		source = looseSources
+	}
+
+	// Every jar says what it is licensed under, beside its classes.
+	tasks.named('jar', Jar) {
+		metaInf {
+			from(rootProject.file('LICENSE'), rootProject.file('NOTICE'))
+		}
+	}
+}
+
+
+// Resolve AWS credentials the way the old maven-s3-wagon did. Gradle's AwsCredentials —
+// unlike the wagon — does NOT consult the AWS default credential chain, so we parse the
+// shared credentials file (~/.aws/credentials, profile from $AWS_PROFILE or 'default')
+// as a fallback after -P properties and env vars.
+def awsSharedCreds() {
+	def file = new File(System.getProperty('user.home'), '.aws/credentials')
+	def profile = System.getenv('AWS_PROFILE') ?: 'default'
+	def creds = [:]
+	if (file.exists()) {
+		def current = null
+		file.eachLine { raw ->
+			def line = raw.trim()
+			if (line.startsWith('[') && line.endsWith(']')) {
+				current = line[1..-2].trim()
+			} else if (current == profile && line.contains('=')) {
+				def i = line.indexOf('=')
+				creds[line.substring(0, i).trim()] = line.substring(i + 1).trim()
+			}
+		}
+	}
+	creds
+}
+
+// The single publish target for every published module.
+def eternitaMaven(repos) {
+	repos.maven {
+		url = 's3://repo.eternita.co/maven2'
+		credentials(AwsCredentials) {
+			def shared = awsSharedCreds()
+			accessKey = findProperty('awsAccessKey') ?: System.getenv('AWS_ACCESS_KEY_ID') ?: shared['aws_access_key_id']
+			secretKey = findProperty('awsSecretKey') ?: System.getenv('AWS_SECRET_ACCESS_KEY') ?: shared['aws_secret_access_key']
+		}
+	}
+}
+
+// Artifact deployment (was pom.xml). Publishes the two library modules to the Eternita
+// S3 repo; the two distribution bundles are published from the block further down.
+// Gradle's maven-publish speaks s3:// natively.
+// Run with: ./gradlew publish  (or publishToMavenLocal for a dry run)
+configure([project(':frontcache-core'), project(':frontcache-agent')]) {
+	apply plugin: 'maven-publish'
+
+	java {
+		// No sources jar: the published artifacts are binary-only. (The javadoc jar
+		// stays - it documents the API without shipping the implementation.)
+		withJavadocJar()   // replaces maven-javadoc-plugin
+	}
+
+	// -Xdoclint:none equivalent — don't fail the build on javadoc lint
+	tasks.withType(Javadoc).configureEach {
+		options.addStringOption('Xdoclint:none', '-quiet')
+	}
+
+	publishing {
+		publications {
+			mavenJava(MavenPublication) {
+				from components.java // emits api deps into the POM with 'compile' scope; 'provided' stays out
+				pom {
+					name = "${project.group}:${project.name}"
+					description = 'Web page/fragment cache with server side includes'
+					url = 'https://github.com/eternita/frontcache'
+					licenses {
+						license {
+							name = rootProject.pomLicense.name
+							url  = rootProject.pomLicense.url
+							distribution = 'repo'
+						}
+					}
+					developers {
+						developer {
+							name = 'Dmitriy Pavlikovskiy'
+							email = 'pdaviti@gmail.com'
+							organization = 'Eternita'
+							organizationUrl = 'https://www.eternita.co'
+						}
+						developer {
+							name = 'Serhiy Pavlikovskiy'
+							email = 'pavlikovskiy@gmail.com'
+							organization = 'Eternita'
+							organizationUrl = 'https://www.eternita.co'
+						}
+					}
+					scm {
+						connection = 'scm:git:git://github.com/eternita/frontcache.git'
+						developerConnection = 'scm:git:ssh://github.com:eternita/frontcache.git'
+						url = 'https://github.com/eternita/frontcache/tree/master'
+					}
+				}
+			}
+		}
+		repositories {
+			rootProject.eternitaMaven(delegate)
+		}
+	}
+}
+
+
+project(':frontcache-core') {
+
+	// StubNode - a scripted management endpoint for the client's fallback tests. Published with the jar, as
+	// org.frontcache:frontcache-core:<v>:test-fixtures (Gradle: testFixtures("org.frontcache:frontcache-core:<v>")),
+	// because the Pro modules' tests use it too and their release build resolves everything it compiles
+	// against from the published repository. Selecting it takes the test-fixtures capability, so an
+	// ordinary dependency on frontcache-core never brings it in.
+	apply plugin: 'java-test-fixtures'
+	// the plugin rebuilds the test source set's class paths, dropping what subprojects {} added to them
+	sourceSets.test.compileClasspath += configurations.provided
+	sourceSets.test.runtimeClasspath += configurations.provided
+
+	// ---- build-info.properties ------------------------------------------------
+	// The version and release date as org.frontcache.license.BuildInfo reads them at runtime. Generated
+	// rather than checked in so version.properties stays the only place either is written.
+	def buildInfoDir = layout.buildDirectory.dir('generated/build-info')
+	def generateBuildInfo = tasks.register('generateBuildInfo') {
+		group = 'build'
+		description = 'Write org/frontcache/build-info.properties (version + release date)'
+		def buildVersion = project.version.toString()
+		def releaseDate = rootProject.frontcacheReleaseDate
+		inputs.property('version', buildVersion)
+		inputs.property('releaseDate', releaseDate)
+		outputs.dir(buildInfoDir)
+		doLast {
+			def f = buildInfoDir.get().file('org/frontcache/build-info.properties').asFile
+			f.parentFile.mkdirs()
+			f.text = "# generated by :frontcache-core:generateBuildInfo from version.properties\n" +
+					"version=${buildVersion}\nrelease-date=${releaseDate}\n"
+		}
+	}
+	sourceSets.main.resources.srcDir(generateBuildInfo)
+
+	// ---- FRONTCACHE_HOME skeleton for filter mode (use case #1) ---------------
+	// Filter-mode customers put frontcache-core on their app's classpath, but they still need
+	// a conf/ directory - and they cannot clone this repo to get one. So the skeleton is
+	// published alongside the jar:
+	//     org.frontcache:frontcache-core:<v>:home@zip
+	//
+	// Everything except frontcache.properties is taken from the server's conf/ so there is one
+	// copy of bots.conf, guard-rules.conf, resilience.properties and friends. frontcache.properties
+	// is the one file that genuinely differs: in filter mode the app IS the origin, so the
+	// standalone template's origin-host/origin-port section would be actively misleading.
+	def frontcacheHomeZip = tasks.register('frontcacheHomeZip', Zip) {
+		group = 'distribution'
+		description = 'FRONTCACHE_HOME skeleton for servlet-filter mode'
+		archiveBaseName = 'frontcache-home'
+		archiveClassifier = ''
+		destinationDirectory = layout.buildDirectory.dir('distributions')
+
+		into('FRONTCACHE_HOME') {
+			from(rootProject.file('frontcache-server/FRONTCACHE_HOME')) {
+				include 'conf/**', 'fallbacks/**', 'cache/**'
+				// the standalone properties template, this node's identity, and the stale
+				// pre-2.0 ReadMe are all replaced or dropped below
+				exclude 'conf/frontcache.properties', 'conf/frontcache.id', 'ReadMe.txt'
+				// a developer's license file is theirs, not every customer's
+				exclude 'conf/frontcache.license'
+				exclude 'cache/l2-lucene-index/*', 'logs/*'
+				exclude '**/.DS_Store'
+			}
+			from('src/dist/frontcache.properties') { into 'conf' }
+		}
+		from('src/dist/README-FILTER.md')
+		from(rootProject.file('LICENSE'), rootProject.file('NOTICE'))
+	}
+
+	// Attached to the existing library publication, so `./gradlew publish` ships it with the jar.
+	afterEvaluate {
+		publishing.publications.named('mavenJava') {
+			artifact(frontcacheHomeZip) {
+				classifier = 'home'
+				extension  = 'zip'
+			}
+		}
+	}
+
+    dependencies {
+        provided        'jakarta.servlet:jakarta.servlet-api:6.0.0'
+		provided        'jakarta.servlet.jsp:jakarta.servlet.jsp-api:3.1.1'
+
+		api 			'com.fasterxml.jackson.core:jackson-databind:2.22.1'
+		api         	'com.fasterxml.jackson.core:jackson-annotations:2.22'
+        // HttpClient 5.3.1. The 4.5 branch ended at 4.5.14 (maintenance only), and 5.x is where every
+        // future fix lands. The migration also took org.apache.http.client.HttpClient out of the
+        // CacheProcessor / IncludeProcessor / FallbackResolver signatures, which now take
+        // org.frontcache.core.FcHttpClient instead.
+        api         	'org.apache.httpcomponents.client5:httpclient5:5.3.1'
+        api         	'commons-io:commons-io:2.22.0'
+        api         	'ch.qos.logback:logback-classic:1.5.38'
+		// Resilience4j replaced Hystrix. Removing hystrix-core took five unmaintained artifacts off the
+		// runtime classpath of every origin call with it: archaius-core (2014), commons-configuration
+		// (2012), commons-lang (2011) and rxjava 1.x (EOL 2018). Each of these declares only
+		// resilience4j-core + slf4j-api.
+		api         	'io.github.resilience4j:resilience4j-circuitbreaker:2.4.0'
+		api         	'io.github.resilience4j:resilience4j-timelimiter:2.4.0'
+		api         	'io.github.resilience4j:resilience4j-bulkhead:2.4.0'
+		// Latency percentiles for the dashboard JSON. Already on the runtime classpath transitively
+		// via hystrix-core (2.1.9); declared explicitly at a current version so it survives the
+		// removal of Hystrix and stops being an accident of someone else's dependency tree.
+		api         	'org.hdrhistogram:HdrHistogram:2.2.2'
+
+		// Prometheus / OTLP export (docs/console-dashboards.md). Additive: the dashboard SSE contract is
+		// unaffected, and export defaults to none, so an upgrade starts no listener and no push loop until
+		// front-cache.metrics.export says so. 1.17.1 is the current STABLE micrometer; 1.18.0-M1 exists and
+		// is deliberately not used - a milestone build on the request path is the opposite of what
+		// replacing Hystrix was about.
+		api         	'io.github.resilience4j:resilience4j-micrometer:2.4.0'
+		api         	'io.micrometer:micrometer-core:1.17.1'
+		api         	'io.micrometer:micrometer-registry-prometheus:1.17.1'
+		api         	'io.micrometer:micrometer-registry-otlp:1.17.1'
+        api         	'net.sf.ehcache:ehcache:2.10.9.2'
+        api         	'com.google.code.gson:gson:2.14.0'
+        api         	'org.apache.lucene:lucene-core:10.5.1'
+        api         	'com.typesafe:config:1.4.9'
+
+        testImplementation     'junit:junit:4.13.2'
+        testImplementation     'org.mockito:mockito-core:5.23.0'
+    }
+
+    test {
+        // FCConfig is a JVM-global singleton initialized once on first touch, and several core
+        // tests (L1L2 cache tests, FileBasedFallbackResolverTest) trigger that init. Without a
+        // valid frontcache.home the init throws and poisons FCConfig for the rest of the JVM
+        // (NoClassDefFoundError), making the failure depend on test-execution order. Pin a minimal
+        // fixture home so init always succeeds regardless of which test runs first.
+        systemProperty 'frontcache.home', "${projectDir}/src/test/resources/fallback-home"
+
+        // Opt-in switch for DashboardJsonKeysTest to rewrite its own golden file. Forwarded explicitly
+        // because Gradle does not pass -D through to the test JVM; default false so the normal build
+        // can only compare, never regenerate.
+        systemProperty 'fc.dashboard.keys.regenerate', System.getProperty('fc.dashboard.keys.regenerate', 'false')
+    }
+}
+
+
+project(':frontcache-agent') {
+	dependencies {
+        // Moves with core: the agent's public API is String-in/String-out, so no customer source
+        // breaks.
+        api         'org.apache.httpcomponents.client5:httpclient5:5.3.1'
+	}
+}
+
+
+
+project(':frontcache-server') {
+	apply plugin: 'war'
+
+	dependencies {
+		implementation project(':frontcache-core')
+
+		// Embedded Jetty 12 (EE10) for the standalone `appRun` task.
+		provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
+	}
+
+	// Sync, not Copy: the launcher deploys exactly ONE webapp (ROOT.war), so nothing else
+	// belongs in this directory - and a Copy leaves whatever was there before. A stale
+	// frontcache-console.war, hand-copied here long ago, survived that way: harmless to the
+	// distribution archive (which is built from task outputs, not from this tree) but shipped
+	// to remote hosts by scripts/dev/deploy-build-remote.sh, which tars the whole tree. Sync deletes
+	// anything that is not ROOT.war on the next build, on every machine.
+	def copyWar = tasks.register('copyWar', Sync) {
+		  from tasks.named('war')
+		  into 'server/frontcache-base/webapps'
+		  rename '(.*).war', 'ROOT.war'
+	}
+	build.finalizedBy(copyWar)
+
+	// Assemble the standalone launcher's runtime classpath into server/lib. The
+	// remote deployment runs `java -cp "server/lib/*" org.frontcache.server.FrontcacheJettyServer`
+	// The launcher only needs the Jetty EE10
+	// jars (in 'provided', deliberately kept out of the war) plus its own class; the
+	// war carries frontcache-core + its deps in WEB-INF/lib, so they stay out of here.
+	def copyServerLibs = tasks.register('copyServerLibs', Sync) {
+		from configurations.provided
+		from tasks.named('jar')
+		into 'server/lib'
+	}
+	build.finalizedBy(copyServerLibs)
+
+	// ---- binary distribution -------------------------------------------------
+	// `./gradlew :frontcache-server:distZip` (or distTar) assembles a self-contained
+	// bundle under build/distributions: the launcher, its Jetty 12 EE10 classpath, the
+	// war and a config skeleton. This is the base artifact of every delivery channel -
+	// the Docker image and the VM installer unpack THIS rather than re-running Gradle.
+	//
+	// The archive is built from the task outputs (war / jar / configurations.provided)
+	// rather than from the in-place server/ tree, so a developer's leftovers there -
+	// a populated server/lib, a hand-copied frontcache-console.war - can never leak
+	// into a release.
+	apply plugin: 'distribution'
+
+	distributions {
+		main {
+			distributionBaseName = 'frontcache-server'
+			contents {
+				// macOS sidecars: Jetty globs *.ini and dies trying to parse a ._ file as UTF-8
+				exclude '**/.DS_Store', '**/._*'
+
+				// launcher classpath: the Jetty EE10 jars (deliberately kept out of the war)
+				// plus this module's jar, which holds FrontcacheJettyServer
+				from(configurations.provided) { into 'server/lib' }
+				from(tasks.named('jar'))      { into 'server/lib' }
+
+				// the webapp; frontcache-core and its deps ride along in WEB-INF/lib
+				from(tasks.named('war')) {
+					into 'server/frontcache-base/webapps'
+					rename '(.*).war', 'ROOT.war'
+				}
+
+				// checked-in parts of the server tree
+				from('server/bin')                 { into 'server/bin'; filePermissions { unix('0755') } }
+				from('bin')                        { into 'bin';        filePermissions { unix('0755') } }
+				from('server/frontcache-base/etc') { into 'server/frontcache-base/etc' }
+				from(files('server/notice.html', 'server/license-eplv10-aslv20.html')) { into 'server' }
+
+				// config skeleton. Runtime state is never shipped: 'logs/*' and
+				// 'cache/l2-lucene-index/*' drop a developer's logs and cache index while
+				// keeping the (empty) directories. ReadMe.txt is the stale pre-2.0
+				// Tomcat/Java-8 instructions, superseded by README-INSTALL.md.
+				// warmer/ ships its two files by name and nothing else: it is also where dump-keys and
+				// the cache warmer write URI lists, failed-entry lists and .state/run.json at runtime, so
+				// copying the directory would ship whatever a local run left in it.
+				from('FRONTCACHE_HOME') {
+					into 'FRONTCACHE_HOME'
+					exclude 'ReadMe.txt', 'logs/*', 'cache/l2-lucene-index/*', 'warmer/**'
+					// runtime state of a local run: the instance id (shipping one would make every install
+					// start as a "copied directory") and the usage log. A license file is per customer.
+					exclude 'usage/**', 'conf/frontcache.license'
+				}
+				from('FRONTCACHE_HOME/warmer') {
+					into 'FRONTCACHE_HOME/warmer'
+					include 'README.txt'
+				}
+				from('FRONTCACHE_HOME/warmer') {
+					into 'FRONTCACHE_HOME/warmer'
+					include 'warmer.sh'
+					filePermissions { unix('0755') }
+				}
+
+				from(rootProject.file('LICENSE'))
+				from('dist/README-INSTALL.md')
+			}
+		}
+	}
+
+	// an uncompressed tar is no use as a download
+	tasks.named('distTar', Tar) {
+		compression = Compression.GZIP
+		archiveExtension = 'tar.gz'
+	}
+
+	// Run Frontcache standalone on embedded Jetty 12.
+	tasks.register('appRun', JavaExec) {
+		group = 'application'
+		description = 'Run Frontcache standalone on embedded Jetty 12'
+		mainClass = 'org.frontcache.server.FrontcacheJettyServer'
+		classpath = sourceSets.main.runtimeClasspath + configurations.provided
+		systemProperty 'frontcache.jetty.port', '9080'
+		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+		systemProperty 'frontcache.home', "${projectDir}/FRONTCACHE_HOME"
+		systemProperty 'org.frontcache.console.config', "${projectDir}/FRONTCACHE_HOME/conf/frontcache-console.conf"
+		systemProperty 'logback.configurationFile', "${projectDir}/FRONTCACHE_HOME/conf/fc-logback.xml"
+	}
+}
+
+
+project(':frontcache-console') {
+	apply plugin: 'war'
+
+	ext {
+		springVersion = '6.2.19'   // 6.2.x bundles ASM that knows class v69, required to scan Java 25 bytecode (6.1.x ASM tops out at v67)
+		                           // latest of the 6.2.x line - Spring 7 requires Jakarta EE11 / Servlet 6.1, Jetty 12.0.x is EE10
+	}
+
+	dependencies {
+		implementation project(':frontcache-core')
+		implementation "org.springframework:spring-context:${springVersion}"
+		implementation "org.springframework:spring-webmvc:${springVersion}"
+		implementation 'org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1'
+		implementation 'jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.2'
+		implementation 'com.typesafe:config:1.4.9'
+		implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.1'
+
+		testImplementation "org.springframework:spring-test:${springVersion}"
+		testImplementation 'org.mockito:mockito-core:5.23.0'
+        provided 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+
+		// Embedded Jetty 12 (EE10) for the standalone `appRun` task
+		provided "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-apache-jsp:${jettyVersion}"
+		provided "org.eclipse.jetty.ee10:jetty-ee10-glassfish-jstl:${jettyVersion}"
+	}
+
+	// ---- binary distribution -------------------------------------------------
+	// The console ships as its own bundle (and its own container) - it is a separate
+	// process on :7080, not something the standalone server can host: the
+	// FrontcacheJettyServer launcher deploys exactly one webapp at context '/'.
+	//
+	// Layout is flatter than frontcache-server (no legacy server/ nesting):
+	//   bin/frontcache-console  lib/*.jar  webapps/ROOT.war  conf/  logs/
+	// The war carries Spring + frontcache-core in WEB-INF/lib; lib/ holds only the
+	// Jetty 12 EE10 launcher classpath plus this module's jar (ConsoleJettyServer).
+	apply plugin: 'distribution'
+
+	distributions {
+		main {
+			distributionBaseName = 'frontcache-console'
+			contents {
+				exclude '**/.DS_Store', '**/._*'
+
+				from(configurations.provided) { into 'lib' }
+				from(tasks.named('jar'))      { into 'lib' }
+				from(tasks.named('war')) {
+					into 'webapps'
+					rename '(.*).war', 'ROOT.war'
+				}
+
+				from('bin')    { into 'bin'; filePermissions { unix('0755') } }
+				from('config') { into 'conf' }
+
+				from(rootProject.file('LICENSE'))
+				from('dist/README-INSTALL.md')
+			}
+		}
+	}
+
+	tasks.named('distTar', Tar) {
+		compression = Compression.GZIP
+		archiveExtension = 'tar.gz'
+	}
+
+	// ---- the realtime monitor's JavaScript -----------------------------------
+	// fc-dashboard.js is the whole realtime monitor and has no dependencies, so there was nothing to run
+	// its code with until the cluster rate put arithmetic in it that is silent when wrong. Node's own test
+	// runner, no package.json, no node_modules.
+	//
+	// SKIPPED when node is not on the PATH rather than failing: a JDK is this build's only stated
+	// prerequisite, and `./gradlew build` on a machine without node must keep working. The skip says
+	// so at lifecycle level, so it is visible in normal build output rather than only under --info.
+	def jsTest = tasks.register('jsTest', Exec) {
+		group = 'verification'
+		description = "Run the console's JavaScript tests (the realtime monitor with no plugin) with node --test"
+
+		def testDir = file('src/test/js')
+		inputs.dir(testDir)
+		inputs.file('src/main/webapp/WEB-INF/static/js/fc-dashboard.js')
+		outputs.upToDateWhen { false }
+
+		// The PATH is scanned rather than `which` being run: this is configuration time, on every
+		// invocation of every task, and spawning a process there is not the place for it.
+		def nodeExe = System.getProperty('os.name').toLowerCase().contains('windows') ? 'node.exe' : 'node'
+		def nodePath = (System.getenv('PATH') ?: '').split(File.pathSeparator)
+				.collect { new File(it, nodeExe) }
+				.find { it.isFile() && it.canExecute() }
+
+		enabled = nodePath != null
+		if (nodePath == null)
+			logger.lifecycle(":${project.name}:jsTest SKIPPED - node is not on the PATH")
+
+		// The glob is the shell's: Exec does not expand one, and node --test needs the files named.
+		commandLine(['sh', '-c', "'${nodePath ?: 'node'}' --test src/test/js/*.test.js"])
+		workingDir = projectDir
+	}
+	tasks.named('check') { dependsOn jsTest }
+
+	// Run the console standalone on embedded Jetty 12.
+	tasks.register('appRun', JavaExec) {
+		group = 'application'
+		description = 'Run the Frontcache console on embedded Jetty 12'
+		mainClass = 'org.frontcache.console.ConsoleJettyServer'
+		classpath = sourceSets.main.runtimeClasspath + configurations.provided
+		systemProperty 'frontcache.jetty.port', '7080'
+		systemProperty 'frontcache.jetty.webapp', "${projectDir}/src/main/webapp"
+		// Without this the console comes up with no edge list at all - every screen empty - because
+		// FrontcacheService reads it from FRONTCACHE_CONFIG or this property and nowhere else.
+		systemProperty 'org.frontcache.console.config', "${projectDir}/config/frontcache-console.conf"
+		systemProperty 'logback.configurationFile', "${projectDir}/config/fc-logback.xml"
+	}
+}
+
+// The end-to-end / integration test suite lives in the ':frontcache-tests'
+// subproject. It depends on frontcache-core / frontcache-agent as project
+// dependencies and is run with the repo-root tests.sh, which starts the two
+// embedded Jetty servers, runs the suite, then kills them. It is deliberately
+// NOT wired into `check` — the suite needs those servers up first.
+
+
+// ---- distribution bundles: checksums, verification, publishing ----------------
+// The two runnable modules ship as downloadable archives (see docs/downloads.md). They are published
+// to the same public-read S3 Maven repo as the jars, so no extra hosting is needed:
+//   https://repo.eternita.co/maven2/org/frontcache/frontcache-server/<v>/frontcache-server-<v>.zip
+// Release step:  ./gradlew dist && ./gradlew publish
+configure([project(':frontcache-server'), project(':frontcache-console')]) {
+	apply plugin: 'maven-publish'
+
+	def zipFile = tasks.named('distZip', Zip).flatMap { it.archiveFile }
+	def tarFile = tasks.named('distTar', Tar).flatMap { it.archiveFile }
+	def zipSha  = layout.buildDirectory.file("distributions/${project.name}-${project.version}.zip.sha256")
+	def tarSha  = layout.buildDirectory.file("distributions/${project.name}-${project.version}.tar.gz.sha256")
+
+	// Structural check on the assembled archive: complete, and free of build/runtime
+	// leftovers. Runs on every distZip so a broken bundle can't reach a release. A real
+	// boot test needs a JDK 25 runtime and a free port, so that lives in
+	// scripts/dist/smoke-test-dist.sh and is driven from the release checklist.
+	def isServer = project.name == 'frontcache-server'
+	def libPrefix = isServer ? 'server/lib/' : 'lib/'
+	def requiredEntries = isServer
+		? ['server/frontcache-base/webapps/ROOT.war', 'server/bin/frontcache', 'bin/frontcache',
+		   'server/frontcache-base/etc/keystore', 'FRONTCACHE_HOME/conf/frontcache.properties',
+		   'FRONTCACHE_HOME/conf/fc-logback.xml', 'FRONTCACHE_HOME/conf/guard-rules.conf',
+		   'README-INSTALL.md', 'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.txt']
+		: ['webapps/ROOT.war', 'bin/frontcache-console', 'conf/frontcache-console.conf',
+		   'conf/fc-logback.xml', 'README-INSTALL.md', 'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.txt']
+	def forbidden = ['.DS_Store', '._', 'frontcache-console.war', '.log', 'l2-lucene-index/', 'instance.id', 'frontcache.license']
+
+	// ---- third-party licenses -----------------------------------------------------
+	// THIRD-PARTY-NOTICES.txt at the bundle's root lists every library the bundle carries - the war's
+	// WEB-INF/lib (runtimeClasspath) and the launcher's lib/ (provided) - with the licenses its POM and
+	// manifest declare and the LICENSE / NOTICE files inside its jar, which is what redistributing an
+	// Apache-2.0 library asks of us. checkLicense fails `check`, and the bundle, when a library offers none
+	// of the licenses in gradle/license/allowed-licenses.json: a new dependency, or a version that changed
+	// its license, is a decision for a person, not something to find out from a customer's audit. A library
+	// under several licenses passes on any one of them (Jetty: EPL-2.0 or Apache-2.0).
+	apply plugin: 'com.github.jk1.dependency-license-report'
+	licenseReport {
+		configurations = ['runtimeClasspath', 'provided']
+		renderers = [new com.github.jk1.license.render.TextReportRenderer('THIRD-PARTY-NOTICES.txt')]
+		filters = [new com.github.jk1.license.filter.LicenseBundleNormalizer()]
+		allowedLicensesFile = rootProject.file('gradle/license/allowed-licenses.json')
+	}
+	tasks.named('check') { dependsOn 'checkLicense' }
+	distributions.main.contents {
+		from(rootProject.file('NOTICE'))
+		from(tasks.named('generateLicenseReport')) { include 'THIRD-PARTY-NOTICES.txt' }
+	}
+
+	// A Community bundle carries no Pro code: no class, services file, view or script of a Pro module, at
+	// any depth - in the war, in a jar in the war, in the launcher's lib/. The Pro modules are built in
+	// another repository, so this checks by name: their packages (org.frontcache.license and .warmer are
+	// split - BuildInfo and WarmRequest are the core's), the two plugin services files, and the jars.
+	def proPatterns = [~/^org\/frontcache\/pro\//, ~/^org\/frontcache\/console\/pro\//,
+			~/^org\/frontcache\/license\/(?!BuildInfo[.$])/, ~/^org\/frontcache\/warmer\/(?!WarmRequest[.$])/,
+			~/^META-INF\/services\/org\.frontcache\.(module\.FrontcacheModule|console\.plugin\.ConsolePlugin)$/,
+			~/(^|\/)frontcache-pro[^\/]*\.jar$/,
+			// the Pro console plugin's views and scripts, as a war or a plugin jar would carry them
+			~/(^|\/)WEB-INF\/views\/(license|cache_warmer)\.jsp$/, ~/(^|\/)(js\/fc-warmer|js\/fc-dashboard-cluster|css\/fc-warmer)\.(js|css)$/]
+
+	def verifyDist = tasks.register('verifyDist') {
+		group = 'distribution'
+		description = 'Assert the distribution archive is complete and carries no build/runtime leftovers'
+		dependsOn 'checkLicense'   // a bundle carrying a library under a license nobody accepted is not complete
+		inputs.file(zipFile)
+		outputs.upToDateWhen { false }
+		def archive = zipFile
+		def prefix = "${project.name}-${project.version}/"
+		doLast {
+			def file = archive.get().asFile
+			def sizes = [:]
+			new java.util.zip.ZipFile(file).withCloseable { zf ->
+				for (entry in zf.entries()) {
+					if (entry.name.startsWith(prefix)) {
+						sizes[entry.name.substring(prefix.length())] = entry.size
+					} else {
+						throw new GradleException("${file.name}: entry outside the '${prefix}' root: ${entry.name}")
+					}
+				}
+			}
+			def problems = []
+			requiredEntries.each { required ->
+				if (!sizes.containsKey(required)) problems << "missing: ${required}"
+			}
+			// only file entries: the empty logs/ and cache/l2-lucene-index/ directories ARE
+			// shipped (they show the layout); it is their contents that must never be.
+			def files = sizes.keySet().findAll { !it.endsWith('/') }
+			forbidden.each { bad ->
+				def hits = files.findAll { it.contains(bad) }
+				if (hits) problems << "must not be shipped (${bad}): ${hits.take(5)}"
+			}
+			def jars = sizes.keySet().findAll { it.startsWith(libPrefix) && it.endsWith('.jar') }
+			if (jars.size() < 15) problems << "only ${jars.size()} jar(s) under ${libPrefix} - launcher classpath looks incomplete"
+			if (!jars.any { it.contains('jetty-ee10-webapp-') }) problems << "no jetty-ee10-webapp jar under ${libPrefix}"
+			if (!jars.any { it.contains("${project.name}-${project.version}.jar") }) problems << "no ${project.name}-${project.version}.jar under ${libPrefix}"
+			def war = sizes.find { it.key.endsWith('ROOT.war') }
+			if (war && war.value < 100_000) problems << "${war.key} is only ${war.value} bytes - war looks empty"
+
+			def isPro = { String name ->
+				def n = name.replaceFirst(/^WEB-INF\/classes\//, '')
+				proPatterns.any { n =~ it }
+			}
+			def proFound = []
+			def scan
+			scan = { String where, InputStream ins ->
+				def zin = new java.util.zip.ZipInputStream(ins)
+				def e
+				while ((e = zin.getNextEntry()) != null) {
+					if (e.isDirectory()) continue
+					if (isPro(e.name)) proFound << "${where}!/${e.name}"
+					else if (e.name.endsWith('.jar') || e.name.endsWith('.war'))
+						scan("${where}!/${e.name}", new java.io.ByteArrayInputStream(zin.readAllBytes()))
+				}
+			}
+			new java.util.zip.ZipFile(file).withCloseable { zf ->
+				for (entry in zf.entries()) {
+					def rel = entry.name.substring(prefix.length())
+					if (entry.isDirectory()) continue
+					if (isPro(rel)) proFound << rel
+					else if (rel.endsWith('.jar') || rel.endsWith('.war'))
+						zf.getInputStream(entry).withCloseable { scan(rel, it) }
+				}
+			}
+			if (proFound) problems << "Pro code in a Community bundle: ${proFound.take(10)}${proFound.size() > 10 ? " and ${proFound.size() - 10} more" : ''}"
+
+			if (problems) {
+				throw new GradleException("${file.name} failed verification:\n  - " + problems.join('\n  - '))
+			}
+			logger.lifecycle("verifyDist: ${file.name} OK (${sizes.size()} entries, ${jars.size()} launcher jars, no Pro code)")
+		}
+	}
+	tasks.named('distZip') { finalizedBy verifyDist }
+
+	// Not wired into `build` - hashing two archives on every dev build is pointless.
+	// It runs from `dist` and, via builtBy below, from `publish`.
+	def distChecksums = tasks.register('distChecksums') {
+		group = 'distribution'
+		description = 'Write .sha256 files next to the distribution archives'
+		inputs.files(zipFile, tarFile)
+		outputs.files(zipSha, tarSha)
+		def pairs = [[zipFile, zipSha], [tarFile, tarSha]]
+		doLast {
+			pairs.each { srcProvider, outProvider ->
+				def src = srcProvider.get().asFile
+				def out = outProvider.get().asFile
+				def digest = java.security.MessageDigest.getInstance('SHA-256')
+				src.withInputStream { ins ->
+					byte[] buf = new byte[1 << 16]
+					int read
+					while ((read = ins.read(buf)) > 0) digest.update(buf, 0, read)
+				}
+				// same format shasum -c / sha256sum -c expect
+				out.text = digest.digest().encodeHex().toString() + '  ' + src.name + '\n'
+				logger.lifecycle("sha256: ${out.name}")
+			}
+		}
+	}
+
+	// The installer and the compose files ride along with the SERVER bundle's coordinates, so
+	// a customer needs exactly one place to look. They are checked-in scripts rather than build
+	// output, so they are published as classified artifacts with their own checksums.
+	//
+	//   frontcache-server-<v>-installer.sh        scripts/dist/install-frontcache.sh
+	//   frontcache-server-<v>-compose.yml         the compose project
+	//   frontcache-server-<v>-env.example         its .env template
+	//
+	// There used to be a fourth, frontcache-server-<v>-nginx-site.sh, which the installer fetched for
+	// --with-nginx. The nginx front door moved to the public repo's examples/front-door. Already-published
+	// versions of that artifact stay where they are; older installers keep resolving them.
+	def releaseAssets = isServer ? [
+		[file: rootProject.file('scripts/dist/install-frontcache.sh'),                classifier: 'installer',   extension: 'sh'],
+		[file: rootProject.file('scripts/docker/fc-server/docker-compose.yml'),        classifier: 'compose',     extension: 'yml'],
+		[file: rootProject.file('scripts/docker/fc-server/.env.example'),              classifier: 'env',         extension: 'example'],
+	] : []
+
+	// One .sha256 per asset, so `shasum -c` works on the installer too - it is a script the
+	// customer is about to run as root.
+	def assetChecksums = tasks.register('assetChecksums') {
+		group = 'distribution'
+		description = 'Write .sha256 files for the published release assets'
+		enabled = isServer
+		def assets = releaseAssets
+		def outDir = layout.buildDirectory.dir('release-assets')
+		def assetVersion = project.version.toString()
+		def assetName = { a -> "${project.name}-${assetVersion}-${a.classifier}.${a.extension}" }
+
+		inputs.files(assets.collect { it.file })
+		// The version is part of every OUTPUT FILE NAME but of no input, so it has to be
+		// declared explicitly - both as an input property and by naming the real output files
+		// rather than the directory holding them. Declaring only `outputs.dir(...)` made a
+		// version bump look up-to-date: the source scripts were unchanged and the directory
+		// still existed (full of the PREVIOUS version's files), so the task was skipped and
+		// publishing then failed on a .sha256 that had never been written.
+		inputs.property('version', assetVersion)
+		outputs.files(assets.collect { outDir.get().file("${assetName(it)}.sha256") })
+
+		doLast {
+			def dir = outDir.get().asFile
+			dir.mkdirs()
+			// drop any earlier version's checksums, so the directory only ever describes
+			// the version actually being built
+			dir.listFiles()?.each { f -> if (f.name.endsWith('.sha256') && !f.name.startsWith("${project.name}-${assetVersion}-")) f.delete() }
+			assets.each { asset ->
+				def digest = java.security.MessageDigest.getInstance('SHA-256')
+				asset.file.withInputStream { ins ->
+					byte[] buf = new byte[1 << 16]
+					int read
+					while ((read = ins.read(buf)) > 0) digest.update(buf, 0, read)
+				}
+				def name = assetName(asset)
+				new File(dir, "${name}.sha256").text =
+					digest.digest().encodeHex().toString() + '  ' + name + '\n'
+				logger.lifecycle("sha256: ${name}.sha256")
+			}
+		}
+	}
+
+	// Per-platform bundles with an embedded Java runtime (phase 4). They are produced by
+	// scripts/dist/build-runtime-bundles.sh, not by Gradle, because building them means
+	// downloading a JDK per target and running jlink on that target's platform (jlink cannot
+	// cross-link) - work that has no business inside a routine `./gradlew build`.
+	//
+	// Publishing them is therefore OPT-IN, so a release can never half-publish a platform:
+	//   ./scripts/dist/build-runtime-bundles.sh
+	//   ./gradlew publish -PwithRuntimeBundles
+	// The property makes the artifacts part of the publication; without it the publication is
+	// exactly what phases 1-3 produced.
+	def runtimeTargets = ['linux-x64', 'linux-aarch64', 'macos-aarch64']
+	def wantRuntimeBundles = project.hasProperty('withRuntimeBundles')
+
+	if (wantRuntimeBundles) {
+		def missing = runtimeTargets.collectMany { t ->
+			['tar.gz', 'zip'].collect { ext ->
+				layout.buildDirectory.file("distributions/${project.name}-${project.version}-${t}.${ext}").get().asFile
+			}
+		}.findAll { !it.exists() }
+		if (missing) {
+			throw new GradleException(
+				"-PwithRuntimeBundles was given but these are not built:\n  " +
+				missing.collect { it.name }.join('\n  ') +
+				"\nRun ./scripts/dist/build-runtime-bundles.sh first.")
+		}
+	}
+
+	publishing {
+		publications {
+			// The console's own classes as a library, org.frontcache:frontcache-console-classes - what a console
+			// plugin (the Pro one is the only one) compiles against: ConsolePlugin, NavEntry, the services and
+			// models it extends. The bundle below stays the console's distribution; this is not a way to run it.
+			if (!isServer) {
+				consoleClasses(MavenPublication) {
+					artifactId = 'frontcache-console-classes'
+					from components.java
+					pom {
+						name = "${project.group}:frontcache-console-classes"
+						description = 'Frontcache console classes - the API a console plugin compiles against'
+						url = 'https://github.com/eternita/frontcache'
+						licenses {
+							license {
+								name = rootProject.pomLicense.name
+								url  = rootProject.pomLicense.url
+								distribution = 'repo'
+							}
+						}
+					}
+				}
+			}
+			dist(MavenPublication) {
+				artifactId = project.name
+				artifact tasks.named('distZip')
+				artifact tasks.named('distTar')
+				artifact(zipSha) { extension = 'zip.sha256'; builtBy distChecksums }
+				artifact(tarSha) { extension = 'tar.gz.sha256'; builtBy distChecksums }
+
+				// classifier = the platform, so the coordinates read
+				// org.frontcache:frontcache-server:<v>:linux-x64@tar.gz
+				if (wantRuntimeBundles) {
+					runtimeTargets.each { t ->
+						['tar.gz', 'zip'].each { ext ->
+							artifact(layout.buildDirectory.file("distributions/${project.name}-${project.version}-${t}.${ext}")) {
+								classifier = t
+								extension  = ext
+							}
+							artifact(layout.buildDirectory.file("distributions/${project.name}-${project.version}-${t}.${ext}.sha256")) {
+								classifier = t
+								extension  = "${ext}.sha256"
+							}
+						}
+					}
+				}
+
+				releaseAssets.each { asset ->
+					artifact(asset.file) {
+						classifier = asset.classifier
+						extension  = asset.extension
+					}
+					artifact(layout.buildDirectory.file(
+							"release-assets/${project.name}-${project.version}-${asset.classifier}.${asset.extension}.sha256")) {
+						classifier = asset.classifier
+						extension  = "${asset.extension}.sha256"
+						builtBy assetChecksums
+					}
+				}
+				pom {
+					packaging = 'zip'
+					name = "${project.group}:${project.name}"
+					description = project.name == 'frontcache-server'
+						? 'Frontcache standalone server - reverse-proxy page fragment cache (binary distribution)'
+						: 'Frontcache console - realtime stats and cache management UI (binary distribution)'
+					url = 'https://github.com/eternita/frontcache'
+					licenses {
+						license {
+							name = rootProject.pomLicense.name
+							url  = rootProject.pomLicense.url
+							distribution = 'repo'
+						}
+					}
+					scm {
+						connection = 'scm:git:git://github.com/eternita/frontcache.git'
+						developerConnection = 'scm:git:ssh://github.com:eternita/frontcache.git'
+						url = 'https://github.com/eternita/frontcache/tree/master'
+					}
+				}
+			}
+		}
+		repositories {
+			rootProject.eternitaMaven(delegate)
+		}
+	}
+}
+
+// One command to build every downloadable artifact, for the release checklist.
+tasks.register('dist') {
+	group = 'distribution'
+	description = 'Build the server + console distribution archives and their checksums'
+	dependsOn ':frontcache-core:frontcacheHomeZip',
+	          ':frontcache-server:distZip', ':frontcache-server:distTar', ':frontcache-server:distChecksums',
+	          ':frontcache-server:assetChecksums',
+	          ':frontcache-console:distZip', ':frontcache-console:distTar', ':frontcache-console:distChecksums'
+}

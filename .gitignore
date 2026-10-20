@@ -1,7 +1,6 @@
 /.idea
 /.claude
 /_ignored
-CLAUDE.md
 
 # Build outputs and runtime state of the examples. None of this belongs in the repo: a fresh
 # clone should build its own, and a committed build/ leaves stale jars and Gradle report files
@@ -16,3 +15,50 @@ CLAUDE.md
 # dump of real production traffic. Regenerate it, never commit it. Saved reports in
 # benchmark/results/ are small text files and are worth keeping.
 /benchmark/requests/
+
+# ---- the product source (frontcache-core, -server, -console, -agent, -tests) ----
+/build/
+.gradle/
+/gradle.properties
+.DS_Store
+/target/
+/distribution/
+/**/target/
+/**/build/
+/frontcache-server/server/frontcache-base/webapps/
+/frontcache-server/server/lib/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/cache/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/logs/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/cache/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/logs/
+# the unit suite starts a real FrontCacheEngine against this home and leaves a Lucene index behind
+/frontcache-core/src/test/resources/fallback-home/cache/
+
+# Written at runtime, not by hand: fallbacks.conf gives fallback2.txt an init URL
+/frontcache-tests/FRONTCACHE_HOME_FILTER/fallbacks/fallback2.txt
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/fallbacks/fallback2.txt
+
+# set-config keeps the previous content as conf/<file>.backup-<timestamp> before it writes. The conf
+# dirs of both e2e homes ARE checked in, so without this a config-write test dirties the working tree.
+/frontcache-tests/FRONTCACHE_HOME_FILTER/conf/*.backup-*
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/conf/*.backup-*
+
+# The cache warmer's run state and failed-entry lists are written at runtime into the e2e homes'
+# warmer/ dirs, which are checked in (they hold warmer.sh)
+/frontcache-tests/FRONTCACHE_HOME_FILTER/warmer/.state/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/warmer/.state/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/warmer/*.failed-*.txt
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/warmer/*.failed-*.txt
+
+# Runtime state a node or console with the (separately distributed) Pro modules writes - its instance id
+# and usage log under FRONTCACHE_HOME/usage. A Community build writes none of it, but a Pro end-to-end run
+# uses these very homes. Never checked in - an instance id in git would be cloned into every checkout.
+/frontcache-server/FRONTCACHE_HOME/usage/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/usage/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/usage/
+/frontcache-core/src/test/resources/fallback-home/usage/
+/frontcache-console/usage/
+# Pro license files and signing keys - never anywhere near a repository.
+frontcache.license
+*.signing-key
+*.signing-key.pem

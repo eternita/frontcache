@@ -1,0 +1,138 @@
+/*
+ * Copyright 2018 Eternita
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.frontcache.tests.base;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import org.htmlunit.Page;
+import org.htmlunit.WebResponse;
+
+public abstract class FallbackAndTimeoutTests extends TestsBase {
+
+	public abstract String getFrontCacheBaseURLLocalhost();
+
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		// Fallbacks are now served with a 503 status (so downstream caches/CDNs don't retain them).
+		// Tell HtmlUnit not to throw on non-2xx so we can inspect the fallback response.
+		webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
+	}
+
+	@After
+	public void tearDown() throws Exception {
+		super.tearDown();
+	}
+
+	@Test
+	public void customTimeoutTest() throws Exception {
+		// page timeout 1500ms. command timeout - 3000ms, what is more than default 1000ms
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/resilience/a.jsp");
+		WebResponse webResponse = page.getWebResponse();
+		printHeaders(webResponse);
+		assertEquals("Hi from Resilience", webResponse.getContentAsString().trim());
+	}
+
+	@Test
+	public void timeoutFailTestLocalhost() throws Exception {
+		// page timeout more than the command timeout
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/resilience/b.jsp");
+		WebResponse webResponse = page.getWebResponse();
+		printHeaders(webResponse);
+
+		// "Default Fallabck for http://localhost:9080/common/resilience/b.jsp"
+		// "Default Fallabck for http://localhost:8080/common/resilience/b.jsp"
+		// difference in port number for Filter VS Standalone (8080 VS 9080)
+		String respStr = webResponse.getContentAsString();
+		assertNotEquals(-1, respStr.indexOf("Default Fallback"));
+		assertNotEquals(-1, respStr.indexOf("/common/resilience/b.jsp"));
+
+		// fallback must be a non-cacheable 503 so downstream caches/CDNs don't pin it
+		assertEquals(503, webResponse.getStatusCode());
+		assertNotEquals(-1, webResponse.getResponseHeaderValue("Cache-Control").indexOf("no-store"));
+	}
+
+
+	@Test
+	public void timeoutInsideIncludeTest() throws Exception {
+		// page timeout more than the command timeout
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/resilience/top1.jsp");
+		WebResponse webResponse = page.getWebResponse();
+		printHeaders(webResponse);
+
+		// difference in port number for Filter VS Standalone (9080 VS 8080)
+		String respStr = webResponse.getContentAsString();
+		assertNotEquals(-1, respStr.indexOf("top")); // from main page
+		assertNotEquals(-1, respStr.indexOf("inc11")); // successful include #1
+		assertNotEquals(-1, respStr.indexOf("Default Fallback")); // default fallback for include #2
+		assertNotEquals(-1, respStr.indexOf("/common/resilience/inc12.jsp")); // default fallback for include #2
+
+		// a fallback on a nested include must NOT turn the parent page into a 503 - the page rendered fine
+		assertEquals(200, webResponse.getStatusCode());
+	}
+
+	@Test
+	public void customFallbackTest1Localhost() throws Exception {
+		// page timeout more than the command timeout
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/resilience/fallback1.jsp");
+		WebResponse webResponse = page.getWebResponse();
+		printHeaders(webResponse);
+
+		assertEquals("Hi from custom fallback localhost", webResponse.getContentAsString());
+		// custom (file-based) fallbacks are non-cacheable 503 too
+		assertEquals(503, webResponse.getStatusCode());
+	}
+
+
+	@Test
+	public void customFallbackTest2LoadFromURLLocalhost() throws Exception {
+		// cleanup is in @BeforeClass
+		// wait while server is started and fallbacks are loaded from URLs (they are loaded in separate thread during startup)
+		// so, it's possible state (server is started but fallback configs are not loaded yet)
+
+		// this wait time should be more than
+		// before
+		// FallbackResolverFactory.init(httpClient);
+		// in FrontCacheEngine
+
+		Thread.sleep(5000);
+
+		// page timeout more than the command timeout
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/resilience/fallback2.jsp");
+		WebResponse webResponse = page.getWebResponse();
+		printHeaders(webResponse);
+
+		assertEquals("Hi from custom fallback (loaded from URL)", webResponse.getContentAsString());
+	}
+
+
+	@Test
+	public void customFallbackTest3URLPatternLocalhost() throws Exception {
+		// page timeout more than the command timeout
+		Page page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/resilience/fallback3-pattern.jsp");
+		WebResponse webResponse = page.getWebResponse();
+		printHeaders(webResponse);
+
+		assertEquals("Hi from custom fallback localhost", webResponse.getContentAsString());
+	}
+
+
+}

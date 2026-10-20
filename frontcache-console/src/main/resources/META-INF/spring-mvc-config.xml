@@ -1,0 +1,22 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xsi:schemaLocation="
+        http://www.springframework.org/schema/beans     
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/mvc 
+        http://www.springframework.org/schema/mvc/spring-mvc.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd ">
+ 
+	<!-- Console plugins' controllers come in through WebMVCConfig's @Import. A plugin class that also
+	     sits in a scanned package is still ONE bean: Spring keeps the scanned definition and ignores the
+	     import of a class it already has (ConsolePluginWiringTest). -->
+	<context:component-scan base-package="org.frontcache.console.config" />
+	<context:component-scan base-package="org.frontcache.console.web.controllers" />
+
+	<!-- /resources/** used to serve the vendored Netflix dashboard assets, deleted in 2.7.
+	     Everything the console serves now lives under /static/** (WebMVCConfig). -->
+
+</beans>

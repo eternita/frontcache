@@ -1,0 +1,58 @@
+Frontcache
+Copyright 2018-2026 Eternita
+
+This product includes software developed by Eternita (https://www.eternita.co/)
+and the Frontcache contributors, licensed under the Apache License, Version 2.0
+(see LICENSE).
+
+Frontcache Pro - additional modules that plug into a Frontcache node and
+console - is NOT part of this source tree or of any distribution built from it,
+and is NOT covered by the Apache License. It is proprietary and licensed only
+under the Frontcache Pro License Agreement.
+
+--------------------------------------------------------------------------------
+Third-party material in the Frontcache source tree
+--------------------------------------------------------------------------------
+
+frontcache-server/bin/frontcache (bin/frontcache in the server distribution)
+    is derived from an Apache Tomcat launcher script and keeps its header.
+    Apache Tomcat
+    Copyright The Apache Software Foundation
+    This product includes software developed at
+    The Apache Software Foundation (https://www.apache.org/).
+    Licensed under the Apache License, Version 2.0.
+
+frontcache-console/src/main/webapp/WEB-INF/static/
+    css/bootstrap*.css, css/style.css, js/bootstrap*.js
+        Bootstrap v3.3.6 (https://getbootstrap.com)
+        Copyright 2011-2015 Twitter, Inc.
+        Licensed under the MIT License.
+    js/min.js
+        jQuery v2.1.1 (https://jquery.com)
+        Copyright 2005, 2014 jQuery Foundation, Inc. and other contributors
+        Licensed under the MIT License (https://jquery.org/license).
+
+frontcache-tests/src/main/webapp/common/static-read/jquery.js
+    (end-to-end test page only; in no distribution)
+        jQuery v1.2.6 (https://jquery.com)
+        Copyright 2008 John Resig
+        Licensed under the MIT License.
+
+gradlew, gradlew.bat, gradle/wrapper/gradle-wrapper.jar
+    (build tooling; in no distribution)
+        Gradle Wrapper
+        Copyright the original author or authors (Gradle, Inc.)
+        Licensed under the Apache License, Version 2.0.
+
+--------------------------------------------------------------------------------
+Third-party libraries in the Frontcache distributions
+--------------------------------------------------------------------------------
+
+The server and console distributions bundle third-party libraries (Eclipse
+Jetty, Apache Lucene, Ehcache, Apache HttpComponents, Resilience4j, Micrometer,
+Jackson, Gson, Spring Framework, logback and others). Each is listed, with its
+license and the license and notice files it ships, in THIRD-PARTY-NOTICES.txt at
+the root of the distribution; the build refuses a distribution that bundles a
+library offering none of Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause or EPL-2.0.
+The server distribution also carries Eclipse Jetty's own notice and license in
+server/notice.html and server/license-eplv10-aslv20.html.

@@ -1,0 +1,202 @@
+/*
+ * Copyright 2018 Eternita
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.frontcache.cache.impl;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.frontcache.cache.CacheProcessor;
+import org.frontcache.cache.CacheStats;
+import org.frontcache.cache.FcCacheMetrics;
+import org.frontcache.cache.CacheProcessorBase;
+import org.frontcache.core.WebResponse;
+
+public class InMemoryCacheProcessor extends CacheProcessorBase implements CacheProcessor {
+
+
+	private Map<String, WebResponse> cache = new ConcurrentHashMap<String, WebResponse>();
+
+	private int currentSize = 0;
+	private int maxSize = 0;
+
+	@Override
+	public void init(Properties properties) {
+		Objects.requireNonNull(properties, "Properties should not be null");
+		super.init(properties);
+
+		try
+		{
+			String maxSizeStr = properties.getProperty("front-cache.cache-processor.impl.in-memory.maxsize");
+			String countStr = maxSizeStr;
+
+			if (null == maxSizeStr)
+			{
+				logger.info("front-cache.cache-processor.impl.in-memory.maxsize is not defined. Please define");
+				logger.info("max cache size is " + maxSize);
+				return;
+			}
+
+			if (maxSizeStr.endsWith("G"))
+			{
+				countStr = maxSizeStr.substring(0, maxSizeStr.indexOf("G"));
+				maxSize = Integer.parseInt(countStr)  * 1024 * 1024 * 1024;
+			} else if (maxSizeStr.endsWith("M")) {
+				countStr = maxSizeStr.substring(0, maxSizeStr.indexOf("M"));
+				maxSize = Integer.parseInt(countStr)  * 1024 * 1024;
+			} else if (maxSizeStr.endsWith("K")) {
+				countStr = maxSizeStr.substring(0, maxSizeStr.indexOf("K"));
+				maxSize = Integer.parseInt(countStr)  * 1024;
+			} else {
+				maxSize = Integer.parseInt(countStr);
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+		logger.info("max cache size is " + maxSize);
+	}
+
+	@Override
+	public void putToCacheImpl(String url, WebResponse component) {
+
+		int newSize = currentSize + component.getContent().length;
+		if (newSize < maxSize)
+		{
+			cache.put(url, component);
+			currentSize = newSize;
+		} else {
+			logger.info("web component is not cached - max cache size " + maxSize + " is reached");
+		}
+
+		return;
+	}
+
+	@Override
+	public WebResponse getFromCacheImpl(String url) {
+
+		WebResponse comp = cache.get(url);
+
+		// This processor has one tier, and it is in memory - so its hits are L1 hits, and the exported
+		// series stay comparable across cache-processor implementations.
+		FcCacheMetrics.recordHitOrMiss(comp, FcCacheMetrics.Outcome.HIT_L1);
+
+		if (null == comp)
+			return null;
+
+		return comp;
+	}
+
+	@Override
+	public void destroy() {
+		super.destroy();
+		cache.clear();
+
+		return;
+	}
+
+	@Override
+	public void removeFromCache(String filter) {
+
+		List<String> removeList = new ArrayList<String>();
+
+		for(String key : cache.keySet())
+		{
+			if (-1 < key.indexOf(filter))
+				removeList.add(key);
+		}
+
+		for(String key : removeList)
+			cache.remove(key);
+
+		return;
+	}
+
+	@Override
+	public void removeFromCacheAll() {
+		cache.clear();
+	}
+
+	/**
+	 * One tier, in memory, so only the L1 entry count is real. Evictions are not tracked by this
+	 * processor and there is no on-disk tier - both stay UNKNOWN rather than being reported as zero,
+	 * so nobody alerts on a flat line that means "not measured".
+	 */
+	@Override
+	public CacheStats getCacheStats() {
+		return new CacheStats(cache.size(), CacheStats.UNKNOWN, CacheStats.UNKNOWN, CacheStats.UNKNOWN);
+	}
+
+	@Override
+	public Map<String, String> getCacheStatus() {
+		Map<String, String> status = super.getCacheStatus();
+
+		status.put("impl", this.getClass().getName());
+
+		status.put(CacheProcessor.CACHED_ENTRIES, "" + cache.keySet().size());
+
+		status.put("current size", "" + currentSize);
+
+		status.put("max size", "" + maxSize);
+
+		return status;
+	}
+
+	@Override
+	public List<String> getCachedKeys() {
+		List<String> keys = new ArrayList<String>();
+		keys.addAll(cache.keySet());
+		return keys;
+	}
+
+	@Override
+	public void patch() {
+		// TODO Auto-generated method stub
+
+	}
+
+	/**
+	 * Removes entries whose effective expiration timestamp is in the past.
+	 * "Cache forever" entries are never removed.
+	 */
+	@Override
+	public void purge() {
+
+		long now = System.currentTimeMillis();
+		List<String> removeList = new ArrayList<String>();
+		for (Map.Entry<String, WebResponse> entry : cache.entrySet())
+		{
+			long expireTimeMillis = entry.getValue().getExpireTimeMillis();
+			if (CacheProcessor.CACHE_FOREVER == expireTimeMillis)
+				continue;
+
+			if (expireTimeMillis < now)
+				removeList.add(entry.getKey());
+		}
+
+		for (String key : removeList)
+			cache.remove(key);
+
+		logger.info("purge() removed {} expired entries", removeList.size());
+	}
+
+}
+
+
+

@@ -1,0 +1,39 @@
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../config/ehcache.xsd">
+
+	<!--
+	  L1 is the in-memory tier. A page fragment lands here only when it asks to, with
+	  x-frontcache-component-cache-level: L1; everything else goes to L2 (the Lucene index).
+
+	  overflowToDisk is OFF, and that is the important part of this file.
+
+	  It used to be on, with diskStore path="/tmp". An entry evicted from memory was then
+	  JAVA-SERIALIZED into Ehcache's own disk store: a second, slower, differently-formatted
+	  on-disk cache sitting underneath an L2 Lucene index whose entire job is to be the disk
+	  tier. Combined with eternal="true" and no maxElementsOnDisk, that store grew without
+	  bound, in /tmp, which on many hosts is a tmpfs (so it was really RAM) and on all of them
+	  is subject to being cleaned out from under the process. It also made purge() expensive:
+	  scanning L1 for expired entries faulted every overflowed entry back off disk to read it.
+
+	  Now an entry that does not fit is simply evicted. L2 still has it, or the origin does.
+
+	  On sizing: maxElementsInMemory is a COUNT, and page fragments vary in size by orders of
+	  magnitude, so a count cannot strictly bound heap. Ehcache's byte based sizing
+	  (maxBytesLocalHeap) would, but it is NOT USABLE on this runtime: its SizeOf engine walks
+	  the object graph by reflection and fails on Java 17+ with
+	  "InaccessibleObjectException: module java.base does not open java.util", which could only
+	  be worked around by adding an add-opens flag to every deployment's JVM arguments.
+
+	  So: a count, raised from 100 (small enough that any site with more than a hundred
+	  L1-marked fragments thrashed) to 1000, plus an explicit way to check the real number.
+	  Frontcache tracks L1's actual content bytes itself (see L1ByteCounter) and exports it as
+	  frontcache_cache_content_bytes{tier="L1"}. Watch that gauge and set this count to suit the
+	  fragment sizes the site actually caches.
+	-->
+	<cache name="FRONT_CACHE"
+	   maxElementsInMemory="1000"
+	   eternal="true"
+	   overflowToDisk="false"
+	   memoryStoreEvictionPolicy="LFU"
+	    />
+
+</ehcache>

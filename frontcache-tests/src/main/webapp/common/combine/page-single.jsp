@@ -1,0 +1,1 @@
+<%@ taglib uri="http://frontcache.org/core" prefix="fc" %><fc:include url="/common/combine/cell?id=1" /><fc:include url="/common/combine/cell?id=2" /><fc:include url="/common/combine/cell?id=3" />
