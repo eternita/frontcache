@@ -1,0 +1,65 @@
+# The build and both test suites, on every push to main and every pull request. Nothing here publishes:
+# releases are cut by hand (the release steps publish to repo.eternita.co with credentials CI does not hold).
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build, unit tests, bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      # node runs the console's JavaScript tests; without it `check` skips them rather than failing
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: gradle/actions/setup-gradle@v4
+      # compile, unit tests, license headers, third-party licenses
+      - run: ./gradlew build
+      # the server and console bundles; verifyDist runs on each (complete, no leftovers, no Pro code)
+      - run: ./gradlew dist
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: '**/build/reports/'
+          retention-days: 7
+
+  e2e:
+    name: end-to-end suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      # starts the two embedded Jetty nodes (:8080, :9080) and the console (:7090), runs the suite, stops them
+      - run: ./tests.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports
+          path: |
+            frontcache-tests/build/reports/
+            frontcache-tests/FRONTCACHE_HOME_*/logs/
+          retention-days: 7

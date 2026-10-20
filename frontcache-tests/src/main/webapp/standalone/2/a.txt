@@ -1,0 +1,1 @@
+a<fc:include url="/standalone/2/b.txt" />

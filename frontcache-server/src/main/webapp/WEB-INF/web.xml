@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee" 
+         xmlns:web="http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+         version="3.1" xmlns="http://xmlns.jcp.org/xml/ns/javaee">
+             
+	<display-name>frontcache-standalone</display-name>
+	<description>frontcache-standalone</description>
+
+    <servlet>
+        <servlet-name>FrontCacheServlet</servlet-name>
+        <servlet-class>org.frontcache.FrontCacheServlet</servlet-class>
+    </servlet>
+
+    <servlet>
+        <servlet-name>FrontCacheIOServlet</servlet-name>
+        <servlet-class>org.frontcache.io.FrontCacheIOServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>FrontCacheServlet</servlet-name>
+        <url-pattern>/*</url-pattern>
+    </servlet-mapping>
+	
+    <servlet-mapping>
+        <servlet-name>FrontCacheIOServlet</servlet-name>
+        <url-pattern>/frontcache-io</url-pattern>
+    </servlet-mapping>
+
+    <!-- The dashboard SSE stream. Two url-patterns, one servlet: /hystrix.stream is the pre-2.7 path
+         and is kept indefinitely, because reverse-proxy no-buffering rules, guard rules and any
+         external Turbine name it and we cannot edit those from here. -->
+    <servlet>
+        <description></description>
+        <display-name>FcDashboardStreamServlet</display-name>
+        <servlet-name>FcDashboardStreamServlet</servlet-name>
+        <servlet-class>org.frontcache.resilience.stream.FcDashboardStreamServlet</servlet-class>
+        <!-- Required: the stream runs on Servlet 3.1 async so a dashboard viewer does not hold a
+             container thread. Without this the container refuses startAsync() outright. -->
+        <async-supported>true</async-supported>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>FcDashboardStreamServlet</servlet-name>
+        <url-pattern>/fc-dashboard.stream</url-pattern>
+        <url-pattern>/hystrix.stream</url-pattern>
+    </servlet-mapping>
+
+    <!-- Prometheus scrape. Serves nothing unless front-cache.metrics.export enables it, and requires
+         this node's front-cache.api-key when one is configured. -->
+    <servlet>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <servlet-class>org.frontcache.metrics.FcMetricsServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>FcMetricsServlet</servlet-name>
+        <url-pattern>/fc-metrics</url-pattern>
+    </servlet-mapping>
+
+    <!-- session timeout: 1 year (365 * 24 * 60 = 525600 minutes) -->
+    <session-config>
+        <session-timeout>525600</session-timeout>
+    </session-config>
+
+</web-app>
