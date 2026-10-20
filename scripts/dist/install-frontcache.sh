@@ -4,7 +4,7 @@
 #
 # Runs ON THE TARGET MACHINE. It needs no repo checkout, no Gradle and no ssh - it downloads
 # the release archive, verifies its checksum, and installs it as a systemd service. This is
-# the customer path; scripts/bash/deploy-dev-build-remote.sh is the developer's
+# the customer path; scripts/dev/deploy-build-remote.sh is the developer's
 # push-from-my-laptop tool and is not this.
 #
 # Download it, check it, then run it - deliberately NOT `curl | sudo bash`, because the
