@@ -43,7 +43,9 @@ Java 25 (via a toolchain: `languageVersion = JavaLanguageVersion.of(25)` and `op
 
 **Never invent a version number.** A change lands in the version `version.properties` currently names — there is no "next release" to label it with. This applies to prose *and* to code: a javadoc saying "as of 2.11", a config comment saying "the pre-2.11 behaviour", a JSP comment saying "an edge older than 2.11". Those spellings are how the fiction spreads, and it is expensive to unwind — it once cost a full sweep of 26 files after work had been labelled two versions ahead of what `version.properties` said.
 
-**Do not bump `version.properties` as a side effect.** Cutting a release is a deliberate act: the bump, a new `docs/release-notes/<new version>.md`, and the previous file frozen as history. A release is cut here and in the Pro repository at once, at the same version. Only do it when asked.
+**Between releases the version is a release candidate: `version.properties` names `<next>-RC`** (e.g. `2.11.0-RC`), and so its note is `docs/release-notes/<next>-RC.md`. The suffix is in the version, the note's file name and its title only — the note's body, javadoc and comments name the release itself ("a 2.11.0 node", "as of 2.11.0"), never the `-RC`, because they must stay true once it is released. Releasing drops the suffix (the version, and the note's name and title); right after, the next cycle opens as the next `-RC` with a new, empty note, and the released note is frozen as history.
+
+**Do not bump `version.properties` as a side effect.** Cutting a release — dropping `-RC` — and opening the next candidate are deliberate acts, done here and in the Pro repository at once, at the same version, and only when asked.
 
 ## Modules
 
