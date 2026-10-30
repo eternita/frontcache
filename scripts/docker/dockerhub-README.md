@@ -22,7 +22,7 @@ docker run -d --name frontcache --restart unless-stopped \
   -p 9080:9080 \
   -e ORIGIN_HOST=your-origin.example.com \
   -v /srv/frontcache/conf:/opt/frontcache-server/FRONTCACHE_HOME/conf \
-  pavlikovskiy/frontcache-server:2.9.0
+  pavlikovskiy/frontcache-server:2.11.0
 ```
 
 Frontcache serves **plain HTTP on 9080 and terminates no TLS.** Whatever fronts it owns 80/443 —
@@ -34,8 +34,8 @@ https://github.com/eternita/frontcache/tree/master/examples/front-door.
 
 | Tag | |
 | --- | --- |
-| `2.9.0`, `2.9` | the release, and its patch-tracking alias |
-| `latest` | currently 2.9.0 |
+| `2.11.0`, `2.11` | the release, and its patch-tracking alias |
+| `latest` | currently 2.11.0 |
 | `*-slim` | **not published since 2.6.0.** The plain tag is what `-slim` was; the `-slim` tags through 2.6.0 stay where they are |
 
 Multi-arch (`linux/amd64`, `linux/arm64`). Pin an exact version.
@@ -82,4 +82,5 @@ Frontcache is licensed under the Apache License 2.0. Each image carries the dist
 are under their own licenses.
 
 Frontcache Pro — the cache warmer, the cluster view and, to come, RBAC, SSO and an audit log — is
-available under a commercial license: https://www.eternita.co/frontcache-license.html
+available under a commercial license: https://www.eternita.co/frontcache-license.html. Since 2.11.0
+the cache warmer and the cluster view are no longer in these images; they ship only with Pro.

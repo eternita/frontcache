@@ -8,6 +8,7 @@ do, and what deliberately kept its old name so you do not have to do anything.
 
 | Release | What is in it | Do you have to do anything? |
 | --- | --- | --- |
+| **[2.11.0](2.11.0.md)** | Frontcache is **open source, Apache-2.0**; an **edge token** lets a second-layer node refuse traffic that skipped its edge; `action=reload` **no longer takes the node down**; a guard redirect can target **the same path on another host**; the **cache warmer** and the console's **cluster rate** left the Community bundles | **No, unless you use the cache warmer or `frontcache.console.clusters`** — both are gone from the Community bundles. Nothing changed on the wire or in a config file, and there is no cache flush |
 | **[2.10.0](2.10.0.md)** | A **cache warmer** on the node, run from the console's new **Cache → Cache Warmer** screen; the realtime monitor shows a **cluster's total rate** on every card; the request log **names the `bots.conf` rule** behind each client type; the per-platform bundles report **JVM CPU** again; the console acts only on **its own edges** | **No, unless you parse the request logs by position.** One column is inserted after the client type, so the user-agent and everything after it move right by one. No cache flush, no config change on any node |
 | **[2.9.0](2.9.0.md)** | The management API's key is renamed `site-key` → `api-key`; the **console authenticates**; `conf/bots.conf` takes **rules**, not just keywords; **a TTL per visitor type**; includes are fetched from the **origin**, not back through the edge | **Yes, and two of them are silent.** Rename `front-cache.site-key` to `front-cache.api-key` on every node and **flush the cache once**. The console fails loudly until its `siteKey` becomes `apiKey`; a node with the old key name just runs with no key at all. Pages using `browser` as a client type need `guest` |
 | **[2.8.0](2.8.0.md)** | Apache HttpClient 5; **per-IP rate limiting** as a guard rule; **combining `<fc:include>` fragments into one origin call** | Drop-in for a stock deployment. Two behaviour changes apply to everyone (guard rejections now send `Cache-Control: no-store`; a bypassed response in filter mode keeps its status). One source edit per method if you implement `CacheProcessor`, `IncludeProcessor` or `FallbackResolver` |
@@ -30,6 +31,8 @@ release's grace periods are written against the one before it. In particular:
   time and are never re-cached.
 - **2.9.x → 2.10.0 needs nothing on the wire or in the cache** — nodes and console upgrade in either
   order. Check any positional parser of `logs/frontcache-requests.log` first.
+- **2.10.x → 2.11.0 needs nothing on the wire or in the cache** either. The cache warmer screen and
+  the console's cluster line are no longer in the Community bundles: decide about them first.
 
 What kept its pre-2.7 name indefinitely — `/hystrix.stream`, the `hystrix.command.*` /
 `hystrix.threadpool.*` property prefixes, and the JSON type literals the dashboard dispatches on —
