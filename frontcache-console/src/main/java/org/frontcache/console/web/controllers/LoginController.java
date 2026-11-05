@@ -151,11 +151,13 @@ public class LoginController {
 	/**
 	 * Starts SSO: a fresh PRE-AUTH session - two minutes, no principal, so the filter never takes it for a signed-in
 	 * one - in which the provider keeps the flow's state, then the identity provider. 404 without a provider: the
-	 * path is anonymous (a fixed entry in the filter's set), and must not be a page that does nothing.
+	 * path is anonymous (a fixed entry in the filter's set), and must not be a page that does nothing. A provider that
+	 * cannot start ({@code ConsoleSsoException} out of {@code begin}: its identity provider unreachable) gets the login
+	 * page with its message, and the pre-auth session ends.
 	 */
 	@ConsolePermit(ConsolePermissions.ANONYMOUS)
 	@RequestMapping(value = "/login/sso", method = RequestMethod.GET)
-	public String startSso(HttpServletRequest request) {
+	public String startSso(HttpServletRequest request, ModelMap model) {
 
 		ConsoleSsoProvider sso = security.sso().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
@@ -170,7 +172,18 @@ public class LoginController {
 		preAuth.setMaxInactiveInterval(PRE_AUTH_SECONDS);
 		preAuth.setAttribute(PRE_AUTH_ATTRIBUTE, Boolean.TRUE);
 
-		URI identityProvider = sso.begin(request, preAuth, safeTarget(request.getParameter("next")));
+		String next = safeTarget(request.getParameter("next"));
+		URI identityProvider;
+		try {
+			identityProvider = sso.begin(request, preAuth, next);
+		} catch (ConsoleSsoProvider.ConsoleSsoException cannot) {
+			logger.warn("SSO sign-in could not start: {}", cannot.getMessage());
+			invalidate(preAuth);
+			model.put("error", cannot.getMessage());
+			model.put("next", next);
+			putSignInOptions(model);
+			return "login";
+		}
 
 		return "redirect:" + identityProvider.toString();
 	}

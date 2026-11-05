@@ -40,6 +40,8 @@ public interface ConsoleSsoProvider {
 	 * @param preAuth the new pre-auth session, to keep the flow's state in
 	 * @param next    where to go after sign-in - already validated as a relative console path
 	 * @return where to send the browser
+	 * @throws ConsoleSsoException when the sign-in cannot start (the identity provider cannot be asked) - the message
+	 *         is shown on the login page and the pre-auth session ends
 	 */
 	URI begin(HttpServletRequest request, HttpSession preAuth, String next);
 

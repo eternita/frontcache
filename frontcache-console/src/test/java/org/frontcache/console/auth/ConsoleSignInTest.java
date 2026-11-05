@@ -95,8 +95,12 @@ public class ConsoleSignInTest {
 			return "Example IdP";
 		}
 
+		boolean down;
+
 		@Override
 		public URI begin(HttpServletRequest request, HttpSession preAuth, String next) {
+			if (down)
+				throw new ConsoleSsoException("The identity provider could not be reached - try again in a minute.");
 			preAuth.setAttribute("next", next);
 			return URI.create("https://idp.example.com/authorize?state=s1");
 		}
@@ -287,7 +291,7 @@ public class ConsoleSignInTest {
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/sso");
 		request.setParameter("next", "//evil.example.com/");
 
-		String view = LoginControllerAccess.controller(security).startSso(request);
+		String view = LoginControllerAccess.controller(security).startSso(request, new ModelMap());
 
 		assertEquals("redirect:https://idp.example.com/authorize?state=s1", view);
 		HttpSession preAuth = request.getSession(false);
@@ -301,7 +305,7 @@ public class ConsoleSignInTest {
 	public void aSuccessfulCallbackReplacesThePreAuthSession() {
 		MockHttpServletRequest start = new MockHttpServletRequest("GET", "/login/sso");
 		start.setParameter("next", "/cache-invalidation");
-		LoginControllerAccess.controller(security).startSso(start);
+		LoginControllerAccess.controller(security).startSso(start, new ModelMap());
 		MockHttpSession preAuth = (MockHttpSession) start.getSession(false);
 
 		MockHttpServletRequest callback = new MockHttpServletRequest("GET", "/login/sso/callback");
@@ -321,7 +325,7 @@ public class ConsoleSignInTest {
 	@Test
 	public void aRefusedCallbackSaysWhyAndLeavesNoSession() {
 		MockHttpServletRequest start = new MockHttpServletRequest("GET", "/login/sso");
-		LoginControllerAccess.controller(security).startSso(start);
+		LoginControllerAccess.controller(security).startSso(start, new ModelMap());
 		MockHttpSession preAuth = (MockHttpSession) start.getSession(false);
 
 		MockHttpServletRequest callback = new MockHttpServletRequest("GET", "/login/sso/callback");
@@ -350,13 +354,27 @@ public class ConsoleSignInTest {
 	}
 
 	@Test
+	public void anSsoThatCannotStartShowsTheLoginPageAndKeepsNoSession() {
+		sso.down = true;
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/sso");
+		request.setParameter("next", "/realtime");
+		ModelMap model = new ModelMap();
+
+		assertEquals("login", LoginControllerAccess.controller(security).startSso(request, model));
+		assertEquals("The identity provider could not be reached - try again in a minute.", model.get("error"));
+		assertEquals("/realtime", model.get("next"));
+		assertEquals("Example IdP", model.get("ssoLabel"));
+		assertNull("the pre-auth session ended", request.getSession(false));
+	}
+
+	@Test
 	public void withNoSsoProviderBothPathsAre404() {
 		FrontcacheService service = Mockito.mock(FrontcacheService.class);
 		when(service.isAuthEnabled()).thenReturn(true);
 		ConsoleSecurity noSso = ConsoleSecurity.defaults(service);
 
 		ResponseStatusException start = assertThrows(ResponseStatusException.class,
-				() -> LoginControllerAccess.controller(noSso).startSso(new MockHttpServletRequest("GET", "/login/sso")));
+				() -> LoginControllerAccess.controller(noSso).startSso(new MockHttpServletRequest("GET", "/login/sso"), new ModelMap()));
 		assertEquals(404, start.getStatusCode().value());
 		assertThrows(ResponseStatusException.class, () -> LoginControllerAccess.controller(noSso)
 				.completeSso(new MockHttpServletRequest("GET", "/login/sso/callback"), new ModelMap()));
