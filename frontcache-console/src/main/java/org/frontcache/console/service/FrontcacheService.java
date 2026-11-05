@@ -580,6 +580,33 @@ public class FrontcacheService {
 	private static final String CONFIG_EDITING_KEY = "config-editing";
 
 	/**
+	 * Whether the Edges screen may add and remove edges, as of 2.12.0. Default true; false for a
+	 * console whose edge list is decided elsewhere - a deployment that renders {@code urls} from its
+	 * own inventory, where an edge added by hand would be monitored, sent the API key and then silently
+	 * dropped at the next restart. It also stops {@code /} adding a local edge by itself on a console
+	 * with none.
+	 *
+	 * Not forced off without credentials, unlike {@link #isConfigEditingEnabled()}: the list is the
+	 * console's own state, and {@link #configuredEdgeClient} already keeps the API key to the edges in
+	 * it.
+	 */
+	public boolean isEdgeEditingEnabled() {
+		return edgeEditingEnabled(fcConsoleConfig);
+	}
+
+	/** The decision half of {@link #isEdgeEditingEnabled()}, testable without a config file. */
+	static boolean edgeEditingEnabled(Config config) {
+
+		if (null != config && config.hasPath(EDGE_EDITING_KEY))
+			return config.getBoolean(EDGE_EDITING_KEY);
+
+		return true;
+	}
+
+	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
+	private static final String EDGE_EDITING_KEY = "edge-editing";
+
+	/**
 	 * A client for {@code edgeURL} - but only when it is one of this console's configured edges, and
 	 * then built from the CONFIGURED spelling, not the caller's.
 	 *
@@ -845,13 +872,14 @@ public class FrontcacheService {
 		return frontcacheAgentURLs.size();
 	}
 
+	/** Nothing when {@link #isEdgeEditingEnabled()} is off - the controller says so, this keeps it so. */
 	public void addEdge(String edge) {
-		if (null != edge)
+		if (null != edge && isEdgeEditingEnabled())
 			frontcacheAgentURLs.add(edge);
 	}
 
 	public void removeEdge(String edge) {
-		if (null != edge)
+		if (null != edge && isEdgeEditingEnabled())
 			frontcacheAgentURLs.remove(edge);
 	}
 

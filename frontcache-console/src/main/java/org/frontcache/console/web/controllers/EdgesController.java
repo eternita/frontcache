@@ -15,11 +15,13 @@
  */
 package org.frontcache.console.web.controllers;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.service.FrontcacheService;
@@ -47,6 +49,7 @@ public class EdgesController {
 	    		return t1.getName().compareTo(t2.getName());
 		    }});
 		model.put("edges", edges);
+		model.put("edgeEditingEnabled", frontcacheService.isEdgeEditingEnabled());
 
 		return "edges";
 	}
@@ -59,7 +62,10 @@ public class EdgesController {
 	 * check at all.
 	 */
 	@RequestMapping(value = "/add-edge", method = RequestMethod.POST)
-	public String addEdge(HttpServletRequest request) {
+	public String addEdge(HttpServletRequest request, HttpServletResponse response) throws IOException {
+		if (!frontcacheService.isEdgeEditingEnabled())
+			return refuse(response);
+
 		String edges = request.getParameter("edges");
 		if (null == edges)
 			return "redirect:edges";
@@ -76,10 +82,19 @@ public class EdgesController {
 
 	/** POST for the same reason as {@link #addEdge} - it removes an edge from the console. */
 	@RequestMapping(value = "/remove-edge", method = RequestMethod.POST)
-	public String removeEdge(HttpServletRequest request) {
+	public String removeEdge(HttpServletRequest request, HttpServletResponse response) throws IOException {
+		if (!frontcacheService.isEdgeEditingEnabled())
+			return refuse(response);
+
 		String edge = request.getParameter("edge");
 		frontcacheService.removeEdge(edge);
 		return "redirect:edges";
+	}
+
+	/** {@code edge-editing = false}: the list is decided where the console's config is written. */
+	private String refuse(HttpServletResponse response) throws IOException {
+		response.sendError(HttpServletResponse.SC_FORBIDDEN, "edge editing is disabled on this console");
+		return null;
 	}
 
 }

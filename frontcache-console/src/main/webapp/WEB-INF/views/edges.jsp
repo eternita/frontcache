@@ -47,6 +47,7 @@
                         <span data-field="cachedEntries">&mdash;</span> items cached
                         <span class="fc-edge-offline" data-field="offline" style="display: none">not reachable</span>
                      </td>
+                     <c:if test="${edgeEditingEnabled}">
                      <td align="left" style="padding: 5px;">
                       <%-- a POST, not a link: removing an edge changes console state, and a GET that
                            does so can be triggered from any page the operator has open - the browser
@@ -57,6 +58,7 @@
                         <button type="submit" class="btn btn-warning">remove</button>
                       </form>
                      </td>
+                     </c:if>
                  </tr>
                 </c:forEach>
              </table>
@@ -68,13 +70,16 @@
 		        
 		        </div>
 
+                <%-- edge-editing = false: the list is the console config's, written elsewhere --%>
+                <c:if test="${edgeEditingEnabled}">
                 <form class="form-inline" action="add-edge" method="post">
                   <div class="form-group" style="padding-top: 25px;">
                      <label for="edges"> Add new edge(s) to console: </label> multiple space separated edges are acceptable<br/>
                      <input type="text" name="edges" class="form-control"  size="100"/>
                      <input  type="submit" class="btn btn-success" style="vertical-align:bottom;" value="Add"/>  
                   </div>
-                </form>         
+                </form>
+                </c:if>         
 
 		    </div>
 		    <hr>

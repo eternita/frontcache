@@ -159,6 +159,15 @@ public class ConfigFileScreenTest {
 		assertFalse(FrontcacheService.configEditingEnabled(config("config-editing = false"), true));
 	}
 
+	/** edge-editing (2.12.0): on unless said otherwise, and NOT tied to credentials, unlike config-editing. */
+	@Test
+	public void edgeEditingIsOnByDefaultAndOffWhenSaid() {
+		assertTrue(FrontcacheService.edgeEditingEnabled(null));
+		assertTrue(FrontcacheService.edgeEditingEnabled(config("")));
+		assertTrue(FrontcacheService.edgeEditingEnabled(config("edge-editing = true")));
+		assertFalse(FrontcacheService.edgeEditingEnabled(config("edge-editing = false")));
+	}
+
 	/**
 	 * A save is refused by the console itself when editing is off, rather than being sent to the node
 	 * and refused there. Both ends check; this is the one that keeps the request off the wire.

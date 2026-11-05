@@ -53,6 +53,8 @@ frontcache {
   console is reached over HTTPS, including through a TLS-terminating proxy, which the console cannot
   detect for itself. With it on behind plain HTTP the login page accepts the password and comes
   straight back, because the cookie is never sent.
+- `edge-editing` — the Edges screen's add / remove buttons (2.12.0). Default true; set it `false` when
+  `urls` is written by your own tooling, so the list cannot drift from it until a restart.
 
 
 ## 3. Run
@@ -61,7 +63,11 @@ frontcache {
 ./bin/frontcache-console
 ```
 
-It listens on **7080**; override with `FRONTCACHE_CONSOLE_PORT`. To point it at a config file
+It listens on **7080**, on every interface; override with `FRONTCACHE_CONSOLE_PORT`, and with
+`FRONTCACHE_CONSOLE_HOST=127.0.0.1` for a console reached only through a reverse proxy on the same host.
+As of 2.12.0 it can also be served under a path of a larger site: `FRONTCACHE_CONSOLE_CONTEXT_PATH=/ops/console`
+makes every page, script and redirect live under `/ops/console/` — the proxy forwards that path as it is, with
+no rewriting. To point it at a config file
 outside the bundle, export `FRONTCACHE_CONFIG=/path/to/frontcache-console.conf` — the launcher
 only supplies its own `conf/` copy as the default.
 

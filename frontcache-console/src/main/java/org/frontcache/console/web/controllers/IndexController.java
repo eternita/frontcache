@@ -52,7 +52,11 @@ public class IndexController {
 		else {
 
 			// check if it's development / test mode
-			// (FC edge and console running locally on the same host)
+			// (FC edge and console running locally on the same host) - never on a console whose edge
+			// list is decided by its config alone (edge-editing = false)
+			if (!frontcacheService.isEdgeEditingEnabled())
+				return "no_edges";
+
 			String localFrontcacheURL = (request.isSecure() ? "https" : "http") + "://localhost:" + request.getServerPort();
 			if (frontcacheService.isFrontCacheEdgeAvailable(localFrontcacheURL))
 			{
