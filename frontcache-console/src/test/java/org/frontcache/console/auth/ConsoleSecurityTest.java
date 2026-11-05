@@ -50,7 +50,7 @@ public class ConsoleSecurityTest {
 		return service;
 	}
 
-	private static final ConsoleIdentityProvider IDENTITY = (user, password) -> Optional.empty();
+	private static final ConsoleIdentityProvider IDENTITY = (user, password, channel) -> Optional.empty();
 
 	private static final ConsoleEdgeScope NO_EDGES = new ConsoleEdgeScope() {
 		@Override
@@ -111,7 +111,7 @@ public class ConsoleSecurityTest {
 	public void twoBeansOfOneTypeRefuseToStart() {
 		StaticListableBeanFactory beans = new StaticListableBeanFactory();
 		beans.addBean("one", IDENTITY);
-		beans.addBean("two", (ConsoleIdentityProvider) (user, password) -> Optional.empty());
+		beans.addBean("two", (ConsoleIdentityProvider) (user, password, channel) -> Optional.empty());
 
 		IllegalStateException e = assertThrows(IllegalStateException.class,
 				() -> new ConsoleSecurity(service(null), beans));

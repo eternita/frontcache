@@ -56,8 +56,11 @@
                 <li><a href="guard-rules" class="${topActive == 'guard' ? 'active-top' : ''}">Guard </a></li>
                 <li><a href="visitor-types" class="${topActive == 'visitor' ? 'active-top' : ''}">Visitor Types </a></li>
 				<li><a href="edges" class="${topActive == 'edges' ? 'active-top' : ''}">Edges </a></li>
+				<%-- an entry naming a permission only for a principal holding it (fcPermits - ConsoleSecurity) --%>
 				<c:forEach var="nav" items="${fcPlugins.topNav}">
+				<c:if test="${empty nav.permission or fcPermits[nav.permission]}">
 				<li><a href="<c:out value='${nav.href}'/>" class="${topActive == nav.id ? 'active-top' : ''}"><c:out value="${nav.label}"/> </a></li>
+				</c:if>
 				</c:forEach>
 			</ul>
 			<%-- Who is signed in, and the only way to stop being signed in.
@@ -69,7 +72,11 @@
 			     POST is what SameOriginFilter covers. --%>
 			<c:if test="${not empty sessionScope['fc.user']}">
 				<ul class="nav navbar-nav navbar-right">
-					<li class="navbar-text fc-signed-in"><c:out value="${sessionScope['fc.user']}"/></li>
+					<%-- the role, when the identity provider gives one (the single user has none) - fcRole, from the
+					     request's principal, which the identity provider may have changed since sign-in. Not
+					     fc.principal.role: the principal is a record, which EL cannot read. --%>
+					<li class="navbar-text fc-signed-in"><c:out value="${sessionScope['fc.user']}"/><c:if
+						test="${not empty fcRole}"> <span class="text-muted">(<c:out value="${fcRole}"/>)</span></c:if></li>
 					<li>
 						<form class="fc-signout" method="post" action="<c:url value='/logout'/>">
 							<button type="submit" class="btn btn-link">Sign out</button>

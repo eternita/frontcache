@@ -37,7 +37,7 @@ public final class SingleUserIdentityProvider implements ConsoleIdentityProvider
 	}
 
 	@Override
-	public Optional<ConsolePrincipal> authenticate(String user, String password) {
+	public Optional<ConsolePrincipal> authenticate(String user, String password, Channel channel) {
 
 		if (!authenticator.matches(user, password))
 			return Optional.empty();

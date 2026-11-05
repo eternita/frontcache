@@ -2,6 +2,8 @@
 
 <%@ page language="java" contentType="text/html; charset=ISO-8859-1" pageEncoding="ISO-8859-1"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core"%>
+<%-- edge-editing (and the scope) AND the principal's edges.write; /add-edge and /remove-edge refuse it either way --%>
+<c:set var="edgeEditingEnabled" value="${edgeEditingEnabled and fcPermits['edges.write']}"/>
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">

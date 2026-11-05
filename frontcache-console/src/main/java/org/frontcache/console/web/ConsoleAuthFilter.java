@@ -22,7 +22,9 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
+import org.frontcache.console.auth.ConsoleIdentityProvider;
 import org.frontcache.console.auth.ConsolePrincipal;
+import org.frontcache.console.auth.ConsoleSignInThrottledException;
 import org.frontcache.console.auth.ConsoleSecurity;
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.web.context.WebApplicationContext;
@@ -174,7 +176,17 @@ public class ConsoleAuthFilter implements Filter {
 
 		ConsolePrincipal principal = sessionPrincipal(httpRequest);
 		if (null == principal)
-			principal = basicPrincipal(httpRequest.getHeader("Authorization"));
+		{
+			try {
+				principal = basicPrincipal(httpRequest.getHeader("Authorization"));
+			} catch (ConsoleSignInThrottledException throttled) {
+				// not a 401: that would read as a wrong password, and invite the script to try another
+				HttpServletResponse httpResponse = (HttpServletResponse) response;
+				httpResponse.setHeader("Retry-After", Long.toString(throttled.retryAfterSeconds()));
+				httpResponse.sendError(429, throttled.getMessage());
+				return;
+			}
+		}
 
 		if (null != principal)
 		{
@@ -236,7 +248,8 @@ public class ConsoleAuthFilter implements Filter {
 		if (null == credentials)
 			return null;
 
-		return security.identityProvider().authenticate(credentials[0], credentials[1]).orElse(null);
+		return security.identityProvider()
+				.authenticate(credentials[0], credentials[1], ConsoleIdentityProvider.Channel.BASIC).orElse(null);
 	}
 
 	private boolean isAnonymous(String path) {

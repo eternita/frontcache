@@ -15,10 +15,14 @@
  */
 package org.frontcache.console.auth;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -205,6 +209,56 @@ public class ConsoleSecurity {
 
 		request.setAttribute(SCOPE_REQUEST_ATTRIBUTE, scope);
 		return scope;
+	}
+
+	/**
+	 * What a page may offer, for its JSP: {@code ${fcPermits['cache.invalidate']}} is whether this request's principal
+	 * holds that permission on the console as a whole (no edge). Set on every request a handler serves, by
+	 * {@link ConsolePermissionInterceptor}. A button a principal may not use is hidden through this <b>and</b> refused
+	 * by the interceptor - hiding is for the page, the refusal is the rule. A page rendered without it (an error page)
+	 * reads every permission as false.
+	 */
+	public static final String PERMITS_REQUEST_ATTRIBUTE = "fcPermits";
+
+	/**
+	 * The request principal's role, for the navbar - a String, because {@link ConsolePrincipal} is a record and EL
+	 * reads JavaBeans getters only ({@code ${principal.role}} fails at render time). Absent when the principal has no
+	 * role (the single user). Set beside {@link #PERMITS_REQUEST_ATTRIBUTE}.
+	 */
+	public static final String ROLE_REQUEST_ATTRIBUTE = "fcRole";
+
+	/** The {@link #PERMITS_REQUEST_ATTRIBUTE} view of this request: each permission asked once, then remembered. */
+	public Map<String, Boolean> permitsView(HttpServletRequest request) {
+		return new PermitsView(this, request);
+	}
+
+	private static final class PermitsView extends AbstractMap<String, Boolean> {
+
+		private final ConsoleSecurity security;
+		private final HttpServletRequest request;
+		private final Map<String, Boolean> asked = new HashMap<String, Boolean>();
+
+		PermitsView(ConsoleSecurity security, HttpServletRequest request) {
+			this.security = security;
+			this.request = request;
+		}
+
+		@Override
+		public Boolean get(Object permission) {
+			if (!(permission instanceof String id) || id.isBlank())
+				return Boolean.FALSE;
+			return asked.computeIfAbsent(id, p -> security.permits(request, p, null));
+		}
+
+		@Override
+		public boolean containsKey(Object permission) {
+			return permission instanceof String;
+		}
+
+		@Override
+		public Set<Map.Entry<String, Boolean>> entrySet() {
+			return Collections.unmodifiableMap(asked).entrySet();
+		}
 	}
 
 	/** Whether this request's principal holds {@code permission}, on {@code edgeURL} when it names one. */

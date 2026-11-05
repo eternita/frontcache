@@ -30,13 +30,24 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 public interface ConsoleIdentityProvider {
 
+	/** Where a password was submitted - an identity provider may admit a user through one and not the other. */
+	enum Channel {
+		/** The login page's form: a browser, and a session is created on success. */
+		FORM,
+		/** {@code Authorization: Basic}, checked on every request of a script; no session. */
+		BASIC
+	}
+
 	/**
 	 * The login form's and the Basic header's check - the one place a password is compared. Constant-time, and the
 	 * same empty answer for a wrong user and a wrong password.
 	 *
+	 * @param channel the form or a Basic header - a service account may be admitted through Basic only
 	 * @return the principal, or empty when the credentials are not a login
+	 * @throws ConsoleSignInThrottledException when this user may not try again yet - answered {@code 429}, never as a
+	 *         wrong password, and without the password having been compared
 	 */
-	Optional<ConsolePrincipal> authenticate(String user, String password);
+	Optional<ConsolePrincipal> authenticate(String user, String password, Channel channel);
 
 	/**
 	 * Called on every request of a signed-in session, before the request is served: the principal to serve it as -

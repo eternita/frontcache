@@ -68,7 +68,7 @@ public class LoginControllerTest {
 		if (null != next)
 			request.setParameter("next", next);
 
-		return controller.login(request, model);
+		return controller.login(request, new org.springframework.mock.web.MockHttpServletResponse(), model);
 	}
 
 	private String signedInUser() {
@@ -146,7 +146,7 @@ public class LoginControllerTest {
 	/** A missing form field is not a credential. */
 	@Test
 	public void anEmptySubmissionIsRefusedWithoutThrowing() {
-		String view = controller.login(request, model);
+		String view = controller.login(request, new org.springframework.mock.web.MockHttpServletResponse(), model);
 
 		assertEquals("login", view);
 		assertEquals(LoginController.WRONG_CREDENTIAL, model.get("error"));

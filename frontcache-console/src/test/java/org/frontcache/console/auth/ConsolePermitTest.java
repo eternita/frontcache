@@ -186,6 +186,36 @@ public class ConsolePermitTest {
 		assertEquals("the authorizer is told the edge", List.of("https://n1.example.com/"), edges);
 	}
 
+	/**
+	 * The page's buttons: {@code fcPermits} answers what the authorizer says, console-wide (no edge), and is set on a
+	 * request whatever the handler's own outcome.
+	 */
+	@Test
+	@SuppressWarnings("unchecked")
+	public void thePageIsToldWhatThePrincipalMayDo() throws Exception {
+		List<String> edges = new ArrayList<String>();
+		MockHttpServletRequest request = request("GET");
+
+		assertTrue(interceptor((who, p, e) -> edges.add(String.valueOf(e)) && !ConsolePermissions.CONFIG_WRITE.equals(p))
+				.preHandle(request, new MockHttpServletResponse(), handler("read")));
+
+		Map<String, Boolean> permits = (Map<String, Boolean>) request.getAttribute(ConsoleSecurity.PERMITS_REQUEST_ATTRIBUTE);
+		assertEquals(Boolean.TRUE, permits.get(ConsolePermissions.CACHE_INVALIDATE));
+		assertEquals(Boolean.FALSE, permits.get(ConsolePermissions.CONFIG_WRITE));
+		assertEquals(Boolean.FALSE, permits.get(""));
+		assertEquals(Boolean.FALSE, permits.get(null));
+		assertEquals("view for the handler (no @ConsolePermit, so no edge), then each asked once, with no edge",
+				List.of("null", "null", "null"), edges);
+		permits.get(ConsolePermissions.CACHE_INVALIDATE);
+		assertEquals(3, edges.size());
+		assertNull("the single user has no role to show", request.getAttribute(ConsoleSecurity.ROLE_REQUEST_ATTRIBUTE));
+
+		MockHttpServletRequest withRole = request("GET");
+		withRole.setAttribute(ConsolePrincipal.REQUEST_ATTRIBUTE, new ConsolePrincipal("bob", "operator", Map.of()));
+		interceptor((who, p, e) -> true).preHandle(withRole, new MockHttpServletResponse(), handler("read"));
+		assertEquals("a String the navbar's EL can read", "operator", withRole.getAttribute(ConsoleSecurity.ROLE_REQUEST_ATTRIBUTE));
+	}
+
 	@Test
 	public void aGrantedPermissionPasses() throws Exception {
 		assertTrue(interceptor((who, p, e) -> ConsolePermissions.CACHE_INVALIDATE.equals(p))

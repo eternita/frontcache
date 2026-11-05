@@ -19,10 +19,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
 
+import org.frontcache.console.auth.ConsoleIdentityProvider;
 import org.frontcache.console.auth.ConsolePermissions;
 import org.frontcache.console.auth.ConsolePermit;
 import org.frontcache.console.auth.ConsolePrincipal;
 import org.frontcache.console.auth.ConsoleSecurity;
+import org.frontcache.console.auth.ConsoleSignInThrottledException;
 import org.frontcache.console.auth.ConsoleSsoProvider;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.web.ConsoleAuthFilter;
@@ -38,6 +40,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 /**
@@ -105,7 +108,7 @@ public class LoginController {
 	 */
 	@ConsolePermit(ConsolePermissions.ANONYMOUS)
 	@RequestMapping(value = "/login", method = RequestMethod.POST)
-	public String login(HttpServletRequest request, ModelMap model) {
+	public String login(HttpServletRequest request, HttpServletResponse response, ModelMap model) {
 
 		if (!security.authRequired())
 			return "redirect:" + DEFAULT_TARGET;
@@ -114,13 +117,23 @@ public class LoginController {
 		String password = request.getParameter("password");
 		String target = safeTarget(request.getParameter("next"));
 
-		Optional<ConsolePrincipal> principal = security.identityProvider().formLogin()
-				? security.identityProvider().authenticate(user, password)
-				: Optional.empty();
+		Optional<ConsolePrincipal> principal;
+		String error = WRONG_CREDENTIAL;
+		try {
+			principal = security.identityProvider().formLogin()
+					? security.identityProvider().authenticate(user, password, ConsoleIdentityProvider.Channel.FORM)
+					: Optional.empty();
+		} catch (ConsoleSignInThrottledException throttled) {
+			// the page again, with 429 and why - never "wrong password" for what may be the right one
+			principal = Optional.empty();
+			error = throttled.getMessage();
+			response.setStatus(429);
+			response.setHeader("Retry-After", Long.toString(throttled.retryAfterSeconds()));
+		}
 
 		if (principal.isEmpty())
 		{
-			model.put("error", WRONG_CREDENTIAL);
+			model.put("error", error);
 			// Echoed so a mistyped password does not also clear the user name. The password is
 			// never echoed.
 			model.put("submittedUser", null == user ? "" : user);

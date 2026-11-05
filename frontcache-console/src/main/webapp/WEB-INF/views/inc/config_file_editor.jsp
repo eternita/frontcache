@@ -9,7 +9,8 @@
        ${configFileId}          - the logical id sent to the node (bots, guard-rules, ...)
        ${configFileName}        - the file's name on disk, shown to the operator
        ${configEdges}           - List<EdgeConfigFile>: name, url, content, available
-       ${configEditingEnabled}  - false hides Edit entirely (no credentials, or config-editing=false)
+       ${configEditingEnabled}  - false hides Edit entirely (no credentials, or config-editing=false);
+                                  narrowed below to a principal holding config.write (fcPermits)
        ${saveResults}           - Map<edge url, SetConfigActionResponse> after a POST, else absent
        ${activeEdgeURL}         - which tab to open on after a POST
 
@@ -18,6 +19,9 @@
      the tab it would send an edit to the wrong node. -->
 
 <c:set var="tabPrefix" value="edge-tab-"/>
+<%-- the console's switch AND the principal's permission: config-editing = false is off for everyone, and a role
+     without config.write sees the files read-only. /save-config refuses it either way. --%>
+<c:set var="configEditingEnabled" value="${configEditingEnabled and fcPermits['config.write']}"/>
 
 <hr>
 

@@ -23,8 +23,11 @@
                <form:options items="${edgeList}" />
             </form:select>      
   </div>
+  <%-- offered to who may use them (fcPermits); the handler refuses the rest either way --%>
+  <c:if test="${fcPermits['cache.invalidate']}">
   <button type="submit" name="invalidate" class="btn btn-success">Invalidate cache</button>
   <button type="submit" name="purge" class="btn btn-warning">Purge</button>
+  </c:if>
   </form:form>
 
   <c:if test="${not empty edgeError}">

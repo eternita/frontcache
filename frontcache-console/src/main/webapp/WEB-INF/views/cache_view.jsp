@@ -23,7 +23,7 @@
                <form:options items="${edgeList}" />
             </form:select>      
   </div>
-  <button type="submit" name="viewCache" class="btn btn-success">View cache</button>
+  <c:if test="${fcPermits['cache.read']}"><button type="submit" name="viewCache" class="btn btn-success">View cache</button></c:if>
   </form:form>
 
   <c:if test="${not empty edgeError}">

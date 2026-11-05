@@ -61,6 +61,12 @@ public class ConsolePermissionInterceptor implements HandlerInterceptor {
 		if (!(handler instanceof HandlerMethod method))
 			return true; // static resources: the auth filter has already decided
 
+		// for the page's buttons - what this principal may use is offered, the rest hidden (and refused below)
+		request.setAttribute(ConsoleSecurity.PERMITS_REQUEST_ATTRIBUTE, security.permitsView(request));
+		ConsolePrincipal principal = ConsoleSecurity.principal(request);
+		if (null != principal && null != principal.role())
+			request.setAttribute(ConsoleSecurity.ROLE_REQUEST_ATTRIBUTE, principal.role());
+
 		String permission = requiredPermission(method, request.getMethod());
 		if (null == permission)
 		{

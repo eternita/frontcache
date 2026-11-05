@@ -61,9 +61,13 @@ public class ConsoleSignInTest {
 		volatile boolean revoked = false;
 		volatile String role = "operator";
 		boolean form = true;
+		final List<Channel> channels = new ArrayList<Channel>();
 
 		@Override
-		public Optional<ConsolePrincipal> authenticate(String user, String password) {
+		public Optional<ConsolePrincipal> authenticate(String user, String password, Channel channel) {
+			channels.add(channel);
+			if ("locked".equals(user))
+				throw new ConsoleSignInThrottledException(42);
 			if (("ann".equals(user) && "pw-ann".equals(password)) || ("ci".equals(user) && "pw-ci".equals(password)))
 				return Optional.of(new ConsolePrincipal(user, role, java.util.Map.of()));
 			return Optional.empty();
@@ -144,6 +148,30 @@ public class ConsoleSignInTest {
 	}
 
 	@Test
+	public void basicIsAskedAsBasic() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/realtime");
+		request.addHeader("Authorization", basic("ci", "pw-ci"));
+		filter(request);
+		assertEquals(List.of(ConsoleIdentityProvider.Channel.BASIC), users.channels);
+	}
+
+	/** A locked user's script gets 429 and Retry-After - not 401, which reads as a wrong password. */
+	@Test
+	public void aThrottledBasicRequestIsA429() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/realtime");
+		request.addHeader("Authorization", basic("locked", "pw"));
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		MockFilterChain chain = new MockFilterChain();
+
+		ConsoleAuthFilterAccess.filter(security).doFilter(request, response, chain);
+
+		assertNull(chain.getRequest());
+		assertEquals(429, response.getStatus());
+		assertEquals("42", response.getHeader("Retry-After"));
+		assertNull(response.getHeader("WWW-Authenticate"));
+	}
+
+	@Test
 	public void theSingleUsersPasswordIsNotALoginWhenAProviderIsConfigured() throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/realtime");
 		request.addHeader("Authorization", basic("admin", "admin"));
@@ -221,8 +249,26 @@ public class ConsoleSignInTest {
 		request.setParameter("user", "ann");
 		request.setParameter("password", "pw-ann");
 
-		assertEquals("login", LoginControllerAccess.controller(security).login(request, new ModelMap()));
+		assertEquals("login", LoginControllerAccess.controller(security).login(request, new MockHttpServletResponse(), new ModelMap()));
 		assertNull(request.getSession(false));
+	}
+
+	@Test
+	public void aThrottledFormLoginIsThePageAgainWith429AndWhy() {
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/login");
+		request.setParameter("user", "locked");
+		request.setParameter("password", "right-or-wrong");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		ModelMap model = new ModelMap();
+
+		assertEquals("login", LoginControllerAccess.controller(security).login(request, response, model));
+
+		assertEquals(429, response.getStatus());
+		assertEquals("42", response.getHeader("Retry-After"));
+		assertTrue(String.valueOf(model.get("error")), String.valueOf(model.get("error")).contains("42 seconds"));
+		assertEquals("locked", model.get("submittedUser"));
+		assertNull(request.getSession(false));
+		assertEquals(List.of(ConsoleIdentityProvider.Channel.FORM), users.channels);
 	}
 
 	@Test
@@ -231,7 +277,7 @@ public class ConsoleSignInTest {
 		request.setParameter("user", "ann");
 		request.setParameter("password", "pw-ann");
 
-		assertEquals("redirect:/", LoginControllerAccess.controller(security).login(request, new ModelMap()));
+		assertEquals("redirect:/", LoginControllerAccess.controller(security).login(request, new MockHttpServletResponse(), new ModelMap()));
 		assertEquals("ann", ((ConsolePrincipal) request.getSession(false).getAttribute(ConsolePrincipal.SESSION_ATTRIBUTE)).name());
 		assertEquals("ann", request.getSession(false).getAttribute("fc.user"));
 	}
