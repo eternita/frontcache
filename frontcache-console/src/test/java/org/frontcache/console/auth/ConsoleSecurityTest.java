@@ -224,4 +224,80 @@ public class ConsoleSecurityTest {
 		assertTrue(ConsoleSecurity.defaults(service).edgeEditing());
 		assertFalse(new ConsoleSecurity(service, null, null, NO_EDGES, null).edgeEditing());
 	}
+
+	/**
+	 * A scope model where a principal sees one of several edge sets at a time (2.12.0): the scope is asked with the
+	 * request, the authorizer is asked with that scope, and the navbar's menu comes from the same scope model.
+	 */
+	@Test
+	public void aRequestAwareScopeDecidesTheScopeTheAuthorizerAndTheMenuSee() throws Exception {
+		ConsoleEdgeScope byParameter = new ConsoleEdgeScope() {
+			@Override
+			public EdgeScope scopeFor(ConsolePrincipal who) {
+				return EdgeScope.empty("default");
+			}
+
+			@Override
+			public EdgeScope scopeFor(ConsolePrincipal who, jakarta.servlet.http.HttpServletRequest request) {
+				String set = request.getParameter("set");
+				return null == set ? scopeFor(who) : EdgeScope.of(set, List.of("https://" + set + ".example.com/"), "k-" + set);
+			}
+
+			@Override
+			public EdgeScope everyEdge() {
+				return EdgeScope.empty("all");
+			}
+
+			@Override
+			public ScopeMenu menu(ConsolePrincipal who, EdgeScope current, jakarta.servlet.http.HttpServletRequest request) {
+				return new ScopeMenu(current.id(), List.of(new ScopeMenu.Entry("a", "realtime?set=a", "a".equals(current.id()), false)));
+			}
+		};
+		List<String> asked = new ArrayList<String>();
+		ConsoleAuthorizer perScope = new ConsoleAuthorizer() {
+			@Override
+			public boolean permits(ConsolePrincipal who, String permission, String edge) {
+				throw new AssertionError("the scope-aware method is the one asked");
+			}
+
+			@Override
+			public boolean permits(ConsolePrincipal who, String permission, String edge, EdgeScope scope) {
+				asked.add(permission + " in " + scope.id());
+				return "a".equals(scope.id());
+			}
+		};
+		ConsoleSecurity security = new ConsoleSecurity(service(null), null, perScope, byParameter, null);
+
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.setParameter("set", "a");
+		request.setAttribute(ConsolePrincipal.REQUEST_ATTRIBUTE, ConsolePrincipal.named("ann"));
+		assertEquals("a", security.scope(request).id());
+		assertTrue(security.permits(request, ConsolePermissions.CACHE_INVALIDATE, null));
+		assertEquals(List.of("cache.invalidate in a"), asked);
+
+		// the interceptor sets the menu for the navbar
+		new ConsolePermissionInterceptor(security).preHandle(request, new org.springframework.mock.web.MockHttpServletResponse(),
+				new org.springframework.web.method.HandlerMethod(this, getClass().getMethod("handlerForTheMenu")));
+		ScopeMenu menu = (ScopeMenu) request.getAttribute(ConsoleSecurity.SCOPE_MENU_REQUEST_ATTRIBUTE);
+		assertEquals("a", menu.getLabel());
+		assertTrue(menu.getEntries().get(0).isCurrent());
+
+		MockHttpServletRequest other = new MockHttpServletRequest();
+		other.setAttribute(ConsolePrincipal.REQUEST_ATTRIBUTE, ConsolePrincipal.named("ann"));
+		assertFalse(security.permits(other, ConsolePermissions.CACHE_INVALIDATE, null));
+	}
+
+	/** A GET handler for the interceptor to see - it needs view, which the per-scope authorizer grants in "a". */
+	public String handlerForTheMenu() {
+		return "x";
+	}
+
+	/** With no scope model offering a choice, there is no menu - the navbar renders as before. */
+	@Test
+	public void theDefaultScopeOffersNoMenu() {
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.setAttribute(ConsolePrincipal.REQUEST_ATTRIBUTE, ConsolePrincipal.named("ann"));
+		assertEquals(null, ConsoleSecurity.defaults(service(null)).scopeMenu(request));
+		assertEquals("signed out: none", null, ConsoleSecurity.defaults(service(null)).scopeMenu(new MockHttpServletRequest()));
+	}
 }

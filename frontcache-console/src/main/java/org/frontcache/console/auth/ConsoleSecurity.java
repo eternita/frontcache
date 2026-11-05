@@ -203,7 +203,7 @@ public class ConsoleSecurity {
 			return scope;
 
 		ConsolePrincipal principal = principal(request);
-		EdgeScope scope = null == principal ? EdgeScope.empty("none") : edgeScope.scopeFor(principal);
+		EdgeScope scope = null == principal ? EdgeScope.empty("none") : edgeScope.scopeFor(principal, request);
 		if (null == scope)
 			scope = EdgeScope.empty("none");
 
@@ -275,6 +275,27 @@ public class ConsoleSecurity {
 		if (principal.isUnauthenticated())
 			return true;
 
-		return authorizer.permits(principal, permission, edgeURL);
+		return authorizer.permits(principal, permission, edgeURL, scope(request));
 	}
+
+	/**
+	 * The navbar's choice of scopes for this request - see {@link ConsoleEdgeScope#menu} - or null when there is
+	 * none to offer. Set by {@link ConsolePermissionInterceptor} as {@link #SCOPE_MENU_REQUEST_ATTRIBUTE}.
+	 */
+	public ScopeMenu scopeMenu(HttpServletRequest request) {
+
+		ConsolePrincipal principal = principal(request);
+		if (null == principal || principal.isUnauthenticated())
+			return null;
+
+		try {
+			return edgeScope.menu(principal, scope(request), request);
+		} catch (RuntimeException e) {
+			logger.warn("The edge scope's menu failed - the page renders without it", e);
+			return null;
+		}
+	}
+
+	/** The request attribute the navbar reads {@link #scopeMenu} from - absent when there is no choice to make. */
+	public static final String SCOPE_MENU_REQUEST_ATTRIBUTE = "fcScopeMenu";
 }

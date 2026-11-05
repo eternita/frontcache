@@ -72,6 +72,23 @@
 			     POST is what SameOriginFilter covers. --%>
 			<c:if test="${not empty sessionScope['fc.user']}">
 				<ul class="nav navbar-nav navbar-right">
+					<%-- the principal's choice of edge scopes, when its edge scope offers one (fcScopeMenu -
+					     ConsoleSecurity.scopeMenu): what a scope is, and what its links do, is the edge scope's --%>
+					<c:if test="${not empty fcScopeMenu}">
+					<li class="dropdown fc-scope-menu">
+						<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+							aria-expanded="false"><c:out value="${fcScopeMenu.label}"/> <span class="caret"></span></a>
+						<ul class="dropdown-menu">
+							<c:forEach var="entry" items="${fcScopeMenu.entries}">
+							<c:choose>
+							<c:when test="${entry.heading}"><li class="dropdown-header"><c:out value="${entry.label}"/></li></c:when>
+							<c:otherwise><li class="${entry.current ? 'active' : ''}"><a href="<c:out value='${entry.href}'/>"
+								style="${entry.nested ? 'padding-left: 30px;' : ''}"><c:out value="${entry.label}"/></a></li></c:otherwise>
+							</c:choose>
+							</c:forEach>
+						</ul>
+					</li>
+					</c:if>
 					<%-- the role, when the identity provider gives one (the single user has none) - fcRole, from the
 					     request's principal, which the identity provider may have changed since sign-in. Not
 					     fc.principal.role: the principal is a record, which EL cannot read. --%>

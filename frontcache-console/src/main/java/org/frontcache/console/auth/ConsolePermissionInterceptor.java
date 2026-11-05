@@ -66,6 +66,9 @@ public class ConsolePermissionInterceptor implements HandlerInterceptor {
 		ConsolePrincipal principal = ConsoleSecurity.principal(request);
 		if (null != principal && null != principal.role())
 			request.setAttribute(ConsoleSecurity.ROLE_REQUEST_ATTRIBUTE, principal.role());
+		ScopeMenu scopeMenu = security.scopeMenu(request);
+		if (null != scopeMenu)
+			request.setAttribute(ConsoleSecurity.SCOPE_MENU_REQUEST_ATTRIBUTE, scopeMenu);
 
 		String permission = requiredPermission(method, request.getMethod());
 		if (null == permission)

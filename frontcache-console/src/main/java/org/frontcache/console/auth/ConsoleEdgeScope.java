@@ -15,6 +15,8 @@
  */
 package org.frontcache.console.auth;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 /**
  * Which edges a principal may see, and with which API key each is called, as of 2.12.0. A console plugin provides
  * one as a bean of its {@code rootComponents()}; without one, every principal sees the console's configured
@@ -28,6 +30,29 @@ public interface ConsoleEdgeScope {
 
 	/** The edges this principal may see. Never null; empty when it may see none. */
 	EdgeScope scopeFor(ConsolePrincipal who);
+
+	/**
+	 * The edges this request may reach - what {@link ConsoleSecurity#scope} asks, once per request. A scope model
+	 * where a principal sees one of several edge sets at a time (a tenant chosen in the session, a request
+	 * parameter) answers here; the default is {@link #scopeFor(ConsolePrincipal)}. Never null.
+	 *
+	 * <b>It must not create a session</b> ({@code request.getSession(false)} only): the console creates one at sign-in
+	 * and nowhere else.
+	 */
+	default EdgeScope scopeFor(ConsolePrincipal who, HttpServletRequest request) {
+		return scopeFor(who);
+	}
+
+	/**
+	 * The choice of scopes this principal has, for the navbar - or null when there is none to make (the default:
+	 * one scope per principal). Read once per page a handler serves, after {@link #scopeFor(ConsolePrincipal,
+	 * HttpServletRequest)}; it must answer from state it holds and never reach an edge.
+	 *
+	 * @param current the request's scope
+	 */
+	default ScopeMenu menu(ConsolePrincipal who, EdgeScope current, HttpServletRequest request) {
+		return null;
+	}
 
 	/**
 	 * Every edge this console knows, for work no request asked for - a plugin's background poll. Never for a

@@ -15,13 +15,29 @@
  */
 package org.frontcache.console.plugin;
 
+import org.frontcache.console.auth.EdgeScope;
+
 /**
  * A bean - in either context - that contributes to every page's banners and footer lines.
  *
  * Called once per MVC request, {@code /edges-status.json} polls included, so it must answer from state it
- * already holds and never fan out to the edges.
+ * already holds and never fan out to the edges. A provider implements one of the two methods: {@link #notices()}
+ * for notices that are the same on every page, {@link #notices(EdgeScope)} for ones about the request's edges.
  */
 public interface ConsoleNoticeProvider {
 
-	ConsoleNotices notices();
+	/** The notices of every page. The default has none. */
+	default ConsoleNotices notices() {
+		return new ConsoleNotices();
+	}
+
+	/**
+	 * The notices of a page whose request reaches {@code scope}'s edges, as of 2.12.0 - for a provider whose notices
+	 * are about edges, which must never be about edges outside the request's scope. The default is {@link #notices()}.
+	 *
+	 * @param scope the request's scope - empty on a page served without a principal (the login page)
+	 */
+	default ConsoleNotices notices(EdgeScope scope) {
+		return notices();
+	}
 }

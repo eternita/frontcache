@@ -32,4 +32,17 @@ public interface ConsoleAuthorizer {
 	 *                   answer, checked separately - this is for a permission granted on some edges only
 	 */
 	boolean permits(ConsolePrincipal who, String permission, String edgeURL);
+
+	/**
+	 * What {@link ConsoleSecurity} asks, with the request's scope - for an authorizer whose answer depends on which of
+	 * a principal's edge sets the request is in (a role per tenant). The default ignores the scope.
+	 *
+	 * <b>The same answer for an edge outside {@code scope} as for one that does not exist</b>: a refusal that differs
+	 * would tell a principal which edges exist beyond what it may see.
+	 *
+	 * @param scope the request's scope, never null
+	 */
+	default boolean permits(ConsolePrincipal who, String permission, String edgeURL, EdgeScope scope) {
+		return permits(who, permission, edgeURL);
+	}
 }

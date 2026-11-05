@@ -143,14 +143,23 @@ public class FrontcacheService {
 			throw new RuntimeException("Can't initialize Frontcache Console", e);
 		}
 
-		List<ConfigValue> urls = fcConsoleConfig.getList("urls");
-		for (ConfigValue urlValue : urls) {
-			String url = urlValue.unwrapped().toString();
-			logger.info(" -- Loading url {} from console config", url);
-			frontcacheAgentURLs.add(url);
+		// Through hasPath since 2.12.0: a console whose edges a plugin's scope decides (a multi-tenant console's
+		// tenants, each site with its own key) has no urls and no console-wide key - and must not need one.
+		if (fcConsoleConfig.hasPath("urls"))
+		{
+			List<ConfigValue> urls = fcConsoleConfig.getList("urls");
+			for (ConfigValue urlValue : urls) {
+				String url = urlValue.unwrapped().toString();
+				logger.info(" -- Loading url {} from console config", url);
+				frontcacheAgentURLs.add(url);
+			}
 		}
-		apiKey = fcConsoleConfig.getString("apiKey");
-		logger.info(" -- Loading apiKey {} from console config", apiKey);
+		if (fcConsoleConfig.hasPath("apiKey"))
+		{
+			apiKey = fcConsoleConfig.getString("apiKey");
+			// never the key itself: a log is read by more people than the config file
+			logger.info(" -- Loading apiKey from console config");
+		}
 
 		readCredentials();
 
@@ -163,7 +172,7 @@ public class FrontcacheService {
 	 * Reads the console's single login.
 	 *
 	 * <b>Every key here is read through hasPath first.</b> {@code Config.getString} throws on a
-	 * missing key, so reading these the way apiKey is read would make every console whose config
+	 * missing key, so reading these without it (as apiKey was, before 2.12.0) would make every console whose config
 	 * predates this feature fail to start - which is precisely what a config still saying
 	 * {@code siteKey} does after the 2.9.0 api-key rename.
 	 *
@@ -562,7 +571,7 @@ public class FrontcacheService {
 	 * {@link #parseCredentials}.
 	 *
 	 * Read through {@code hasPath}, like the credentials are: {@code Config.getString} and friends throw
-	 * on a missing key, so reading this the way {@code apiKey} is read would make every console whose
+	 * on a missing key, so reading this without it would make every console whose
 	 * config predates the feature fail to start.
 	 */
 	static boolean configEditingEnabled(Config config, boolean authEnabled) {

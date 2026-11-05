@@ -28,6 +28,7 @@ import org.frontcache.console.web.controllers.IndexController;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.web.context.support.XmlWebApplicationContext;
 
@@ -82,7 +83,7 @@ public class ConsoleWithoutPluginsTest {
 		assertEquals(0, root.getBeansOfType(DashboardStreamContributor.class).size());
 		assertEquals(0, web.getBeansOfType(ConsoleNoticeProvider.class).size());
 
-		ConsoleNotices notices = web.getBean(ConsoleNoticesAdvice.class).consoleNotices();
+		ConsoleNotices notices = web.getBean(ConsoleNoticesAdvice.class).consoleNotices(new MockHttpServletRequest());
 		assertEquals(List.of(), notices.getBanners());
 		assertEquals(List.of(), notices.getFooterLines());
 	}
