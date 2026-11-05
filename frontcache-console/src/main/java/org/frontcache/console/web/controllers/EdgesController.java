@@ -24,6 +24,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.frontcache.console.model.FrontCacheStatus;
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
+import org.frontcache.console.auth.ConsoleSecurity;
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -37,19 +41,22 @@ public class EdgesController {
 	@Autowired
 	private FrontcacheService frontcacheService;
 
+	@Autowired
+	private ConsoleSecurity consoleSecurity;
+
 	@RequestMapping(value = "/edges", method = RequestMethod.GET)
-	public String domainRealtimeMonitor(ModelMap model) {
+	public String domainRealtimeMonitor(ModelMap model, EdgeScope scope) {
 
 		// The edge list, not a fan-out: this page renders the same live block as the others, so the
 		// dot and the item count are filled by the poll rather than by a round trip per edge before
 		// the page can paint. Sorting by name needs no network.
-		List<FrontCacheStatus> edges = frontcacheService.getEdgeList();
+		List<FrontCacheStatus> edges = frontcacheService.getEdgeList(scope);
 		Collections.sort(edges, new Comparator<FrontCacheStatus>(){
 		    public int compare(FrontCacheStatus t1, FrontCacheStatus t2) {
 	    		return t1.getName().compareTo(t2.getName());
 		    }});
 		model.put("edges", edges);
-		model.put("edgeEditingEnabled", frontcacheService.isEdgeEditingEnabled());
+		model.put("edgeEditingEnabled", consoleSecurity.edgeEditing());
 
 		return "edges";
 	}
@@ -61,9 +68,10 @@ public class EdgesController {
 	 * SameOriginFilter checks the origin of the POST; the method change is what brings it under that
 	 * check at all.
 	 */
+	@ConsolePermit(value = ConsolePermissions.EDGES_WRITE, edgeParameter = "")
 	@RequestMapping(value = "/add-edge", method = RequestMethod.POST)
-	public String addEdge(HttpServletRequest request, HttpServletResponse response) throws IOException {
-		if (!frontcacheService.isEdgeEditingEnabled())
+	public String addEdge(HttpServletRequest request, HttpServletResponse response, EdgeScope scope) throws IOException {
+		if (!consoleSecurity.edgeEditing())
 			return refuse(response);
 
 		String edges = request.getParameter("edges");
@@ -81,9 +89,10 @@ public class EdgesController {
 	}
 
 	/** POST for the same reason as {@link #addEdge} - it removes an edge from the console. */
+	@ConsolePermit(ConsolePermissions.EDGES_WRITE)
 	@RequestMapping(value = "/remove-edge", method = RequestMethod.POST)
-	public String removeEdge(HttpServletRequest request, HttpServletResponse response) throws IOException {
-		if (!frontcacheService.isEdgeEditingEnabled())
+	public String removeEdge(HttpServletRequest request, HttpServletResponse response, EdgeScope scope) throws IOException {
+		if (!consoleSecurity.edgeEditing())
 			return refuse(response);
 
 		String edge = request.getParameter("edge");

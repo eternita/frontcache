@@ -70,33 +70,39 @@ public final class ConsoleAuthenticator {
 	 */
 	public boolean isAuthorizedBasicHeader(String header) {
 
-		if (null == header || header.length() <= BASIC_PREFIX.length())
-			return false;
+		String[] credentials = basicCredentials(header);
 
-		// RFC 7617: the scheme token is case-insensitive.
+		return null != credentials && matches(credentials[0], credentials[1]);
+	}
+
+	/**
+	 * The user and password an {@code Authorization: Basic} header carries, or null when it is not one: no
+	 * header, another scheme, not base64, no colon. Split on the FIRST colon only - a password may contain
+	 * colons, a username may not. RFC 7617: the scheme token is case-insensitive.
+	 */
+	public static String[] basicCredentials(String header) {
+
+		if (null == header || header.length() <= BASIC_PREFIX.length())
+			return null;
+
 		if (!BASIC_PREFIX.equalsIgnoreCase(header.substring(0, BASIC_PREFIX.length())))
-			return false;
+			return null;
 
 		String decoded;
 		try {
 			decoded = new String(Base64.getDecoder().decode(header.substring(BASIC_PREFIX.length()).trim()),
 					StandardCharsets.UTF_8);
 		} catch (IllegalArgumentException e) {
-			return false; // not base64 - a probe, not a login
+			return null; // not base64 - a probe, not a login
 		}
 
-		// Split on the FIRST colon only: a password may contain colons, a username may not.
 		int separator = decoded.indexOf(':');
 		if (separator < 0)
-			return false;
+			return null;
 
-		return matches(decoded.substring(0, separator), decoded.substring(separator + 1));
+		return new String[] { decoded.substring(0, separator), decoded.substring(separator + 1) };
 	}
 
-	/**
-	 * Constant-time over the bytes, so the number of correct leading characters is not readable
-	 * from the response time.
-	 */
 	private boolean equalsConstantTime(String candidate, String expected) {
 
 		if (null == expected)

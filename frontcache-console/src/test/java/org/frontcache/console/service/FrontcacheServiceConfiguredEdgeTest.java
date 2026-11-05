@@ -33,6 +33,7 @@ import java.net.SocketTimeoutException;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.ConfigFile;
 import org.frontcache.io.SetConfigActionResponse;
+import org.frontcache.console.auth.EdgeScope;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,7 +41,7 @@ import org.junit.Test;
 /**
  * Every console method that takes an edge URL from a request sends the fleet's API key to it, so an
  * edge that is not one of this console's must never get a client - see
- * {@link FrontcacheService#configuredEdgeClient}.
+ * {@link org.frontcache.console.auth.EdgeScope#client}.
  *
  * The unknown edge here is a real listening socket, so "refused" is asserted as "nothing connected",
  * not merely as "an exception came back": a method that built the client, sent the request and then
@@ -79,60 +80,60 @@ public class FrontcacheServiceConfiguredEdgeTest {
 
 	@Test
 	public void anUnknownEdgeGetsNoClient() throws IOException {
-		assertNull(service.configuredEdgeClient(attackerURL));
-		assertNull(service.configuredEdgeClient(""));
-		assertNull(service.configuredEdgeClient(null));
+		assertNull(edges(service).client(attackerURL));
+		assertNull(edges(service).client(""));
+		assertNull(edges(service).client(null));
 
-		assertNotNull(service.configuredEdgeClient(EDGE + "/"));
-		assertEquals("built from the configured spelling", EDGE, service.configuredEdgeClient(EDGE + "/").getFrontCacheURL());
+		assertNotNull(edges(service).client(EDGE + "/"));
+		assertEquals("built from the configured spelling", EDGE, edges(service).client(EDGE + "/").getFrontCacheURL());
 	}
 
 	/** The Edges page adds edges at runtime; the allowlist is the current list, not the startup one. */
 	@Test
 	public void anEdgeAddedAtRuntimeIsAccepted() {
-		assertNull(service.configuredEdgeClient(attackerURL));
+		assertNull(edges(service).client(attackerURL));
 		service.addEdge(attackerURL);
-		assertNotNull(service.configuredEdgeClient(attackerURL));
+		assertNotNull(edges(service).client(attackerURL));
 		service.removeEdge(attackerURL);
-		assertNull(service.configuredEdgeClient(attackerURL));
+		assertNull(edges(service).client(attackerURL));
 	}
 
 	@Test
 	public void cacheViewRefusesAnUnknownEdge() throws IOException {
-		assertThrows(UnknownEdgeException.class, () -> service.getFromCache(attackerURL, "http://site/page"));
+		assertThrows(UnknownEdgeException.class, () -> service.getFromCache(edges(service), attackerURL, "http://site/page"));
 		assertNothingConnected();
 	}
 
 	@Test
 	public void invalidationRefusesAnUnknownEdge() throws IOException {
-		assertThrows(UnknownEdgeException.class, () -> service.invalidateEdge(attackerURL, "*"));
-		assertThrows(UnknownEdgeException.class, () -> service.purgeEdge(attackerURL));
+		assertThrows(UnknownEdgeException.class, () -> service.invalidateEdge(edges(service), attackerURL, "*"));
+		assertThrows(UnknownEdgeException.class, () -> service.purgeEdge(edges(service), attackerURL));
 		assertNothingConnected();
 	}
 
 	@Test
 	public void cacheOtherRefusesAnUnknownEdge() throws IOException {
-		assertThrows(UnknownEdgeException.class, () -> service.dumpKeys(attackerURL));
-		assertThrows(UnknownEdgeException.class, () -> service.backupEdge(attackerURL));
+		assertThrows(UnknownEdgeException.class, () -> service.dumpKeys(edges(service), attackerURL));
+		assertThrows(UnknownEdgeException.class, () -> service.backupEdge(edges(service), attackerURL));
 		assertNothingConnected();
 	}
 
 	/** Either end of a replication receives the key - the source is read, the target written. */
 	@Test
 	public void replicationRefusesAnUnknownSourceOrTarget() throws IOException {
-		assertThrows(UnknownEdgeException.class, () -> service.startReplication(EDGE, attackerURL));
-		assertThrows(UnknownEdgeException.class, () -> service.startReplication(attackerURL, EDGE));
-		assertThrows("an unselected edge", UnknownEdgeException.class, () -> service.startReplication(EDGE, ""));
-		assertNull("nothing started", service.getReplicationStatus());
+		assertThrows(UnknownEdgeException.class, () -> service.startReplication(edges(service), EDGE, attackerURL));
+		assertThrows(UnknownEdgeException.class, () -> service.startReplication(edges(service), attackerURL, EDGE));
+		assertThrows("an unselected edge", UnknownEdgeException.class, () -> service.startReplication(edges(service), EDGE, ""));
+		assertNull("nothing started", service.getReplicationStatus(edges(service)));
 		assertNothingConnected();
 	}
 
 	/** Two spellings of one edge are one edge: replicating onto itself would skip every key and report success. */
 	@Test
 	public void replicationRefusesTheSameEdgeSpelledTwoWays() {
-		IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> service.startReplication(EDGE, EDGE + "/"));
+		IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> service.startReplication(edges(service), EDGE, EDGE + "/"));
 		assertFalse(e instanceof UnknownEdgeException);
-		assertNull(service.getReplicationStatus());
+		assertNull(service.getReplicationStatus(edges(service)));
 	}
 
 	/** Config editing refuses per edge rather than throwing: the screen shows one result line per edge. */
@@ -141,7 +142,7 @@ public class FrontcacheServiceConfiguredEdgeTest {
 		FrontcacheService editing = spy(service);
 		doReturn(true).when(editing).isConfigEditingEnabled();
 
-		SetConfigActionResponse response = editing.saveConfigFile(attackerURL, ConfigFile.BOTS, "Googlebot\n", null);
+		SetConfigActionResponse response = editing.saveConfigFile(edges(editing), attackerURL, ConfigFile.BOTS, "Googlebot\n", null);
 
 		assertEquals(ActionResponse.RESPONSE_STATUS_ERROR, response.getResponseStatus());
 		assertFalse(response.isWritten());
@@ -159,5 +160,10 @@ public class FrontcacheServiceConfiguredEdgeTest {
 		assertEquals("http://a/b/", FrontcacheService.canonicalEdgeURL("http://a/b"));
 		assertEquals("", FrontcacheService.canonicalEdgeURL("   "));
 		assertNull(FrontcacheService.canonicalEdgeURL(null));
+	}
+
+	/** The console's configured edges, as a request on a console with no plugin sees them. */
+	private static EdgeScope edges(FrontcacheService service) {
+		return new ConfiguredEdgeScope(service).everyEdge();
 	}
 }

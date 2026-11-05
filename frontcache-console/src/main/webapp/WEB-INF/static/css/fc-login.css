@@ -124,3 +124,16 @@ body {
 	outline: 2px solid rgba(102, 175, 233, .65);
 	outline-offset: 2px;
 }
+
+/* "Sign in with ..." - an identity provider's button, a link styled as the form's (2.12.0) */
+.fc-login-sso {
+	display: block;
+	box-sizing: border-box;
+	text-align: center;
+	text-decoration: none;
+}
+
+.fc-login-input + .fc-login-sso,
+.fc-login-submit + .fc-login-sso {
+	margin-top: 12px;
+}

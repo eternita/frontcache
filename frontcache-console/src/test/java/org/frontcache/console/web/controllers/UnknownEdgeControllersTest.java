@@ -22,6 +22,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
+
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.service.UnknownEdgeException;
 import org.junit.Before;
@@ -39,6 +42,8 @@ import org.springframework.ui.ExtendedModelMap;
 public class UnknownEdgeControllersTest {
 
 	private static final String UNKNOWN = "http://attacker.example.com/";
+
+	private static final EdgeScope SCOPE = EdgeScope.of("test", List.of("http://localhost:9080/"), "key");
 	private static final String MESSAGE = UnknownEdgeException.messageFor(UNKNOWN);
 
 	private FrontcacheService service;
@@ -49,12 +54,12 @@ public class UnknownEdgeControllersTest {
 		service = Mockito.mock(FrontcacheService.class);
 		UnknownEdgeException refusal = new UnknownEdgeException(UNKNOWN);
 
-		when(service.getFromCache(Mockito.eq(UNKNOWN), any())).thenThrow(refusal);
-		doThrow(refusal).when(service).invalidateEdge(Mockito.eq(UNKNOWN), any());
-		doThrow(refusal).when(service).purgeEdge(UNKNOWN);
-		when(service.dumpKeys(UNKNOWN)).thenThrow(refusal);
-		when(service.backupEdge(UNKNOWN)).thenThrow(refusal);
-		when(service.startReplication(anyString(), Mockito.eq(UNKNOWN))).thenThrow(refusal);
+		when(service.getFromCache(any(), Mockito.eq(UNKNOWN), any())).thenThrow(refusal);
+		doThrow(refusal).when(service).invalidateEdge(any(), Mockito.eq(UNKNOWN), any());
+		doThrow(refusal).when(service).purgeEdge(any(), Mockito.eq(UNKNOWN));
+		when(service.dumpKeys(any(), Mockito.eq(UNKNOWN))).thenThrow(refusal);
+		when(service.backupEdge(any(), Mockito.eq(UNKNOWN))).thenThrow(refusal);
+		when(service.startReplication(any(), anyString(), Mockito.eq(UNKNOWN))).thenThrow(refusal);
 
 		model = new ExtendedModelMap();
 	}
@@ -70,7 +75,7 @@ public class UnknownEdgeControllersTest {
 		form.setEdge(UNKNOWN);
 		form.setKey("http://site/page");
 
-		assertEquals("cache_view", controller(new CacheViewController()).submitForm(model, form));
+		assertEquals("cache_view", controller(new CacheViewController()).submitForm(model, form, SCOPE));
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse("not 'Nothing Found'", model.containsAttribute("submitted"));
 	}
@@ -82,11 +87,11 @@ public class UnknownEdgeControllersTest {
 		form.setEdge(UNKNOWN);
 		form.setFilter("*");
 
-		controller.submitForm(model, form);
+		controller.submitForm(model, form, SCOPE);
 		assertEquals(MESSAGE, model.get("edgeError"));
 
 		model = new ExtendedModelMap();
-		controller.purge(model, form);
+		controller.purge(model, form, SCOPE);
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse(model.containsAttribute("purgeResult"));
 	}
@@ -97,17 +102,17 @@ public class UnknownEdgeControllersTest {
 		CacheOtherForm form = new CacheOtherForm();
 		form.setEdge(UNKNOWN);
 
-		controller.dumpKeys(model, form);
+		controller.dumpKeys(model, form, SCOPE);
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse(model.containsAttribute("dumpKeysResult"));
 
 		model = new ExtendedModelMap();
-		controller.purge(model, form);
+		controller.purge(model, form, SCOPE);
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse(model.containsAttribute("purgeResult"));
 
 		model = new ExtendedModelMap();
-		controller.backupIndex(model, form);
+		controller.backupIndex(model, form, SCOPE);
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse(model.containsAttribute("backupResult"));
 	}
@@ -118,7 +123,7 @@ public class UnknownEdgeControllersTest {
 		form.setSourceEdge("http://localhost:9080/");
 		form.setTargetEdge(UNKNOWN);
 
-		controller(new CacheReplicationController()).startReplication(model, form);
+		controller(new CacheReplicationController()).startReplication(model, form, SCOPE);
 		assertEquals(MESSAGE, model.get("replicationError"));
 		assertFalse(model.containsAttribute("replicationMessage"));
 	}

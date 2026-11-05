@@ -24,6 +24,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.frontcache.console.auth.ConsoleSecurity;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -45,9 +47,12 @@ public class EdgeEditingTest {
 		return service;
 	}
 
+	private static final EdgeScope SCOPE = EdgeScope.empty("test");
+
 	private EdgesController controller(FrontcacheService service) {
 		EdgesController controller = new EdgesController();
 		ReflectionTestUtils.setField(controller, "frontcacheService", service);
+		ReflectionTestUtils.setField(controller, "consoleSecurity", ConsoleSecurity.defaults(service));
 		return controller;
 	}
 
@@ -59,11 +64,11 @@ public class EdgeEditingTest {
 		request.setParameter("edge", "https://n1.example.com/");
 
 		MockHttpServletResponse added = new MockHttpServletResponse();
-		assertNull(controller(service).addEdge(request, added));
+		assertNull(controller(service).addEdge(request, added, SCOPE));
 		assertEquals(403, added.getStatus());
 
 		MockHttpServletResponse removed = new MockHttpServletResponse();
-		assertNull(controller(service).removeEdge(request, removed));
+		assertNull(controller(service).removeEdge(request, removed, SCOPE));
 		assertEquals(403, removed.getStatus());
 
 		verify(service, never()).addEdge(anyString());
@@ -77,22 +82,22 @@ public class EdgeEditingTest {
 		request.setParameter("edges", "https://a.example.com/ https://b.example.com/");
 		request.setParameter("edge", "https://a.example.com/");
 
-		assertEquals("redirect:edges", controller(service).addEdge(request, new MockHttpServletResponse()));
+		assertEquals("redirect:edges", controller(service).addEdge(request, new MockHttpServletResponse(), SCOPE));
 		verify(service).addEdge("https://a.example.com/");
 		verify(service).addEdge("https://b.example.com/");
 
-		assertEquals("redirect:edges", controller(service).removeEdge(request, new MockHttpServletResponse()));
+		assertEquals("redirect:edges", controller(service).removeEdge(request, new MockHttpServletResponse(), SCOPE));
 		verify(service).removeEdge("https://a.example.com/");
 	}
 
 	@Test
 	public void theScreenSaysWhetherToOfferIt() {
 		ModelMap model = new ModelMap();
-		controller(service(false)).domainRealtimeMonitor(model);
+		controller(service(false)).domainRealtimeMonitor(model, SCOPE);
 		assertFalse((Boolean) model.get("edgeEditingEnabled"));
 
 		model = new ModelMap();
-		controller(service(true)).domainRealtimeMonitor(model);
+		controller(service(true)).domainRealtimeMonitor(model, SCOPE);
 		assertTrue((Boolean) model.get("edgeEditingEnabled"));
 	}
 
@@ -102,8 +107,9 @@ public class EdgeEditingTest {
 		FrontcacheService service = service(false);
 		IndexController index = new IndexController();
 		ReflectionTestUtils.setField(index, "frontcacheService", service);
+		ReflectionTestUtils.setField(index, "consoleSecurity", ConsoleSecurity.defaults(service));
 
-		assertEquals("no_edges", index.index(new MockHttpServletRequest("GET", "/")));
+		assertEquals("no_edges", index.index(new MockHttpServletRequest("GET", "/"), SCOPE));
 		verify(service, never()).isFrontCacheEdgeAvailable(anyString());
 		verify(service, never()).addEdge(anyString());
 	}

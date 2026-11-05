@@ -15,7 +15,13 @@
  */
 package org.frontcache.console.config;
 
+import java.util.List;
+
 import jakarta.servlet.ServletContext;
+
+import org.frontcache.console.auth.ConsolePermissionInterceptor;
+import org.frontcache.console.auth.ConsoleRequestArguments;
+import org.frontcache.console.auth.ConsoleSecurity;
 
 import org.frontcache.console.plugin.ConsoleNoticesAdvice;
 import org.frontcache.console.plugin.ConsolePluginWebImports;
@@ -31,10 +37,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.web.context.ServletContextAware;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.ViewResolver;
 import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer;
 import org.springframework.web.servlet.config.annotation.DefaultServletHandlerConfigurer;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
@@ -62,6 +70,25 @@ public class WebMVCConfig implements WebMvcConfigurer, ServletContextAware, Appl
 		// what the JSPs render from the plugins - menu entries, realtime-page scripts, stylesheets - as
 		// an application attribute: constant for the process, so no page pays for it per request
 		servletContext.setAttribute("fcPlugins", ConsolePlugins.view());
+	}
+
+	/** From the root context: the identity provider, authorizer and edge scope every handler goes through. */
+	@Autowired
+	private ConsoleSecurity consoleSecurity;
+
+	/**
+	 * Every handler - the core's and every plugin's - runs after its {@code @ConsolePermit} is checked
+	 * ({@link ConsolePermissionInterceptor}); static resources are not handler methods and are the auth filter's.
+	 */
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+		registry.addInterceptor(new ConsolePermissionInterceptor(consoleSecurity));
+	}
+
+	/** An {@code EdgeScope} or {@code ConsolePrincipal} handler parameter is the request's. */
+	@Override
+	public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+		resolvers.add(new ConsoleRequestArguments(consoleSecurity));
 	}
 
     @Override

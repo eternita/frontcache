@@ -20,6 +20,9 @@ import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.io.ConfigFile;
 import org.frontcache.io.SetConfigActionResponse;
@@ -55,23 +58,23 @@ public class ConfigFileController {
 	private FrontcacheService frontcacheService;
 
 	@RequestMapping(value = "/fallbacks", method = RequestMethod.GET)
-	public String fallbacks(ModelMap model) {
-		return screen(model, ConfigFile.FALLBACKS);
+	public String fallbacks(ModelMap model, EdgeScope scope) {
+		return screen(model, scope, ConfigFile.FALLBACKS);
 	}
 
 	@RequestMapping(value = "/bot-configs", method = RequestMethod.GET)
-	public String bots(ModelMap model) {
-		return screen(model, ConfigFile.BOTS);
+	public String bots(ModelMap model, EdgeScope scope) {
+		return screen(model, scope, ConfigFile.BOTS);
 	}
 
 	@RequestMapping(value = "/dynamic-urls-configs", method = RequestMethod.GET)
-	public String dynamicURLs(ModelMap model) {
-		return screen(model, ConfigFile.DYNAMIC_URLS);
+	public String dynamicURLs(ModelMap model, EdgeScope scope) {
+		return screen(model, scope, ConfigFile.DYNAMIC_URLS);
 	}
 
 	@RequestMapping(value = "/guard-configs", method = RequestMethod.GET)
-	public String guardRules(ModelMap model) {
-		return screen(model, ConfigFile.GUARD_RULES);
+	public String guardRules(ModelMap model, EdgeScope scope) {
+		return screen(model, scope, ConfigFile.GUARD_RULES);
 	}
 
 	/**
@@ -79,20 +82,20 @@ public class ConfigFileController {
 	 * a person can have bookmarked or linked to, so it keeps resolving rather than 404ing.
 	 */
 	@RequestMapping(value = { "/resilience-configs", "/hystrix-configs" }, method = RequestMethod.GET)
-	public String resilience(ModelMap model) {
-		return screen(model, ConfigFile.RESILIENCE);
+	public String resilience(ModelMap model, EdgeScope scope) {
+		return screen(model, scope, ConfigFile.RESILIENCE);
 	}
 
 	/**
 	 * Renders one Configs screen. Shared by the five GETs and by the POST, so the page an operator
 	 * sees after a Save is built by exactly the same code as the page they saved from.
 	 */
-	private String screen(ModelMap model, ConfigFile configFile) {
+	private String screen(ModelMap model, EdgeScope scope, ConfigFile configFile) {
 
 		model.put("configFileId", configFile.getId());
 		model.put("configFileName", configFile.getFileName());
 		model.put("activeConfig", activeConfigFor(configFile));
-		model.put("configEdges", frontcacheService.getConfigFiles(configFile));
+		model.put("configEdges", frontcacheService.getConfigFiles(scope, configFile));
 		model.put("configEditingEnabled", frontcacheService.isConfigEditingEnabled());
 
 		return "config_file";
@@ -114,8 +117,9 @@ public class ConfigFileController {
 	 * something (CRLF, see {@code ConfigFileStore.normalize}), and what the operator needs to see next
 	 * is what is on disk.
 	 */
+	@ConsolePermit(ConsolePermissions.CONFIG_WRITE)
 	@RequestMapping(value = "/save-config", method = RequestMethod.POST)
-	public String save(ModelMap model, HttpServletRequest request) {
+	public String save(ModelMap model, HttpServletRequest request, EdgeScope scope) {
 
 		ConfigFile configFile = ConfigFile.byId(request.getParameter("file"));
 		if (null == configFile)
@@ -129,11 +133,11 @@ public class ConfigFileController {
 		Map<String, SetConfigActionResponse> results;
 
 		if (allEdges)
-			results = frontcacheService.saveConfigFileToAllEdges(configFile, content, baseHash, edgeURL);
+			results = frontcacheService.saveConfigFileToAllEdges(scope, configFile, content, baseHash, edgeURL);
 		else
 		{
 			results = new LinkedHashMap<String, SetConfigActionResponse>();
-			results.put(edgeURL, frontcacheService.saveConfigFile(edgeURL, configFile, content, baseHash));
+			results.put(edgeURL, frontcacheService.saveConfigFile(scope, edgeURL, configFile, content, baseHash));
 		}
 
 		model.put("saveResults", results);
@@ -142,7 +146,7 @@ public class ConfigFileController {
 		// the first edge.
 		model.put("activeEdgeURL", edgeURL);
 
-		return screen(model, configFile);
+		return screen(model, scope, configFile);
 	}
 
 	/** Which pill config_menu.jsp highlights. Console presentation, so it lives here and not on the enum. */

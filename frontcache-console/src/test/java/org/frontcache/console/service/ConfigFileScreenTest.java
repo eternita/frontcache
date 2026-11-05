@@ -28,6 +28,7 @@ import org.frontcache.console.model.EdgeConfigFile;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.ConfigFile;
 import org.frontcache.io.SetConfigActionResponse;
+import org.frontcache.console.auth.EdgeScope;
 import org.junit.Test;
 
 import com.typesafe.config.Config;
@@ -66,7 +67,7 @@ public class ConfigFileScreenTest {
 		service.addEdge("http://127.0.0.1:1/");
 		service.addEdge("http://127.0.0.1:2/");
 
-		List<EdgeConfigFile> edges = service.getConfigFiles(ConfigFile.BOTS);
+		List<EdgeConfigFile> edges = service.getConfigFiles(edges(service), ConfigFile.BOTS);
 
 		assertEquals("both edges must be on the page", 2, edges.size());
 
@@ -93,7 +94,7 @@ public class ConfigFileScreenTest {
 		service.addEdge("http://127.0.0.2:1/");
 		service.addEdge("http://127.0.0.3:1/");
 
-		List<EdgeConfigFile> edges = service.getConfigFiles(ConfigFile.BOTS);
+		List<EdgeConfigFile> edges = service.getConfigFiles(edges(service), ConfigFile.BOTS);
 
 		assertEquals("http://127.0.0.1:1/", edges.get(0).getUrl());
 		assertEquals("http://127.0.0.2:1/", edges.get(1).getUrl());
@@ -116,7 +117,7 @@ public class ConfigFileScreenTest {
 		service.addEdge("http://127.0.0.1:1/");
 		service.addEdge("http://127.0.0.1:2/");
 
-		Map<String, SetConfigActionResponse> results = service.saveConfigFileToAllEdges(
+		Map<String, SetConfigActionResponse> results = service.saveConfigFileToAllEdges(edges(service), 
 				ConfigFile.BOTS, "Googlebot\n", null, "http://127.0.0.1:1/");
 
 		assertEquals(2, results.size());
@@ -179,10 +180,15 @@ public class ConfigFileScreenTest {
 		assertFalse(service.isConfigEditingEnabled());
 
 		SetConfigActionResponse response =
-				service.saveConfigFile("http://127.0.0.1:1/", ConfigFile.BOTS, "Googlebot\n", null);
+				service.saveConfigFile(edges(service), "http://127.0.0.1:1/", ConfigFile.BOTS, "Googlebot\n", null);
 
 		assertEquals(ActionResponse.RESPONSE_STATUS_ERROR, response.getResponseStatus());
 		assertFalse(response.isWritten());
 		assertEquals("bots.conf", response.getFile());
+	}
+
+	/** The console's configured edges, as a request on a console with no plugin sees them. */
+	private static EdgeScope edges(FrontcacheService service) {
+		return new ConfiguredEdgeScope(service).everyEdge();
 	}
 }

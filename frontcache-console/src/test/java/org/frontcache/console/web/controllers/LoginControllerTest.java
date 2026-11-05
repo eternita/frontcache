@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.when;
 
+import org.frontcache.console.auth.ConsolePrincipal;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.web.ConsoleAuthFilter;
 import org.junit.Before;
@@ -181,7 +182,7 @@ public class LoginControllerTest {
 	@Test
 	public void anAlreadySignedInBrowserIsSentAwayFromTheForm() {
 		MockHttpSession session = new MockHttpSession();
-		session.setAttribute(ConsoleAuthFilter.SESSION_USER_ATTRIBUTE, "admin");
+		session.setAttribute(ConsolePrincipal.SESSION_ATTRIBUTE, ConsolePrincipal.named("admin"));
 		request.setSession(session);
 
 		assertEquals("redirect:/", controller.loginForm(request, model));
@@ -200,7 +201,7 @@ public class LoginControllerTest {
 	@Test
 	public void signingOutInvalidatesTheSession() {
 		MockHttpSession session = new MockHttpSession();
-		session.setAttribute(ConsoleAuthFilter.SESSION_USER_ATTRIBUTE, "admin");
+		session.setAttribute(ConsolePrincipal.SESSION_ATTRIBUTE, ConsolePrincipal.named("admin"));
 		request.setSession(session);
 
 		assertEquals("redirect:/login", controller.logout(request));

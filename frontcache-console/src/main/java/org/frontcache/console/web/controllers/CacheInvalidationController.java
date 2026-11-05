@@ -15,8 +15,11 @@
  */
 package org.frontcache.console.web.controllers;
 
-import java.util.Set;
+import java.util.List;
 
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.service.UnknownEdgeException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,53 +38,55 @@ public class CacheInvalidationController {
 
 
 	@RequestMapping(method = RequestMethod.GET)
-	public String initForm(Model model) {
+	public String initForm(Model model, EdgeScope scope) {
 		CacheInvalidationForm cacheInvalidationForm = new CacheInvalidationForm();
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getEdgeList());
+		model.addAttribute("edges", frontcacheService.getEdgeList(scope));
 
 		return "cache_invalidation";
 	}
 
 
+	@ConsolePermit(ConsolePermissions.CACHE_INVALIDATE)
 	@RequestMapping(method = RequestMethod.POST, params = "invalidate")
-	public String submitForm(Model model, CacheInvalidationForm cacheInvalidationForm) {
+	public String submitForm(Model model, CacheInvalidationForm cacheInvalidationForm, EdgeScope scope) {
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
 
 		try {
-			frontcacheService.invalidateEdge(cacheInvalidationForm.getEdge(), cacheInvalidationForm.getFilter());
+			frontcacheService.invalidateEdge(scope, cacheInvalidationForm.getEdge(), cacheInvalidationForm.getFilter());
 		} catch (UnknownEdgeException e) {
 			model.addAttribute("edgeError", e.getMessage());
 		}
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getEdgeList());
+		model.addAttribute("edges", frontcacheService.getEdgeList(scope));
 
 		return "cache_invalidation";
 	}
 
 
+	@ConsolePermit(ConsolePermissions.CACHE_INVALIDATE)
 	@RequestMapping(method = RequestMethod.POST, params = "purge")
-	public String purge(Model model, CacheInvalidationForm cacheInvalidationForm) {
+	public String purge(Model model, CacheInvalidationForm cacheInvalidationForm, EdgeScope scope) {
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
 
 		try {
-			frontcacheService.purgeEdge(cacheInvalidationForm.getEdge());
+			frontcacheService.purgeEdge(scope, cacheInvalidationForm.getEdge());
 			model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheInvalidationForm.getEdge());
 		} catch (UnknownEdgeException e) {
 			model.addAttribute("edgeError", e.getMessage());
 		}
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getEdgeList());
+		model.addAttribute("edges", frontcacheService.getEdgeList(scope));
 
 		return "cache_invalidation";
 	}

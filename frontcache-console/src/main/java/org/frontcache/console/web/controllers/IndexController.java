@@ -22,6 +22,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.frontcache.console.model.DashboardStream;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.plugin.DashboardStreamContributor;
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
+import org.frontcache.console.auth.ConsoleSecurity;
 import org.frontcache.console.service.FrontcacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,21 +44,24 @@ public class IndexController {
 	@Autowired
 	private FrontcacheService frontcacheService;
 
+	@Autowired
+	private ConsoleSecurity consoleSecurity;
+
 	/** Console plugins' additions to the realtime page's edge list - none on a Community console. */
 	@Autowired(required = false)
 	private List<DashboardStreamContributor> streamContributors = List.of();
 
 	@RequestMapping(value = {"/", "/index"}, method = RequestMethod.GET)
-	public String index(HttpServletRequest request) {
+	public String index(HttpServletRequest request, EdgeScope scope) {
 
-		if (frontcacheService.getEdgesAmount() > 0)
+		if (!scope.isEmpty())
 			return "redirect:realtime";
 		else {
 
 			// check if it's development / test mode
 			// (FC edge and console running locally on the same host) - never on a console whose edge
 			// list is decided by its config alone (edge-editing = false)
-			if (!frontcacheService.isEdgeEditingEnabled())
+			if (!consoleSecurity.edgeEditing())
 				return "no_edges";
 
 			String localFrontcacheURL = (request.isSecure() ? "https" : "http") + "://localhost:" + request.getServerPort();
@@ -73,14 +80,14 @@ public class IndexController {
 
 
 	@RequestMapping(value = "/realtime", method = RequestMethod.GET)
-	public String domainRealtimeMonitor(ModelMap model) {
+	public String domainRealtimeMonitor(ModelMap model, EdgeScope scope) {
 
 		// names and URLs only - no fan-out. The numbers, and the online dot itself, arrive from
 		// /edges-status.json a moment after the page paints; see inc/edges_status_stacked.jsp.
-		model.put("edges", frontcacheService.getEdgeList());
+		model.put("edges", frontcacheService.getEdgeList(scope));
 
 		// a console plugin fills in what the core does not know - the Pro cluster membership
-		List<DashboardStream> streams = frontcacheService.getDashboardStreamList();
+		List<DashboardStream> streams = frontcacheService.getDashboardStreamList(scope);
 		for (DashboardStreamContributor contributor : streamContributors)
 		{
 			try {
@@ -103,8 +110,8 @@ public class IndexController {
 	 */
 	@RequestMapping(value = "/edges-status.json", method = RequestMethod.GET, produces = "application/json")
 	@ResponseBody
-	public List<FrontCacheStatus> edgesStatus() {
-		return frontcacheService.getClusterStatusListPolled();
+	public List<FrontCacheStatus> edgesStatus(EdgeScope scope) {
+		return frontcacheService.getClusterStatusListPolled(scope);
 	}
 
 }

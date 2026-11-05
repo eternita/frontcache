@@ -49,6 +49,7 @@
 					<p class="fc-login-error" role="alert"><c:out value="${error}"/></p>
 				</c:if>
 
+				<c:if test="${formLogin}">
 				<label class="fc-login-label" for="fc-user">User</label>
 				<input class="fc-login-input" id="fc-user" name="user" type="text"
 					autocomplete="username" autofocus required
@@ -61,6 +62,11 @@
 				<input type="hidden" name="next" value="<c:out value='${next}'/>">
 
 				<button class="fc-login-submit" type="submit">Sign in</button>
+				</c:if>
+
+				<c:if test="${not empty ssoLabel}">
+					<a class="fc-login-submit fc-login-sso" href="<c:url value='/login/sso'><c:param name='next' value='${next}'/></c:url>">Sign in with <c:out value="${ssoLabel}"/></a>
+				</c:if>
 			</form>
 		</div>
 	</body>

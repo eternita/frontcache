@@ -17,15 +17,25 @@ package org.frontcache.console.web.controllers;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Optional;
 
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.ConsolePrincipal;
+import org.frontcache.console.auth.ConsoleSecurity;
+import org.frontcache.console.auth.ConsoleSsoProvider;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.web.ConsoleAuthFilter;
 import org.frontcache.console.web.ConsoleAuthenticator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -33,13 +43,16 @@ import jakarta.servlet.http.HttpSession;
 /**
  * The console's login screen.
  *
- * The credential is unchanged from 2.9.0: one user, no roles, read from conf/frontcache-console.conf,
- * compared in {@link ConsoleAuthenticator}. What this adds is the page, the session that remembers a
- * successful sign-in, and a logout - which Basic authentication could not have, because a browser re-sends
- * a cached credential whatever the server does.
+ * The credential is the identity provider's (as of 2.12.0, {@code ConsoleSecurity}): with no console plugin, one
+ * user, no roles, read from conf/frontcache-console.conf and compared in {@link ConsoleAuthenticator}, as since
+ * 2.9.0. What this adds is the page, the session that remembers a successful sign-in, and a logout - which Basic
+ * authentication could not have, because a browser re-sends a cached credential whatever the server does - and,
+ * when a plugin provides one, sign-in through an identity provider at {@code /login/sso}.
  */
 @Controller
 public class LoginController {
+
+	private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
 
 	/**
 	 * One message for wrong password, wrong user, both wrong and an empty submission - the same
@@ -51,32 +64,34 @@ public class LoginController {
 	/** Where a login goes when it has nowhere better - IndexController's own redirect. */
 	static final String DEFAULT_TARGET = "/";
 
+	/** How long a pre-auth session lives: the round trip to the identity provider and back. */
+	static final int PRE_AUTH_SECONDS = 120;
+
+	/** Marks the pre-auth session, so a callback cannot complete a sign-in in some other session. */
+	static final String PRE_AUTH_ATTRIBUTE = "fc.sso.pre-auth";
+
 	@Autowired
-	private FrontcacheService frontcacheService;
+	private ConsoleSecurity security;
 
-	private ConsoleAuthenticator authenticator;
-
-	/** Test seam, and the lazy build the field needs because @Autowired lands after construction. */
-	private ConsoleAuthenticator authenticator() {
-
-		if (null == authenticator)
-			authenticator = new ConsoleAuthenticator(frontcacheService);
-
-		return authenticator;
-	}
-
+	/** Test seam: the single-user console's security. */
 	void setFrontcacheService(FrontcacheService frontcacheService) {
-		this.frontcacheService = frontcacheService;
-		this.authenticator = null;
+		this.security = ConsoleSecurity.defaults(frontcacheService);
 	}
 
+	/** Test seam: any security. */
+	void setConsoleSecurity(ConsoleSecurity security) {
+		this.security = security;
+	}
+
+	@ConsolePermit(ConsolePermissions.ANONYMOUS)
 	@RequestMapping(value = "/login", method = RequestMethod.GET)
 	public String loginForm(HttpServletRequest request, ModelMap model) {
 
-		if (!frontcacheService.isAuthEnabled() || isSignedIn(request))
+		if (!security.authRequired() || isSignedIn(request))
 			return "redirect:" + DEFAULT_TARGET;
 
 		model.put("next", safeTarget(request.getParameter("next")));
+		putSignInOptions(model);
 
 		return "login";
 	}
@@ -88,30 +103,97 @@ public class LoginController {
 	 * deliberately not a 401 either - that is what tempts a browser into its native dialog on top
 	 * of this page.
 	 */
+	@ConsolePermit(ConsolePermissions.ANONYMOUS)
 	@RequestMapping(value = "/login", method = RequestMethod.POST)
 	public String login(HttpServletRequest request, ModelMap model) {
 
-		if (!frontcacheService.isAuthEnabled())
+		if (!security.authRequired())
 			return "redirect:" + DEFAULT_TARGET;
 
 		String user = request.getParameter("user");
 		String password = request.getParameter("password");
 		String target = safeTarget(request.getParameter("next"));
 
-		if (!authenticator().matches(user, password))
+		Optional<ConsolePrincipal> principal = security.identityProvider().formLogin()
+				? security.identityProvider().authenticate(user, password)
+				: Optional.empty();
+
+		if (principal.isEmpty())
 		{
 			model.put("error", WRONG_CREDENTIAL);
 			// Echoed so a mistyped password does not also clear the user name. The password is
 			// never echoed.
 			model.put("submittedUser", null == user ? "" : user);
 			model.put("next", target);
+			putSignInOptions(model);
 
 			return "login";
 		}
 
-		signIn(request);
+		signIn(request, principal.get());
 
 		return "redirect:" + target;
+	}
+
+	/**
+	 * Starts SSO: a fresh PRE-AUTH session - two minutes, no principal, so the filter never takes it for a signed-in
+	 * one - in which the provider keeps the flow's state, then the identity provider. 404 without a provider: the
+	 * path is anonymous (a fixed entry in the filter's set), and must not be a page that does nothing.
+	 */
+	@ConsolePermit(ConsolePermissions.ANONYMOUS)
+	@RequestMapping(value = "/login/sso", method = RequestMethod.GET)
+	public String startSso(HttpServletRequest request) {
+
+		ConsoleSsoProvider sso = security.sso().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+		if (!security.authRequired() || isSignedIn(request))
+			return "redirect:" + DEFAULT_TARGET;
+
+		HttpSession existing = request.getSession(false);
+		if (null != existing)
+			existing.invalidate();
+
+		HttpSession preAuth = request.getSession(true);
+		preAuth.setMaxInactiveInterval(PRE_AUTH_SECONDS);
+		preAuth.setAttribute(PRE_AUTH_ATTRIBUTE, Boolean.TRUE);
+
+		URI identityProvider = sso.begin(request, preAuth, safeTarget(request.getParameter("next")));
+
+		return "redirect:" + identityProvider.toString();
+	}
+
+	/**
+	 * Where the identity provider sends the browser back. A GET from another origin, so {@code SameOriginFilter} does
+	 * not cover it - the provider's {@code state} check does. The pre-auth session is invalidated whatever the
+	 * outcome; on success the real session is created; on refusal the login page says why, with no session.
+	 */
+	@ConsolePermit(ConsolePermissions.ANONYMOUS)
+	@RequestMapping(value = "/login/sso/callback", method = RequestMethod.GET)
+	public String completeSso(HttpServletRequest request, ModelMap model) {
+
+		ConsoleSsoProvider sso = security.sso().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+		HttpSession session = request.getSession(false);
+		HttpSession preAuth = null != session && Boolean.TRUE.equals(attribute(session, PRE_AUTH_ATTRIBUTE)) ? session : null;
+
+		ConsoleSsoProvider.Outcome outcome;
+		try {
+			outcome = sso.complete(request, preAuth);
+		} catch (ConsoleSsoProvider.ConsoleSsoException refused) {
+			// Only the pre-auth session ends (finally): a forged callback arriving in a signed-in browser must
+			// not be a way to sign its operator out.
+			logger.warn("SSO sign-in refused: {}", refused.getMessage());
+			model.put("error", refused.getMessage());
+			model.put("next", DEFAULT_TARGET);
+			putSignInOptions(model);
+			return "login";
+		} finally {
+			invalidate(preAuth);
+		}
+
+		signIn(request, outcome.principal());
+
+		return "redirect:" + safeTarget(outcome.next());
 	}
 
 	/**
@@ -122,43 +204,62 @@ public class LoginController {
 	 *
 	 * A logout with no session is not an error.
 	 */
+	@ConsolePermit(ConsolePermissions.ANONYMOUS)
 	@RequestMapping(value = "/logout", method = RequestMethod.POST)
 	public String logout(HttpServletRequest request) {
 
-		HttpSession session = request.getSession(false);
-
-		if (null != session)
-			session.invalidate();
+		invalidate(request.getSession(false));
 
 		return "redirect:" + ConsoleAuthFilter.LOGIN_PATH;
+	}
+
+	/** What the login page offers: the form, and the SSO button. */
+	private void putSignInOptions(ModelMap model) {
+		model.put("formLogin", security.identityProvider().formLogin());
+		security.sso().ifPresent(sso -> model.put("ssoLabel", sso.label()));
 	}
 
 	private boolean isSignedIn(HttpServletRequest request) {
 
 		HttpSession session = request.getSession(false);
 
-		return null != session && null != session.getAttribute(ConsoleAuthFilter.SESSION_USER_ATTRIBUTE);
+		return null != session && attribute(session, ConsolePrincipal.SESSION_ATTRIBUTE) instanceof ConsolePrincipal;
 	}
 
 	/**
-	 * The one place a session is created.
+	 * Where a signed-in session is created: here, after a form login or an SSO callback.
 	 *
-	 * The old session is invalidated first: with a single user, session fixation buys an attacker
-	 * who can plant a session id in the operator's browser a session shared with the operator
-	 * rather than the reverse - but the fix is three lines, and the argument for skipping it is
-	 * never worth writing down.
+	 * The old session is invalidated first: session fixation would otherwise hand an attacker who can plant a
+	 * session id in an operator's browser a signed-in session - the fix is three lines, and the argument for
+	 * skipping it is never worth writing down.
 	 *
-	 * What goes in is a marker, not the credential. Nothing needs the password afterwards, and the
-	 * user name is what the navbar renders.
+	 * What goes in is the principal and the name the navbar renders - never the credential.
 	 */
-	private void signIn(HttpServletRequest request) {
+	private void signIn(HttpServletRequest request, ConsolePrincipal principal) {
 
-		HttpSession existing = request.getSession(false);
-		if (null != existing)
-			existing.invalidate();
+		invalidate(request.getSession(false));
 
-		request.getSession(true)
-				.setAttribute(ConsoleAuthFilter.SESSION_USER_ATTRIBUTE, frontcacheService.getUser());
+		HttpSession session = request.getSession(true);
+		session.setAttribute(ConsolePrincipal.SESSION_ATTRIBUTE, principal);
+		session.setAttribute(ConsoleAuthFilter.SESSION_USER_ATTRIBUTE, principal.name());
+	}
+
+	private static Object attribute(HttpSession session, String name) {
+		try {
+			return session.getAttribute(name);
+		} catch (IllegalStateException invalidated) {
+			return null;
+		}
+	}
+
+	private static void invalidate(HttpSession session) {
+		if (null == session)
+			return;
+		try {
+			session.invalidate();
+		} catch (IllegalStateException alreadyInvalid) {
+			// the same outcome
+		}
 	}
 
 	/**
