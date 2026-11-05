@@ -38,7 +38,6 @@ import org.frontcache.console.model.GuardRulesConfig;
 import org.frontcache.console.model.DashboardStream;
 import org.frontcache.console.plugin.ConsolePlugins;
 import org.frontcache.core.WebResponse;
-import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.ConfigFile;
@@ -283,42 +282,17 @@ public class FrontcacheService {
 
 
 	/**
-	 *
-	 * @return
+	 * Every edge's numbers, keyed by canonical edge URL, in console-config order.
 	 */
 	public Map<String, FrontCacheStatus> getClusterStatus() {
 
-        List<Future<FrontCacheStatus>> futureList = new ArrayList<Future<FrontCacheStatus>>();
+		List<FrontCacheClient> clients = getFrontCacheAgents();
+		List<Future<FrontCacheStatus>> futureList = new ArrayList<Future<FrontCacheStatus>>();
 
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order).
-		Map<String, FrontCacheStatus> clusterStatus = new LinkedHashMap<String, FrontCacheStatus>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		for (FrontCacheClient fcClient : clients)
             futureList.add(executor.submit(new FrontCacheStatusCaller(fcClient)));
 
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<FrontCacheStatus> f : futureList)
-        {
-            try {
-            	FrontCacheStatus result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result);
-
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some statuses may not be retrieved ");
-            }
-        }
-
-		return clusterStatus;
+		return byEdge(clients, futureList, "statuses");
 	}
 
 	/**
@@ -419,38 +393,13 @@ public class FrontcacheService {
 	 */
 	public Map<String, VisitorTypesConfig> getVisitorTypes() {
 
-        List<Future<VisitorTypesConfig>> futureList = new ArrayList<Future<VisitorTypesConfig>>();
+		List<FrontCacheClient> clients = getFrontCacheAgents();
+		List<Future<VisitorTypesConfig>> futureList = new ArrayList<Future<VisitorTypesConfig>>();
 
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order) so the UI
-		// tabs appear in the configured order.
-		Map<String, VisitorTypesConfig> clusterStatus = new LinkedHashMap<String, VisitorTypesConfig>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		for (FrontCacheClient fcClient : clients)
             futureList.add(executor.submit(new VisitorTypesCaller(fcClient)));
 
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<VisitorTypesConfig> f : futureList)
-        {
-            try {
-            	VisitorTypesConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result);
-
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
-            }
-        }
-
-		return clusterStatus;
+		return byEdge(clients, futureList, "configs");
 	}
 
 	/**
@@ -459,38 +408,53 @@ public class FrontcacheService {
 	 * Read-only: rules are edited in FRONTCACHE_HOME/conf/guard-rules.conf and applied with the
 	 * reload-guard-rules action - same story as the other config screens.
 	 */
-	public Map<String, List<GuardRuleEntry>> getGuardRules() {
+	public Map<String, GuardRulesConfig> getGuardRules() {
 
-        List<Future<GuardRulesConfig>> futureList = new ArrayList<Future<GuardRulesConfig>>();
+		List<FrontCacheClient> clients = getFrontCacheAgents();
+		List<Future<GuardRulesConfig>> futureList = new ArrayList<Future<GuardRulesConfig>>();
 
-		// LinkedHashMap preserves the edge order defined in the console config
-		Map<String, List<GuardRuleEntry>> clusterStatus = new LinkedHashMap<String, List<GuardRuleEntry>>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		for (FrontCacheClient fcClient : clients)
             futureList.add(executor.submit(new GuardRulesCaller(fcClient)));
 
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<GuardRulesConfig> f : futureList)
-        {
-            try {
-            	GuardRulesConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		Map<String, GuardRulesConfig> guardRules = byEdge(clients, futureList, "guard rules");
+		guardRules.values().removeIf(rules -> null == rules.getConfig());
+		return guardRules;
+	}
 
-            	if (null != result && null != result.getConfig())
-            		clusterStatus.put(result.getName(), result.getConfig());
+	/**
+	 * One fan-out's answers, keyed by the canonical URL of the edge each came from - the client at the
+	 * same index - in console-config order. <b>Never by {@link FrontCacheClient#getName()}</b>: it
+	 * strips the scheme and everything from the first colon, so two edges on one host
+	 * ({@code localhost:8080}, {@code localhost:9080}) have one name, and keying by it kept one of
+	 * them and silently dropped the other - from the Edges status, Visitor Types and Guard screens.
+	 *
+	 * An edge that answers nothing within the timeout is left out; once one edge has timed out, the
+	 * rest get the shorter {@link #CONSOLE_TIMEOUT}, so one slow edge does not multiply the wait.
+	 */
+	static <T> Map<String, T> byEdge(List<FrontCacheClient> clients, List<Future<T>> futures, String what) {
+
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures are submitted/consumed in that same order).
+		Map<String, T> byEdge = new LinkedHashMap<String, T>();
+
+        boolean timeoutReached = false;
+        for (int i = 0; i < futures.size(); i++)
+        {
+            Future<T> f = futures.get(i);
+            try {
+            	T result = f.get(timeoutReached ? CONSOLE_TIMEOUT : FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+
+            	if (null != result)
+            		byEdge.put(canonicalEdgeURL(clients.get(i).getFrontCacheURL()), result);
 
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some guard rules may not be retrieved ");
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some " + what + " may not be retrieved ");
             }
         }
 
-		return clusterStatus;
+		return byEdge;
 	}
 
 	/**
