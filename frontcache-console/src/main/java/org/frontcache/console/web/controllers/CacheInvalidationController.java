@@ -17,12 +17,16 @@ package org.frontcache.console.web.controllers;
 
 import java.util.List;
 
+import org.frontcache.console.auth.ConsoleAudit;
+import org.frontcache.console.auth.ConsoleAuditor;
 import org.frontcache.console.auth.ConsolePermissions;
 import org.frontcache.console.auth.ConsolePermit;
 import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.service.UnknownEdgeException;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,13 +56,15 @@ public class CacheInvalidationController {
 
 
 	@ConsolePermit(ConsolePermissions.CACHE_INVALIDATE)
+	@ConsoleAudit(value = "cache.invalidate", parameters = "filter")
 	@RequestMapping(method = RequestMethod.POST, params = "invalidate")
-	public String submitForm(Model model, CacheInvalidationForm cacheInvalidationForm, EdgeScope scope) {
+	public String submitForm(Model model, CacheInvalidationForm cacheInvalidationForm, EdgeScope scope, HttpServletRequest request) {
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
 
 		try {
 			frontcacheService.invalidateEdge(scope, cacheInvalidationForm.getEdge(), cacheInvalidationForm.getFilter());
 		} catch (UnknownEdgeException e) {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			model.addAttribute("edgeError", e.getMessage());
 		}
 
@@ -72,14 +78,16 @@ public class CacheInvalidationController {
 
 
 	@ConsolePermit(ConsolePermissions.CACHE_INVALIDATE)
+	@ConsoleAudit("cache.purge")
 	@RequestMapping(method = RequestMethod.POST, params = "purge")
-	public String purge(Model model, CacheInvalidationForm cacheInvalidationForm, EdgeScope scope) {
+	public String purge(Model model, CacheInvalidationForm cacheInvalidationForm, EdgeScope scope, HttpServletRequest request) {
 		model.addAttribute("cacheInvalidation", cacheInvalidationForm);
 
 		try {
 			frontcacheService.purgeEdge(scope, cacheInvalidationForm.getEdge());
 			model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheInvalidationForm.getEdge());
 		} catch (UnknownEdgeException e) {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			model.addAttribute("edgeError", e.getMessage());
 		}
 

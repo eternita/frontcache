@@ -30,6 +30,7 @@ import org.frontcache.console.service.UnknownEdgeException;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.ui.ExtendedModelMap;
 
@@ -75,7 +76,7 @@ public class UnknownEdgeControllersTest {
 		form.setEdge(UNKNOWN);
 		form.setKey("http://site/page");
 
-		assertEquals("cache_view", controller(new CacheViewController()).submitForm(model, form, SCOPE));
+		assertEquals("cache_view", controller(new CacheViewController()).submitForm(model, form, SCOPE, new MockHttpServletRequest()));
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse("not 'Nothing Found'", model.containsAttribute("submitted"));
 	}
@@ -87,11 +88,11 @@ public class UnknownEdgeControllersTest {
 		form.setEdge(UNKNOWN);
 		form.setFilter("*");
 
-		controller.submitForm(model, form, SCOPE);
+		controller.submitForm(model, form, SCOPE, new MockHttpServletRequest());
 		assertEquals(MESSAGE, model.get("edgeError"));
 
 		model = new ExtendedModelMap();
-		controller.purge(model, form, SCOPE);
+		controller.purge(model, form, SCOPE, new MockHttpServletRequest());
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse(model.containsAttribute("purgeResult"));
 	}
@@ -102,17 +103,17 @@ public class UnknownEdgeControllersTest {
 		CacheOtherForm form = new CacheOtherForm();
 		form.setEdge(UNKNOWN);
 
-		controller.dumpKeys(model, form, SCOPE);
+		controller.dumpKeys(model, form, SCOPE, new MockHttpServletRequest());
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse(model.containsAttribute("dumpKeysResult"));
 
 		model = new ExtendedModelMap();
-		controller.purge(model, form, SCOPE);
+		controller.purge(model, form, SCOPE, new MockHttpServletRequest());
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse(model.containsAttribute("purgeResult"));
 
 		model = new ExtendedModelMap();
-		controller.backupIndex(model, form, SCOPE);
+		controller.backupIndex(model, form, SCOPE, new MockHttpServletRequest());
 		assertEquals(MESSAGE, model.get("edgeError"));
 		assertFalse(model.containsAttribute("backupResult"));
 	}
@@ -123,7 +124,7 @@ public class UnknownEdgeControllersTest {
 		form.setSourceEdge("http://localhost:9080/");
 		form.setTargetEdge(UNKNOWN);
 
-		controller(new CacheReplicationController()).startReplication(model, form, SCOPE);
+		controller(new CacheReplicationController()).startReplication(model, form, SCOPE, new MockHttpServletRequest());
 		assertEquals(MESSAGE, model.get("replicationError"));
 		assertFalse(model.containsAttribute("replicationMessage"));
 	}

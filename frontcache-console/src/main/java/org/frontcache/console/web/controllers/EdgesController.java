@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.frontcache.console.model.FrontCacheStatus;
+import org.frontcache.console.auth.ConsoleAudit;
 import org.frontcache.console.auth.ConsolePermissions;
 import org.frontcache.console.auth.ConsolePermit;
 import org.frontcache.console.auth.EdgeScope;
@@ -69,6 +70,7 @@ public class EdgesController {
 	 * check at all.
 	 */
 	@ConsolePermit(value = ConsolePermissions.EDGES_WRITE, edgeParameter = "")
+	@ConsoleAudit(value = "edges.add", parameters = "edges")
 	@RequestMapping(value = "/add-edge", method = RequestMethod.POST)
 	public String addEdge(HttpServletRequest request, HttpServletResponse response, EdgeScope scope) throws IOException {
 		if (!consoleSecurity.edgeEditing())
@@ -90,6 +92,7 @@ public class EdgesController {
 
 	/** POST for the same reason as {@link #addEdge} - it removes an edge from the console. */
 	@ConsolePermit(ConsolePermissions.EDGES_WRITE)
+	@ConsoleAudit("edges.remove")
 	@RequestMapping(value = "/remove-edge", method = RequestMethod.POST)
 	public String removeEdge(HttpServletRequest request, HttpServletResponse response, EdgeScope scope) throws IOException {
 		if (!consoleSecurity.edgeEditing())

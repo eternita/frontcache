@@ -22,6 +22,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
+import org.frontcache.console.auth.ConsoleAuditEvent;
+import org.frontcache.console.auth.ConsoleAuditor;
 import org.frontcache.console.auth.ConsoleIdentityProvider;
 import org.frontcache.console.auth.ConsolePrincipal;
 import org.frontcache.console.auth.ConsoleSignInThrottledException;
@@ -175,22 +177,29 @@ public class ConsoleAuthFilter implements Filter {
 		}
 
 		ConsolePrincipal principal = sessionPrincipal(httpRequest);
+		String channel = ConsoleAuditEvent.CHANNEL_SESSION;
 		if (null == principal)
 		{
+			channel = ConsoleAuditEvent.CHANNEL_BASIC;
+			String[] credentials = ConsoleAuthenticator.basicCredentials(httpRequest.getHeader("Authorization"));
 			try {
-				principal = basicPrincipal(httpRequest.getHeader("Authorization"));
+				principal = basicPrincipal(credentials);
 			} catch (ConsoleSignInThrottledException throttled) {
+				auditBasicFailure(httpRequest, credentials, "throttled", 429);
 				// not a 401: that would read as a wrong password, and invite the script to try another
 				HttpServletResponse httpResponse = (HttpServletResponse) response;
 				httpResponse.setHeader("Retry-After", Long.toString(throttled.retryAfterSeconds()));
 				httpResponse.sendError(429, throttled.getMessage());
 				return;
 			}
+			if (null == principal)
+				auditBasicFailure(httpRequest, credentials, "wrong user or password", HttpServletResponse.SC_UNAUTHORIZED);
 		}
 
 		if (null != principal)
 		{
 			httpRequest.setAttribute(ConsolePrincipal.REQUEST_ATTRIBUTE, principal);
+			httpRequest.setAttribute(ConsoleAuditEvent.CHANNEL_ATTRIBUTE, channel);
 			chain.doFilter(request, response);
 			return;
 		}
@@ -227,6 +236,9 @@ public class ConsoleAuthFilter implements Filter {
 		Optional<ConsolePrincipal> resumed = security.identityProvider().resume(principal, request);
 		if (resumed.isEmpty())
 		{
+			// the identity provider ended it - a removed or changed user, a refused revalidation; why, if it noted it
+			security.audit(ConsoleAuditEvent.of(request, "session.ended").principal(principal)
+					.channel(ConsoleAuditEvent.CHANNEL_SESSION));
 			try {
 				session.invalidate();
 			} catch (IllegalStateException alreadyInvalid) {
@@ -242,14 +254,26 @@ public class ConsoleAuthFilter implements Filter {
 	}
 
 	/** A script's {@code Authorization: Basic}, checked on every request - no session is created for it. */
-	private ConsolePrincipal basicPrincipal(String header) {
+	private ConsolePrincipal basicPrincipal(String[] credentials) {
 
-		String[] credentials = ConsoleAuthenticator.basicCredentials(header);
 		if (null == credentials)
 			return null;
 
 		return security.identityProvider()
 				.authenticate(credentials[0], credentials[1], ConsoleIdentityProvider.Channel.BASIC).orElse(null);
+	}
+
+	/**
+	 * A Basic credential that was presented and refused - recorded with the user name as sent, never the password. A
+	 * request with no credential is not a sign-in attempt (a browser before its first sign-in, a scanner) and is not
+	 * recorded: one scanner would otherwise write a line per request.
+	 */
+	private void auditBasicFailure(HttpServletRequest request, String[] credentials, String reason, int status) {
+		if (null == credentials)
+			return;
+		security.audit(ConsoleAuditEvent.about(request, "login.failure").channel(ConsoleAuditEvent.CHANNEL_BASIC)
+				.detail("user", credentials[0]).detail("reason", reason)
+				.outcome(ConsoleAuditor.REFUSED).status(status));
 	}
 
 	private boolean isAnonymous(String path) {

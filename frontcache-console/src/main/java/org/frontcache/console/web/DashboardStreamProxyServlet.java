@@ -33,6 +33,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.frontcache.console.auth.ConsoleAuditEvent;
+import org.frontcache.console.auth.ConsoleAuditor;
 import org.frontcache.console.auth.ConsolePermissions;
 import org.frontcache.console.auth.ConsoleSecurity;
 import org.frontcache.console.auth.EdgeScope;
@@ -179,6 +181,8 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 
 		// Outside the dispatcher, so no permission interceptor: the check is here.
 		if (!consoleSecurity.permits(request, ConsolePermissions.VIEW, origin)) {
+			consoleSecurity.audit(ConsoleAuditEvent.about(request, "permission.denied").permission(ConsolePermissions.VIEW)
+					.detail("edge", origin).outcome(ConsoleAuditor.REFUSED).status(HttpServletResponse.SC_FORBIDDEN));
 			response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden: this needs the 'view' permission");
 			return;
 		}
@@ -188,6 +192,8 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 		EdgeScope.Edge edge = resolveEdge(origin, consoleSecurity.scope(request));
 		if (null == edge) {
 			logger.warn("Refusing to proxy '{}' - not one of this request's edges", origin);
+			consoleSecurity.audit(ConsoleAuditEvent.about(request, "edge.denied").detail("edge", origin)
+					.outcome(ConsoleAuditor.REFUSED).status(HttpServletResponse.SC_FORBIDDEN));
 			response.sendError(HttpServletResponse.SC_FORBIDDEN, "Unknown edge");
 			return;
 		}

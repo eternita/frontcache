@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -37,9 +38,9 @@ import org.springframework.stereotype.Component;
 import com.typesafe.config.Config;
 
 /**
- * The console's four security SPIs, resolved once, as of 2.12.0: {@link ConsoleIdentityProvider} (who may sign in),
- * {@link ConsoleAuthorizer} (what they may do), {@link ConsoleEdgeScope} (which edges they reach, with which key) and
- * {@link ConsoleSsoProvider} (sign-in elsewhere). A console plugin provides any of them as beans of its
+ * The console's security SPIs, resolved once, as of 2.12.0: {@link ConsoleIdentityProvider} (who may sign in),
+ * {@link ConsoleAuthorizer} (what they may do), {@link ConsoleEdgeScope} (which edges they reach, with which key),
+ * {@link ConsoleSsoProvider} (sign-in elsewhere) and {@link ConsoleAuditor} (who did what - {@link #audit}). A console plugin provides any of them as beans of its
  * {@code rootComponents()} - so {@code ConsolePlugin} needed no new method - and the core takes the one bean of each
  * type, or its own default when there is none.
  *
@@ -49,7 +50,8 @@ import com.typesafe.config.Config;
  * <li>a {@code users} or {@code sso} block with no identity provider to read it - falling back to
  *     {@code user} / {@code password} would silently re-admit a removed admin;</li>
  * <li>an {@code sso} block with no SSO provider;</li>
- * <li>a {@code tenants} or {@code tenants-file} key with no edge scope - every tenant would see every edge.</li>
+ * <li>a {@code tenants} or {@code tenants-file} key with no edge scope - every tenant would see every edge;</li>
+ * <li>an {@code audit} block with no auditor - a console its config says is audited would record nothing.</li>
  * </ul>
  */
 @Component
@@ -65,13 +67,15 @@ public class ConsoleSecurity {
 			"users", ConsoleIdentityProvider.class,
 			"sso", ConsoleSsoProvider.class,
 			"tenants", ConsoleEdgeScope.class,
-			"tenants-file", ConsoleEdgeScope.class);
+			"tenants-file", ConsoleEdgeScope.class,
+			"audit", ConsoleAuditor.class);
 
 	private final FrontcacheService frontcacheService;
 	private final ConsoleIdentityProvider identityProvider;
 	private final ConsoleAuthorizer authorizer;
 	private final ConsoleEdgeScope edgeScope;
 	private final ConsoleSsoProvider sso;
+	private final ConsoleAuditor auditor;
 
 	@Autowired
 	public ConsoleSecurity(FrontcacheService frontcacheService, ListableBeanFactory beans) {
@@ -79,7 +83,14 @@ public class ConsoleSecurity {
 				one(beans, ConsoleIdentityProvider.class),
 				one(beans, ConsoleAuthorizer.class),
 				one(beans, ConsoleEdgeScope.class),
-				one(beans, ConsoleSsoProvider.class));
+				one(beans, ConsoleSsoProvider.class),
+				one(beans, ConsoleAuditor.class));
+	}
+
+	/** No auditor: nothing is recorded. */
+	public ConsoleSecurity(FrontcacheService frontcacheService, ConsoleIdentityProvider identityProvider,
+			ConsoleAuthorizer authorizer, ConsoleEdgeScope edgeScope, ConsoleSsoProvider sso) {
+		this(frontcacheService, identityProvider, authorizer, edgeScope, sso, null);
 	}
 
 	/**
@@ -87,21 +98,23 @@ public class ConsoleSecurity {
 	 * @param authorizer       null for "every principal may do everything"
 	 * @param edgeScope        null for the configured edges
 	 * @param sso              null for none
+	 * @param auditor          null for none - nothing is recorded
 	 */
 	public ConsoleSecurity(FrontcacheService frontcacheService, ConsoleIdentityProvider identityProvider,
-			ConsoleAuthorizer authorizer, ConsoleEdgeScope edgeScope, ConsoleSsoProvider sso) {
+			ConsoleAuthorizer authorizer, ConsoleEdgeScope edgeScope, ConsoleSsoProvider sso, ConsoleAuditor auditor) {
 
-		refuseUnservedKeys(frontcacheService.getConsoleConfig(), identityProvider, edgeScope, sso);
+		refuseUnservedKeys(frontcacheService.getConsoleConfig(), identityProvider, edgeScope, sso, auditor);
 
 		this.frontcacheService = frontcacheService;
 		this.identityProvider = null != identityProvider ? identityProvider : new SingleUserIdentityProvider(frontcacheService);
 		this.authorizer = null != authorizer ? authorizer : (who, permission, edge) -> true;
 		this.edgeScope = null != edgeScope ? edgeScope : new ConfiguredEdgeScope(frontcacheService);
 		this.sso = sso;
+		this.auditor = auditor;
 
-		if (null != identityProvider || null != authorizer || null != edgeScope || null != sso)
-			logger.info(" -- Console security: identity {}, authorizer {}, edge scope {}, SSO {}",
-					name(identityProvider), name(authorizer), name(edgeScope), name(sso));
+		if (null != identityProvider || null != authorizer || null != edgeScope || null != sso || null != auditor)
+			logger.info(" -- Console security: identity {}, authorizer {}, edge scope {}, SSO {}, audit {}",
+					name(identityProvider), name(authorizer), name(edgeScope), name(sso), name(auditor));
 	}
 
 	/** The single-user console's security - every default. */
@@ -110,7 +123,7 @@ public class ConsoleSecurity {
 	}
 
 	static void refuseUnservedKeys(Config config, ConsoleIdentityProvider identityProvider, ConsoleEdgeScope edgeScope,
-			ConsoleSsoProvider sso) {
+			ConsoleSsoProvider sso, ConsoleAuditor auditor) {
 
 		if (null == config)
 			return;
@@ -123,6 +136,7 @@ public class ConsoleSecurity {
 
 			Object provided = ConsoleIdentityProvider.class == key.getValue() ? identityProvider
 					: ConsoleSsoProvider.class == key.getValue() ? sso
+					: ConsoleAuditor.class == key.getValue() ? auditor
 					: edgeScope;
 
 			// an sso block needs an identity provider too: SSO answers who, the plugin's users/roles what
@@ -171,6 +185,28 @@ public class ConsoleSecurity {
 		return Optional.ofNullable(sso);
 	}
 
+	/** Whether anything is recorded - a plugin provides a {@link ConsoleAuditor}. */
+	public boolean auditing() {
+		return null != auditor;
+	}
+
+	/**
+	 * Hands an event to the auditor, if there is one. <b>Never throws and never fails the action it records</b>: an
+	 * auditor that throws is logged at ERROR and the request goes on - an audit sink that is down must not take the
+	 * console with it.
+	 */
+	public void audit(ConsoleAuditEvent.Builder event) {
+
+		if (null == auditor || null == event)
+			return;
+
+		try {
+			auditor.record(event.build());
+		} catch (Throwable t) {
+			logger.error("The console's auditor failed to record an event - the action was not affected", t);
+		}
+	}
+
 	/** True when a request must be signed in - a login, a {@code users} block or an {@code sso} block is configured. */
 	public boolean authRequired() {
 		return frontcacheService.isAuthEnabled();
@@ -207,8 +243,31 @@ public class ConsoleSecurity {
 		if (null == scope)
 			scope = EdgeScope.empty("none");
 
+		// Every edge a handler asks this scope for and does not get - another tenant's, or none at all - is collected
+		// for the audit (edge.denied, ConsolePermissionInterceptor). Into a set, not the request: a scope may outlive
+		// its request in a plugin's background work, and must never reach back into a recycled one.
+		if (null != auditor)
+		{
+			Set<String> refused = ConcurrentHashMap.newKeySet();
+			request.setAttribute(REFUSED_EDGES_REQUEST_ATTRIBUTE, refused);
+			scope = scope.withRefusals(edge -> {
+				if (refused.size() < 16)
+					refused.add(ConsoleAuditEvent.shorten(edge));
+			});
+		}
+
 		request.setAttribute(SCOPE_REQUEST_ATTRIBUTE, scope);
 		return scope;
+	}
+
+	/** The edges this request's scope refused to build a client for - see {@link #scope}. */
+	static final String REFUSED_EDGES_REQUEST_ATTRIBUTE = "fc.audit.refused-edges";
+
+	/** The edges this request named and its scope does not hold, in no order - empty without an auditor. */
+	@SuppressWarnings("unchecked")
+	public static Set<String> refusedEdges(HttpServletRequest request) {
+		Object refused = request.getAttribute(REFUSED_EDGES_REQUEST_ATTRIBUTE);
+		return refused instanceof Set<?> set ? (Set<String>) set : Set.of();
 	}
 
 	/**

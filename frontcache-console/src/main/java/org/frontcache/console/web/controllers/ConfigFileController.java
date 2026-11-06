@@ -15,11 +15,17 @@
  */
 package org.frontcache.console.web.controllers;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.frontcache.console.auth.ConsoleAudit;
+import org.frontcache.console.auth.ConsoleAuditor;
 import org.frontcache.console.auth.ConsolePermissions;
 import org.frontcache.console.auth.ConsolePermit;
 import org.frontcache.console.auth.EdgeScope;
@@ -118,6 +124,7 @@ public class ConfigFileController {
 	 * is what is on disk.
 	 */
 	@ConsolePermit(ConsolePermissions.CONFIG_WRITE)
+	@ConsoleAudit(value = "config.save", parameters = { "file", "scope" })
 	@RequestMapping(value = "/save-config", method = RequestMethod.POST)
 	public String save(ModelMap model, HttpServletRequest request, EdgeScope scope) {
 
@@ -141,12 +148,45 @@ public class ConfigFileController {
 		}
 
 		model.put("saveResults", results);
+		auditSave(request, content, baseHash, results);
 
 		// The tab the operator was on, so the re-rendered page opens where they left it rather than on
 		// the first edge.
 		model.put("activeEdgeURL", edgeURL);
 
 		return screen(model, scope, configFile);
+	}
+
+	/**
+	 * What the audit keeps of a save: the file's SHA-256 and size before (as the editor saw it) and after - <b>never
+	 * the content</b>, which may hold an internal hostname - and what each edge answered.
+	 */
+	private static void auditSave(HttpServletRequest request, String content, String baseHash,
+			Map<String, SetConfigActionResponse> results) {
+
+		if (null != baseHash && !baseHash.isBlank())
+			ConsoleAuditor.note(request, "sha256-before", baseHash.trim());
+		if (null != content)
+		{
+			byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+			ConsoleAuditor.note(request, "sha256", sha256(bytes));
+			ConsoleAuditor.note(request, "size", bytes.length);
+		}
+		for (Map.Entry<String, SetConfigActionResponse> result : results.entrySet())
+		{
+			SetConfigActionResponse answer = result.getValue();
+			String outcome = null == answer || !answer.isWritten() ? ConsoleAuditor.REFUSED
+					: answer.isApplied() ? ConsoleAuditor.OK : "written";
+			ConsoleAuditor.edgeOutcome(request, String.valueOf(result.getKey()), outcome);
+		}
+	}
+
+	private static String sha256(byte[] bytes) {
+		try {
+			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e); // every JDK has it
+		}
 	}
 
 	/** Which pill config_menu.jsp highlights. Console presentation, so it lives here and not on the enum. */

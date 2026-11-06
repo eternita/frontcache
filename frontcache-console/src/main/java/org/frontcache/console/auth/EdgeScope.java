@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import org.frontcache.client.FrontCacheClient;
 
@@ -54,9 +55,27 @@ public final class EdgeScope {
 	/** canonical URL -> edge, in display order */
 	private final Map<String, Edge> edges;
 
+	/** Told of every edge {@link #client} was asked for and does not hold - null: nobody listens. */
+	private final Consumer<String> refusals;
+
 	private EdgeScope(String id, Map<String, Edge> edges) {
+		this(id, Collections.unmodifiableMap(edges), null);
+	}
+
+	private EdgeScope(String id, Map<String, Edge> edges, Consumer<String> refusals) {
 		this.id = Objects.requireNonNull(id, "id");
-		this.edges = Collections.unmodifiableMap(edges);
+		this.edges = edges;
+		this.refusals = refusals;
+	}
+
+	/**
+	 * The same scope - same id, same edges - telling {@code refusals} of every edge a caller asks {@link #client} for
+	 * and does not get: what the audit records as {@code edge.denied}. Only {@link #client} reports, because it is what
+	 * a handler acting on an edge calls; {@link #contains} and {@link #edge} are questions, and an authorizer asking
+	 * one is no refusal. A blank URL ("no edge selected") is not reported.
+	 */
+	public EdgeScope withRefusals(Consumer<String> refusals) {
+		return new EdgeScope(id, edges, refusals);
 	}
 
 	/**
@@ -133,7 +152,13 @@ public final class EdgeScope {
 	 */
 	public FrontCacheClient client(String edgeURL) {
 		Edge edge = edge(edgeURL);
-		return null == edge ? null : new FrontCacheClient(edge.url(), edge.apiKey());
+		if (null == edge)
+		{
+			if (null != refusals && null != edgeURL && !edgeURL.isBlank())
+				refusals.accept(edgeURL.trim());
+			return null;
+		}
+		return new FrontCacheClient(edge.url(), edge.apiKey());
 	}
 
 	/** A client for every edge, in display order. */

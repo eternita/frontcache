@@ -100,6 +100,28 @@ public class ConsolePermitTest {
 				.filter(p -> !ConsolePermissions.VIEW.equals(p)).toList()));
 	}
 
+	/**
+	 * The audit's half of the enumeration: {@link ConsoleAudit} only on a handler that changes something (a GET is
+	 * never recorded, so a name there is a mistake), never naming a parameter that holds a secret or content, and on
+	 * every core POST - so each has a type an operator can filter by. Plugins' handlers get the same check in their own
+	 * module (Pro: ConsolePluginWiringTest).
+	 */
+	@Test
+	public void auditAnnotationsNameOnlyIdentifiers() {
+		List<String> violations = ConsolePermissionInterceptor.auditViolations(mapping());
+		assertTrue(String.join("\n", violations), violations.isEmpty());
+
+		for (Map.Entry<RequestMappingInfo, HandlerMethod> entry : mapping().getHandlerMethods().entrySet())
+		{
+			ConsolePermit permit = entry.getValue().getMethodAnnotation(ConsolePermit.class);
+			boolean post = entry.getKey().getMethodsCondition().getMethods()
+					.contains(org.springframework.web.bind.annotation.RequestMethod.POST);
+			if (post && null != permit && !ConsolePermissions.ANONYMOUS.equals(permit.value()))
+				assertTrue(entry.getValue() + " has no @ConsoleAudit",
+						null != entry.getValue().getMethodAnnotation(ConsoleAudit.class));
+		}
+	}
+
 	@Test
 	public void theViolationCheckCatchesAnUnmarkedPost() throws Exception {
 		RequestMappingHandlerMapping mapping = new RequestMappingHandlerMapping();

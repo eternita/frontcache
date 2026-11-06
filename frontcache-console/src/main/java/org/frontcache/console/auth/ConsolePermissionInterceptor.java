@@ -86,9 +86,85 @@ public class ConsolePermissionInterceptor implements HandlerInterceptor {
 		if (security.permits(request, permission, edge))
 			return true;
 
+		security.audit(ConsoleAuditEvent.about(request, "permission.denied")
+				.permission(permission).detail("edge", edge).outcome(ConsoleAuditor.REFUSED)
+				.status(HttpServletResponse.SC_FORBIDDEN));
+
 		response.setHeader("Cache-Control", "no-store");
 		response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden: this needs the '" + permission + "' permission");
 		return false;
+	}
+
+	/**
+	 * The audit's half, once the handler has run (and only when {@code preHandle} let it): one {@code edge.denied} per
+	 * edge the request named outside its scope, and - for every handler that changes something, which is every one
+	 * that is not a GET or HEAD and not the login controller's (that one records its own sign-ins) - one event saying
+	 * what it was, with the parameters its {@link ConsoleAudit} names, the details it noted, and how it went.
+	 * Enumerated by the dispatcher, never listed: a new POST is recorded the day it is added.
+	 */
+	@Override
+	public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+
+		if (!security.auditing() || !(handler instanceof HandlerMethod method))
+			return;
+
+		Set<String> refusedEdges = ConsoleSecurity.refusedEdges(request);
+		for (String edge : refusedEdges)
+			security.audit(ConsoleAuditEvent.about(request, "edge.denied")
+					.detail("edge", edge).outcome(ConsoleAuditor.REFUSED).status(response.getStatus()));
+
+		String permission = requiredPermission(method, request.getMethod());
+		if (!changesState(request.getMethod()) || null == permission || ConsolePermissions.ANONYMOUS.equals(permission))
+			return;
+
+		ConsoleAudit audit = method.getMethodAnnotation(ConsoleAudit.class);
+		ConsolePermit permit = method.getMethodAnnotation(ConsolePermit.class);
+		String type = null != audit && !audit.value().isBlank() ? audit.value() : permission;
+
+		ConsoleAuditEvent.Builder event = ConsoleAuditEvent.of(request, type)
+				.permission(permission).status(response.getStatus());
+
+		// the permit's edge first, then the named parameters - and nothing else the request carried
+		if (null != permit && !permit.edgeParameter().isEmpty())
+			event.detail(permit.edgeParameter(), parameter(request, permit.edgeParameter()));
+		if (null != audit)
+			for (String name : audit.parameters())
+				if (!NEVER_RECORDED.contains(name.toLowerCase(java.util.Locale.ROOT)))
+					event.detail(name, parameter(request, name));
+
+		event.outcomeUnlessSet(outcome(response.getStatus(), ex, !refusedEdges.isEmpty(), event.edges()));
+		security.audit(event);
+	}
+
+	private static boolean changesState(String httpMethod) {
+		return !"GET".equalsIgnoreCase(httpMethod) && !"HEAD".equalsIgnoreCase(httpMethod);
+	}
+
+	/** A parameter, or null - never an exception: a raw-body handler has read the stream a form parse would need. */
+	private static String parameter(HttpServletRequest request, String name) {
+		try {
+			return request.getParameter(name);
+		} catch (RuntimeException unreadable) {
+			return null;
+		}
+	}
+
+	/**
+	 * What an action came to when its handler did not say: an exception or a 5xx failed, a 4xx or an edge outside the
+	 * scope was refused, per-edge outcomes decide between ok, partial and failed, and anything else is ok.
+	 */
+	static String outcome(int status, Exception ex, boolean edgeRefused, Map<String, String> edges) {
+
+		if (null != ex || status >= 500)
+			return ConsoleAuditor.FAILED;
+		if (status >= 400 || edgeRefused)
+			return ConsoleAuditor.REFUSED;
+		if (!edges.isEmpty())
+		{
+			long ok = edges.values().stream().filter(ConsoleAuditor.OK::equals).count();
+			return ok == edges.size() ? ConsoleAuditor.OK : 0 == ok ? ConsoleAuditor.FAILED : ConsoleAuditor.PARTIAL;
+		}
+		return ConsoleAuditor.OK;
 	}
 
 	/**
@@ -118,6 +194,37 @@ public class ConsolePermissionInterceptor implements HandlerInterceptor {
 			else if (null != permit && ConsolePermissions.ANONYMOUS.equals(permit.value())
 					&& !anonymousHandlers.contains(method.getBeanType()))
 				violations.add(where + ": anonymous outside the login controller");
+		}
+		return violations;
+	}
+
+	/**
+	 * Parameter names that may hold a credential or content - never recorded, whatever a {@link ConsoleAudit} names.
+	 * Compared case-insensitively.
+	 */
+	public static final Set<String> NEVER_RECORDED = Set.of("password", "content", "apikey", "api-key", "key-hash",
+			"token", "secret", "code", "authorization", "cookie", "session", "body");
+
+	/**
+	 * Every {@link ConsoleAudit} of a dispatcher that breaks the audit's rule, as "{@code handler: why}": on a GET-only
+	 * handler (a read is never recorded, so a name there is a mistake), or naming a {@link #NEVER_RECORDED} parameter.
+	 * For tests - the core's and a plugin's - like {@link #violations}.
+	 */
+	public static List<String> auditViolations(RequestMappingHandlerMapping mapping) {
+
+		List<String> violations = new ArrayList<String>();
+		for (Map.Entry<RequestMappingInfo, HandlerMethod> entry : mapping.getHandlerMethods().entrySet())
+		{
+			ConsoleAudit audit = entry.getValue().getMethodAnnotation(ConsoleAudit.class);
+			if (null == audit)
+				continue;
+			Set<RequestMethod> methods = entry.getKey().getMethodsCondition().getMethods();
+			if (methods.isEmpty() || methods.stream().allMatch(m -> RequestMethod.GET == m || RequestMethod.HEAD == m))
+				violations.add(entry.getValue().getShortLogMessage() + ": @ConsoleAudit on a read - reads are not recorded");
+			for (String parameter : audit.parameters())
+				if (NEVER_RECORDED.contains(parameter.toLowerCase(java.util.Locale.ROOT)))
+					violations.add(entry.getValue().getShortLogMessage() + ": records '" + parameter
+							+ "', which may hold a secret or content");
 		}
 		return violations;
 	}

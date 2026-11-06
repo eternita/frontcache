@@ -19,6 +19,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
 
+import org.frontcache.console.auth.ConsoleAuditEvent;
+import org.frontcache.console.auth.ConsoleAuditor;
 import org.frontcache.console.auth.ConsoleIdentityProvider;
 import org.frontcache.console.auth.ConsolePermissions;
 import org.frontcache.console.auth.ConsolePermit;
@@ -119,6 +121,7 @@ public class LoginController {
 
 		Optional<ConsolePrincipal> principal;
 		String error = WRONG_CREDENTIAL;
+		String reason = security.identityProvider().formLogin() ? "wrong user or password" : "form sign-in is off";
 		try {
 			principal = security.identityProvider().formLogin()
 					? security.identityProvider().authenticate(user, password, ConsoleIdentityProvider.Channel.FORM)
@@ -127,12 +130,16 @@ public class LoginController {
 			// the page again, with 429 and why - never "wrong password" for what may be the right one
 			principal = Optional.empty();
 			error = throttled.getMessage();
+			reason = "throttled";
 			response.setStatus(429);
 			response.setHeader("Retry-After", Long.toString(throttled.retryAfterSeconds()));
 		}
 
 		if (principal.isEmpty())
 		{
+			// the name as typed, never the password
+			security.audit(ConsoleAuditEvent.about(request, "login.failure").channel(ConsoleAuditEvent.CHANNEL_FORM)
+					.detail("user", user).detail("reason", reason).outcome(ConsoleAuditor.REFUSED));
 			model.put("error", error);
 			// Echoed so a mistyped password does not also clear the user name. The password is
 			// never echoed.
@@ -144,6 +151,8 @@ public class LoginController {
 		}
 
 		signIn(request, principal.get());
+		security.audit(ConsoleAuditEvent.about(request, "login.success").principal(principal.get())
+				.channel(ConsoleAuditEvent.CHANNEL_FORM).outcome(ConsoleAuditor.OK));
 
 		return "redirect:" + target;
 	}
@@ -178,6 +187,8 @@ public class LoginController {
 			identityProvider = sso.begin(request, preAuth, next);
 		} catch (ConsoleSsoProvider.ConsoleSsoException cannot) {
 			logger.warn("SSO sign-in could not start: {}", cannot.getMessage());
+			security.audit(ConsoleAuditEvent.about(request, "login.failure").channel(ConsoleAuditEvent.CHANNEL_SSO)
+					.detail("reason", cannot.getMessage()).outcome(ConsoleAuditor.FAILED));
 			invalidate(preAuth);
 			model.put("error", cannot.getMessage());
 			model.put("next", next);
@@ -209,6 +220,10 @@ public class LoginController {
 			// Only the pre-auth session ends (finally): a forged callback arriving in a signed-in browser must
 			// not be a way to sign its operator out.
 			logger.warn("SSO sign-in refused: {}", refused.getMessage());
+			// the provider's message is the login page's - written to say nothing an attacker can use; the code,
+			// state and tokens are never recorded
+			security.audit(ConsoleAuditEvent.of(request, "login.failure").channel(ConsoleAuditEvent.CHANNEL_SSO)
+					.detail("reason", refused.getMessage()).outcome(ConsoleAuditor.REFUSED));
 			model.put("error", refused.getMessage());
 			model.put("next", DEFAULT_TARGET);
 			putSignInOptions(model);
@@ -218,6 +233,9 @@ public class LoginController {
 		}
 
 		signIn(request, outcome.principal());
+		// what the provider noted about the sign-in (its subject and session id, for correlation) rides along
+		security.audit(ConsoleAuditEvent.of(request, "login.success").principal(outcome.principal())
+				.channel(ConsoleAuditEvent.CHANNEL_SSO).outcome(ConsoleAuditor.OK));
 
 		return "redirect:" + safeTarget(outcome.next());
 	}
@@ -234,7 +252,12 @@ public class LoginController {
 	@RequestMapping(value = "/logout", method = RequestMethod.POST)
 	public String logout(HttpServletRequest request) {
 
-		invalidate(request.getSession(false));
+		HttpSession session = request.getSession(false);
+		if (null != session && attribute(session, ConsolePrincipal.SESSION_ATTRIBUTE) instanceof ConsolePrincipal who)
+			security.audit(ConsoleAuditEvent.about(request, "logout").principal(who)
+					.channel(ConsoleAuditEvent.CHANNEL_SESSION).outcome(ConsoleAuditor.OK));
+
+		invalidate(session);
 
 		return "redirect:" + ConsoleAuthFilter.LOGIN_PATH;
 	}

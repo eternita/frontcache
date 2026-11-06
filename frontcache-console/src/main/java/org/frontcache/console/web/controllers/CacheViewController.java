@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.frontcache.console.auth.ConsoleAudit;
+import org.frontcache.console.auth.ConsoleAuditor;
 import org.frontcache.console.auth.ConsolePermissions;
 import org.frontcache.console.auth.ConsolePermit;
 import org.frontcache.console.auth.EdgeScope;
@@ -29,6 +31,8 @@ import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.service.UnknownEdgeException;
 import org.frontcache.core.WebResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -58,14 +62,16 @@ public class CacheViewController {
 
 
 	@ConsolePermit(ConsolePermissions.CACHE_READ)
+	@ConsoleAudit(value = "cache.view", parameters = "key")
 	@RequestMapping(method = RequestMethod.POST, params = "viewCache")
-	public String submitForm(Model model, CacheViewForm cacheViewForm, EdgeScope scope) {
+	public String submitForm(Model model, CacheViewForm cacheViewForm, EdgeScope scope, HttpServletRequest request) {
 		model.addAttribute("cacheView", cacheViewForm);
 
 		WebResponse webResponse;
 		try {
 			webResponse = frontcacheService.getFromCache(scope, cacheViewForm.getEdge(), cacheViewForm.getKey());
 		} catch (UnknownEdgeException e) {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			// not "submitted": the page would otherwise say "Nothing Found", as if the edge had been asked
 			model.addAttribute("edgeError", e.getMessage());
 			model.addAttribute("edgeList", scope.edgeURLs());
