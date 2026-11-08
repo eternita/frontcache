@@ -19,9 +19,10 @@
                <form:options items="${edgeList}" />
             </form:select>
   </div>
-  <button type="submit" name="dumpKeys" class="btn btn-success">Dump keys</button>
-  <button type="submit" name="purge" class="btn btn-warning">Purge</button>
-  <button type="submit" name="backupIndex" class="btn btn-success">Backup index</button>
+  <%-- offered to who may use them (fcPermits); the handlers refuse the rest either way --%>
+  <c:if test="${fcPermits['cache.read']}"><button type="submit" name="dumpKeys" class="btn btn-success">Dump keys</button></c:if>
+  <c:if test="${fcPermits['cache.invalidate']}"><button type="submit" name="purge" class="btn btn-warning">Purge</button></c:if>
+  <c:if test="${fcPermits['cache.replicate']}"><button type="submit" name="backupIndex" class="btn btn-success">Backup index</button></c:if>
   </form:form>
 
   <c:if test="${not empty edgeError}">

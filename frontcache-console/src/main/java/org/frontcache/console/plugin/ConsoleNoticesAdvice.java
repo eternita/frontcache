@@ -17,6 +17,10 @@ package org.frontcache.console.plugin;
 
 import java.util.List;
 
+import jakarta.servlet.http.HttpServletRequest;
+
+import org.frontcache.console.auth.ConsoleSecurity;
+import org.frontcache.console.auth.EdgeScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,14 +40,21 @@ public class ConsoleNoticesAdvice {
 	@Autowired(required = false)
 	private List<ConsoleNoticeProvider> providers = List.of();
 
+	/** The console's security - absent only in a test that built a context without it. */
+	@Autowired(required = false)
+	private ConsoleSecurity consoleSecurity;
+
 	@ModelAttribute("consoleNotices")
-	public ConsoleNotices consoleNotices() {
+	public ConsoleNotices consoleNotices(HttpServletRequest request) {
+
+		// the request's scope: a provider's notices about edges are about these edges only
+		EdgeScope scope = null == consoleSecurity ? EdgeScope.empty("none") : consoleSecurity.scope(request);
 
 		ConsoleNotices all = new ConsoleNotices();
 		for (ConsoleNoticeProvider provider : providers)
 		{
 			try {
-				all.addAll(provider.notices());
+				all.addAll(provider.notices(scope));
 			} catch (RuntimeException e) {
 				logger.warn("A console notice provider failed - its notices are skipped", e);
 			}

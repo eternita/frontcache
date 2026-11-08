@@ -24,7 +24,7 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.List;
-import java.util.Set;
+import java.util.Collection;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
@@ -33,7 +33,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.frontcache.console.service.FrontcacheService;
+import org.frontcache.console.auth.ConsoleAuditEvent;
+import org.frontcache.console.auth.ConsoleAuditor;
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsoleSecurity;
+import org.frontcache.console.auth.EdgeScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -148,7 +152,7 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 	private static volatile ScheduledExecutorService reaper;
 
 	@Autowired
-	private FrontcacheService frontcacheService;
+	private ConsoleSecurity consoleSecurity;
 
 	@Override
 	public void init() throws ServletException {
@@ -175,19 +179,32 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 			return;
 		}
 
-		String streamUrl = resolveStreamUrl(origin, frontcacheService.getFrontCacheAgentURLs());
-		if (null == streamUrl) {
-			logger.warn("Refusing to proxy '{}' - not one of the console's edges", origin);
+		// Outside the dispatcher, so no permission interceptor: the check is here.
+		if (!consoleSecurity.permits(request, ConsolePermissions.VIEW, origin)) {
+			consoleSecurity.audit(ConsoleAuditEvent.about(request, "permission.denied").permission(ConsolePermissions.VIEW)
+					.detail("edge", origin).outcome(ConsoleAuditor.REFUSED).status(HttpServletResponse.SC_FORBIDDEN));
+			response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden: this needs the 'view' permission");
+			return;
+		}
+
+		// The request's scope, never a console-wide list: an edge outside it is refused exactly like an
+		// unknown one, and the stream is opened with THAT edge's key.
+		EdgeScope.Edge edge = resolveEdge(origin, consoleSecurity.scope(request));
+		if (null == edge) {
+			logger.warn("Refusing to proxy '{}' - not one of this request's edges", origin);
+			consoleSecurity.audit(ConsoleAuditEvent.about(request, "edge.denied").detail("edge", origin)
+					.outcome(ConsoleAuditor.REFUSED).status(HttpServletResponse.SC_FORBIDDEN));
 			response.sendError(HttpServletResponse.SC_FORBIDDEN, "Unknown edge");
 			return;
 		}
+		String streamUrl = normalize(edge.url()) + STREAM_PATH;
 
 		// Everything past here happens on a JDK HttpClient thread or a container callback. This one
 		// goes back to the pool now.
 		AsyncContext async = request.startAsync();
 		async.setTimeout(0);
 
-		open(streamUrl, frontcacheService.getApiKey(), async, response);
+		open(streamUrl, edge.apiKey(), async, response);
 	}
 
 	private void open(String streamUrl, String apiKey, AsyncContext async, HttpServletResponse response) {
@@ -269,13 +286,25 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 	 * @return the URL of the dashboard stream on that edge, or null if {@code origin} is not an edge this
 	 *         console knows.
 	 */
-	static String resolveStreamUrl(String origin, Set<String> edgeUrls) {
+	static String resolveStreamUrl(String origin, Collection<String> edgeUrls) {
 
 		String requested = normalize(origin);
 
 		for (String edgeUrl : edgeUrls)
 			if (normalize(edgeUrl).equals(requested))
 				return normalize(edgeUrl) + STREAM_PATH;
+
+		return null;
+	}
+
+	/** The scope's edge {@code origin} names - with or without the stream path - or null when it names none. */
+	static EdgeScope.Edge resolveEdge(String origin, EdgeScope scope) {
+
+		String requested = normalize(origin);
+
+		for (EdgeScope.Edge edge : scope.edges())
+			if (normalize(edge.url()).equals(requested))
+				return edge;
 
 		return null;
 	}

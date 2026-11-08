@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
+import org.frontcache.console.auth.ConsolePrincipal;
 import org.frontcache.console.service.FrontcacheService;
 import org.junit.Before;
 import org.junit.Test;
@@ -458,7 +459,7 @@ public class ConsoleAuthFilterTest {
 
 	private MockHttpSession signedInSession() {
 		MockHttpSession session = new MockHttpSession();
-		session.setAttribute(ConsoleAuthFilter.SESSION_USER_ATTRIBUTE, "admin");
+		session.setAttribute(ConsolePrincipal.SESSION_ATTRIBUTE, ConsolePrincipal.named("admin"));
 		return session;
 	}
 

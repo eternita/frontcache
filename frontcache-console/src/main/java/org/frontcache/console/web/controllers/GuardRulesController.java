@@ -15,11 +15,13 @@
  */
 package org.frontcache.console.web.controllers;
 
-import java.util.List;
 import java.util.Map;
 
+import org.frontcache.console.model.GuardRulesConfig;
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
-import org.frontcache.guard.GuardRuleEntry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -34,9 +36,9 @@ public class GuardRulesController {
 	private FrontcacheService frontcacheService;
 
     @RequestMapping(value = "/guard-rules", method = RequestMethod.GET)
-    public String getGuardRules(ModelMap model) {
+    public String getGuardRules(ModelMap model, EdgeScope scope) {
 
-    	Map<String, List<GuardRuleEntry>> guardRules = frontcacheService.getGuardRules();
+    	Map<String, GuardRulesConfig> guardRules = frontcacheService.getGuardRules(scope);
 		model.put("guardRules", guardRules);
 
         return "guard_rules";

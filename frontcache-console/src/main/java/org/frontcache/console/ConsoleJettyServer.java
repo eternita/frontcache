@@ -21,16 +21,23 @@ import org.eclipse.jetty.ee10.annotations.AnnotationConfiguration;
 import org.eclipse.jetty.ee10.webapp.MetaInfConfiguration;
 import org.eclipse.jetty.ee10.webapp.WebAppContext;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 
 /**
  * Embedded Jetty 12 (Jakarta EE10) launcher for running the Frontcache console
- * locally. Deploys the webapp at context "/".
+ * locally. Deploys the webapp at context "/" unless told otherwise.
  * Kept self-contained in this module so the console does not depend on the
  * frontcache-server project.
  *
  * System properties:
- *   frontcache.jetty.port    - listen port (default 7080)
- *   frontcache.jetty.webapp  - path to the exploded webapp directory (or war)
+ *   frontcache.jetty.port          - listen port (default 7080)
+ *   frontcache.jetty.webapp        - path to the exploded webapp directory (or war)
+ *   frontcache.jetty.host          - the address to listen on (default: every interface). 127.0.0.1
+ *                                    for a console reached only through a reverse proxy on the same host
+ *   frontcache.jetty.context-path  - the context path (default "/"), as of 2.12.0 - for a console
+ *                                    served under a path of a larger site, e.g. /ops/console. The
+ *                                    console's pages, scripts and redirects are context-relative, so a
+ *                                    proxy forwards the path unchanged rather than rewriting it
  */
 public class ConsoleJettyServer {
 
@@ -38,13 +45,21 @@ public class ConsoleJettyServer {
 
 		int port = Integer.parseInt(System.getProperty("frontcache.jetty.port", "7080"));
 		String webDir = System.getProperty("frontcache.jetty.webapp");
+		String host = System.getProperty("frontcache.jetty.host", "").trim();
+		String contextPath = contextPath(System.getProperty("frontcache.jetty.context-path"));
 
-		System.out.println("Starting Frontcache Console Jetty Server (port=" + port + ", webapp=" + webDir + ") ...");
+		System.out.println("Starting Frontcache Console Jetty Server (port=" + port
+				+ (host.isEmpty() ? "" : ", host=" + host) + ", context-path=" + contextPath + ", webapp=" + webDir + ") ...");
 
-		Server server = new Server(port);
+		Server server = new Server();
+		ServerConnector connector = new ServerConnector(server);
+		connector.setPort(port);
+		if (!host.isEmpty())
+			connector.setHost(host);
+		server.addConnector(connector);
 
 		WebAppContext webapp = new WebAppContext();
-		webapp.setContextPath("/");
+		webapp.setContextPath(contextPath);
 		webapp.setWar(new File(webDir).getAbsolutePath());
 		webapp.setThrowUnavailableOnStartupException(true);
 
@@ -77,6 +92,23 @@ public class ConsoleJettyServer {
 		System.out.println("Frontcache Console Jetty Server has been started successfully ...");
 
 		server.join();
+	}
+
+	/**
+	 * {@code "/"} for nothing, else one leading slash and no trailing one - what Jetty wants, from what
+	 * an operator is likely to type ({@code console/}, {@code /console/}).
+	 */
+	static String contextPath(String configured) {
+
+		String path = null == configured ? "" : configured.trim();
+
+		while (path.endsWith("/"))
+			path = path.substring(0, path.length() - 1);
+
+		if (path.isEmpty())
+			return "/";
+
+		return path.startsWith("/") ? path : "/" + path;
 	}
 
 }

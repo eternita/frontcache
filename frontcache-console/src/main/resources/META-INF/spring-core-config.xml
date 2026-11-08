@@ -9,6 +9,9 @@
  
 	<context:component-scan base-package="org.frontcache.console.service" />
 	<context:component-scan base-package="org.frontcache.console.dao" />
+	<!-- ConsoleSecurity: the identity provider, authorizer, edge scope and SSO provider, each a plugin's bean or
+	     the core's default. Its own package only: nothing else there is a bean. -->
+	<context:component-scan base-package="org.frontcache.console.auth" />
 
 	<!-- Console plugins' root-context beans (services) - org.frontcache.console.plugin.ConsolePlugin.
 	     A plugin class that is also scanned above stays one bean - see ConsolePluginWiringTest. -->

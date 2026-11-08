@@ -23,6 +23,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.frontcache.client.FrontCacheClient;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.model.EdgeConfigFile;
 import org.frontcache.console.model.VisitorTypesConfig;
 import org.frontcache.console.model.FrontCacheStatus;
@@ -38,7 +41,6 @@ import org.frontcache.console.model.GuardRulesConfig;
 import org.frontcache.console.model.DashboardStream;
 import org.frontcache.console.plugin.ConsolePlugins;
 import org.frontcache.core.WebResponse;
-import org.frontcache.guard.GuardRuleEntry;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.BackupActionResponse;
 import org.frontcache.io.ConfigFile;
@@ -71,7 +73,11 @@ public class FrontcacheService {
 
 	private ObjectMapper jsonMapper = new ObjectMapper();
 
-	private Set<String> frontcacheAgentURLs = new LinkedHashSet<String>();
+	/**
+	 * The configured edges, in config order. Copy-on-write: the Edges screen adds and removes while requests read
+	 * it through {@link ConfiguredEdgeScope}.
+	 */
+	private final Set<String> frontcacheAgentURLs = new CopyOnWriteArraySet<String>();
 
 	private String apiKey = "default-api-key";
 
@@ -137,14 +143,23 @@ public class FrontcacheService {
 			throw new RuntimeException("Can't initialize Frontcache Console", e);
 		}
 
-		List<ConfigValue> urls = fcConsoleConfig.getList("urls");
-		for (ConfigValue urlValue : urls) {
-			String url = urlValue.unwrapped().toString();
-			logger.info(" -- Loading url {} from console config", url);
-			frontcacheAgentURLs.add(url);
+		// Through hasPath since 2.12.0: a console whose edges a plugin's scope decides (a multi-tenant console's
+		// tenants, each site with its own key) has no urls and no console-wide key - and must not need one.
+		if (fcConsoleConfig.hasPath("urls"))
+		{
+			List<ConfigValue> urls = fcConsoleConfig.getList("urls");
+			for (ConfigValue urlValue : urls) {
+				String url = urlValue.unwrapped().toString();
+				logger.info(" -- Loading url {} from console config", url);
+				frontcacheAgentURLs.add(url);
+			}
 		}
-		apiKey = fcConsoleConfig.getString("apiKey");
-		logger.info(" -- Loading apiKey {} from console config", apiKey);
+		if (fcConsoleConfig.hasPath("apiKey"))
+		{
+			apiKey = fcConsoleConfig.getString("apiKey");
+			// never the key itself: a log is read by more people than the config file
+			logger.info(" -- Loading apiKey from console config");
+		}
 
 		readCredentials();
 
@@ -157,7 +172,7 @@ public class FrontcacheService {
 	 * Reads the console's single login.
 	 *
 	 * <b>Every key here is read through hasPath first.</b> {@code Config.getString} throws on a
-	 * missing key, so reading these the way apiKey is read would make every console whose config
+	 * missing key, so reading these without it (as apiKey was, before 2.12.0) would make every console whose config
 	 * predates this feature fail to start - which is precisely what a config still saying
 	 * {@code siteKey} does after the 2.9.0 api-key rename.
 	 *
@@ -180,6 +195,9 @@ public class FrontcacheService {
 			password = credentials.password();
 			return;
 		}
+
+		if (hasUsersOrSso(fcConsoleConfig))
+			return; // a console plugin signs in; ConsoleSecurity refuses to start when none does
 
 		if (fcConsoleConfig.hasPath("auth-required") && fcConsoleConfig.getBoolean("auth-required"))
 			throw new IllegalStateException("frontcache-console.conf: auth-required = true, but "
@@ -231,6 +249,14 @@ public class FrontcacheService {
 	 */
 	private void logAuthState() {
 
+		if (isAuthEnabled() && null == user)
+		{
+			logger.info(" -- Console authentication is ON, by a console plugin ({} block)",
+					fcConsoleConfig.hasPath("sso") ? "sso" : "users");
+			logger.info(" -- Config editing is {}", isConfigEditingEnabled() ? "ON" : "OFF (config-editing = false)");
+			return;
+		}
+
 		if (isAuthEnabled())
 		{
 			logger.info(" -- Console authentication is ON for user '{}'", user);
@@ -254,9 +280,18 @@ public class FrontcacheService {
 				+ " unauthenticated console is a monitoring tool; it is not a fleet configuration tool.");
 	}
 
-	/** True when a login is configured. False = every request is served without a check. */
+	/**
+	 * True when a request must be signed in: a login is configured, or - as of 2.12.0 - a {@code users} or
+	 * {@code sso} block, which a console plugin's identity provider reads. False = every request is served without
+	 * a check.
+	 */
 	public boolean isAuthEnabled() {
-		return null != user && null != password;
+		return (null != user && null != password) || hasUsersOrSso(fcConsoleConfig);
+	}
+
+	/** A {@code users} or {@code sso} block - read through hasPath, like the credentials are. */
+	static boolean hasUsersOrSso(Config config) {
+		return null != config && (config.hasPath("users") || config.hasPath("sso"));
 	}
 
 	public String getUser() {
@@ -267,7 +302,13 @@ public class FrontcacheService {
 		return password;
 	}
 
-	public String getApiKey(){
+	/** The configured edges, as configured - for {@link ConfiguredEdgeScope} only: requests reach edges through a scope. */
+	List<String> configuredEdgeURLs() {
+		return new ArrayList<String>(frontcacheAgentURLs);
+	}
+
+	/** The configured API key - for {@link ConfiguredEdgeScope} only. */
+	String configuredApiKey() {
 		return apiKey;
 	}
 
@@ -283,50 +324,25 @@ public class FrontcacheService {
 
 
 	/**
-	 *
-	 * @return
+	 * Every edge's numbers, keyed by canonical edge URL, in console-config order.
 	 */
-	public Map<String, FrontCacheStatus> getClusterStatus() {
+	public Map<String, FrontCacheStatus> getClusterStatus(EdgeScope scope) {
 
-        List<Future<FrontCacheStatus>> futureList = new ArrayList<Future<FrontCacheStatus>>();
+		List<FrontCacheClient> clients = scope.clients();
+		List<Future<FrontCacheStatus>> futureList = new ArrayList<Future<FrontCacheStatus>>();
 
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order).
-		Map<String, FrontCacheStatus> clusterStatus = new LinkedHashMap<String, FrontCacheStatus>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		for (FrontCacheClient fcClient : clients)
             futureList.add(executor.submit(new FrontCacheStatusCaller(fcClient)));
 
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<FrontCacheStatus> f : futureList)
-        {
-            try {
-            	FrontCacheStatus result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result);
-
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some statuses may not be retrieved ");
-            }
-        }
-
-		return clusterStatus;
+		return byEdge(clients, futureList, "statuses");
 	}
 
 	/**
 	 * Cluster statuses as a list in console-config edge order - the order used
 	 * by the "Edges status" block across the console pages.
 	 */
-	public List<FrontCacheStatus> getClusterStatusList() {
-		return new ArrayList<FrontCacheStatus>(getClusterStatus().values());
+	public List<FrontCacheStatus> getClusterStatusList(EdgeScope scope) {
+		return new ArrayList<FrontCacheStatus>(getClusterStatus(scope).values());
 	}
 
 	/**
@@ -343,11 +359,11 @@ public class FrontcacheService {
 	 * first poll answers, this console does not know, and a red dot on a healthy node is a worse
 	 * answer than an honest "checking".
 	 */
-	public List<FrontCacheStatus> getEdgeList() {
+	public List<FrontCacheStatus> getEdgeList(EdgeScope scope) {
 
 		List<FrontCacheStatus> edges = new ArrayList<FrontCacheStatus>();
 
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		for (FrontCacheClient fcClient : scope.clients())
 		{
 			FrontCacheStatus edge = new FrontCacheStatus();
 			edge.setName(fcClient.getName());
@@ -371,38 +387,41 @@ public class FrontcacheService {
 	 */
 	private static final long STATUS_CACHE_MILLIS = 8000;
 
-	private volatile List<FrontCacheStatus> cachedClusterStatus = null;
-	private volatile long cachedClusterStatusStamp = 0;
-	private final Object clusterStatusLock = new Object();
+	/** One scope's polled answer and when it was taken. */
+	private record Polled(List<FrontCacheStatus> statuses, long stamp) { }
 
 	/**
-	 * The same list {@link #getClusterStatusList()} returns, but reused across callers for a few
+	 * By {@link EdgeScope#id()}: a poll taken for one scope is never another's answer - a cache keyed by nothing is
+	 * how one tenant would read another's edges with no edge parameter in sight.
+	 */
+	private final Map<String, Polled> polledByScope = new ConcurrentHashMap<String, Polled>();
+	private final Map<String, Object> pollLocks = new ConcurrentHashMap<String, Object>();
+
+	/**
+	 * The same list {@link #getClusterStatusList} returns, but reused across callers of one scope for a few
 	 * seconds. This is what the realtime page polls.
 	 *
 	 * Page loads deliberately keep using the uncached call: an operator who has just invalidated a
 	 * cache and reloaded expects to see it, and one fan-out per page load was never the problem this
 	 * cache exists to solve.
 	 */
-	public List<FrontCacheStatus> getClusterStatusListPolled() {
+	public List<FrontCacheStatus> getClusterStatusListPolled(EdgeScope scope) {
 
-		long now = System.currentTimeMillis();
-		List<FrontCacheStatus> current = cachedClusterStatus;
-		if (null != current && now - cachedClusterStatusStamp < STATUS_CACHE_MILLIS)
-			return current;
+		Polled current = polledByScope.get(scope.id());
+		if (null != current && System.currentTimeMillis() - current.stamp() < STATUS_CACHE_MILLIS)
+			return current.statuses();
 
-		// One fan-out at a time. Without the lock, every poll that arrives while one is in flight
-		// starts its own - which is precisely the multiplication the cache is here to prevent, just
-		// moved from "many tabs" to "one slow fleet".
-		synchronized (clusterStatusLock) {
+		// One fan-out at a time per scope. Without the lock, every poll that arrives while one is in
+		// flight starts its own - which is precisely the multiplication the cache is here to prevent,
+		// just moved from "many tabs" to "one slow fleet".
+		synchronized (pollLocks.computeIfAbsent(scope.id(), id -> new Object())) {
 
-			now = System.currentTimeMillis();
-			current = cachedClusterStatus;
-			if (null != current && now - cachedClusterStatusStamp < STATUS_CACHE_MILLIS)
-				return current;
+			current = polledByScope.get(scope.id());
+			if (null != current && System.currentTimeMillis() - current.stamp() < STATUS_CACHE_MILLIS)
+				return current.statuses();
 
-			List<FrontCacheStatus> fresh = getClusterStatusList();
-			cachedClusterStatus = fresh;
-			cachedClusterStatusStamp = System.currentTimeMillis();
+			List<FrontCacheStatus> fresh = getClusterStatusList(scope);
+			polledByScope.put(scope.id(), new Polled(fresh, System.currentTimeMillis()));
 
 			return fresh;
 		}
@@ -417,40 +436,15 @@ public class FrontcacheService {
 	 * because the console reads a mixed fleet and the JSP renders whichever the edge answered with.
 	 * The raw file behind this is what {@link #getConfigFiles} returns for ConfigFile.BOTS.
 	 */
-	public Map<String, VisitorTypesConfig> getVisitorTypes() {
+	public Map<String, VisitorTypesConfig> getVisitorTypes(EdgeScope scope) {
 
-        List<Future<VisitorTypesConfig>> futureList = new ArrayList<Future<VisitorTypesConfig>>();
+		List<FrontCacheClient> clients = scope.clients();
+		List<Future<VisitorTypesConfig>> futureList = new ArrayList<Future<VisitorTypesConfig>>();
 
-		// LinkedHashMap preserves the edge order defined in the console config
-		// (futures below are submitted/consumed in that same order) so the UI
-		// tabs appear in the configured order.
-		Map<String, VisitorTypesConfig> clusterStatus = new LinkedHashMap<String, VisitorTypesConfig>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		for (FrontCacheClient fcClient : clients)
             futureList.add(executor.submit(new VisitorTypesCaller(fcClient)));
 
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<VisitorTypesConfig> f : futureList)
-        {
-            try {
-            	VisitorTypesConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-
-            	if (null != result)
-            		clusterStatus.put(result.getName(), result);
-
-            } catch (TimeoutException | InterruptedException | ExecutionException e) {
-                f.cancel(true);
-                timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some configs may not be retrieved ");
-            }
-        }
-
-		return clusterStatus;
+		return byEdge(clients, futureList, "configs");
 	}
 
 	/**
@@ -459,38 +453,53 @@ public class FrontcacheService {
 	 * Read-only: rules are edited in FRONTCACHE_HOME/conf/guard-rules.conf and applied with the
 	 * reload-guard-rules action - same story as the other config screens.
 	 */
-	public Map<String, List<GuardRuleEntry>> getGuardRules() {
+	public Map<String, GuardRulesConfig> getGuardRules(EdgeScope scope) {
 
-        List<Future<GuardRulesConfig>> futureList = new ArrayList<Future<GuardRulesConfig>>();
+		List<FrontCacheClient> clients = scope.clients();
+		List<Future<GuardRulesConfig>> futureList = new ArrayList<Future<GuardRulesConfig>>();
 
-		// LinkedHashMap preserves the edge order defined in the console config
-		Map<String, List<GuardRuleEntry>> clusterStatus = new LinkedHashMap<String, List<GuardRuleEntry>>();
-
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		for (FrontCacheClient fcClient : clients)
             futureList.add(executor.submit(new GuardRulesCaller(fcClient)));
 
-		// processing timeouts
-        boolean timeoutReached = false;
-        for (Future<GuardRulesConfig> f : futureList)
-        {
-            try {
-            	GuardRulesConfig result = null;
-            	if (timeoutReached)
-            		result = f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS);
-            	else
-            		result = f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		Map<String, GuardRulesConfig> guardRules = byEdge(clients, futureList, "guard rules");
+		guardRules.values().removeIf(rules -> null == rules.getConfig());
+		return guardRules;
+	}
 
-            	if (null != result && null != result.getConfig())
-            		clusterStatus.put(result.getName(), result.getConfig());
+	/**
+	 * One fan-out's answers, keyed by the canonical URL of the edge each came from - the client at the
+	 * same index - in console-config order. <b>Never by {@link FrontCacheClient#getName()}</b>: it
+	 * strips the scheme and everything from the first colon, so two edges on one host
+	 * ({@code localhost:8080}, {@code localhost:9080}) have one name, and keying by it kept one of
+	 * them and silently dropped the other - from the Edges status, Visitor Types and Guard screens.
+	 *
+	 * An edge that answers nothing within the timeout is left out; once one edge has timed out, the
+	 * rest get the shorter {@link #CONSOLE_TIMEOUT}, so one slow edge does not multiply the wait.
+	 */
+	static <T> Map<String, T> byEdge(List<FrontCacheClient> clients, List<Future<T>> futures, String what) {
+
+		// LinkedHashMap preserves the edge order defined in the console config
+		// (futures are submitted/consumed in that same order).
+		Map<String, T> byEdge = new LinkedHashMap<String, T>();
+
+        boolean timeoutReached = false;
+        for (int i = 0; i < futures.size(); i++)
+        {
+            Future<T> f = futures.get(i);
+            try {
+            	T result = f.get(timeoutReached ? CONSOLE_TIMEOUT : FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+
+            	if (null != result)
+            		byEdge.put(canonicalEdgeURL(clients.get(i).getFrontCacheURL()), result);
 
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
                 f.cancel(true);
                 timeoutReached =  true;
-                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some guard rules may not be retrieved ");
+                logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached. Some " + what + " may not be retrieved ");
             }
         }
 
-		return clusterStatus;
+		return byEdge;
 	}
 
 	/**
@@ -507,9 +516,9 @@ public class FrontcacheService {
 	 * An edge that times out keeps its tab and is marked unreachable, rather than vanishing from the
 	 * page - a missing tab reads as "this node has no such file", which is a different thing.
 	 */
-	public List<EdgeConfigFile> getConfigFiles(ConfigFile configFile) {
+	public List<EdgeConfigFile> getConfigFiles(EdgeScope scope, ConfigFile configFile) {
 
-		List<FrontCacheClient> fcClients = getFrontCacheAgents();
+		List<FrontCacheClient> fcClients = scope.clients();
 
 		List<Future<EdgeConfigFile>> futureList = new ArrayList<Future<EdgeConfigFile>>();
 		for (FrontCacheClient fcClient : fcClients)
@@ -562,7 +571,7 @@ public class FrontcacheService {
 	 * {@link #parseCredentials}.
 	 *
 	 * Read through {@code hasPath}, like the credentials are: {@code Config.getString} and friends throw
-	 * on a missing key, so reading this the way {@code apiKey} is read would make every console whose
+	 * on a missing key, so reading this without it would make every console whose
 	 * config predates the feature fail to start.
 	 */
 	static boolean configEditingEnabled(Config config, boolean authEnabled) {
@@ -580,43 +589,48 @@ public class FrontcacheService {
 	private static final String CONFIG_EDITING_KEY = "config-editing";
 
 	/**
-	 * A client for {@code edgeURL} - but only when it is one of this console's configured edges, and
-	 * then built from the CONFIGURED spelling, not the caller's.
+	 * Whether the Edges screen may add and remove edges, as of 2.12.0. Default true; false for a
+	 * console whose edge list is decided elsewhere - a deployment that renders {@code urls} from its
+	 * own inventory, where an edge added by hand would be monitored, sent the API key and then silently
+	 * dropped at the next restart. It also stops {@code /} adding a local edge by itself on a console
+	 * with none.
 	 *
-	 * Every call a client makes carries the fleet's API key, and on every screen that names one edge -
-	 * Cache View, Invalidation, Other, Replication, Config editing, the Cache Warmer - the edge arrives
-	 * as a request parameter. A client built from whatever URL the request named would send that key to
-	 * any host a caller chooses, which a crafted POST from an authenticated session is enough to do.
-	 * {@code DashboardStreamProxyServlet} only relays edges in the list for the same reason.
-	 *
-	 * The allowlist is the CURRENT edge list, so an edge added at runtime from the Edges page is
-	 * accepted from then on. Matching is by {@link #canonicalEdgeURL}, so the trailing slash does not
-	 * matter; it is never by {@link FrontCacheClient#getName()}.
-	 *
-	 * @return the client, or null when the URL is not a configured edge
+	 * Not forced off without credentials, unlike {@link #isConfigEditingEnabled()}: the list is the
+	 * console's own state, and the request's {@code EdgeScope} already keeps the API key to the edges in
+	 * it.
 	 */
-	public FrontCacheClient configuredEdgeClient(String edgeURL) {
-
-		String wanted = canonicalEdgeURL(edgeURL);
-		if (null == wanted || wanted.isEmpty())
-			return null;
-
-		for (String configured : frontcacheAgentURLs)
-			if (wanted.equals(canonicalEdgeURL(configured)))
-				return new FrontCacheClient(configured, apiKey);
-
-		return null;
+	public boolean isEdgeEditingEnabled() {
+		return edgeEditingEnabled(fcConsoleConfig);
 	}
 
-	/**
-	 * {@link #configuredEdgeClient}, for the methods whose callers show an error rather than test for
-	 * null: every one of them either returns nothing or a string the page renders as a success.
-	 *
-	 * @throws UnknownEdgeException when the URL is not a configured edge - before any client exists
-	 */
-	private FrontCacheClient requireConfiguredEdgeClient(String edgeURL) {
+	/** The decision half of {@link #isEdgeEditingEnabled()}, testable without a config file. */
+	static boolean edgeEditingEnabled(Config config) {
 
-		FrontCacheClient client = configuredEdgeClient(edgeURL);
+		if (null != config && config.hasPath(EDGE_EDITING_KEY))
+			return config.getBoolean(EDGE_EDITING_KEY);
+
+		return true;
+	}
+
+	/** HOCON key under frontcache.console - read through hasPath, like the credentials are. */
+	private static final String EDGE_EDITING_KEY = "edge-editing";
+
+	/**
+	 * A client for {@code edgeURL} - but only when it is in the request's scope, and then built from the
+	 * CONFIGURED spelling with that edge's key ({@link EdgeScope#client}).
+	 *
+	 * Every call a client makes carries an API key, and on every screen that names one edge - Cache View,
+	 * Invalidation, Other, Replication, Config editing, the Cache Warmer - the edge arrives as a request parameter.
+	 * A client built from whatever URL the request named would send that key to any host a caller chooses, which a
+	 * crafted POST from an authenticated session is enough to do. {@code DashboardStreamProxyServlet} only relays
+	 * edges in the scope for the same reason.
+	 *
+	 * @throws UnknownEdgeException when the URL is not in the scope - before any client exists. Not in the scope and
+	 *         not configured at all are one answer.
+	 */
+	private static FrontCacheClient requireEdgeClient(EdgeScope scope, String edgeURL) {
+
+		FrontCacheClient client = scope.client(edgeURL);
 		if (null == client)
 			throw new UnknownEdgeException(edgeURL);
 
@@ -680,15 +694,7 @@ public class FrontcacheService {
 	 * it used to drop a tab.
 	 */
 	public static String canonicalEdgeURL(String edgeURL) {
-
-		if (null == edgeURL)
-			return null;
-
-		String canonical = edgeURL.trim();
-		if (canonical.isEmpty())
-			return canonical;
-
-		return canonical.endsWith("/") ? canonical : canonical + "/";
+		return EdgeScope.canonical(edgeURL);
 	}
 
 	/**
@@ -700,7 +706,7 @@ public class FrontcacheService {
 	 *                 check (the browser cannot always compute one - see fc-config-editor.js)
 	 * @return the node's answer, or a synthetic refusal when the node could not be reached at all
 	 */
-	public SetConfigActionResponse saveConfigFile(String edgeURL, ConfigFile configFile, String content, String baseHash) {
+	public SetConfigActionResponse saveConfigFile(EdgeScope scope, String edgeURL, ConfigFile configFile, String content, String baseHash) {
 
 		if (!isConfigEditingEnabled())
 		{
@@ -710,7 +716,7 @@ public class FrontcacheService {
 			return refused;
 		}
 
-		FrontCacheClient fcClient = configuredEdgeClient(edgeURL);
+		FrontCacheClient fcClient = scope.client(edgeURL);
 		if (null == fcClient)
 		{
 			SetConfigActionResponse refused = new SetConfigActionResponse();
@@ -749,11 +755,11 @@ public class FrontcacheService {
 	 * @param baseHash the hash of the content as the console rendered it, which is meaningful only for
 	 *                 the edge it was read from - see the note in the caller
 	 */
-	public Map<String, SetConfigActionResponse> saveConfigFileToAllEdges(ConfigFile configFile, String content, String baseHash, String baseHashEdgeURL) {
+	public Map<String, SetConfigActionResponse> saveConfigFileToAllEdges(EdgeScope scope, ConfigFile configFile, String content, String baseHash, String baseHashEdgeURL) {
 
 		Map<String, SetConfigActionResponse> results = new LinkedHashMap<String, SetConfigActionResponse>();
 
-		for (String edgeURL : frontcacheAgentURLs)
+		for (String edgeURL : scope.edgeURLs())
 		{
 			// The hash guards the file the operator was LOOKING at. Sending it to the other nodes would
 			// refuse every one of them whose file differs - which is most of the reason a fleet has more
@@ -761,7 +767,7 @@ public class FrontcacheService {
 			// says so.
 			String hashForEdge = edgeURL.equals(baseHashEdgeURL) ? baseHash : null;
 
-			results.put(edgeURL, saveConfigFile(edgeURL, configFile, content, hashForEdge));
+			results.put(edgeURL, saveConfigFile(scope, edgeURL, configFile, content, hashForEdge));
 		}
 
 		return results;
@@ -774,10 +780,10 @@ public class FrontcacheService {
 	 * Every stream's {@code cluster} is null here; a console plugin's
 	 * {@link org.frontcache.console.plugin.DashboardStreamContributor} fills it in (the Pro cluster rate).
 	 */
-	public List<DashboardStream> getDashboardStreamList()
+	public List<DashboardStream> getDashboardStreamList(EdgeScope scope)
 	{
 		List<DashboardStream> streams = new ArrayList<DashboardStream>();
-		for (FrontCacheClient fcClient : getFrontCacheAgents())
+		for (FrontCacheClient fcClient : scope.clients())
 			streams.add(new DashboardStream(fcClient.getName(), canonicalEdgeURL(fcClient.getFrontCacheURL()), null));
 		return streams;
 	}
@@ -795,69 +801,33 @@ public class FrontcacheService {
 
 
 
-	public Set<String> getFrontCacheAgentURLs()
-	{
-		Set<String> urls = new LinkedHashSet<String>();
-		urls.addAll(frontcacheAgentURLs);
-
-		return urls;
-	}
-
 	/** @throws UnknownEdgeException if the URL is not one of this console's edges */
-	public WebResponse getFromCache(String edgeURL, String key)
+	public WebResponse getFromCache(EdgeScope scope, String edgeURL, String key)
 	{
 		if (null == key)
 			return null;
 
-		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
+		FrontCacheClient fcClient = requireEdgeClient(scope, edgeURL);
 		WebResponse webResponse = fcClient.getFromCache(key.trim());
 
 		return webResponse;
 	}
 
 
-	/** A client for every configured edge, in the console config's order - for a plugin's fan-out too. */
-	public List<FrontCacheClient> getFrontCacheAgents()
-	{
-		return getFrontCacheAgents(false);
-	}
-
-	private List<FrontCacheClient> getFrontCacheAgents(boolean activeOnly)
-	{
-		List<FrontCacheClient> fcClients = new ArrayList<FrontCacheClient>();
-		for (String frontcacheURL : frontcacheAgentURLs)
-		{
-			FrontCacheClient fcClient = new FrontCacheClient(frontcacheURL, apiKey);
-
-			if (activeOnly)
-			{
-				if (null != fcClient.getCacheState()) // if get state work -> FC is active
-					fcClients.add(fcClient);
-			} else {
-				fcClients.add(fcClient);
-			}
-		}
-
-		return fcClients;
-	}
-
-	public int getEdgesAmount() {
-		return frontcacheAgentURLs.size();
-	}
-
+	/** Nothing when {@link #isEdgeEditingEnabled()} is off - the controller says so, this keeps it so. */
 	public void addEdge(String edge) {
-		if (null != edge)
+		if (null != edge && isEdgeEditingEnabled())
 			frontcacheAgentURLs.add(edge);
 	}
 
 	public void removeEdge(String edge) {
-		if (null != edge)
+		if (null != edge && isEdgeEditingEnabled())
 			frontcacheAgentURLs.remove(edge);
 	}
 
 	/** @throws UnknownEdgeException if the URL is not one of this console's edges */
-	public void invalidateEdge(String edgeURL, String filter) {
-		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
+	public void invalidateEdge(EdgeScope scope, String edgeURL, String filter) {
+		FrontCacheClient fcClient = requireEdgeClient(scope, edgeURL);
 		fcClient.removeFromCache(filter);
 	}
 
@@ -867,8 +837,8 @@ public class FrontcacheService {
 	 * @param edgeURL
 	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
-	public void purgeEdge(String edgeURL) {
-		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
+	public void purgeEdge(EdgeScope scope, String edgeURL) {
+		FrontCacheClient fcClient = requireEdgeClient(scope, edgeURL);
 		fcClient.purge();
 	}
 
@@ -880,8 +850,8 @@ public class FrontcacheService {
 	 * @return status message returned by the edge, or an error message if the edge is not available
 	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
-	public String dumpKeys(String edgeURL) {
-		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
+	public String dumpKeys(EdgeScope scope, String edgeURL) {
+		FrontCacheClient fcClient = requireEdgeClient(scope, edgeURL);
 		DumpKeysActionResponse response = fcClient.dumpKeys();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
@@ -897,8 +867,8 @@ public class FrontcacheService {
 	 * @return status message returned by the edge, or an error message if the edge is not available
 	 * @throws UnknownEdgeException if the URL is not one of this console's edges
 	 */
-	public String backupEdge(String edgeURL) {
-		FrontCacheClient fcClient = requireConfiguredEdgeClient(edgeURL);
+	public String backupEdge(EdgeScope scope, String edgeURL) {
+		FrontCacheClient fcClient = requireEdgeClient(scope, edgeURL);
 		BackupActionResponse response = fcClient.backup();
 		if (null == response)
 			return "ERROR - edge " + edgeURL + " is not available";
@@ -908,29 +878,33 @@ public class FrontcacheService {
 
 	// --- Cache Replication ---
 
-	private ExecutorService replicationExecutor = Executors.newSingleThreadExecutor();
-	private volatile CacheReplicator activeReplicator = null;
+	private final ExecutorService replicationExecutor = Executors.newCachedThreadPool(runnable -> {
+		Thread thread = new Thread(runnable, "fc-console-replication");
+		thread.setDaemon(true);
+		return thread;
+	});
 
 	/**
-	 * Starts a cache replication from source edge to target edge.
-	 * Runs in a background thread. Only one replication can be active at a time.
+	 * The running replication of each scope, by {@link EdgeScope#id()}. One per scope, as there used to be one per
+	 * console: a run started in one scope is never another's to see, nor to cancel.
+	 */
+	private final Map<String, CacheReplicator> activeReplicators = new ConcurrentHashMap<String, CacheReplicator>();
+
+	/**
+	 * Starts a cache replication from source edge to target edge, both in the scope.
+	 * Runs in a background thread. Only one replication can be active at a time in one scope.
 	 *
 	 * @param sourceUrl the source edge URL
 	 * @param targetUrl the target edge URL
 	 * @return the initial ReplicationResult (status RUNNING)
-	 * @throws IllegalStateException if a replication is already in progress
-	 * @throws UnknownEdgeException if either URL is not one of this console's edges
+	 * @throws IllegalStateException if a replication is already in progress in this scope
+	 * @throws UnknownEdgeException if either URL is not in the scope
 	 * @throws IllegalArgumentException if both name the same edge
 	 */
-	public ReplicationResult startReplication(String sourceUrl, String targetUrl) {
-		if (activeReplicator != null && activeReplicator.isRunning()) {
-			throw new IllegalStateException("Replication already in progress from "
-					+ activeReplicator.getCurrentResult().getSourceUrl()
-					+ " to " + activeReplicator.getCurrentResult().getTargetUrl());
-		}
+	public ReplicationResult startReplication(EdgeScope scope, String sourceUrl, String targetUrl) {
 
-		FrontCacheClient source = requireConfiguredEdgeClient(sourceUrl);
-		FrontCacheClient target = requireConfiguredEdgeClient(targetUrl);
+		FrontCacheClient source = requireEdgeClient(scope, sourceUrl);
+		FrontCacheClient target = requireEdgeClient(scope, targetUrl);
 
 		// Compared on the configured spelling: "http://edge:9080" and "http://edge:9080/" are one edge,
 		// and replicating an edge onto itself would skip every key while reporting success.
@@ -938,7 +912,13 @@ public class FrontcacheService {
 			throw new IllegalArgumentException("Source and target edge must be different");
 
 		CacheReplicator replicator = new CacheReplicator(source, target);
-		activeReplicator = replicator;
+
+		CacheReplicator running = activeReplicators.compute(scope.id(),
+				(id, active) -> null != active && active.isRunning() ? active : replicator);
+		if (running != replicator)
+			throw new IllegalStateException("Replication already in progress from "
+					+ running.getCurrentResult().getSourceUrl()
+					+ " to " + running.getCurrentResult().getTargetUrl());
 
 		replicationExecutor.submit(new Runnable() {
 			@Override
@@ -962,7 +942,7 @@ public class FrontcacheService {
 						}
 					});
 				} finally {
-					activeReplicator = null;
+					activeReplicators.remove(scope.id(), replicator);
 				}
 			}
 		});
@@ -971,19 +951,19 @@ public class FrontcacheService {
 	}
 
 	/**
-	 * Returns the current replication status, or null if no replication is active.
+	 * Returns the scope's current replication status, or null if none is active in it.
 	 */
-	public ReplicationResult getReplicationStatus() {
-		CacheReplicator r = activeReplicator;
+	public ReplicationResult getReplicationStatus(EdgeScope scope) {
+		CacheReplicator r = activeReplicators.get(scope.id());
 		return r != null ? r.getCurrentResult() : null;
 	}
 
 	/**
-	 * Requests cancellation of the running replication.
-	 * No-op if no replication is active.
+	 * Requests cancellation of the scope's running replication.
+	 * No-op if none is active in it.
 	 */
-	public void cancelReplication() {
-		CacheReplicator r = activeReplicator;
+	public void cancelReplication(EdgeScope scope) {
+		CacheReplicator r = activeReplicators.get(scope.id());
 		if (r != null) {
 			r.cancel();
 		}

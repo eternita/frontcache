@@ -1,0 +1,52 @@
+/*
+ * Copyright 2018 Eternita
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.frontcache.console.service;
+
+import org.frontcache.console.auth.ConsoleEdgeScope;
+import org.frontcache.console.auth.ConsolePrincipal;
+import org.frontcache.console.auth.EdgeScope;
+
+/**
+ * The default {@link ConsoleEdgeScope}: every principal sees the console's configured {@code urls}, each called with
+ * the one {@code apiKey} - the console as it has always been. Read live, so an edge added on the Edges screen is in
+ * scope from then on. In this package because it is the only reader of {@link FrontcacheService}'s edge list.
+ */
+public final class ConfiguredEdgeScope implements ConsoleEdgeScope {
+
+	/** Every principal shares this scope, so they share its cached results - which is today's behaviour. */
+	public static final String ID = "console";
+
+	private final FrontcacheService frontcacheService;
+
+	public ConfiguredEdgeScope(FrontcacheService frontcacheService) {
+		this.frontcacheService = frontcacheService;
+	}
+
+	@Override
+	public EdgeScope scopeFor(ConsolePrincipal who) {
+		return everyEdge();
+	}
+
+	@Override
+	public EdgeScope everyEdge() {
+		return EdgeScope.of(ID, frontcacheService.configuredEdgeURLs(), frontcacheService.configuredApiKey());
+	}
+
+	@Override
+	public boolean edgeEditing() {
+		return true;
+	}
+}

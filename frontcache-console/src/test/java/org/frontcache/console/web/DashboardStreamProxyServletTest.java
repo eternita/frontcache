@@ -16,17 +16,19 @@
 package org.frontcache.console.web;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import org.frontcache.console.auth.ConsoleEdgeScope;
+import org.frontcache.console.auth.ConsolePrincipal;
+import org.frontcache.console.auth.ConsoleSecurity;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.junit.Before;
 import org.junit.Test;
@@ -55,11 +57,30 @@ public class DashboardStreamProxyServletTest {
 		return new LinkedHashSet<String>(Arrays.asList(urls));
 	}
 
+	/** The edges the request's scope holds - what the servlet may relay, each with its own key. */
+	private volatile EdgeScope scope = EdgeScope.empty("test");
+
 	@Before
 	public void setUp() {
 		servlet = new DashboardStreamProxyServlet();
 		frontcacheService = Mockito.mock(FrontcacheService.class);
-		ReflectionTestUtils.setField(servlet, "frontcacheService", frontcacheService);
+		ConsoleEdgeScope edgeScope = new ConsoleEdgeScope() {
+			@Override
+			public EdgeScope scopeFor(ConsolePrincipal who) {
+				return scope;
+			}
+
+			@Override
+			public EdgeScope everyEdge() {
+				return scope;
+			}
+		};
+		ReflectionTestUtils.setField(servlet, "consoleSecurity",
+				new ConsoleSecurity(frontcacheService, null, null, edgeScope, null));
+	}
+
+	private void scopeHolds(String... urls) {
+		scope = EdgeScope.of("test", Arrays.asList(urls), "the-edge-key");
 	}
 
 	// ---- the allowlist itself ------------------------------------------------------------------
@@ -137,7 +158,7 @@ public class DashboardStreamProxyServletTest {
 	@Test
 	public void aMissingOriginIsABadRequest() throws Exception
 	{
-		when(frontcacheService.getFrontCacheAgentURLs()).thenReturn(edges("http://edge-1.example.com:8080/"));
+		scopeHolds("http://edge-1.example.com:8080/");
 
 		MockHttpServletResponse response = get(null);
 
@@ -145,28 +166,68 @@ public class DashboardStreamProxyServletTest {
 	}
 
 	/**
-	 * The one that matters: an unknown origin is refused, and - the actual defect being closed - the
-	 * API key is never even read, so it cannot travel to a host the console does not know.
+	 * The one that matters: an unknown origin is refused before anything is opened - the actual defect
+	 * being closed - so no edge's key can travel to a host the request's scope does not hold.
 	 */
 	@Test
-	public void anUnknownOriginIsRefusedAndNeverSeesTheApiKey() throws Exception
+	public void anUnknownOriginIsRefusedAndNothingIsOpened() throws Exception
 	{
-		when(frontcacheService.getFrontCacheAgentURLs()).thenReturn(edges("http://edge-1.example.com:8080/"));
+		scopeHolds("http://edge-1.example.com:8080/");
 
-		MockHttpServletResponse response = get("http://169.254.169.254/latest/meta-data/");
+		MockHttpServletRequest request = request("http://169.254.169.254/latest/meta-data/");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		servlet.doGet(request, response);
 
 		assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
-		verify(frontcacheService, never()).getApiKey();
+		assertFalse("nothing relayed", request.isAsyncStarted());
+	}
+
+	/** An edge the console has, but outside this request's scope, is refused exactly as an unknown one (2.12.0). */
+	@Test
+	public void anEdgeOutsideTheScopeIsRefusedLikeAnUnknownOne() throws Exception
+	{
+		scopeHolds("http://edge-1.example.com:8080/");
+
+		MockHttpServletResponse unknown = get("http://edge-9.example.com:8080/");
+		MockHttpServletResponse inScope = new MockHttpServletResponse();
+
+		assertEquals(HttpServletResponse.SC_FORBIDDEN, unknown.getStatus());
+		assertEquals("Unknown edge", unknown.getErrorMessage());
+		assertEquals(DashboardStreamProxyServlet.resolveEdge("http://edge-1.example.com:8080/hystrix.stream", scope).apiKey(),
+				"the-edge-key");
+		assertNull(DashboardStreamProxyServlet.resolveEdge("http://edge-9.example.com:8080/", scope));
+		assertEquals(200, inScope.getStatus());
+	}
+
+	/** Without a principal - a request the auth filter did not let through - nothing is relayed. */
+	@Test
+	public void aRequestWithNoPrincipalIsRefused() throws Exception
+	{
+		scopeHolds("http://edge-1.example.com:8080/");
+
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/fc-dashboard-proxy.stream");
+		request.setParameter("origin", "http://edge-1.example.com:8080/");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		servlet.doGet(request, response);
+
+		assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
+		assertFalse(request.isAsyncStarted());
+	}
+
+	/** A request as the auth filter lets it through on a console with authentication off. */
+	private static MockHttpServletRequest request(String origin)
+	{
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/fc-dashboard-proxy.stream");
+		request.setAttribute(ConsolePrincipal.REQUEST_ATTRIBUTE, ConsolePrincipal.unauthenticated());
+		if (null != origin)
+			request.setParameter("origin", origin);
+		return request;
 	}
 
 	private MockHttpServletResponse get(String origin) throws Exception
 	{
-		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/fc-dashboard-proxy.stream");
-		if (null != origin)
-			request.setParameter("origin", origin);
-
 		MockHttpServletResponse response = new MockHttpServletResponse();
-		servlet.doGet(request, response);
+		servlet.doGet(request(origin), response);
 
 		return response;
 	}

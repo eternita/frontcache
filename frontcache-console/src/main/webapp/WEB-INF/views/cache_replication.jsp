@@ -32,12 +32,14 @@
         <form:options items="${edgeList}" />
     </form:select>
   </div>
+  <c:if test="${fcPermits['cache.replicate']}">
   <button type="submit" name="startReplication" class="btn btn-success"
       <c:if test="${replicationStatus != null and replicationStatus.status == 'RUNNING'}">disabled</c:if>
   >Start Replication</button>
   <button type="submit" name="cancelReplication" class="btn btn-warning"
       <c:if test="${replicationStatus == null or replicationStatus.status != 'RUNNING'}">disabled</c:if>
   >Cancel</button>
+  </c:if>
 </form:form>
 
 <c:if test="${not empty replicationMessage}">
