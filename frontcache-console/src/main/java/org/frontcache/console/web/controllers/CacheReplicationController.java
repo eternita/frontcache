@@ -15,11 +15,19 @@
  */
 package org.frontcache.console.web.controllers;
 
-import java.util.Set;
+import java.util.List;
 
+
+import org.frontcache.console.auth.ConsoleAudit;
+import org.frontcache.console.auth.ConsoleAuditor;
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.replication.ReplicationResult;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,24 +44,26 @@ public class CacheReplicationController {
 
 
 	@RequestMapping(method = RequestMethod.GET)
-	public String initForm(Model model) {
+	public String initForm(Model model, EdgeScope scope) {
 		CacheReplicationForm form = new CacheReplicationForm();
 		model.addAttribute("cacheReplication", form);
 
-		Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+		List<String> agents = scope.edgeURLs();
 		model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getEdgeList());
+		model.addAttribute("edges", frontcacheService.getEdgeList(scope));
 
-		ReplicationResult status = frontcacheService.getReplicationStatus();
+		ReplicationResult status = frontcacheService.getReplicationStatus(scope);
 		model.addAttribute("replicationStatus", status);
 
 		return "cache_replication";
 	}
 
 
+	@ConsolePermit(value = ConsolePermissions.CACHE_REPLICATE, edgeParameter = "")
+	@ConsoleAudit(value = "cache.replicate.start", parameters = { "sourceEdge", "targetEdge" })
 	@RequestMapping(method = RequestMethod.POST, params = "startReplication")
-	public String startReplication(Model model, CacheReplicationForm form) {
+	public String startReplication(Model model, CacheReplicationForm form, EdgeScope scope, HttpServletRequest request) {
 		model.addAttribute("cacheReplication", form);
 
 		String sourceUrl = form.getSourceEdge();
@@ -61,43 +71,48 @@ public class CacheReplicationController {
 
 		if (sourceUrl != null && targetUrl != null && !sourceUrl.equals(targetUrl)) {
 			try {
-				frontcacheService.startReplication(sourceUrl, targetUrl);
+				frontcacheService.startReplication(scope, sourceUrl, targetUrl);
 				model.addAttribute("replicationMessage", "Replication started: " + sourceUrl + " → " + targetUrl);
 			} catch (IllegalStateException | IllegalArgumentException e) {
 				// IllegalArgumentException includes UnknownEdgeException: an edge this console does not have
+				ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 				model.addAttribute("replicationError", e.getMessage());
 			}
 		} else if (sourceUrl != null && sourceUrl.equals(targetUrl)) {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			model.addAttribute("replicationError", "Source and target edge must be different");
 		} else {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			model.addAttribute("replicationError", "Please select both source and target edges");
 		}
 
-		Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+		List<String> agents = scope.edgeURLs();
 		model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getEdgeList());
+		model.addAttribute("edges", frontcacheService.getEdgeList(scope));
 
-		ReplicationResult status = frontcacheService.getReplicationStatus();
+		ReplicationResult status = frontcacheService.getReplicationStatus(scope);
 		model.addAttribute("replicationStatus", status);
 
 		return "cache_replication";
 	}
 
 
+	@ConsolePermit(value = ConsolePermissions.CACHE_REPLICATE, edgeParameter = "")
+	@ConsoleAudit("cache.replicate.cancel")
 	@RequestMapping(method = RequestMethod.POST, params = "cancelReplication")
-	public String cancelReplication(Model model, CacheReplicationForm form) {
+	public String cancelReplication(Model model, CacheReplicationForm form, EdgeScope scope) {
 		model.addAttribute("cacheReplication", form);
 
-		frontcacheService.cancelReplication();
+		frontcacheService.cancelReplication(scope);
 		model.addAttribute("replicationMessage", "Replication cancellation requested");
 
-		Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+		List<String> agents = scope.edgeURLs();
 		model.addAttribute("edgeList", agents);
 
-		model.addAttribute("edges", frontcacheService.getEdgeList());
+		model.addAttribute("edges", frontcacheService.getEdgeList(scope));
 
-		ReplicationResult status = frontcacheService.getReplicationStatus();
+		ReplicationResult status = frontcacheService.getReplicationStatus(scope);
 		model.addAttribute("replicationStatus", status);
 
 		return "cache_replication";
@@ -110,8 +125,8 @@ public class CacheReplicationController {
 	 */
 	@RequestMapping(value = "/status", method = RequestMethod.GET, produces = "application/json")
 	@ResponseBody
-	public ReplicationResult getStatus() {
-		return frontcacheService.getReplicationStatus();
+	public ReplicationResult getStatus(EdgeScope scope) {
+		return frontcacheService.getReplicationStatus(scope);
 	}
 
 }

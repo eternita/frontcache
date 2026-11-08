@@ -16,9 +16,10 @@
 package org.frontcache.console.service;
 
 /**
- * A request named an edge that is not one of this console's configured edges - see
- * {@link FrontcacheService#configuredEdgeClient}. Thrown before any client is built, so nothing
- * carrying the API key is sent anywhere.
+ * A request named an edge that is not in its {@code EdgeScope} - one this console does not have, or, as
+ * of 2.12.0, one the signed-in principal may not see; the two are one answer, so the message says
+ * nothing about edges outside the scope. Thrown before any client is built, so nothing carrying an
+ * API key is sent anywhere.
  *
  * An {@link IllegalArgumentException} because the edge is a request parameter: the controllers catch
  * it and put {@link #getMessage()} on the page.

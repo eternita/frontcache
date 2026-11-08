@@ -15,17 +15,18 @@
       <code>default</code> is the traffic no rule claimed.
     </p>
 
-    <!-- one tab per edge; tab order follows the edge order from the console config -->
+    <%-- one tab per edge, keyed by its URL (two edges on one host share a name); the order is the console config's --%>
     <ul class="nav nav-tabs" role="tablist">
       <c:forEach var="edge" items="${visitorTypes}" varStatus="status">
         <li role="presentation" class="${status.first ? 'active' : ''}">
-          <a href="#edge-tab-${status.index}" role="tab" data-toggle="tab">${edge.key}</a>
+          <a href="#edge-tab-${status.index}" role="tab" data-toggle="tab"
+             title="<c:out value='${edge.key}'/>"><c:out value="${edge.value.name}"/></a>
         </li>
       </c:forEach>
     </ul>
 
     <div class="tab-content">
-      <!-- one panel per edge - Map <edge, VisitorTypesConfig> -->
+      <!-- one panel per edge - Map <edge URL, VisitorTypesConfig> -->
       <c:forEach var="edge" items="${visitorTypes}" varStatus="status">
 
         <div role="tabpanel" class="tab-pane ${status.first ? 'active' : ''}" id="edge-tab-${status.index}">

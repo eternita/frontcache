@@ -15,11 +15,18 @@
  */
 package org.frontcache.console.web.controllers;
 
-import java.util.Set;
+import java.util.List;
 
+import org.frontcache.console.auth.ConsoleAudit;
+import org.frontcache.console.auth.ConsoleAuditor;
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.service.UnknownEdgeException;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,65 +42,74 @@ public class CacheOtherController {
 
 
 	@RequestMapping(method = RequestMethod.GET)
-	public String initForm(Model model) {
+	public String initForm(Model model, EdgeScope scope) {
 		CacheOtherForm cacheOtherForm = new CacheOtherForm();
 		model.addAttribute("cacheOther", cacheOtherForm);
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
 		return "cache_other";
 	}
 
 
+	@ConsolePermit(ConsolePermissions.CACHE_READ)
+	@ConsoleAudit("cache.dump-keys")
 	@RequestMapping(method = RequestMethod.POST, params = "dumpKeys")
-	public String dumpKeys(Model model, CacheOtherForm cacheOtherForm) {
+	public String dumpKeys(Model model, CacheOtherForm cacheOtherForm, EdgeScope scope, HttpServletRequest request) {
 		model.addAttribute("cacheOther", cacheOtherForm);
 
 		try {
-			String dumpKeysResult = frontcacheService.dumpKeys(cacheOtherForm.getEdge());
+			String dumpKeysResult = frontcacheService.dumpKeys(scope, cacheOtherForm.getEdge());
 			model.addAttribute("dumpKeysResult", dumpKeysResult);
 		} catch (UnknownEdgeException e) {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			model.addAttribute("edgeError", e.getMessage());
 		}
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
 		return "cache_other";
 	}
 
 
+	@ConsolePermit(ConsolePermissions.CACHE_INVALIDATE)
+	@ConsoleAudit("cache.purge")
 	@RequestMapping(method = RequestMethod.POST, params = "purge")
-	public String purge(Model model, CacheOtherForm cacheOtherForm) {
+	public String purge(Model model, CacheOtherForm cacheOtherForm, EdgeScope scope, HttpServletRequest request) {
 		model.addAttribute("cacheOther", cacheOtherForm);
 
 		try {
-			frontcacheService.purgeEdge(cacheOtherForm.getEdge());
+			frontcacheService.purgeEdge(scope, cacheOtherForm.getEdge());
 			model.addAttribute("purgeResult", "Purge of expired entries started on " + cacheOtherForm.getEdge());
 		} catch (UnknownEdgeException e) {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			model.addAttribute("edgeError", e.getMessage());
 		}
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
 		return "cache_other";
 	}
 
 
+	@ConsolePermit(ConsolePermissions.CACHE_REPLICATE)
+	@ConsoleAudit("cache.backup-index")
 	@RequestMapping(method = RequestMethod.POST, params = "backupIndex")
-	public String backupIndex(Model model, CacheOtherForm cacheOtherForm) {
+	public String backupIndex(Model model, CacheOtherForm cacheOtherForm, EdgeScope scope, HttpServletRequest request) {
 		model.addAttribute("cacheOther", cacheOtherForm);
 
 		try {
-			String backupResult = frontcacheService.backupEdge(cacheOtherForm.getEdge());
+			String backupResult = frontcacheService.backupEdge(scope, cacheOtherForm.getEdge());
 			model.addAttribute("backupResult", backupResult + " on " + cacheOtherForm.getEdge());
 		} catch (UnknownEdgeException e) {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			model.addAttribute("edgeError", e.getMessage());
 		}
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
 		return "cache_other";

@@ -18,6 +18,9 @@ package org.frontcache.console.web.controllers;
 import java.util.Map;
 
 import org.frontcache.console.model.VisitorTypesConfig;
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -42,9 +45,9 @@ public class VisitorTypesController {
 	private FrontcacheService frontcacheService;
 
     @RequestMapping(value = "/visitor-types", method = RequestMethod.GET)
-    public String getVisitorTypes(ModelMap model) {
+    public String getVisitorTypes(ModelMap model, EdgeScope scope) {
 
-    	Map<String, VisitorTypesConfig> visitorTypes = frontcacheService.getVisitorTypes();
+    	Map<String, VisitorTypesConfig> visitorTypes = frontcacheService.getVisitorTypes(scope);
 		model.put("visitorTypes", visitorTypes);
 
         return "visitor_types";

@@ -9,11 +9,12 @@
       reload); a rule with no hits is doing nothing.
     </p>
 
-    <!-- one tab per edge; tab order follows the edge order from the console config -->
+    <%-- one tab per edge, keyed by its URL (two edges on one host share a name); the order is the console config's --%>
     <ul class="nav nav-tabs" role="tablist">
       <c:forEach var="edge" items="${guardRules}" varStatus="status">
         <li role="presentation" class="${status.first ? 'active' : ''}">
-          <a href="#edge-tab-${status.index}" role="tab" data-toggle="tab">${edge.key}</a>
+          <a href="#edge-tab-${status.index}" role="tab" data-toggle="tab"
+             title="<c:out value='${edge.key}'/>"><c:out value="${edge.value.name}"/></a>
         </li>
       </c:forEach>
     </ul>
@@ -37,7 +38,7 @@
           </thead>
           <tbody>
 
-          <c:forEach var="rule" items="${edge.value}" varStatus="ruleStatus">
+          <c:forEach var="rule" items="${edge.value.config}" varStatus="ruleStatus">
             <tr>
               <td>${ruleStatus.index + 1}</td>
               <td><b>${rule.name}</b></td>
@@ -53,7 +54,7 @@
             </tr>
           </c:forEach>
 
-          <c:if test="${empty edge.value}">
+          <c:if test="${empty edge.value.config}">
             <tr><td colspan="6"><i>no guard rules loaded</i></td></tr>
           </c:if>
 

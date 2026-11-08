@@ -37,6 +37,7 @@ public final class NavEntry {
 	private final String label;
 	private final String href;
 	private final List<String> activeWhen;
+	private final String permission;
 
 	/**
 	 * @param section     {@link #TOP} or {@link #CACHE}
@@ -46,11 +47,20 @@ public final class NavEntry {
 	 * @param activeWhen  for {@link #TOP}: substrings of the request URI that mark this tab active
 	 */
 	public NavEntry(String section, String id, String label, String href, List<String> activeWhen) {
+		this(section, id, label, href, activeWhen, null);
+	}
+
+	/**
+	 * @param permission  shown only to a principal holding it (as of 2.12.0) - its screen must refuse the rest too,
+	 *                    through its handler's {@code @ConsolePermit}; null to show it to everyone
+	 */
+	public NavEntry(String section, String id, String label, String href, List<String> activeWhen, String permission) {
 		this.section = section;
 		this.id = id;
 		this.label = label;
 		this.href = href;
 		this.activeWhen = (null == activeWhen) ? List.of() : List.copyOf(activeWhen);
+		this.permission = (null == permission || permission.isBlank()) ? null : permission;
 	}
 
 	public String getSection() {
@@ -71,5 +81,10 @@ public final class NavEntry {
 
 	public List<String> getActiveWhen() {
 		return activeWhen;
+	}
+
+	/** The permission the entry is shown for, or null for everyone. */
+	public String getPermission() {
+		return permission;
 	}
 }

@@ -19,8 +19,15 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
+import org.frontcache.console.auth.ConsoleAuditEvent;
+import org.frontcache.console.auth.ConsoleAuditor;
+import org.frontcache.console.auth.ConsoleIdentityProvider;
+import org.frontcache.console.auth.ConsolePrincipal;
+import org.frontcache.console.auth.ConsoleSignInThrottledException;
+import org.frontcache.console.auth.ConsoleSecurity;
 import org.frontcache.console.service.FrontcacheService;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
@@ -38,7 +45,12 @@ import jakarta.servlet.http.HttpSession;
 /**
  * Authentication for the whole console - the credential, and the login screen that presents it.
  *
- * One user, no roles, credentials from conf/frontcache-console.conf. The console can invalidate the
+ * As of 2.12.0 who may sign in is {@code ConsoleSecurity}'s identity provider - the one user from
+ * conf/frontcache-console.conf unless a console plugin provides another - and the session holds the
+ * {@link ConsolePrincipal} it answered, which every request it lets through carries as a request
+ * attribute; the provider's {@code resume} is asked on every request of a session, so it can end one.
+ * What a principal may DO is checked after this filter (the permission interceptor), and which edges it
+ * reaches by its {@code EdgeScope}. The console can invalidate the
  * cache of every node it knows and holds the api-key that authorizes it, so an unauthenticated
  * console is a credentialed proxy in front of an authenticated fleet.
  *
@@ -80,7 +92,10 @@ public class ConsoleAuthFilter implements Filter {
 
 	static final String REALM = "Frontcache Console";
 
-	/** Set on the session at login, read by this filter and by the navbar. Never the password. */
+	/**
+	 * Set on the session at login beside the principal: the signed-in user's name, for the navbar. Never
+	 * the password, and never what this filter checks - that is the principal.
+	 */
 	public static final String SESSION_USER_ATTRIBUTE = "fc.user";
 
 	/** The one page served without a credential, and where a refused browser is sent. */
@@ -102,15 +117,23 @@ public class ConsoleAuthFilter implements Filter {
 	 * that pins it asserts a NEGATIVE - that /static/js/console.js is not in it - because that is
 	 * the assertion which fails when someone loosens the match.
 	 */
+	/** Where SSO starts and where the identity provider sends the browser back - served by LoginController. */
+	public static final String SSO_PATH = "/login/sso";
+	public static final String SSO_CALLBACK_PATH = "/login/sso/callback";
+
+	/**
+	 * Exact matches, never a prefix. The two SSO paths are fixed here rather than contributed by a plugin:
+	 * no plugin can add an anonymous path. Without an SSO provider they answer 404.
+	 */
 	private static final Set<String> ANONYMOUS_PATHS = Set.of(
 			LOGIN_PATH,
+			SSO_PATH,
+			SSO_CALLBACK_PATH,
 			"/static/css/fc-login.css",
 			"/static/images/frontcache-logo.png",
 			"/static/images/favicon.ico");
 
-	private FrontcacheService frontcacheService;
-
-	private ConsoleAuthenticator authenticator;
+	private ConsoleSecurity security;
 
 	@Override
 	public void init(FilterConfig filterConfig) throws ServletException {
@@ -119,13 +142,17 @@ public class ConsoleAuthFilter implements Filter {
 		// so the bean is there.
 		WebApplicationContext context =
 				WebApplicationContextUtils.getRequiredWebApplicationContext(filterConfig.getServletContext());
-		setFrontcacheService(context.getBean(FrontcacheService.class));
+		setConsoleSecurity(context.getBean(ConsoleSecurity.class));
 	}
 
-	/** Test seam - lets the filter be built without a servlet context. */
+	/** Test seam - the single-user console's security, without a servlet context. */
 	void setFrontcacheService(FrontcacheService frontcacheService) {
-		this.frontcacheService = frontcacheService;
-		this.authenticator = new ConsoleAuthenticator(frontcacheService);
+		setConsoleSecurity(ConsoleSecurity.defaults(frontcacheService));
+	}
+
+	/** Test seam - any security, without a servlet context. */
+	void setConsoleSecurity(ConsoleSecurity security) {
+		this.security = security;
 	}
 
 	@Override
@@ -134,8 +161,9 @@ public class ConsoleAuthFilter implements Filter {
 
 		HttpServletRequest httpRequest = (HttpServletRequest) request;
 
-		if (!frontcacheService.isAuthEnabled())
+		if (!security.authRequired())
 		{
+			httpRequest.setAttribute(ConsolePrincipal.REQUEST_ATTRIBUTE, ConsolePrincipal.unauthenticated());
 			chain.doFilter(request, response);
 			return;
 		}
@@ -148,8 +176,30 @@ public class ConsoleAuthFilter implements Filter {
 			return;
 		}
 
-		if (hasAuthenticatedSession(httpRequest) || authenticator.isAuthorizedBasicHeader(httpRequest.getHeader("Authorization")))
+		ConsolePrincipal principal = sessionPrincipal(httpRequest);
+		String channel = ConsoleAuditEvent.CHANNEL_SESSION;
+		if (null == principal)
 		{
+			channel = ConsoleAuditEvent.CHANNEL_BASIC;
+			String[] credentials = ConsoleAuthenticator.basicCredentials(httpRequest.getHeader("Authorization"));
+			try {
+				principal = basicPrincipal(credentials);
+			} catch (ConsoleSignInThrottledException throttled) {
+				auditBasicFailure(httpRequest, credentials, "throttled", 429);
+				// not a 401: that would read as a wrong password, and invite the script to try another
+				HttpServletResponse httpResponse = (HttpServletResponse) response;
+				httpResponse.setHeader("Retry-After", Long.toString(throttled.retryAfterSeconds()));
+				httpResponse.sendError(429, throttled.getMessage());
+				return;
+			}
+			if (null == principal)
+				auditBasicFailure(httpRequest, credentials, "wrong user or password", HttpServletResponse.SC_UNAUTHORIZED);
+		}
+
+		if (null != principal)
+		{
+			httpRequest.setAttribute(ConsolePrincipal.REQUEST_ATTRIBUTE, principal);
+			httpRequest.setAttribute(ConsoleAuditEvent.CHANNEL_ATTRIBUTE, channel);
 			chain.doFilter(request, response);
 			return;
 		}
@@ -161,13 +211,69 @@ public class ConsoleAuthFilter implements Filter {
 	 * <b>{@code getSession(false)}, always.</b> The console answers whatever can route to its port,
 	 * and a filter that called {@code getSession(true)} would allocate a session object and a timer
 	 * per scanner probe - with no per-IP limit to lean on and no identity to key one to. A session
-	 * is created in exactly one place: the successful branch of {@code POST /login}.
+	 * is created in exactly two places: the successful branch of {@code POST /login}, and
+	 * {@code GET /login/sso}'s short pre-auth session, which carries no principal.
+	 *
+	 * @return the session's principal, as the identity provider still sees it - or null when there is
+	 *         none, or the provider ended it (the session is then invalidated, and the request is met as
+	 *         signed out)
 	 */
-	private boolean hasAuthenticatedSession(HttpServletRequest request) {
+	private ConsolePrincipal sessionPrincipal(HttpServletRequest request) {
 
 		HttpSession session = request.getSession(false);
+		if (null == session)
+			return null;
 
-		return null != session && null != session.getAttribute(SESSION_USER_ATTRIBUTE);
+		Object stored;
+		try {
+			stored = session.getAttribute(ConsolePrincipal.SESSION_ATTRIBUTE);
+		} catch (IllegalStateException invalidated) {
+			return null;
+		}
+		if (!(stored instanceof ConsolePrincipal principal))
+			return null;
+
+		Optional<ConsolePrincipal> resumed = security.identityProvider().resume(principal, request);
+		if (resumed.isEmpty())
+		{
+			// the identity provider ended it - a removed or changed user, a refused revalidation; why, if it noted it
+			security.audit(ConsoleAuditEvent.of(request, "session.ended").principal(principal)
+					.channel(ConsoleAuditEvent.CHANNEL_SESSION));
+			try {
+				session.invalidate();
+			} catch (IllegalStateException alreadyInvalid) {
+				// ended by another request meanwhile - the same outcome
+			}
+			return null;
+		}
+
+		if (!principal.equals(resumed.get()))
+			session.setAttribute(ConsolePrincipal.SESSION_ATTRIBUTE, resumed.get());
+
+		return resumed.get();
+	}
+
+	/** A script's {@code Authorization: Basic}, checked on every request - no session is created for it. */
+	private ConsolePrincipal basicPrincipal(String[] credentials) {
+
+		if (null == credentials)
+			return null;
+
+		return security.identityProvider()
+				.authenticate(credentials[0], credentials[1], ConsoleIdentityProvider.Channel.BASIC).orElse(null);
+	}
+
+	/**
+	 * A Basic credential that was presented and refused - recorded with the user name as sent, never the password. A
+	 * request with no credential is not a sign-in attempt (a browser before its first sign-in, a scanner) and is not
+	 * recorded: one scanner would otherwise write a line per request.
+	 */
+	private void auditBasicFailure(HttpServletRequest request, String[] credentials, String reason, int status) {
+		if (null == credentials)
+			return;
+		security.audit(ConsoleAuditEvent.about(request, "login.failure").channel(ConsoleAuditEvent.CHANNEL_BASIC)
+				.detail("user", credentials[0]).detail("reason", reason)
+				.outcome(ConsoleAuditor.REFUSED).status(status));
 	}
 
 	private boolean isAnonymous(String path) {

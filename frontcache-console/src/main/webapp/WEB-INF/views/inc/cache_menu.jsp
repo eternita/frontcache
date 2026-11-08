@@ -8,7 +8,9 @@
   -->
   <%-- a console plugin's cache screens - org.frontcache.console.plugin.NavEntry, section "cache" --%>
   <c:forEach var="nav" items="${fcPlugins.cacheNav}">
+  <c:if test="${empty nav.permission or fcPermits[nav.permission]}">
   <li role="presentation" class="${activeCache == nav.id ? 'active' : ''}"><a href="<c:out value='${nav.href}'/>"><c:out value="${nav.label}"/></a></li>
+  </c:if>
   </c:forEach>
   <li role="presentation" class="${activeCache == 'other' ? 'active' : ''}"><a href="cache-other">Other</a></li>
 </ul>

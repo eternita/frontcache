@@ -16,6 +16,7 @@
 package org.frontcache.console.plugin;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -28,6 +29,7 @@ import org.frontcache.console.web.controllers.IndexController;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.web.context.support.XmlWebApplicationContext;
 
@@ -82,9 +84,13 @@ public class ConsoleWithoutPluginsTest {
 		assertEquals(0, root.getBeansOfType(DashboardStreamContributor.class).size());
 		assertEquals(0, web.getBeansOfType(ConsoleNoticeProvider.class).size());
 
-		ConsoleNotices notices = web.getBean(ConsoleNoticesAdvice.class).consoleNotices();
+		ConsoleNotices notices = web.getBean(ConsoleNoticesAdvice.class).consoleNotices(new MockHttpServletRequest());
 		assertEquals(List.of(), notices.getBanners());
 		assertEquals(List.of(), notices.getFooterLines());
+
+		// nothing is recorded: no auditor, and no scope collects refused edges
+		assertEquals(0, root.getBeansOfType(org.frontcache.console.auth.ConsoleAuditor.class).size());
+		assertFalse(root.getBean(org.frontcache.console.auth.ConsoleSecurity.class).auditing());
 	}
 
 	@Test

@@ -20,13 +20,19 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 
+import org.frontcache.console.auth.ConsoleAudit;
+import org.frontcache.console.auth.ConsoleAuditor;
+import org.frontcache.console.auth.ConsolePermissions;
+import org.frontcache.console.auth.ConsolePermit;
+import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.service.UnknownEdgeException;
 import org.frontcache.core.WebResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,28 +50,31 @@ public class CacheViewController {
 
 
 	@RequestMapping(method = RequestMethod.GET)
-	public String initForm(Model model) {
+	public String initForm(Model model, EdgeScope scope) {
 		CacheViewForm cacheViewForm = new CacheViewForm();
 		model.addAttribute("cacheView", cacheViewForm);
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
 		return "cache_view";
 	}
 
 
+	@ConsolePermit(ConsolePermissions.CACHE_READ)
+	@ConsoleAudit(value = "cache.view", parameters = "key")
 	@RequestMapping(method = RequestMethod.POST, params = "viewCache")
-	public String submitForm(Model model, CacheViewForm cacheViewForm) {
+	public String submitForm(Model model, CacheViewForm cacheViewForm, EdgeScope scope, HttpServletRequest request) {
 		model.addAttribute("cacheView", cacheViewForm);
 
 		WebResponse webResponse;
 		try {
-			webResponse = frontcacheService.getFromCache(cacheViewForm.getEdge(), cacheViewForm.getKey());
+			webResponse = frontcacheService.getFromCache(scope, cacheViewForm.getEdge(), cacheViewForm.getKey());
 		} catch (UnknownEdgeException e) {
+			ConsoleAuditor.outcome(request, ConsoleAuditor.REFUSED);
 			// not "submitted": the page would otherwise say "Nothing Found", as if the edge had been asked
 			model.addAttribute("edgeError", e.getMessage());
-			model.addAttribute("edgeList", frontcacheService.getFrontCacheAgentURLs());
+			model.addAttribute("edgeList", scope.edgeURLs());
 			return "cache_view";
 		}
 		model.addAttribute("submitted", true);
@@ -103,7 +112,7 @@ public class CacheViewController {
 
 		}
 
-    	Set<String> agents = frontcacheService.getFrontCacheAgentURLs();
+    	List<String> agents = scope.edgeURLs();
     	model.addAttribute("edgeList", agents);
 
 		return "cache_view";
