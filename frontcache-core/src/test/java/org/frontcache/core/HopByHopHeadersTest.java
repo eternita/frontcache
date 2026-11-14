@@ -21,6 +21,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -31,14 +32,18 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.junit.Test;
 
 /**
  * Hop-by-hop headers (RFC 9110 section 7.6.1) describe the client's connection to this node and never reach the
  * origin. Relaying them broke the origin call: an h2c upgrade - {@code Upgrade: h2c} + {@code HTTP2-Settings}, which
  * the JDK's HttpClient and {@code curl --http2} send on plain http - arrived without the {@code Connection} that came
- * with it, and the origin answered 400 on every forwarded path.
+ * with it, and the origin answered 400 on every forwarded path. The other direction is the origin's connection to this
+ * node: its hop-by-hop response headers were stored in the cache entry and replayed to every client.
  */
 public class HopByHopHeadersTest {
 
@@ -111,5 +116,51 @@ public class HopByHopHeadersTest {
 		headers.put("Accept", "*/*");
 		assertFalse(FCUtils.buildRequestHeaders(request(headers), false).containsKey("Upgrade"));
 		assertFalse(FCUtils.buildRequestHeaders(request(headers), true).containsKey("Upgrade"));
+	}
+
+	private static final List<String> HOP_BY_HOP_RESPONSE = Arrays.asList("Connection", "KEEP-ALIVE", "proxy-connection",
+			"TE", "Trailer", "Transfer-Encoding", "Upgrade", "HTTP2-Settings", "Proxy-Authenticate", "Content-Length");
+
+	/** From the origin through the HTTP client (the cached path and the bypass): only end-to-end headers are kept. */
+	@Test
+	public void anOriginsHopByHopHeadersAreNeitherServedNorCached() {
+		Header[] origin = new Header[HOP_BY_HOP_RESPONSE.size() + 3];
+		int i = 0;
+		for (String name : HOP_BY_HOP_RESPONSE)
+			origin[i++] = new BasicHeader(name, "x");
+		origin[i++] = new BasicHeader("Content-Type", "text/html");
+		origin[i++] = new BasicHeader("Cache-Control", "max-age=60");
+		origin[i++] = new BasicHeader("Set-Cookie", "a=b");
+
+		assertEquals(new TreeSet<>(Arrays.asList("Cache-Control", "Content-Type", "Set-Cookie")),
+				new TreeSet<>(FCUtils.revertHeaders(origin).keySet()));
+	}
+
+	/** From the origin as a wrapped servlet response (filter mode): the same drop. */
+	@Test
+	public void aFilterModeResponseDropsTheSame() {
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		List<String> names = new ArrayList<>(HOP_BY_HOP_RESPONSE);
+		names.add("Content-Type");
+		when(response.getHeaderNames()).thenReturn(names);
+		for (String name : names)
+			when(response.getHeader(name)).thenReturn("x");
+
+		assertEquals(Collections.singleton("Content-Type"), FCUtils.revertHeaders(response).keySet());
+	}
+
+	/**
+	 * The engine writes an entry's headers through the same predicate, so an entry cached before the drop - which may
+	 * hold one of these - does not replay it.
+	 */
+	@Test
+	public void theWriteOutPredicateRefusesEveryHopByHopHeaderWhateverItsCase() {
+		for (String name : HOP_BY_HOP_RESPONSE)
+		{
+			assertFalse(name, FCUtils.isIncludedHeaderToResponse(name));
+			assertFalse(name, FCUtils.isIncludedHeaderToResponse(name.toUpperCase(Locale.ROOT)));
+		}
+		for (String name : Arrays.asList("Content-Type", "Vary", "ETag", "Location", "x-frontcache-component-maxage"))
+			assertTrue(name, FCUtils.isIncludedHeaderToResponse(name));
 	}
 }

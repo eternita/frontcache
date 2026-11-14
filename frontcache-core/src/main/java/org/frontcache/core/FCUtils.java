@@ -764,13 +764,34 @@ public class FCUtils {
 		return map;
 	}
 
-	private static boolean isIncludedHeaderToResponse(String headerName) {
-		String name = headerName.toLowerCase();
+	/**
+	 * Whether an origin response header is kept - in the response this node sends and in the cache entry it stores.
+	 * Also applied where an entry's headers are written to a client ({@code FrontCacheEngine}), so an entry cached
+	 * before 2.13.0, which may still hold a hop-by-hop header, does not replay it.
+	 */
+	public static boolean isIncludedHeaderToResponse(String headerName) {
+		String name = headerName.toLowerCase(Locale.ROOT);
 
 		switch (name) {
 			case "content-length": // do not use 'content-length' because 'transfer-encoding' is used
 			case "transfer-encoding": // put it here to avoid duplicates
 				return false;
+
+			// Hop-by-hop (RFC 9110 section 7.6.1): about the origin's connection to this node, never the
+			// client's. Kept, they were stored in the cache entry and replayed to every client - an origin's
+			// "Connection: close" or "Keep-Alive: timeout=5" describing a connection the client never had.
+			// Proxy-Authenticate is a challenge for the next hop only (section 11.7.1). The same fixed list
+			// as the request side (isIncludedHeader).
+			case "connection":
+			case "keep-alive":
+			case "proxy-connection":
+			case "te":
+			case "trailer":
+			case "upgrade":
+			case "http2-settings":
+			case "proxy-authenticate":
+				return false;
+
 			default:
 				return true;
 		}

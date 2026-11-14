@@ -1624,6 +1624,10 @@ public class FrontCacheEngine {
 
 		if (webResponse.getHeaders() != null) {
 			for (String name : webResponse.getHeaders().keySet()) {
+				// An entry cached before 2.13.0 may still hold an origin's hop-by-hop header - never replayed.
+				if (!FCUtils.isIncludedHeaderToResponse(name))
+					continue;
+
 				for (String value : webResponse.getHeaders().get(name)) {
 
 					if (null == servletResponse.getHeader(name)) // if header already exist (e.g. in case of WebFilter) - do not duplicate
