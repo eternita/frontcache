@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -1210,15 +1211,31 @@ public class FCUtils {
 	}
 
 	private static boolean isIncludedHeader(String headerName) {
-		String name = headerName.toLowerCase();
+		String name = headerName.toLowerCase(Locale.ROOT);
 
 		switch (name) {
 			case "host":
-			case "connection":
 			case "content-length":
 			case "content-encoding":
 			case "server":
+				return false;
+
+			// Hop-by-hop (RFC 9110 section 7.6.1): about the client's connection to this node, never the
+			// origin's. Relayed, they break the origin call - an h2c upgrade (Upgrade + HTTP2-Settings, sent
+			// on plain http by the JDK's HttpClient and curl --http2) without the Connection that came with it
+			// is a 400 at the origin, on every forwarded path. Proxy-Authorization is a credential for a
+			// proxy, never for the origin. A fixed list, as nginx and HAProxy keep: the names a client lists
+			// in Connection are NOT dropped too, because that would let a client strip a header an upstream
+			// proxy added (X-Forwarded-For, say) before the origin reads it.
+			case "connection":
+			case "keep-alive":
+			case "proxy-connection":
+			case "te":
+			case "trailer":
 			case "transfer-encoding":
+			case "upgrade":
+			case "http2-settings":
+			case "proxy-authorization":
 				return false;
 
 			// Dropped, not forwarded: this one is Frontcache telling Frontcache how a request was
