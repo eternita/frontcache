@@ -213,7 +213,8 @@ def eternitaMaven(repos) {
 // S3 repo; the two distribution bundles are published from the block further down.
 // Gradle's maven-publish speaks s3:// natively.
 // Run with: ./gradlew publish  (or publishToMavenLocal for a dry run)
-configure([project(':frontcache-plugin-api'), project(':frontcache-core'), project(':frontcache-agent')]) {
+configure([project(':frontcache-plugin-api'), project(':frontcache-plugin-testkit'), project(':frontcache-core'),
+		project(':frontcache-agent')]) {
 	apply plugin: 'maven-publish'
 
 	java {
@@ -283,6 +284,50 @@ project(':frontcache-plugin-api') {
 		// A plugin's config (FrontcachePlugin.configure) is handed over as a parsed, resolved Typesafe Config -
 		// HOCON, the console's format. The core already carries it at this version; no dependencies of its own.
 		api 'com.typesafe:config:1.4.9'
+	}
+}
+
+// The plugin testkit (docs: the pluggable architecture's section 10) - what a plugin's own tests depend on,
+// test-scoped: PluginHarness (a plugin started against a TestPluginContext - a temp FRONTCACHE_HOME, a real
+// scheduler, writeList with the node's rules - with the node's kind checks), fakes of the serve and decide views,
+// and PluginContract, the abstract JUnit 4 test every plugin's test extends. Nothing of frontcache-core: a
+// plugin is tested against the API's contract, as a dropped-in plugin's class loader shows it.
+project(':frontcache-plugin-testkit') {
+	dependencies {
+		api project(':frontcache-plugin-api')
+		// a plugin's tests extend PluginContract, a JUnit 4 test - test-scoped for the plugin, api here
+		api 'junit:junit:4.13.2'
+		// the examples log through slf4j - which a dropped-in plugin's class loader shows from the node
+		testImplementation 'org.slf4j:slf4j-api:2.0.17'
+	}
+
+	// coreVersion() of a TestPluginContext: this build's version, as a node's BuildInfo reports its own
+	tasks.named('processResources', ProcessResources) {
+		def testkitVersion = project.version.toString()
+		inputs.property('version', testkitVersion)
+		filesMatching('org/frontcache/plugin/testkit/testkit.properties') {
+			expand(version: testkitVersion)
+		}
+	}
+
+	// ---- the self-test --------------------------------------------------------
+	// The plugin template and the two example plugins are standalone Gradle builds (examples/), never part of
+	// this one - so their sources and tests are compiled and run HERE, in this module's test source set, and
+	// `:frontcache-plugin-testkit:test` runs every example's PluginContract test against this checkout's API.
+	// Each one's src/main/resources is its own class-path root rather than a resource dir: every example carries
+	// META-INF/frontcache-plugin.properties, and copying three into one directory would keep one of them -
+	// PluginHarness picks the manifest that names the plugin's class, as a node sees one per jar.
+	def examples = ['examples/plugin-template', 'examples/plugins/debug', 'examples/plugins/crawler-feeder']
+			.collect { rootProject.file(it) }
+	sourceSets.test.java.srcDirs(examples.collect { new File(it, 'src/main/java') })
+	sourceSets.test.java.srcDirs(examples.collect { new File(it, 'src/test/java') })
+	def exampleResources = files(examples.collect { new File(it, 'src/main/resources') })
+	sourceSets.test.runtimeClasspath += exampleResources
+	tasks.named('test', Test) {
+		classpath += exampleResources
+		// deliberately broken plugins and the contracts over them, run by PluginContractTest through JUnitCore -
+		// on their own they fail, which is the point
+		exclude 'org/frontcache/plugin/testkit/fixtures/**'
 	}
 }
 

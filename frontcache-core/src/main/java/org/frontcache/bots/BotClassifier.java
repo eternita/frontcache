@@ -130,6 +130,23 @@ public class BotClassifier {
 		CoreEvents.configReloaded(BOTS_CONFIG_FILE, true, reloaded.rules.size(), List.of());
 	}
 
+	/**
+	 * Binds every rule's {@code ext:} predicates to the started plugins now, so a mistake is in the log at once - see
+	 * {@code GuardRuleEngine.checkPluginPredicates}.
+	 */
+	public void checkPluginPredicates()
+	{
+		if (!org.frontcache.plugin.host.PluginPredicates.isRunning())
+			return;
+		for (BotRule rule : this.rules)
+			for (GuardPredicate predicate : rule.getPredicates())
+			{
+				org.frontcache.guard.ExtPredicate ext = predicate.pluginPredicate();
+				if (null != ext)
+					org.frontcache.plugin.host.PluginPredicates.check(ext, BOTS_CONFIG_FILE + ": " + rule.getName());
+			}
+	}
+
 	/** for tests - installs a classifier without going through FCConfig */
 	public static void install(BotClassifier classifier) {
 		instance = classifier;
@@ -228,6 +245,7 @@ public class BotClassifier {
 
 		BotClassifier classifier = new BotClassifier(loaded, keywords);
 		classifier.warnOnClientIpWithoutTrustedProxies();
+		classifier.checkPluginPredicates();
 		return classifier;
 	}
 
@@ -318,7 +336,9 @@ public class BotClassifier {
 				continue;
 
 			try {
-				BotRuleParser.parse(trimmed);
+				BotRule rule = BotRuleParser.parse(trimmed);
+				for (String refusal : org.frontcache.guard.GuardRuleEngine.pluginPredicateRefusals(rule.getPredicates()))
+					errors.add("line " + (i + 1) + ": " + refusal);
 			} catch (GuardConfigException e) {
 				errors.add("line " + (i + 1) + ": " + e.getMessage());
 			}

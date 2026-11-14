@@ -129,6 +129,7 @@ public class GuardRuleEngine {
 		warnOnMissingExemptions();
 		warnOnRateLimitWithoutTrustedProxies();
 		checkChallengeProviders();
+		checkPluginPredicates();
 
 		CoreEvents.configReloaded(GUARD_RULES_CONFIG_FILE, true, this.rules.size(), this.loadProblems);
 	}
@@ -256,13 +257,53 @@ public class GuardRuleEngine {
 				continue;
 
 			try {
-				checkNoSelfRedirect(parser.parse(trimmed));
+				GuardRule rule = parser.parse(trimmed);
+				checkNoSelfRedirect(rule);
+				for (String refusal : pluginPredicateRefusals(rule.getPredicates()))
+					errors.add("line " + (i + 1) + ": " + refusal);
 			} catch (GuardConfigException e) {
 				errors.add("line " + (i + 1) + ": " + e.getMessage());
 			}
 		}
 
 		return errors;
+	}
+
+	/**
+	 * What the started plugins say of a rule's {@code ext:} predicates - nothing when no plugin has started (the console
+	 * and the portal parse with none, and a node checks its rules again once its plugins start).
+	 */
+	public static List<String> pluginPredicateRefusals(List<GuardPredicate> predicates)
+	{
+		List<String> refusals = new ArrayList<String>();
+		for (GuardPredicate predicate : predicates)
+		{
+			ExtPredicate ext = predicate.pluginPredicate();
+			if (null == ext)
+				continue;
+			String refusal = org.frontcache.plugin.host.PluginPredicates.validate(ext);
+			if (null != refusal)
+				refusals.add(refusal);
+		}
+		return refusals;
+	}
+
+	/**
+	 * Binds every rule's {@code ext:} predicates to the started plugins now - at load once they run, and by the engine
+	 * right after it starts them (the engine's first load runs before) - so a name no plugin offers, or an argument a
+	 * plugin refuses, is an ERROR in the log at once, not at the first request that reaches the rule.
+	 */
+	public void checkPluginPredicates()
+	{
+		if (!org.frontcache.plugin.host.PluginPredicates.isRunning())
+			return;
+		for (GuardRule rule : this.rules)
+			for (GuardPredicate predicate : rule.getPredicates())
+			{
+				ExtPredicate ext = predicate.pluginPredicate();
+				if (null != ext)
+					org.frontcache.plugin.host.PluginPredicates.check(ext, GUARD_RULES_CONFIG_FILE + ": " + rule.getName());
+			}
 	}
 
 	private List<GuardRule> loadConfiguredRules()

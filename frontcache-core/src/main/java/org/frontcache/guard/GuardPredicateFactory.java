@@ -54,6 +54,7 @@ import org.frontcache.guard.ratelimit.RateLimitSpec;
  *   [!] header:&lt;name&gt;[~&lt;regex&gt;]
  *   [!] request-type:&lt;toplevel|include|include-async&gt;
  *   [!] edge-token                        (carries this node's front-cache.edge-token; guard-rules.conf only)
+ *   [!] ext:&lt;name&gt;[:&lt;argument&gt;]           (a started plugin's predicate - see ExtPredicate)
  *       rate:&lt;limit&gt;/&lt;window&gt; [bucket=&lt;name&gt;] [scope=&lt;toplevel|all&gt;]   (never negated)
  *
  * Regexes are compiled once, here, and matched with find() semantics - the same behaviour as
@@ -157,6 +158,11 @@ public class GuardPredicateFactory {
 			public String describe() {
 				return described;
 			}
+
+			@Override
+			public ExtPredicate pluginPredicate() {
+				return delegate.pluginPredicate();
+			}
 		};
 	}
 
@@ -247,6 +253,14 @@ public class GuardPredicateFactory {
 
 		case "client-ip":
 		{
+			if (arg.startsWith("@") && IpLists.isLive(arg.substring(1).trim()))
+			{
+				// a list under conf/lists/: read through IpLists, so a plugin's writeList reaches this rule at once
+				checkConfPath(arg.substring(1).trim(), expr);
+				final IpLists.LiveList list = IpLists.get(arg.substring(1).trim(), expr);
+				return simplePredicate(expr, ctx -> list.contains(ctx.getResolvedClientIP()));
+			}
+
 			final List<Cidr> blocks = parseClientIpArgument(arg, expr);
 			return simplePredicate(expr, ctx -> {
 				// Resolved through ClientIpResolver, NOT FCUtils.getClientIP(): the latter believes
@@ -274,6 +288,10 @@ public class GuardPredicateFactory {
 
 		case "cookie-hmac":
 			return parseCookieHmac(arg, expr);
+
+		case "ext":
+			// a plugin's predicate (E3): the name and argument here, the plugin's own parse once plugins have started
+			return ExtPredicate.parse(arg, expr);
 
 		case "request-type":
 		{
@@ -425,13 +443,7 @@ public class GuardPredicateFactory {
 
 	private static List<Cidr> loadClientIpFile(String name, String expr)
 	{
-		// A config file names a list to read, not a capability to read the filesystem: the name is
-		// resolved under FRONTCACHE_HOME/conf by FCConfig, so anything that could climb out of it is
-		// refused before it gets there.
-		if (0 == name.length() || name.startsWith("/") || name.startsWith("\\")
-				|| -1 < name.indexOf("..") || -1 < name.indexOf(':'))
-			throw new GuardConfigException("'@" + name + "' in '" + expr
-					+ "' must be a plain path under FRONTCACHE_HOME/conf, e.g. @bot-networks/googlebot.txt");
+		checkConfPath(name, expr);
 
 		List<Cidr> blocks = new ArrayList<Cidr>();
 		InputStream is = null;
@@ -479,6 +491,18 @@ public class GuardPredicateFactory {
 					+ " - a client-ip rule with an empty list matches nothing, silently");
 
 		return blocks;
+	}
+
+	/**
+	 * A config file names a list to read, not a capability to read the filesystem: the name is resolved under
+	 * FRONTCACHE_HOME/conf by FCConfig, so anything that could climb out of it is refused before it gets there.
+	 */
+	private static void checkConfPath(String name, String expr)
+	{
+		if (0 == name.length() || name.startsWith("/") || name.startsWith("\\")
+				|| -1 < name.indexOf("..") || -1 < name.indexOf(':') || -1 < name.indexOf('\\'))
+			throw new GuardConfigException("'@" + name + "' in '" + expr
+					+ "' must be a plain path under FRONTCACHE_HOME/conf, e.g. @bot-networks/googlebot.txt");
 	}
 
 	private static void close(java.io.Closeable closeable)

@@ -29,7 +29,10 @@ public enum PluginKind {
 	/** E2: answers requests under a path it owns, {@code /fc-x/<id>/}. Fails as: its path answers 503. */
 	SERVE(false),
 
-	/** E3: contributes a named guard predicate. Fails as: the rule is skipped. Not offered by this node yet. */
+	/**
+	 * E3: contributes named guard predicates ({@code ext:<name>:...}). Fails as: the rule does not match; a plugin over
+	 * its budget is switched off for a while. Open to a community or an operator's own plugin.
+	 */
 	DECIDE(true),
 
 	/** E4: rewrites a response. Reserved - not designed, never offered by this node. */

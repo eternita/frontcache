@@ -1,0 +1,2 @@
+// A Frontcache plugin - a standalone build. Rename it with the plugin: the jar is named after it.
+rootProject.name = 'frontcache-plugin-example'

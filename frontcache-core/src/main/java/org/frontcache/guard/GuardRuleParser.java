@@ -28,7 +28,7 @@ import org.frontcache.guard.ratelimit.RateLimitPredicate;
  *
  * Line format (see docs/guard-getting-started.md):
  *
- *   &lt;name&gt; | &lt;predicate&gt; ; &lt;predicate&gt; ... | &lt;action&gt; [| dry-run]
+ *   &lt;name&gt; | &lt;predicate&gt; ; &lt;predicate&gt; ... | &lt;action&gt; [| dry-run] [| on-error=allow]
  *
  * A {@code rate:} predicate is moved to the END of its condition here (see
  * {@link #parseCondition}); a rule may hold at most one.
@@ -45,6 +45,13 @@ import org.frontcache.guard.ratelimit.RateLimitPredicate;
 public class GuardRuleParser {
 
 	private static final String CHALLENGE = "challenge";
+
+	/**
+	 * The flag an {@code allow} rule naming a plugin's predicate ({@code ext:}) must carry: its author has accepted that
+	 * when the predicate has no answer - the plugin threw, is over its budget, or is absent - the rule does not match,
+	 * so the exemption does not apply to that request.
+	 */
+	public static final String ON_ERROR_ALLOW = "on-error=allow";
 
 	/** A provider's name - as a plugin's manifest names it in {@code challenges}. */
 	private static final java.util.regex.Pattern PROVIDER = java.util.regex.Pattern.compile("[a-z][a-z0-9-]{0,30}");
@@ -81,16 +88,22 @@ public class GuardRuleParser {
 		GuardAction action = parseAction(parts.get(2).trim(), line);
 
 		boolean dryRun = false;
-		if (3 < parts.size())
+		boolean onErrorAllow = false;
+		for (int i = 3; i < parts.size(); i++)
 		{
-			String flag = parts.get(3).trim();
-			if ("dry-run".equalsIgnoreCase(flag))
+			String flag = parts.get(i).trim();
+			if ("dry-run".equalsIgnoreCase(flag) && !dryRun)
 				dryRun = true;
+			else if (ON_ERROR_ALLOW.equalsIgnoreCase(flag.replace(" ", "")) && !onErrorAllow)
+				onErrorAllow = true;
 			else if (0 < flag.length())
-				throw new GuardConfigException("unknown flag '" + flag + "' in '" + line + "' (only 'dry-run' is supported)");
+				throw new GuardConfigException("unknown or repeated flag '" + flag + "' in '" + line + "' (the flags are 'dry-run' and '"
+						+ ON_ERROR_ALLOW + "')");
 		}
 
-		return new GuardRule(name, predicates, action, dryRun);
+		checkPluginPredicates(predicates, action, onErrorAllow, line);
+
+		return new GuardRule(name, predicates, action, dryRun, onErrorAllow);
 	}
 
 	/**
@@ -210,6 +223,28 @@ public class GuardRuleParser {
 
 		predicates.remove(index);
 		predicates.add(rateLimit.bind(ruleName));
+	}
+
+	/**
+	 * A rule whose predicate a plugin answers does not match when the plugin has no answer. For a reject, redirect or
+	 * challenge that is fail-open; for an {@code allow} rule it is an exemption that stops applying - a lockout risk the
+	 * rule must state in {@value #ON_ERROR_ALLOW}, which means nothing on any other rule and is refused there.
+	 */
+	private static void checkPluginPredicates(List<GuardPredicate> predicates, GuardAction action, boolean onErrorAllow,
+			String line)
+	{
+		boolean plugin = false;
+		for (GuardPredicate predicate : predicates)
+			plugin |= predicate.isPluginPredicate();
+		boolean allow = GuardAction.Type.ALLOW == action.getType();
+
+		if (allow && plugin && !onErrorAllow)
+			throw new GuardConfigException("an allow rule naming a plugin's ext: predicate needs '| " + ON_ERROR_ALLOW + "' in '"
+					+ line + "' - when the plugin has no answer (it threw, is over its budget or is absent) the rule does"
+					+ " not match, so the exemption does not apply; the flag says that is accepted");
+		if (onErrorAllow && !(allow && plugin))
+			throw new GuardConfigException("'" + ON_ERROR_ALLOW + "' is only for an allow rule naming an ext: predicate, in '"
+					+ line + "'");
 	}
 
 	private GuardAction parseAction(String action, String line)

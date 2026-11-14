@@ -58,9 +58,29 @@ public class ConsoleJettyServer {
 			connector.setHost(host);
 		server.addConnector(connector);
 
+		WebAppContext webapp = webApp(new File(webDir).getAbsolutePath(), contextPath,
+				System.getProperty("frontcache.jetty.container-jars", "").trim());
+
+		server.setHandler(webapp);
+		server.start();
+
+		System.out.println("Frontcache Console Jetty Server has been started successfully ...");
+
+		server.join();
+	}
+
+	/**
+	 * The console's webapp as {@link #main} deploys it - also what a test that renders the console's pages starts, so
+	 * the container-jar pattern the JSPs need is written once.
+	 *
+	 * @param war        the exploded webapp directory, or a war
+	 * @param extraJars  a regex of further container-class-path jars to scan, or empty
+	 */
+	static WebAppContext webApp(String war, String contextPath, String extraJars) {
+
 		WebAppContext webapp = new WebAppContext();
 		webapp.setContextPath(contextPath);
-		webapp.setWar(new File(webDir).getAbsolutePath());
+		webapp.setWar(war);
 		webapp.setThrowUnavailableOnStartupException(true);
 
 		// Scan container jars for ServletContainerInitializers (JSP/JSTL support).
@@ -74,7 +94,6 @@ public class ConsoleJettyServer {
 		// path (a plugin's dev run, which serves the exploded webapp) carries its JSPs under
 		// META-INF/resources, and Jetty serves those only from a jar the pattern names. A plugin jar in
 		// the war's WEB-INF/lib needs nothing - Jetty scans every one of those.
-		String extraJars = System.getProperty("frontcache.jetty.container-jars", "").trim();
 		webapp.addConfiguration(new AnnotationConfiguration());
 		webapp.setAttribute(MetaInfConfiguration.CONTAINER_JAR_PATTERN,
 				".*/jakarta\\.servlet\\.jsp\\.jstl-.*\\.jar$|"
@@ -84,14 +103,8 @@ public class ConsoleJettyServer {
 				+ ".*/jetty-ee10-glassfish-jstl-.*\\.jar$|"
 				+ ".*/spring-webmvc-.*\\.jar$|"
 				+ ".*/taglibs.*\\.jar$"
-				+ (extraJars.isEmpty() ? "" : "|" + extraJars));
-
-		server.setHandler(webapp);
-		server.start();
-
-		System.out.println("Frontcache Console Jetty Server has been started successfully ...");
-
-		server.join();
+				+ (null == extraJars || extraJars.isEmpty() ? "" : "|" + extraJars));
+		return webapp;
 	}
 
 	/**

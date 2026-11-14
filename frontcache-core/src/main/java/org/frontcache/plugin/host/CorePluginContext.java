@@ -55,11 +55,21 @@ final class CorePluginContext implements BundledPluginContext {
 
 	private final PluginManifest manifest;
 	private final String publicDomain;
+	private final PluginScheduler scheduler;
 
 	/** @param publicDomain {@code FrontCacheEngine.getPublicDomain()} - null when unset */
 	CorePluginContext(PluginManifest manifest, String publicDomain) {
+		this(manifest, publicDomain, null);
+	}
+
+	/**
+	 * @param publicDomain {@code FrontCacheEngine.getPublicDomain()} - null when unset
+	 * @param scheduler    this start's scheduler; null for none
+	 */
+	CorePluginContext(PluginManifest manifest, String publicDomain, PluginScheduler scheduler) {
 		this.manifest = manifest;
 		this.publicDomain = publicDomain;
+		this.scheduler = scheduler;
 	}
 
 	@Override
@@ -115,6 +125,19 @@ final class CorePluginContext implements BundledPluginContext {
 		if (!manifest.declares(PluginKind.SERVE) || manifest.cookies().isEmpty() || !EvidenceCookies.isConfigured())
 			return null;
 		return new CoreEvidenceSigner(manifest);
+	}
+
+	@Override
+	public java.util.concurrent.ScheduledExecutorService scheduler() {
+		return scheduler;
+	}
+
+	@Override
+	public int writeList(String name, java.util.List<String> lines) throws java.io.IOException {
+		if (!manifest.declares(PluginKind.MANAGE))
+			throw new UnsupportedOperationException("plugin '" + manifest.id() + "' does not declare kind 'manage' - writing"
+					+ " a list the core decides on is a manage plugin's");
+		return PluginLists.write(manifest.id(), name, lines);
 	}
 
 	@Override

@@ -18,6 +18,7 @@ package org.frontcache.plugin;
 import java.util.List;
 import java.util.Map;
 
+import org.frontcache.plugin.decide.GuardPredicateProvider;
 import org.frontcache.plugin.event.EventListener;
 import org.frontcache.plugin.serve.PluginEndpoint;
 
@@ -118,6 +119,17 @@ public interface FrontcachePlugin {
 	 */
 	default PluginEndpoint endpoint() {
 		return null;
+	}
+
+	/**
+	 * {@link PluginKind#DECIDE}: the {@code ext:<name>:...} predicates this plugin offers guard and bot rules - see
+	 * {@link GuardPredicateProvider}. Read after every start, and again after {@link #configure} accepted a config on
+	 * {@code reload-plugin-config} (every {@code ext:} predicate is then compiled afresh); a plugin that hands one over without declaring
+	 * {@code decide} is refused at start. On the request path: each call is timed against the plugin's budget, and a
+	 * plugin over it is switched off for a while.
+	 */
+	default List<GuardPredicateProvider> predicates() {
+		return List.of();
 	}
 
 	/**

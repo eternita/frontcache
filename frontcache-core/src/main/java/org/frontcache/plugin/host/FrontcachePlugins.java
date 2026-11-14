@@ -15,6 +15,7 @@
  */
 package org.frontcache.plugin.host;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -47,6 +48,7 @@ import org.frontcache.plugin.NodeMode;
 import org.frontcache.plugin.PluginConfigException;
 import org.frontcache.plugin.PluginKind;
 import org.frontcache.plugin.PluginManifest;
+import org.frontcache.plugin.decide.GuardPredicateProvider;
 import org.frontcache.plugin.event.EventListener;
 import org.frontcache.plugin.event.RequestCompleted;
 import org.frontcache.plugin.serve.PluginEndpoint;
@@ -86,7 +88,7 @@ public final class FrontcachePlugins {
 
 	/** The kinds this node offers today; a plugin declaring another is refused at load. */
 	static final Set<PluginKind> OFFERED = Collections.unmodifiableSet(
-			java.util.EnumSet.of(PluginKind.OBSERVE, PluginKind.SERVE, PluginKind.MANAGE));
+			java.util.EnumSet.of(PluginKind.OBSERVE, PluginKind.SERVE, PluginKind.DECIDE, PluginKind.MANAGE));
 
 	/** {@code front-cache.plugins.<id>.queue}: a listener's queue capacity. */
 	static final String QUEUE_PROPERTY = "front-cache.plugins.%s.queue";
@@ -101,10 +103,12 @@ public final class FrontcachePlugins {
 	static final long GUARD_SUMMARY_INTERVAL_MILLIS = 10_000L;
 
 	enum State {
-		LOADED, STARTED, FAILED, REFUSED, STOPPED;
+		LOADED, STARTED, FAILED, REFUSED, STOPPED,
+		/** A dropped-in plugin's directory that {@code front-cache.plugins} does not list: found, nothing of it read. */
+		NOT_ENABLED;
 
 		String label() {
-			return name().toLowerCase(java.util.Locale.ROOT);
+			return name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
 		}
 	}
 
@@ -123,6 +127,16 @@ public final class FrontcachePlugins {
 		volatile long configLoaded;
 		/** Its last start failed on its config: {@link #reloadConfig} may start it. */
 		volatile boolean failedOnConfig;
+		/** A dropped-in plugin's directory ({@code plugins/<id>}); null for a bundled one. */
+		volatile String directory;
+		volatile List<String> jars = List.of();
+		volatile boolean pinned;
+		/** {@code decide}: the budget its predicates are timed against - the process's, kept across starts. */
+		volatile DecideBudget budget;
+		/** The scheduler handed to its current start; shut down when it stops. */
+		volatile PluginScheduler scheduler;
+		/** {@code decide}: what its current start offers. */
+		volatile List<PluginPredicates.Provider> offered = List.of();
 
 		Slot(String id, PluginManifest manifest, FrontcachePlugin plugin, boolean legacy, State state, String reason) {
 			this.id = id;
@@ -133,9 +147,20 @@ public final class FrontcachePlugins {
 			this.reason = reason;
 		}
 
-		/** Refused for good (manifest, class, kinds): never started, whatever the engine does. */
+		/** Refused for good (manifest, class, kinds), or not enabled: never started, whatever the engine does. */
 		boolean refused() {
-			return null == plugin || State.REFUSED == state;
+			return null == plugin || State.REFUSED == state || State.NOT_ENABLED == state;
+		}
+
+		/** Marks it as found in a plugin directory. */
+		void droppedIn(String directory, List<String> jars, boolean pinned) {
+			this.directory = directory;
+			this.jars = List.copyOf(jars);
+			this.pinned = pinned;
+		}
+
+		boolean isDroppedIn() {
+			return null != directory;
 		}
 	}
 
@@ -148,6 +173,9 @@ public final class FrontcachePlugins {
 	private static volatile Map<String, ManagementAction> actions = Map.of();
 
 	private static volatile NodeMode mode = null;
+
+	/** Whether dropped-in plugins were read from {@code FRONTCACHE_HOME/plugins} before the mode was known. */
+	private static volatile boolean droppedInByDefault = false;
 
 	/** Whether the engine has started the plugins and not stopped them - and with what. */
 	private static boolean running = false;
@@ -166,7 +194,7 @@ public final class FrontcachePlugins {
 
 		synchronized (FrontcachePlugins.class) {
 			if (null == loaded)
-				loaded = load(FrontcachePlugin.class.getClassLoader());
+				loaded = loadAll(FrontcachePlugin.class.getClassLoader());
 			return loaded;
 		}
 	}
@@ -176,6 +204,46 @@ public final class FrontcachePlugins {
 		stop(true);
 		loaded = Collections.unmodifiableList(new ArrayList<>(slots));
 		mode = null;
+	}
+
+	/** The bundled plugins, then the dropped-in ones. Never throws. */
+	static List<Slot> loadAll(ClassLoader core) {
+
+		List<Slot> slots = new ArrayList<>(load(core));
+		File dir;
+		Set<String> enabled;
+		try {
+			dir = PluginDirectory.directory(mode);
+			enabled = PluginDirectory.enabled();
+		} catch (Throwable t) {
+			logger.error("Could not read the plugin directory's settings - the node starts without dropped-in plugins", t);
+			return Collections.unmodifiableList(slots);
+		}
+		if (null == dir && enabled.isEmpty())
+			return Collections.unmodifiableList(slots);
+
+		List<Slot> droppedIn;
+		try {
+			droppedIn = PluginDirectory.scan(dir, core, slots, enabled);
+		} catch (Throwable t) {
+			logger.error("Could not read the plugin directory " + dir + " - the node starts without dropped-in plugins", t);
+			droppedIn = List.of();
+		}
+		for (Slot slot : droppedIn)
+		{
+			if (State.NOT_ENABLED == slot.state)
+				continue; // said at INFO by the scan
+			if (slot.refused())
+				logger.error("Plugin '{}' ({}) is not loaded - the node starts without it: {}", slot.id, slot.directory,
+						slot.reason);
+			else
+				logger.info("Plugin '{}' found in {}: {} ({}{})", slot.id, slot.directory, slot.manifest,
+						slot.plugin.getClass().getName(), slot.pinned ? "; pinned" : "");
+		}
+		if (!droppedIn.isEmpty() && null == mode && PluginDirectory.isDefault())
+			droppedInByDefault = true;
+		slots.addAll(droppedIn);
+		return Collections.unmodifiableList(slots);
 	}
 
 	/** Finds the plugins a class loader sees - their manifests, then the legacy modules. Never throws. */
@@ -222,7 +290,7 @@ public final class FrontcachePlugins {
 		return Collections.unmodifiableList(slots);
 	}
 
-	private static Slot fromManifest(URL url, ClassLoader loader, Set<String> ids, Set<String> configs) {
+	static Slot fromManifest(URL url, ClassLoader loader, Set<String> ids, Set<String> configs) {
 
 		Properties properties = new Properties();
 		try (InputStream in = url.openStream(); Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
@@ -341,6 +409,7 @@ public final class FrontcachePlugins {
 		started = Collections.unmodifiableList(ok);
 		actions = Collections.unmodifiableMap(byName);
 		PluginEndpoints.install(served);
+		PluginPredicates.install(offered(ok));
 
 		FcEventBus.startGuardSummary(guardRules, GUARD_SUMMARY_INTERVAL_MILLIS);
 
@@ -361,21 +430,29 @@ public final class FrontcachePlugins {
 			return false;
 		}
 
+		PluginScheduler scheduler = new PluginScheduler(slot.id, slot.counters);
+		slot.scheduler = scheduler;
+		if (slot.manifest.declares(PluginKind.DECIDE) && null == slot.budget)
+			slot.budget = new DecideBudget(slot.id);
 		try {
-			plugin.start(new CorePluginContext(slot.manifest, publicDomain));
+			CorePluginContext context = new CorePluginContext(slot.manifest, publicDomain, scheduler);
+			plugin.start(slot.isDroppedIn() ? new DroppedInPluginContext(context) : context);
 		} catch (Throwable t) {
 			slot.counters.errors.increment();
 			fail(slot, State.FAILED, "start threw " + t, t);
+			scheduler.shutdown();
 			return false;
 		}
 
 		List<EventListener> listeners;
 		Map<String, ManagementAction> own;
 		PluginEndpoint endpoint;
+		List<GuardPredicateProvider> predicates;
 		try {
 			listeners = nonNull(plugin.eventListeners());
 			own = nonNull(plugin.managementActions());
 			endpoint = plugin.endpoint();
+			predicates = nonNull(plugin.predicates());
 		} catch (Throwable t) {
 			slot.counters.errors.increment();
 			fail(slot, State.FAILED, "listing its contributions threw " + t, t);
@@ -390,12 +467,26 @@ public final class FrontcachePlugins {
 			refusal = "it has management actions but does not declare kind 'manage'";
 		else if (null != endpoint && !slot.manifest.declares(PluginKind.SERVE))
 			refusal = "it has an endpoint but does not declare kind 'serve'";
+		else if (!predicates.isEmpty() && !slot.manifest.declares(PluginKind.DECIDE))
+			refusal = "it has predicates but does not declare kind 'decide'";
+		List<PluginPredicates.Provider> offers = List.of();
+		if (null == refusal)
+		{
+			try {
+				offers = providers(slot, predicates);
+			} catch (IllegalArgumentException e) {
+				refusal = e.getMessage();
+			}
+		}
 		if (null != refusal)
 		{
 			fail(slot, State.REFUSED, refusal, null);
 			stopQuietly(slot, false);
 			return false;
 		}
+		slot.offered = offers;
+		if (slot.manifest.declares(PluginKind.DECIDE) && offers.isEmpty())
+			logger.warn("Plugin '{}' declares kind 'decide' but offers no predicate", slot.id);
 
 		subscribe(slot, listeners, false);
 
@@ -419,6 +510,49 @@ public final class FrontcachePlugins {
 		slot.reason = null;
 		logger.info("Plugin '{}' started: {}", slot.id, slot.manifest);
 		return true;
+	}
+
+	/**
+	 * A plugin's predicates as offered names. A name that is not one refuses the plugin (an author's mistake, found at
+	 * its first start); a name it offers twice is the first one.
+	 */
+	private static List<PluginPredicates.Provider> providers(Slot slot, List<GuardPredicateProvider> predicates) {
+
+		List<PluginPredicates.Provider> offers = new ArrayList<>();
+		Set<String> names = new HashSet<>();
+		for (GuardPredicateProvider provider : predicates)
+		{
+			if (null == provider)
+				continue;
+			String name;
+			try {
+				name = provider.name();
+			} catch (Throwable t) {
+				slot.counters.errors.increment();
+				throw new IllegalArgumentException("a predicate's name() threw " + t);
+			}
+			if (null == name || !org.frontcache.guard.ExtPredicate.NAME.matcher(name).matches())
+				throw new IllegalArgumentException("it offers a predicate named '" + name + "', which is not a name ("
+						+ org.frontcache.guard.ExtPredicate.NAME.pattern() + ")");
+			if (names.add(name))
+				offers.add(new PluginPredicates.Provider(name, slot.id, provider, slot.budget));
+		}
+		return Collections.unmodifiableList(offers);
+	}
+
+	/** What the started plugins offer, by name - the first plugin loaded wins a name two offer. */
+	private static Map<String, PluginPredicates.Provider> offered(List<Slot> slots) {
+
+		Map<String, PluginPredicates.Provider> byName = new LinkedHashMap<>();
+		for (Slot slot : slots)
+			for (PluginPredicates.Provider provider : slot.offered)
+			{
+				PluginPredicates.Provider first = byName.putIfAbsent(provider.name(), provider);
+				if (null != first && first != provider)
+					logger.warn("Plugin '{}' offers predicate 'ext:{}', which plugin '{}' already offers - the first one wins",
+							slot.id, provider.name(), first.plugin());
+			}
+		return byName;
 	}
 
 	/**
@@ -485,6 +619,26 @@ public final class FrontcachePlugins {
 		}
 		subscribe(slot, listeners, true);
 		FcEventBus.startGuardSummary(runningGuardRules, GUARD_SUMMARY_INTERVAL_MILLIS);
+	}
+
+	/**
+	 * After a running plugin accepted a new config: its predicates again, since a config may change what they answer -
+	 * and every {@code ext:} predicate binds afresh (its argument compiled again) at its next use.
+	 */
+	private static void repredicate(Slot slot) {
+
+		if (!slot.manifest.declares(PluginKind.DECIDE))
+			return;
+		try {
+			List<GuardPredicateProvider> predicates = nonNull(slot.plugin.predicates());
+			slot.offered = providers(slot, predicates);
+		} catch (Throwable t) {
+			slot.counters.errors.increment();
+			logger.error("Plugin '" + slot.id + "' threw listing its predicates after a config reload - it keeps the ones"
+					+ " it had", t);
+			return;
+		}
+		PluginPredicates.install(offered(started));
 	}
 
 	/**
@@ -556,7 +710,10 @@ public final class FrontcachePlugins {
 		{
 			ok = configure(slot);
 			if (ok)
+			{
 				resubscribe(slot);
+				repredicate(slot);
+			}
 		}
 		else if (running && State.FAILED == slot.state && slot.failedOnConfig)
 		{
@@ -570,6 +727,8 @@ public final class FrontcachePlugins {
 				List<Slot> next = new ArrayList<>(started);
 				next.add(slot);
 				started = Collections.unmodifiableList(next);
+				if (!slot.offered.isEmpty())
+					PluginPredicates.install(offered(started));
 				actions = Collections.unmodifiableMap(byName);
 				FcEventBus.startGuardSummary(runningGuardRules, GUARD_SUMMARY_INTERVAL_MILLIS);
 				CoreEvents.pluginStateChanged(slot.id, slot.state.label(), slot.reason);
@@ -685,6 +844,7 @@ public final class FrontcachePlugins {
 
 		running = false;
 		PluginEndpoints.clear();
+		PluginPredicates.clear();
 		FcEventBus.stopAll();
 
 		for (Slot slot : started)
@@ -703,6 +863,10 @@ public final class FrontcachePlugins {
 			slot.counters.errors.increment();
 			logger.error("Plugin '" + slot.id + "' failed to stop", t);
 			return false;
+		} finally {
+			PluginScheduler scheduler = slot.scheduler;
+			if (null != scheduler)
+				scheduler.shutdown(); // its tasks end with it - a reload's next start schedules its own
 		}
 	}
 
@@ -715,6 +879,10 @@ public final class FrontcachePlugins {
 		if (null == deployedAs || deployedAs == mode)
 			return;
 		mode = deployedAs;
+		if (NodeMode.FILTER == deployedAs && droppedInByDefault)
+			logger.warn("Dropped-in plugins were loaded from FRONTCACHE_HOME/plugins before the filter started - in filter"
+					+ " mode a node reads a plugin directory only when -D{} or ${} names it", PluginDirectory.DIR_PROPERTY,
+					PluginDirectory.DIR_ENV);
 
 		for (Slot slot : loaded())
 		{
@@ -826,6 +994,29 @@ public final class FrontcachePlugins {
 		stats.setState(slot.state.label());
 		stats.setReason(slot.reason);
 		stats.setLegacy(slot.legacy);
+		if (slot.isDroppedIn())
+		{
+			stats.setSource(PluginStats.SOURCE_DROPPED_IN);
+			stats.setDirectory(slot.directory);
+			stats.setJars(new ArrayList<>(slot.jars));
+			stats.setPinned(slot.pinned);
+		}
+		DecideBudget budget = slot.budget;
+		if (null != budget)
+		{
+			List<String> names = new ArrayList<>();
+			for (PluginPredicates.Provider provider : slot.offered)
+				names.add(provider.name());
+			stats.setPredicates(names);
+			stats.setDecideState(budget.isOverBudget() ? PluginStats.DECIDE_OVER_BUDGET : PluginStats.DECIDE_OK);
+			stats.setDecideReason(budget.reason());
+			stats.setDecideBudgetMicros(budget.budgetNanos() / 1_000);
+			stats.setDecideP99Micros(budget.lastP99Micros());
+			stats.setDecideCalls(budget.calls());
+			stats.setDecideErrors(budget.errors());
+			stats.setDecideSwitchedOff(budget.switchedOff());
+			stats.setDecideRetryAt(budget.retryAtMillis());
+		}
 		if (null != manifest && manifest.declares(PluginKind.SERVE))
 		{
 			stats.setServes(PluginEndpoints.serves(slot.id));

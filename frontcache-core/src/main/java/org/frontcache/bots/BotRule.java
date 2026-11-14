@@ -56,9 +56,13 @@ public class BotRule {
 	 */
 	public boolean matches(RequestContext context)
 	{
-		for (GuardPredicate predicate : predicates)
-			if (!predicate.test(context))
-				return false;
+		try {
+			for (GuardPredicate predicate : predicates)
+				if (!predicate.test(context))
+					return false;
+		} catch (org.frontcache.guard.PredicateUndecided e) {
+			return false; // a plugin's predicate had no answer: the rule does not match, negated or not
+		}
 
 		return true;
 	}

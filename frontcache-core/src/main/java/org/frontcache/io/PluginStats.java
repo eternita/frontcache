@@ -27,6 +27,21 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PluginStats {
 
+	/** {@link #getSource()}: on the core's class path - the war's {@code WEB-INF/lib}, a filter-mode application's. */
+	public static final String SOURCE_BUNDLED = "bundled";
+
+	/** {@link #getSource()}: from the node's plugin directory, {@code FRONTCACHE_HOME/plugins/<id>/}. */
+	public static final String SOURCE_DROPPED_IN = "dropped-in";
+
+	/** {@link #getState()}: a plugin directory that {@code front-cache.plugins} does not list - found, not loaded. */
+	public static final String STATE_NOT_ENABLED = "not-enabled";
+
+	/** {@link #getDecideState()}: its predicates answer. */
+	public static final String DECIDE_OK = "ok";
+
+	/** {@link #getDecideState()}: switched off for going over its budget or throwing - its rules do not match. */
+	public static final String DECIDE_OVER_BUDGET = "over-budget";
+
 	private String id;
 	private String name;
 	private String version;
@@ -51,6 +66,19 @@ public class PluginStats {
 	private long served;
 	private long serveRefused;
 	private long serveFailed;
+	private String source = SOURCE_BUNDLED;
+	private String directory;
+	private List<String> jars = new ArrayList<>();
+	private boolean pinned;
+	private List<String> predicates = new ArrayList<>();
+	private String decideState;
+	private String decideReason;
+	private long decideBudgetMicros;
+	private double decideP99Micros = -1;
+	private long decideCalls;
+	private long decideErrors;
+	private long decideSwitchedOff;
+	private long decideRetryAt;
 
 	public PluginStats() { // for JSON mapper
 	}
@@ -122,7 +150,7 @@ public class PluginStats {
 		this.requestPath = requestPath;
 	}
 
-	/** {@code loaded}, {@code started}, {@code failed}, {@code refused} or {@code stopped}. */
+	/** {@code loaded}, {@code started}, {@code failed}, {@code refused}, {@code stopped} or {@value #STATE_NOT_ENABLED}. */
 	public String getState() {
 		return state;
 	}
@@ -265,5 +293,122 @@ public class PluginStats {
 
 	public void setServeFailed(long serveFailed) {
 		this.serveFailed = serveFailed;
+	}
+
+	/** {@value #SOURCE_BUNDLED} or {@value #SOURCE_DROPPED_IN}. */
+	public String getSource() {
+		return source;
+	}
+
+	public void setSource(String source) {
+		this.source = source;
+	}
+
+	/** A dropped-in plugin's directory, relative to the plugin directory's parent ({@code plugins/geoip}); else null. */
+	public String getDirectory() {
+		return directory;
+	}
+
+	public void setDirectory(String directory) {
+		this.directory = directory;
+	}
+
+	/** A dropped-in plugin's jars, each {@code <file name> <sha256>}; empty for a bundled one. */
+	public List<String> getJars() {
+		return jars;
+	}
+
+	public void setJars(List<String> jars) {
+		this.jars = (null == jars) ? new ArrayList<>() : jars;
+	}
+
+	/** Whether {@code front-cache.plugins.<id>.sha256} pinned its jars (and they matched - else it is refused). */
+	public boolean isPinned() {
+		return pinned;
+	}
+
+	public void setPinned(boolean pinned) {
+		this.pinned = pinned;
+	}
+
+	/** {@code decide}: the names of the {@code ext:<name>:} predicates it offers; empty until it starts. */
+	public List<String> getPredicates() {
+		return predicates;
+	}
+
+	public void setPredicates(List<String> predicates) {
+		this.predicates = (null == predicates) ? new ArrayList<>() : predicates;
+	}
+
+	/** {@code decide}: {@value #DECIDE_OK} or {@value #DECIDE_OVER_BUDGET}; null for a plugin that does not decide. */
+	public String getDecideState() {
+		return decideState;
+	}
+
+	public void setDecideState(String decideState) {
+		this.decideState = decideState;
+	}
+
+	/** {@code decide}: why it was last switched off - the p99 or the error rate; null when it never was. */
+	public String getDecideReason() {
+		return decideReason;
+	}
+
+	public void setDecideReason(String decideReason) {
+		this.decideReason = decideReason;
+	}
+
+	/** {@code decide}: its budget, {@code front-cache.plugins.<id>.decide-budget}, in microseconds. */
+	public long getDecideBudgetMicros() {
+		return decideBudgetMicros;
+	}
+
+	public void setDecideBudgetMicros(long decideBudgetMicros) {
+		this.decideBudgetMicros = decideBudgetMicros;
+	}
+
+	/** {@code decide}: its predicates' p99 over the last minute judged, in microseconds; -1 before the first. */
+	public double getDecideP99Micros() {
+		return decideP99Micros;
+	}
+
+	public void setDecideP99Micros(double decideP99Micros) {
+		this.decideP99Micros = decideP99Micros;
+	}
+
+	/** {@code decide}: calls into its predicates since the process started. */
+	public long getDecideCalls() {
+		return decideCalls;
+	}
+
+	public void setDecideCalls(long decideCalls) {
+		this.decideCalls = decideCalls;
+	}
+
+	/** {@code decide}: calls that threw. */
+	public long getDecideErrors() {
+		return decideErrors;
+	}
+
+	public void setDecideErrors(long decideErrors) {
+		this.decideErrors = decideErrors;
+	}
+
+	/** {@code decide}: how many times it was switched off. */
+	public long getDecideSwitchedOff() {
+		return decideSwitchedOff;
+	}
+
+	public void setDecideSwitchedOff(long decideSwitchedOff) {
+		this.decideSwitchedOff = decideSwitchedOff;
+	}
+
+	/** {@code decide}: while {@value #DECIDE_OVER_BUDGET}, when it is tried again (epoch millis); 0 otherwise. */
+	public long getDecideRetryAt() {
+		return decideRetryAt;
+	}
+
+	public void setDecideRetryAt(long decideRetryAt) {
+		this.decideRetryAt = decideRetryAt;
 	}
 }

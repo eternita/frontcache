@@ -16,6 +16,9 @@
 package org.frontcache.plugin;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.frontcache.plugin.serve.EvidenceSigner;
 
@@ -67,5 +70,39 @@ public interface PluginContext {
 	 */
 	default EvidenceSigner evidenceSigner() {
 		return null;
+	}
+
+	/**
+	 * Where this plugin runs background work - refreshing a list it writes, or the data its predicates answer from (a
+	 * {@code decide} plugin answers from memory, never from I/O on the request thread). Threads the node shares between
+	 * its plugins - daemon threads, so keep a task short and never block one forever; every task is wrapped, so one that
+	 * throws is logged and a periodic one keeps its schedule. Tasks the plugin scheduled are cancelled when it stops - a
+	 * {@code reload} included - so schedule them in {@link FrontcachePlugin#start}, and ask for the scheduler in every start: a stopped
+	 * start's scheduler takes no task. {@code shutdown()} cancels this
+	 * plugin's tasks only. Null only from a context that offers none (a test's own).
+	 */
+	default ScheduledExecutorService scheduler() {
+		return null;
+	}
+
+	/**
+	 * {@link PluginKind#MANAGE}: replaces {@code conf/lists/<name>.txt} atomically - the sanctioned way for a plugin to
+	 * change what the core decides. A guard or bot rule reading the list ({@code client-ip:@lists/<name>.txt}) sees the
+	 * new content at once, without a reload; the plugin decides nothing itself.
+	 *
+	 * <p>Each line is an address or a CIDR block ({@code 203.0.113.7}, {@code 66.249.64.0/19}, IPv6 alike); blank lines
+	 * and {@code #} comments are kept as written. <b>Written whole or refused whole</b>: one entry that is not an
+	 * address refuses the write, and the list keeps what it had. The file starts with {@code # managed by plugin <id>}:
+	 * a list another plugin manages, or one an operator wrote (a file without the marker), is never overwritten.
+	 *
+	 * @param name the list's name - lower case letters, digits, {@code .}, {@code _} and {@code -}, starting with a
+	 *             letter or digit, at most 64 characters; {@code .txt} is added
+	 * @param lines the entries, at most 100,000
+	 * @return how many address blocks the list now holds
+	 * @throws IllegalArgumentException naming the entries that are not addresses, or a name that is not one
+	 * @throws IOException when the file cannot be written, belongs to someone else, or the node has no FRONTCACHE_HOME
+	 */
+	default int writeList(String name, List<String> lines) throws IOException {
+		throw new UnsupportedOperationException("this node does not offer writeList");
 	}
 }

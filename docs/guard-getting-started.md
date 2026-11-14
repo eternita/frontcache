@@ -39,7 +39,7 @@ curl -H "Authorization: Bearer <your-api-key>" "http://<edge>/frontcache-io?acti
 ## 2. The format
 
 ```
-<name> | <condition> | <action> [| dry-run]
+<name> | <condition> | <action> [| dry-run] [| on-error=allow]
 ```
 
 - **name** — a short slug you choose. It is what you will see in the console, in the
@@ -49,6 +49,8 @@ curl -H "Authorization: Bearer <your-api-key>" "http://<edge>/frontcache-io?acti
 - **action** — `allow`, `reject:…`, or `redirect:…`.
 - **dry-run** — optional. The rule is evaluated and logged, but the request is left
   alone. Always start here (§6).
+- **on-error=allow** — only on an `allow` rule naming a plugin's `ext:` condition, and
+  required there (§4.3).
 
 Rules run **top to bottom, first match wins**, after the two built-ins. Blank lines
 and `#` comments are ignored.
@@ -66,6 +68,8 @@ and `#` comments are ignored.
 | `client-type:bot` \| `client-type:guest` | how Frontcache classified the visitor, using `bots.conf` |
 | `cookie:<name>` | that cookie is present (presence only — values are never read) |
 | `cookie-hmac:<name>` | that cookie carries a value signed with this node's secret, not yet expired — evidence a client cannot forge (§4.1, since 2.13.0) |
+| `client-ip:<address or CIDR>[,…]` or `client-ip:@<file>` | the client's address (as resolved through `front-cache.client-ip.trusted-proxies`, §5.1) is in one of the blocks; `@<file>` is a list under `conf/`, one block per line — and `@lists/<file>` one that may change while the node runs (§4.3) |
+| `ext:<name>[:<argument>]` | a plugin's condition — `ext:geo:country=DE` — answered by a `decide` plugin the node runs (§4.3, since 2.13.0) |
 | `header:<name>` or `header:<name>~<regex>` | the header is present / matches |
 | `request-type:<toplevel\|include\|include-async>` | `toplevel` is a request from a client; the others are `<fc:include>` fragments re-entering the engine |
 | `rate:<limit>/<window>` | one client IP has already sent `<limit>` requests in the current `<window>` — **§5**, and it needs one property set first |
@@ -231,6 +235,57 @@ The `else` action is a `reject:` or a `redirect:`, never `allow`.
 **`/fc-x/` is reserved** for plugins: a request under it is never cached and never sent
 to the origin, and a path no plugin owns answers a one-line `404`. If your site serves
 pages under `/fc-x/`, they are no longer reachable through Frontcache.
+
+### 4.3 A plugin's condition: `ext:`, and lists a plugin keeps
+
+A plugin of kind `decide` adds conditions of its own, written `ext:<name>:<argument>` in
+`guard-rules.conf` and `bots.conf` alike, and negated with `!` like any other:
+
+```
+# the plugin 'geoip' offers ext:geo; the argument is the plugin's own syntax
+eu-checkout | uri~^/checkout ; !ext:geo:country=DE,FR,PL | reject:403
+```
+
+The node decides what a failure means, never the plugin. When the condition **has no
+answer** — no running plugin offers the name, the plugin refused the argument, it threw,
+or it is switched off (below) — **the rule does not match** that request, whichever way
+it is negated: an `!ext:` that fails is never "true". For a `reject`, `redirect` or
+`challenge` rule that means the request is served as if the rule were not there. For an
+`allow` rule it means the **exemption stops applying** — so such a rule loads only when
+it says it accepts that:
+
+```
+office | ext:geo:office ; uri~^/admin | allow | on-error=allow
+```
+
+A name no plugin offers, or an argument the plugin refuses, is an error in the log once
+the plugins have started (and `set-config` refuses the file on such a node); the console
+and the portal accept any `ext:` they cannot check.
+
+**The budget.** A plugin's conditions run on the request thread, so every call is timed.
+Over a minute, a plugin whose p99 is over its budget — 200 µs unless
+`front-cache.plugins.<id>.decide-budget` says otherwise (`500us`, `1ms`) — or that threw
+on more than 1 % of calls (judged on 100 calls or more) is **switched off for five
+minutes**: its rules do not match, the console's Plugins screen says *over budget*, and
+`frontcache_plugin_decide_over_budget` is `1`. Then it is tried again.
+
+**Lists a plugin keeps — `client-ip:@lists/<file>`.** A list under `conf/lists/` is one
+that changes while the node runs: a plugin (kind `manage`) can replace it, and every rule
+naming it sees the new content at once, with no reload — the sanctioned way for a plugin
+to change what the node decides:
+
+```
+# lists/googlebot.txt is kept current by the crawler-feeder plugin
+googlebot-ok | ua~(?i)googlebot ; client-ip:@lists/googlebot.txt | allow
+# lists/banned.txt by whatever bans
+banned       | client-ip:@lists/banned.txt                        | reject:403
+```
+
+Unlike any other `@file`, a missing `lists/` file is an empty list (a warning, not a
+skipped rule — the plugin may not have run yet), and an empty list is fine. A file a
+plugin writes starts with `# managed by plugin <id>`; a plugin never overwrites a list
+without its own marker, so a list you keep by hand is safe there. A rule reload re-reads a
+`lists/` file whose size or date changed.
 
 ---
 

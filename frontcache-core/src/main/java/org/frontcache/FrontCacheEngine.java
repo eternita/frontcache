@@ -692,6 +692,9 @@ public class FrontCacheEngine {
 		// the rules loaded before the plugins started, so whether each challenge rule's provider is there is known
 		// only now
 		guardRuleEngine.checkChallengeProviders();
+		// the rules loaded before the plugins started: bind their ext: predicates now, so a mistake is logged at once
+		guardRuleEngine.checkPluginPredicates();
+		BotClassifier.getInstance().checkPluginPredicates();
 
 		// Prometheus / OTLP export. A no-op unless front-cache.metrics.export says otherwise, which is
 		// why this is called unconditionally: the node's lifecycle owner is the right place to start a

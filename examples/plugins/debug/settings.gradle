@@ -1,0 +1,2 @@
+// The debug example plugin - a standalone build (the core's :frontcache-plugin-testkit:test also compiles and tests it).
+rootProject.name = 'frontcache-plugin-debug'

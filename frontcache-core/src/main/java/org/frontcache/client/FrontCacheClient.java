@@ -64,6 +64,7 @@ import org.frontcache.io.ConfigFile;
 import org.frontcache.io.ConfigWriteAction;
 import org.frontcache.io.GetPluginConfigActionResponse;
 import org.frontcache.io.ReloadDynamicUrlsActionResponse;
+import org.frontcache.io.ReloadPluginConfigActionResponse;
 import org.frontcache.io.ReloadResilienceActionResponse;
 import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.BackupActionResponse;
@@ -892,6 +893,29 @@ public class FrontCacheClient {
 			return response;
 
 		GetPluginConfigActionResponse none = new GetPluginConfigActionResponse();
+		none.setPlugin(pluginId);
+		none.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+		none.setErrorDescription("this node predates plugin configs");
+		return none;
+	}
+
+	/**
+	 * Re-reads a plugin's config on the edge - {@code reload-plugin-config?plugin=<id>}: the file already on the node's
+	 * disk, applied (a running plugin keeps the config it had when it refuses the new one; one whose last start failed
+	 * on its config is started).
+	 *
+	 * @return the answer - {@code applied} false with status ERROR and the reasons in {@code errors} when the plugin
+	 *         refused it or has no config - or null when the edge could not be reached. A node that predates the
+	 *         action (a ping) is answered as an ERROR, never as a reload that succeeded.
+	 */
+	public ReloadPluginConfigActionResponse reloadPluginConfig(String pluginId)
+	{
+		ReloadPluginConfigActionResponse response = call(Map.of("action", FrontcacheAction.RELOAD_PLUGIN_CONFIG,
+				"plugin", (null == pluginId) ? "" : pluginId), ReloadPluginConfigActionResponse.class);
+		if (null == response || !isPing(response))
+			return response;
+
+		ReloadPluginConfigActionResponse none = new ReloadPluginConfigActionResponse();
 		none.setPlugin(pluginId);
 		none.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
 		none.setErrorDescription("this node predates plugin configs");

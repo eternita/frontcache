@@ -36,6 +36,8 @@ import java.util.function.Function;
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.model.EdgeConfigFile;
+import org.frontcache.console.model.EdgePlugins;
+import org.frontcache.console.model.PluginView;
 import org.frontcache.console.model.VisitorTypesConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.GuardRulesConfig;
@@ -49,6 +51,8 @@ import org.frontcache.io.ConfigFile;
 import org.frontcache.io.GetPluginConfigActionResponse;
 import org.frontcache.io.NodeStatsActionResponse;
 import org.frontcache.io.PluginStats;
+import org.frontcache.io.FrontcacheAction;
+import org.frontcache.io.ReloadPluginConfigActionResponse;
 import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.replication.CacheReplicator;
@@ -978,6 +982,75 @@ public class FrontcacheService {
 			results.put(edgeURL, savePluginConfigFile(scope, edgeURL, pluginId, fileName, content, hashForEdge));
 		}
 		return results;
+	}
+
+	// ---- plugins (the Plugins screen) ----------------------------------------------------------------------------
+
+	/**
+	 * Every edge of the scope with the plugins its {@code get-node-stats} reports - the Plugins screen's tabs, in the
+	 * console config's edge order. An edge that did not answer keeps its tab, marked unreachable; one that answered
+	 * {@code get-cache-state} instead (it predates {@code get-node-stats}) is marked as reporting no plugin information.
+	 */
+	public List<EdgePlugins> getEdgePlugins(EdgeScope scope) {
+
+		List<FrontCacheClient> fcClients = scope.clients();
+		List<NodeStatsActionResponse> answers = fanOut(fcClients, FrontCacheClient::getNodeStatsActionResponse);
+
+		List<EdgePlugins> result = new ArrayList<EdgePlugins>();
+		for (int i = 0; i < fcClients.size(); i++)
+		{
+			FrontCacheClient fcClient = fcClients.get(i);
+			NodeStatsActionResponse stats = answers.get(i);
+			if (null == stats)
+			{
+				result.add(EdgePlugins.unreachable(fcClient.getName(), fcClient.getFrontCacheURL()));
+				continue;
+			}
+
+			boolean reported = FrontcacheAction.GET_NODE_STATS.equals(stats.getAction());
+			List<PluginView> plugins = new ArrayList<PluginView>();
+			if (reported)
+				for (PluginStats plugin : stats.getPlugins())
+					if (null != plugin)
+						plugins.add(new PluginView(plugin));
+			result.add(new EdgePlugins(fcClient.getName(), fcClient.getFrontCacheURL(), true, reported, plugins));
+		}
+		return result;
+	}
+
+	/**
+	 * Re-reads a plugin's config on one edge of the scope - {@code reload-plugin-config}: what is already on the node's
+	 * disk, applied. Gated as a config save is: the console's {@code config-editing} switch here, the handler's
+	 * permission before it, and an edge outside the scope is refused before any client exists.
+	 *
+	 * @return the node's answer, or a synthetic refusal (status ERROR, the reason in {@code errorDescription}) when
+	 *         editing is off, the edge is not in the scope, or it could not be reached
+	 */
+	public ReloadPluginConfigActionResponse reloadPluginConfig(EdgeScope scope, String edgeURL, String pluginId) {
+
+		if (!isConfigEditingEnabled())
+			return reloadRefused(pluginId, "config editing is disabled on this console");
+
+		FrontCacheClient fcClient = scope.client(edgeURL);
+		if (null == fcClient)
+			return reloadRefused(pluginId, UnknownEdgeException.messageFor(edgeURL));
+
+		if (null == pluginId || pluginId.isBlank())
+			return reloadRefused(pluginId, "no plugin selected");
+
+		ReloadPluginConfigActionResponse response = fcClient.reloadPluginConfig(pluginId);
+		if (null == response)
+			return reloadRefused(pluginId, "edge " + edgeURL + " is not available");
+
+		return response;
+	}
+
+	private static ReloadPluginConfigActionResponse reloadRefused(String pluginId, String reason) {
+		ReloadPluginConfigActionResponse refused = new ReloadPluginConfigActionResponse();
+		refused.setPlugin(pluginId);
+		refused.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+		refused.setErrorDescription(reason);
+		return refused;
 	}
 
 	/**

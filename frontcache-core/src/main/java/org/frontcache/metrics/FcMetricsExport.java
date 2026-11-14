@@ -554,6 +554,8 @@ public class FcMetricsExport {
 					.register(registry);
 
 			org.frontcache.io.PluginStats declared = FrontcachePlugins.stats(id);
+			if (null != declared && declared.getKinds().contains("decide"))
+				bindDecideMetrics(id, tags);
 			if (null == declared || !declared.getKinds().contains("serve"))
 				continue;
 			FunctionCounter.builder("plugin.serve.requests", id, p -> pluginStat(p, org.frontcache.io.PluginStats::getServed))
@@ -574,6 +576,43 @@ public class FcMetricsExport {
 					.tags(tags.and("outcome", "failed"))
 					.register(registry);
 		}
+	}
+
+	/**
+	 * A {@code decide} plugin's predicates - their calls, the calls that threw, the p99 of the last minute judged
+	 * against its budget, and whether it is switched off for going over it ({@code frontcache_plugin_decide_*}).
+	 */
+	private void bindDecideMetrics(String id, Tags tags)
+	{
+		FunctionCounter.builder("plugin.decide.calls", id, p -> pluginStat(p, org.frontcache.io.PluginStats::getDecideCalls))
+				.description("Calls into a plugin's ext: predicates, on the request thread")
+				.tags(tags)
+				.register(registry);
+		FunctionCounter.builder("plugin.decide.errors", id, p -> pluginStat(p, org.frontcache.io.PluginStats::getDecideErrors))
+				.description("Calls into a plugin's ext: predicates that threw - the rule did not match")
+				.tags(tags)
+				.register(registry);
+		FunctionCounter.builder("plugin.decide.switched.off", id,
+				p -> pluginStat(p, org.frontcache.io.PluginStats::getDecideSwitchedOff))
+				.description("Times a plugin was switched off for going over its decide budget or throwing")
+				.tags(tags)
+				.register(registry);
+		Gauge.builder("plugin.decide.p99", id, p -> {
+					org.frontcache.io.PluginStats stats = FrontcachePlugins.stats(p);
+					return (null == stats || 0 > stats.getDecideP99Micros()) ? Double.NaN : stats.getDecideP99Micros() / 1e6;
+				})
+				.description("The p99 of a plugin's ext: predicates over the last minute judged, against its decide budget")
+				.baseUnit("seconds")
+				.tags(tags)
+				.register(registry);
+		Gauge.builder("plugin.decide.over.budget", id, p -> {
+					org.frontcache.io.PluginStats stats = FrontcachePlugins.stats(p);
+					return (null != stats && org.frontcache.io.PluginStats.DECIDE_OVER_BUDGET.equals(stats.getDecideState())) ? 1 : 0;
+				})
+				.description("1 while a plugin is switched off for going over its decide budget - the rules naming its"
+						+ " predicates do not match")
+				.tags(tags)
+				.register(registry);
 	}
 
 	private static double pluginStarted(String id) {

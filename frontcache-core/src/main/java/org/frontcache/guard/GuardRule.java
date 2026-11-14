@@ -34,6 +34,7 @@ public class GuardRule {
 	private final List<GuardPredicate> predicates;
 	private final GuardAction action;
 	private final boolean dryRun;
+	private final boolean onErrorAllow;
 
 	// hit count since start; in-memory only, reset on restart (by design)
 	private final LongAdder hits = new LongAdder();
@@ -42,10 +43,19 @@ public class GuardRule {
 	private final java.util.concurrent.atomic.AtomicBoolean unavailableReported = new java.util.concurrent.atomic.AtomicBoolean();
 
 	public GuardRule(String name, List<GuardPredicate> predicates, GuardAction action, boolean dryRun) {
+		this(name, predicates, action, dryRun, false);
+	}
+
+	/**
+	 * @param onErrorAllow the rule says {@code on-error=allow}: an {@code allow} rule naming a plugin's predicate,
+	 *                     whose author accepted that the exemption does not apply when the predicate has no answer
+	 */
+	public GuardRule(String name, List<GuardPredicate> predicates, GuardAction action, boolean dryRun, boolean onErrorAllow) {
 		this.name = name;
 		this.predicates = Collections.unmodifiableList(predicates);
 		this.action = action;
 		this.dryRun = dryRun;
+		this.onErrorAllow = onErrorAllow;
 	}
 
 	/**
@@ -53,9 +63,13 @@ public class GuardRule {
 	 */
 	public boolean matches(RequestContext context)
 	{
-		for (GuardPredicate predicate : predicates)
-			if (!predicate.test(context))
-				return false;
+		try {
+			for (GuardPredicate predicate : predicates)
+				if (!predicate.test(context))
+					return false;
+		} catch (PredicateUndecided e) {
+			return false; // a plugin's predicate had no answer: the rule does not match, negated or not
+		}
 
 		return true;
 	}
@@ -74,6 +88,11 @@ public class GuardRule {
 
 	public boolean isDryRun() {
 		return dryRun;
+	}
+
+	/** {@code | on-error=allow} - see the constructor. */
+	public boolean isOnErrorAllow() {
+		return onErrorAllow;
 	}
 
 	public long getHits() {
@@ -110,7 +129,8 @@ public class GuardRule {
 
 	@Override
 	public String toString() {
-		return name + " | " + getCondition() + " | " + action + (dryRun ? " | dry-run" : "");
+		return name + " | " + getCondition() + " | " + action + (dryRun ? " | dry-run" : "")
+				+ (onErrorAllow ? " | " + GuardRuleParser.ON_ERROR_ALLOW : "");
 	}
 
 }
