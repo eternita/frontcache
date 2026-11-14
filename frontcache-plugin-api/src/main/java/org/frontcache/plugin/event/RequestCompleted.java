@@ -26,8 +26,9 @@ package org.frontcache.plugin.event;
  * @param uri           host + path + query, truncated to {@value FcEvent#MAX_URI_LENGTH}
  * @param outcome       {@code success}, or {@code error} when a fallback was served
  * @param cacheable     whether the request went through the cache ({@code cacheable}) or straight to the origin
- * @param cache         {@code from-cache}, {@code dynamic} (the origin answered) or {@code dynamic-soft} (a soft
- *                      refresh)
+ * @param cache         {@code from-cache}, {@code dynamic} (the origin answered), {@code dynamic-soft} (a soft
+ *                      refresh), or - for a request under {@code /fc-x/}, answered by neither - {@code plugin:<id>}
+ *                      ({@code plugin:none} when no plugin owns the path)
  * @param runtimeMillis how long it took
  * @param lengthBytes   the response body's length
  * @param clientKey     the client's resolved address; personal data, see {@link FcEvent}

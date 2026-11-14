@@ -113,7 +113,15 @@ final class GuardSummaryTicker {
 	static String disposition(GuardRule rule) {
 		if (rule.isDryRun())
 			return GuardAction.DISPOSITION_DRY_RUN;
-		String disposition = rule.getAction().getDisposition();
+		GuardAction action = rule.getAction();
+		// a challenge whose provider is absent acts as its else action, or as a dry run - say what it does now
+		if (GuardAction.Type.CHALLENGE == action.getType() && null == PluginEndpoints.challenge(action.getProvider()))
+		{
+			if (null == action.getOtherwise())
+				return GuardAction.DISPOSITION_DRY_RUN;
+			action = action.getOtherwise();
+		}
+		String disposition = action.getDisposition();
 		return (null == disposition) ? DISPOSITION_ALLOWED : disposition;
 	}
 }

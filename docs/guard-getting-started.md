@@ -65,6 +65,7 @@ and `#` comments are ignored.
 | `method:GET` | the HTTP method is GET (POST, HEAD, …) |
 | `client-type:bot` \| `client-type:guest` | how Frontcache classified the visitor, using `bots.conf` |
 | `cookie:<name>` | that cookie is present (presence only — values are never read) |
+| `cookie-hmac:<name>` | that cookie carries a value signed with this node's secret, not yet expired — evidence a client cannot forge (§4.1, since 2.13.0) |
 | `header:<name>` or `header:<name>~<regex>` | the header is present / matches |
 | `request-type:<toplevel\|include\|include-async>` | `toplevel` is a request from a client; the others are `<fc:include>` fragments re-entering the engine |
 | `rate:<limit>/<window>` | one client IP has already sent `<limit>` requests in the current `<window>` — **§5**, and it needs one property set first |
@@ -79,6 +80,7 @@ same behaviour as `dynamic-urls.conf`. Anchor with `^` when you mean "starts wit
 | `allow` | stop checking, let the request through — this is how you write exemptions |
 | `reject:<status> [message]` | send the status and a short plain-text body (default body: `"<status> Rejected"`) |
 | `redirect:<301\|302\|303\|307\|308> <target>` | send a `Location` header, plus `Cache-Control: no-store` so nobody caches the decision |
+| `challenge <provider> [else <reject:…\|redirect:…>]` | send the visitor to a challenge provider's page, served by a plugin under `/fc-x/` — and, when no plugin offers the provider, act as a dry run or as the `else` action (§4.2, since 2.13.0) |
 
 A redirect target can be relative (`/login.htm`) or absolute. Absolute targets must
 point at a host you serve — see §8 if a rule is refused.
@@ -148,6 +150,87 @@ Worth knowing:
   render normally, add `; client-type:guest` to the condition.
 - **Presence only.** Frontcache checks that the cookie *exists*; it never validates a
   session. Deciding whether a session is real stays your app's job.
+
+---
+
+### 4.1 A cookie a client cannot forge: `cookie-hmac:`
+
+`cookie:` tests presence, and any client can send any cookie. That is fine for §4 — a
+forged session cookie only gets someone to a page the origin then refuses — and wrong
+for anything a rule **exempts or favours**: "visitors who solved the CAPTCHA skip the
+rate limit" cannot be decided on a cookie a scraper can set itself.
+
+`cookie-hmac:<name>` is true only when the cookie's value was signed with this node's
+secret and has not expired:
+
+```
+# frontcache.properties - at least 32 characters, the same on every node (and on the origin, if it signs)
+front-cache.visitor.cookie-secret=<32 or more random characters>
+```
+
+```
+search-limit | uri~^/search ; client-type:guest ; !cookie-hmac:fc_pass ; rate:30/1m | redirect:302 /challenge?return=${url:enc}
+```
+
+Whoever completes the challenge sets the cookie — your origin's own challenge page, with
+the same secret, or a Frontcache plugin (§4.2). The value is
+
+```
+<expiry>.<mac>
+  expiry = epoch seconds, decimal
+  mac    = base64url (no padding) of HMAC-SHA256(secret, "<cookie name>|<expiry>")
+```
+
+so the origin needs a dozen lines in any language. The name is part of the MAC, so a
+value is worthless under another cookie's name. A plugin may also **bind** a pass to the
+visitor's address or user agent (`<expiry>.<ip|ua|ip_ua>.<mac>`, the MAC then covering
+those too); a bound pass is refused from anywhere else. The address is the one §5.1
+resolves, never a header the client sets.
+
+- **No secret, no predicate.** On a node without `front-cache.visitor.cookie-secret` (or
+  with one shorter than 32 characters) the rule is skipped with an error at load — never
+  "always false", which would make `!cookie-hmac:` match everyone.
+- **Rotating** the secret: put the old one in `front-cache.visitor.cookie-secret.previous`
+  while the fleet moves to the new one. The previous secret verifies; only the current one signs.
+- Works in `bots.conf` too — a rule there can classify a visitor with a pass.
+- Values are verified, never logged.
+
+### 4.2 Sending a visitor to a challenge: `challenge`
+
+```
+search-challenge | uri~^/search ; client-type:guest ; rate:30/1m | challenge pow
+```
+
+`challenge <provider>` is a redirect that knows what it is for. When a plugin on the node
+offers the provider (a plugin names its providers in its manifest) **and** the node has a
+cookie secret, a matching `GET` gets a `302` to the plugin's page,
+`/fc-x/<plugin>/?p=<provider>&return=<path and query>`, with `Cache-Control: no-store`.
+The plugin renders the challenge, checks the answer, and has the node sign a pass; the
+next request carries it and the rule no longer matches. Logged with disposition
+`challenged`. On top of a redirect it knows that:
+
+- **a visitor already holding a pass is not challenged** — a valid `cookie-hmac:` pass
+  from the provider's plugin counts, so forgetting `!cookie-hmac:fc_pass` in the rule
+  does not send people round in circles. Writing it anyway is clearer;
+- **a non-GET is never redirected** (a redirect would lose its body): it gets `429` with
+  `Retry-After` — the rate limiter's, or 60 seconds;
+- **an `<fc:include>` and anything under `/fc-x/` are never challenged** — the rule does
+  not act on them, and counts no hit.
+
+**With the provider absent** — a Community node, a plugin not installed or failed, no
+cookie secret — the rule **acts as a dry run**: logged as `<rule>:dry-run`, the request
+served as if the rule were not there, and one error in the log per reload saying why.
+A challenge nobody can pass is never issued. To refuse instead, say so:
+
+```
+search-challenge | uri~^/search ; client-type:guest ; rate:30/1m | challenge pow else reject:429 Too many searches
+```
+
+The `else` action is a `reject:` or a `redirect:`, never `allow`.
+
+**`/fc-x/` is reserved** for plugins: a request under it is never cached and never sent
+to the origin, and a path no plugin owns answers a one-line `404`. If your site serves
+pages under `/fc-x/`, they are no longer reachable through Frontcache.
 
 ---
 
@@ -463,6 +546,8 @@ re-reads live:
 | `front-cache.guard-rules.rate-limit.enabled` | `true` | emergency off switch for rate limiting only; every `rate:` predicate returns false and the rules stay visible |
 | `front-cache.guard-rules.rate-limit.slots` | `262144` | counter slots per bucket, 8 bytes each — 2 MB. Undersizing costs accuracy, never a wrongly refused visitor |
 | `front-cache.guard-rules.rate-limit.max-total-slots` | `4194304` | ceiling across all buckets; a rule that would exceed it is skipped with an error |
+| `front-cache.visitor.cookie-secret` | *(empty)* | the key `cookie-hmac:` verifies with and a plugin's passes are signed with — at least 32 characters, the same on every node. Without it `cookie-hmac:` rules are skipped and `challenge` rules act as a dry run (§4.1). Read per request, so a reload is not needed — but `cookie-hmac:` rules refused for its absence load only at the next `reload-guard-rules` |
+| `front-cache.visitor.cookie-secret.previous` | *(empty)* | accepted, never signed with — the overlap while a fleet rotates the secret |
 
 Management actions (both need the `Authorization: Bearer <api-key>` header when an api key is
 configured):

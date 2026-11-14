@@ -53,6 +53,12 @@ the guard rules — the checks that answer a request before it reaches cache or 
 ([guard-getting-started.md](guard-getting-started.md)).
 <img src="diagrams/02-request-lifecycle.svg" alt="Request lifecycle" width="820"/>
 
+One path is answered between the guard rules and the cache, as of 2.13.0: **`/fc-x/` is reserved for
+plugins**. A request under `/fc-x/<plugin>/` is answered by the plugin that owns that path — a challenge page,
+say — and is never cached, never forwarded to the origin and never a cache key; a path no plugin owns answers a
+one-line `404`. Being after the guard, a `rate:` rule protects it like any other path
+([guard-getting-started.md](guard-getting-started.md) §4.2).
+
 The resilience command names in that flow (`FC_Total`, `FC_ThroughCache*`, `FC_BypassCache`), their
 group keys and their isolation strategies are covered in
 [resilience-command-flow.md](resilience-command-flow.md).

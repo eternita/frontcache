@@ -90,6 +90,7 @@ import org.frontcache.metrics.FcMetricsExport;
 import org.frontcache.reqlog.RequestLogger;
 import org.frontcache.plugin.host.CoreEvents;
 import org.frontcache.plugin.host.FrontcachePlugins;
+import org.frontcache.plugin.host.PluginEndpoints;
 import org.frontcache.warmer.WarmRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -688,6 +689,9 @@ public class FrontCacheEngine {
 		// bind to a started plugin. A plugin that throws is dropped rather than stopping the node. The guard
 		// rules are handed over for the guard summary an observing plugin may subscribe to.
 		FrontcachePlugins.start(getPublicDomain(), () -> guardRuleEngine.getRules());
+		// the rules loaded before the plugins started, so whether each challenge rule's provider is there is known
+		// only now
+		guardRuleEngine.checkChallengeProviders();
 
 		// Prometheus / OTLP export. A no-op unless front-cache.metrics.export says otherwise, which is
 		// why this is called unconditionally: the node's lifecycle owner is the right place to start a
@@ -1115,7 +1119,11 @@ public class FrontCacheEngine {
 		// client-ip: block could refuse it outright - the guard protects the origin from clients.
 		if (context.isWarmRequest())
 		{
-			new FC_Total(this, context).execute();
+			// /fc-x/ is never cached, so there is nothing to warm there - but it is never the origin's either
+			if (PluginEndpoints.isReserved(context.getRequestURI()))
+				PluginEndpoints.serve(context, guardRuleEngine::isAllowedRedirectTarget);
+			else
+				new FC_Total(this, context).execute();
 			return;
 		}
 
@@ -1136,6 +1144,15 @@ public class FrontCacheEngine {
 		if (guardOutcome.isTerminal())
 		{
 			applyGuardAction(context, guardOutcome);
+			return;
+		}
+
+		// E2: the paths plugins own, /fc-x/<id>/ - after the guard, so a rate: rule protects them like any other
+		// path, and before the cache, so they are never cached, never forwarded and never a key. A path no started
+		// plugin owns answers 404, what a node without the plugin answers.
+		if (PluginEndpoints.isReserved(context.getRequestURI()))
+		{
+			PluginEndpoints.serve(context, guardRuleEngine::isAllowedRedirectTarget);
 			return;
 		}
 
@@ -1172,7 +1189,7 @@ public class FrontCacheEngine {
 			if (0 < retryAfterSeconds)
 				servletResponse.setHeader(FCHeaders.RETRY_AFTER, Integer.toString(retryAfterSeconds));
 
-			if (GuardAction.Type.REDIRECT == action.getType())
+			if (GuardAction.Type.REDIRECT == action.getType() || GuardAction.Type.CHALLENGE == action.getType())
 			{
 				servletResponse.setHeader("Location", outcome.getResolvedTarget());
 			} else {
@@ -1186,6 +1203,8 @@ public class FrontCacheEngine {
 		logGuardAction(context, guardReason(context, rule), status, action.getDisposition());
 		// after the response is written: an observing plugin learns of it, it never takes part in it
 		CoreEvents.guardMatched(context, rule.getName(), action.getDisposition(), status);
+		if (GuardAction.Type.CHALLENGE == action.getType())
+			CoreEvents.challengeIssued(context, rule.getName(), action.getProvider(), outcome.getChallengePlugin());
 		return;
 	}
 

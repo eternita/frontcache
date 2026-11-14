@@ -16,12 +16,14 @@
 package org.frontcache.plugin.event;
 
 /**
- * A guard rule matched a request and acted on it ({@code rejected} / {@code redirected}), or matched as a dry run
- * ({@code dry-run}, status 0). An {@code allow} rule's match is not an event: it is the request being served.
+ * A guard rule matched a request and acted on it ({@code rejected} / {@code redirected} / {@code challenged} - a
+ * {@code challenge} rule's redirect to its provider's page, also a {@link ChallengeIssued}), or matched as a dry run
+ * ({@code dry-run}, status 0 - a challenge rule whose provider is absent included). An {@code allow} rule's match is
+ * not an event: it is the request being served.
  *
  * @param requestId   the request's id, or null
  * @param rule        the rule's name
- * @param disposition {@code rejected}, {@code redirected} or {@code dry-run}
+ * @param disposition {@code rejected}, {@code redirected}, {@code challenged} or {@code dry-run}
  * @param status      the status the node answered with; 0 for a dry run
  * @param uri         host + path + query as the request carried them, truncated to {@value FcEvent#MAX_URI_LENGTH}
  * @param clientType  the bots.conf verdict - {@code bot}, {@code guest}, ...; may be null

@@ -26,6 +26,8 @@ import java.util.function.Supplier;
 
 import org.frontcache.guard.GuardRule;
 import org.frontcache.plugin.event.CacheInvalidated;
+import org.frontcache.plugin.event.ChallengeIssued;
+import org.frontcache.plugin.event.ChallengeResult;
 import org.frontcache.plugin.event.CircuitStateChanged;
 import org.frontcache.plugin.event.ConfigReloaded;
 import org.frontcache.plugin.event.EventListener;
@@ -81,19 +83,23 @@ public final class FcEventBus {
 	public static final long ORIGIN_ERROR = 1L << 7;
 	public static final long CACHE_INVALIDATED = 1L << 8;
 	public static final long REQUEST_COMPLETED = 1L << 9;
+	public static final long CHALLENGE_ISSUED = 1L << 10;
+	public static final long CHALLENGE_RESULT = 1L << 11;
 
 	/** Every event type this node emits, and its bit. A type a listener names that is not here is never emitted. */
-	static final Map<Class<? extends FcEvent>, Long> BITS = Map.of(
-			GuardMatched.class, GUARD_MATCHED,
-			RateLimitExceeded.class, RATE_LIMIT_EXCEEDED,
-			GuardSummary.class, GUARD_SUMMARY,
-			CircuitStateChanged.class, CIRCUIT_STATE_CHANGED,
-			ConfigReloaded.class, CONFIG_RELOADED,
-			PluginStateChanged.class, PLUGIN_STATE_CHANGED,
-			FallbackServed.class, FALLBACK_SERVED,
-			OriginError.class, ORIGIN_ERROR,
-			CacheInvalidated.class, CACHE_INVALIDATED,
-			RequestCompleted.class, REQUEST_COMPLETED);
+	static final Map<Class<? extends FcEvent>, Long> BITS = Map.ofEntries(
+			Map.entry(GuardMatched.class, GUARD_MATCHED),
+			Map.entry(RateLimitExceeded.class, RATE_LIMIT_EXCEEDED),
+			Map.entry(GuardSummary.class, GUARD_SUMMARY),
+			Map.entry(CircuitStateChanged.class, CIRCUIT_STATE_CHANGED),
+			Map.entry(ConfigReloaded.class, CONFIG_RELOADED),
+			Map.entry(PluginStateChanged.class, PLUGIN_STATE_CHANGED),
+			Map.entry(FallbackServed.class, FALLBACK_SERVED),
+			Map.entry(OriginError.class, ORIGIN_ERROR),
+			Map.entry(CacheInvalidated.class, CACHE_INVALIDATED),
+			Map.entry(RequestCompleted.class, REQUEST_COMPLETED),
+			Map.entry(ChallengeIssued.class, CHALLENGE_ISSUED),
+			Map.entry(ChallengeResult.class, CHALLENGE_RESULT));
 
 	public static final int DEFAULT_QUEUE_CAPACITY = 10_000;
 

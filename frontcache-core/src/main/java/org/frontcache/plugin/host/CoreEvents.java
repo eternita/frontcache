@@ -24,6 +24,8 @@ import org.frontcache.FCConfig;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.plugin.event.CacheInvalidated;
+import org.frontcache.plugin.event.ChallengeIssued;
+import org.frontcache.plugin.event.ChallengeResult;
 import org.frontcache.plugin.event.CircuitStateChanged;
 import org.frontcache.plugin.event.ConfigReloaded;
 import org.frontcache.plugin.event.FallbackServed;
@@ -67,6 +69,30 @@ public final class CoreEvents {
 					disposition, status, uri(context), context.getClientType(), context.getRateLimitKey()));
 		} catch (RuntimeException e) {
 			// a request view that cannot answer (a recycled request) is no reason to fail the request
+		}
+	}
+
+	/** A challenge rule sent a visitor to a provider's page - after the redirect is written. */
+	public static void challengeIssued(RequestContext context, String rule, String provider, String plugin) {
+		if (!FcEventBus.wants(FcEventBus.CHALLENGE_ISSUED))
+			return;
+		try {
+			FcEventBus.publish(new ChallengeIssued(System.currentTimeMillis(), node(), site, context.getRequestId(), rule,
+					provider, plugin, uri(context), context.getClientType(), context.getRateLimitKey()));
+		} catch (RuntimeException e) {
+			// as above
+		}
+	}
+
+	/** A plugin's evidence signer signed a pass ({@code pass}) or was told a challenge was not passed. */
+	static void challengeResult(RequestContext context, String provider, String plugin, String outcome) {
+		if (!FcEventBus.wants(FcEventBus.CHALLENGE_RESULT))
+			return;
+		try {
+			FcEventBus.publish(new ChallengeResult(System.currentTimeMillis(), node(), site, context.getRequestId(),
+					provider, plugin, outcome, context.getRateLimitKey()));
+		} catch (RuntimeException e) {
+			// as above
 		}
 	}
 
@@ -153,7 +179,8 @@ public final class CoreEvents {
 	 * - so a node that is observed but not for requests pays one volatile read here, and one that is pays a random
 	 * draw per request and builds the event for the sampled share only.
 	 *
-	 * @param cache {@code from-cache}, {@code dynamic} or {@code dynamic-soft}, as the request log writes it
+	 * @param cache {@code from-cache}, {@code dynamic}, {@code dynamic-soft} or {@code plugin:<id>}, as the request log
+	 *              writes it
 	 */
 	public static void requestCompleted(RequestContext context, boolean cacheable, String cache,
 			long runtimeMillis, long lengthBytes) {

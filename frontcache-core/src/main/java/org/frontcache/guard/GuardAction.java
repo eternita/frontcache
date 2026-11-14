@@ -23,40 +23,60 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.frontcache.core.RequestContext;
 
 /**
- * What a matching guard rule does with the request: reject it, redirect it, or explicitly let it
- * through (an exemption placed above a broader rule).
+ * What a matching guard rule does with the request: reject it, redirect it, explicitly let it
+ * through (an exemption placed above a broader rule), or challenge it - send the visitor to a
+ * challenge provider's page under {@code /fc-x/<plugin>/}, which is a redirect that knows which
+ * provider it needs (see {@link #challenge}).
  */
 public class GuardAction {
 
 	public enum Type {
-		REJECT, REDIRECT, ALLOW
+		REJECT, REDIRECT, ALLOW, CHALLENGE
 	}
 
 	/** disposition written to the failed-requests log (the is_cached column) */
 	public static final String DISPOSITION_REJECTED = "rejected";
 	public static final String DISPOSITION_REDIRECTED = "redirected";
 	public static final String DISPOSITION_DRY_RUN = "dry-run";
+	public static final String DISPOSITION_CHALLENGED = "challenged";
 
-	private static final GuardAction ALLOW = new GuardAction(Type.ALLOW, 0, null, null);
+	private static final GuardAction ALLOW = new GuardAction(Type.ALLOW, 0, null, null, null, null);
 
 	private final Type type;
 	private final int status;
 	private final String body;    // REJECT only
 	private final String target;  // REDIRECT only - may contain ${...} placeholders
+	private final String provider;            // CHALLENGE only
+	private final GuardAction otherwise;      // CHALLENGE only, may be null: what to do when the provider is absent
 
-	private GuardAction(Type type, int status, String body, String target) {
+	private GuardAction(Type type, int status, String body, String target, String provider, GuardAction otherwise) {
 		this.type = type;
 		this.status = status;
 		this.body = body;
 		this.target = target;
+		this.provider = provider;
+		this.otherwise = otherwise;
 	}
 
 	public static GuardAction reject(int status, String body) {
-		return new GuardAction(Type.REJECT, status, body, null);
+		return new GuardAction(Type.REJECT, status, body, null, null, null);
 	}
 
 	public static GuardAction redirect(int status, String target) {
-		return new GuardAction(Type.REDIRECT, status, null, target);
+		return new GuardAction(Type.REDIRECT, status, null, target, null, null);
+	}
+
+	/**
+	 * {@code challenge <provider> [else <reject|redirect>]}: a {@code 302} to the page of the plugin offering the
+	 * provider - when one is started and the node can sign a pass. When either is missing, the {@code else} action
+	 * if there is one, and otherwise the rule acts as a dry run: a node without the plugin serves every request as
+	 * it would without the rule, and says so. See GuardRuleEngine for the rest of what it knows that a redirect does
+	 * not (never a non-GET, never an include, never the provider's own path, never a visitor holding a pass).
+	 *
+	 * @param otherwise a reject or redirect action, or null
+	 */
+	public static GuardAction challenge(String provider, GuardAction otherwise) {
+		return new GuardAction(Type.CHALLENGE, 302, null, null, provider, otherwise);
 	}
 
 	public static GuardAction allow() {
@@ -82,6 +102,16 @@ public class GuardAction {
 		return target;
 	}
 
+	/** @return the challenge provider, or null for any other action */
+	public String getProvider() {
+		return provider;
+	}
+
+	/** @return a challenge's {@code else} action, or null */
+	public GuardAction getOtherwise() {
+		return otherwise;
+	}
+
 	/**
 	 * @return the disposition string for the log line, or null for ALLOW (not logged)
 	 */
@@ -92,6 +122,8 @@ public class GuardAction {
 			return DISPOSITION_REJECTED;
 		case REDIRECT:
 			return DISPOSITION_REDIRECTED;
+		case CHALLENGE:
+			return DISPOSITION_CHALLENGED;
 		default:
 			return null;
 		}
@@ -248,6 +280,8 @@ public class GuardAction {
 			return "reject:" + status;
 		case REDIRECT:
 			return "redirect:" + status + " " + target;
+		case CHALLENGE:
+			return "challenge " + provider + ((null != otherwise) ? " else " + otherwise : "");
 		default:
 			return "allow";
 		}

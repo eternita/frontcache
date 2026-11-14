@@ -49,6 +49,7 @@ import org.frontcache.plugin.PluginKind;
 import org.frontcache.plugin.PluginManifest;
 import org.frontcache.plugin.event.EventListener;
 import org.frontcache.plugin.event.RequestCompleted;
+import org.frontcache.plugin.serve.PluginEndpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,8 +68,9 @@ import org.slf4j.LoggerFactory;
  * <h2>A plugin that fails is a plugin that is absent</h2>
  *
  * Every call into a plugin is wrapped. One that throws in {@code start} is dropped until the next start; one that
- * contributes something of a kind it did not declare (an event listener without {@code observe}, a management
- * action without {@code manage}) is refused and stopped. Nothing here may stop a node from serving.
+ * contributes something of a kind it did not declare (an event listener without {@code observe}, an endpoint without
+ * {@code serve}, a management action without {@code manage}) is refused and stopped. Nothing here may stop a node
+ * from serving. A started plugin's endpoint answers {@code /fc-x/<id>/} through {@link PluginEndpoints}.
  *
  * <h2>A plugin's config</h2>
  *
@@ -84,7 +86,7 @@ public final class FrontcachePlugins {
 
 	/** The kinds this node offers today; a plugin declaring another is refused at load. */
 	static final Set<PluginKind> OFFERED = Collections.unmodifiableSet(
-			java.util.EnumSet.of(PluginKind.OBSERVE, PluginKind.MANAGE));
+			java.util.EnumSet.of(PluginKind.OBSERVE, PluginKind.SERVE, PluginKind.MANAGE));
 
 	/** {@code front-cache.plugins.<id>.queue}: a listener's queue capacity. */
 	static final String QUEUE_PROPERTY = "front-cache.plugins.%s.queue";
@@ -326,17 +328,19 @@ public final class FrontcachePlugins {
 
 		List<Slot> ok = new ArrayList<>();
 		Map<String, ManagementAction> byName = new LinkedHashMap<>();
+		Map<String, PluginEndpoints.Served> served = new LinkedHashMap<>();
 
 		for (Slot slot : loaded())
 		{
 			if (slot.refused())
 				continue;
-			if (startOne(slot, publicDomain, byName))
+			if (startOne(slot, publicDomain, byName, served))
 				ok.add(slot);
 		}
 
 		started = Collections.unmodifiableList(ok);
 		actions = Collections.unmodifiableMap(byName);
+		PluginEndpoints.install(served);
 
 		FcEventBus.startGuardSummary(guardRules, GUARD_SUMMARY_INTERVAL_MILLIS);
 
@@ -344,7 +348,8 @@ public final class FrontcachePlugins {
 			CoreEvents.pluginStateChanged(slot.id, slot.state.label(), slot.reason);
 	}
 
-	private static boolean startOne(Slot slot, String publicDomain, Map<String, ManagementAction> byName) {
+	private static boolean startOne(Slot slot, String publicDomain, Map<String, ManagementAction> byName,
+			Map<String, PluginEndpoints.Served> served) {
 
 		FrontcachePlugin plugin = slot.plugin;
 		slot.failedOnConfig = false;
@@ -366,9 +371,11 @@ public final class FrontcachePlugins {
 
 		List<EventListener> listeners;
 		Map<String, ManagementAction> own;
+		PluginEndpoint endpoint;
 		try {
 			listeners = nonNull(plugin.eventListeners());
 			own = nonNull(plugin.managementActions());
+			endpoint = plugin.endpoint();
 		} catch (Throwable t) {
 			slot.counters.errors.increment();
 			fail(slot, State.FAILED, "listing its contributions threw " + t, t);
@@ -381,6 +388,8 @@ public final class FrontcachePlugins {
 			refusal = "it has event listeners but does not declare kind 'observe'";
 		else if (!own.isEmpty() && !slot.manifest.declares(PluginKind.MANAGE))
 			refusal = "it has management actions but does not declare kind 'manage'";
+		else if (null != endpoint && !slot.manifest.declares(PluginKind.SERVE))
+			refusal = "it has an endpoint but does not declare kind 'serve'";
 		if (null != refusal)
 		{
 			fail(slot, State.REFUSED, refusal, null);
@@ -389,6 +398,13 @@ public final class FrontcachePlugins {
 		}
 
 		subscribe(slot, listeners, false);
+
+		if (null != endpoint)
+			served.put(slot.id, PluginEndpoints.served(slot.id, slot.manifest, endpoint, slot.counters));
+		else if (slot.manifest.declares(PluginKind.SERVE))
+			logger.warn("Plugin '{}' declares kind 'serve' but has no endpoint - {}{}/ answers 404{}", slot.id,
+					PluginEndpoints.PREFIX, slot.id, slot.manifest.challenges().isEmpty() ? ""
+							: ", and its challenge providers " + slot.manifest.challenges() + " are absent");
 
 		for (Map.Entry<String, ManagementAction> e : own.entrySet())
 		{
@@ -545,9 +561,12 @@ public final class FrontcachePlugins {
 		else if (running && State.FAILED == slot.state && slot.failedOnConfig)
 		{
 			Map<String, ManagementAction> byName = new LinkedHashMap<>(actions);
-			ok = startOne(slot, runningDomain, byName);
+			Map<String, PluginEndpoints.Served> served = new LinkedHashMap<>();
+			ok = startOne(slot, runningDomain, byName, served);
 			if (ok)
 			{
+				if (!served.isEmpty())
+					PluginEndpoints.add(served);
 				List<Slot> next = new ArrayList<>(started);
 				next.add(slot);
 				started = Collections.unmodifiableList(next);
@@ -665,6 +684,7 @@ public final class FrontcachePlugins {
 	public static synchronized void stop(boolean shutdown) {
 
 		running = false;
+		PluginEndpoints.clear();
 		FcEventBus.stopAll();
 
 		for (Slot slot : started)
@@ -806,6 +826,15 @@ public final class FrontcachePlugins {
 		stats.setState(slot.state.label());
 		stats.setReason(slot.reason);
 		stats.setLegacy(slot.legacy);
+		if (null != manifest && manifest.declares(PluginKind.SERVE))
+		{
+			stats.setServes(PluginEndpoints.serves(slot.id));
+			stats.setCookies(new ArrayList<>(manifest.cookies()));
+			stats.setChallenges(new ArrayList<>(manifest.challenges()));
+			stats.setServed(slot.counters.served.sum());
+			stats.setServeRefused(slot.counters.serveRefused.sum());
+			stats.setServeFailed(slot.counters.serveFailed.sum());
+		}
 		stats.setEventsDelivered(slot.counters.delivered.sum());
 		stats.setEventsDropped(slot.counters.dropped.sum());
 		stats.setErrors(slot.counters.errors.sum());

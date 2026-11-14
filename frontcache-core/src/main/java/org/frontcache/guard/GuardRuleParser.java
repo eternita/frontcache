@@ -37,11 +37,17 @@ import org.frontcache.guard.ratelimit.RateLimitPredicate;
  *   allow
  *   reject:&lt;status&gt; [body]
  *   redirect:&lt;301|302|303|307|308&gt; &lt;target&gt;
+ *   challenge &lt;provider&gt; [else &lt;reject:...|redirect:...&gt;]
  *
  * Every rejection is reported as a {@link GuardConfigException} so the caller can skip that single
  * line and keep the rest of the file working.
  */
 public class GuardRuleParser {
+
+	private static final String CHALLENGE = "challenge";
+
+	/** A provider's name - as a plugin's manifest names it in {@code challenges}. */
+	private static final java.util.regex.Pattern PROVIDER = java.util.regex.Pattern.compile("[a-z][a-z0-9-]{0,30}");
 
 	private static final Set<Integer> REDIRECT_STATUSES = new HashSet<Integer>(java.util.Arrays.asList(301, 302, 303, 307, 308));
 
@@ -211,6 +217,10 @@ public class GuardRuleParser {
 		if ("allow".equalsIgnoreCase(action))
 			return GuardAction.allow();
 
+		if (action.regionMatches(true, 0, CHALLENGE, 0, CHALLENGE.length())
+				&& (action.length() == CHALLENGE.length() || Character.isWhitespace(action.charAt(CHALLENGE.length()))))
+			return parseChallenge(action.substring(CHALLENGE.length()).trim(), line);
+
 		int colon = action.indexOf(':');
 		if (-1 == colon)
 			throw new GuardConfigException("unknown action '" + action + "' in '" + line + "'");
@@ -251,6 +261,52 @@ public class GuardRuleParser {
 		}
 
 		throw new GuardConfigException("unknown action '" + verb + "' in '" + line + "'");
+	}
+
+	/**
+	 * {@code challenge <provider> [else <action>]}. The provider is not looked up here: plugins start after the
+	 * rules load, a rule must load the same on a node without the plugin (where it acts as a dry run), and the
+	 * console and the portal validate files with no plugin at all. The {@code else} action is a reject or a
+	 * redirect - never {@code allow} (a missing provider must not become an exemption) or another challenge.
+	 */
+	private GuardAction parseChallenge(String rest, String line)
+	{
+		if (0 == rest.length())
+			throw new GuardConfigException("challenge needs a provider in '" + line + "' - e.g. 'challenge pow'");
+
+		String provider = rest;
+		GuardAction otherwise = null;
+
+		int space = indexOfWhitespace(rest);
+		if (-1 < space)
+		{
+			provider = rest.substring(0, space);
+			String tail = rest.substring(space).trim();
+			if (!tail.regionMatches(true, 0, "else", 0, 4) || (4 < tail.length() && !Character.isWhitespace(tail.charAt(4))))
+				throw new GuardConfigException("expected 'challenge <provider> [else <action>]' but got 'challenge " + rest
+						+ "' in '" + line + "'");
+			String elseAction = tail.substring(4).trim();
+			if (0 == elseAction.length())
+				throw new GuardConfigException("'else' needs an action in '" + line + "' - reject:<status> or redirect:<status> <target>");
+			otherwise = parseAction(elseAction, line);
+			if (GuardAction.Type.REJECT != otherwise.getType() && GuardAction.Type.REDIRECT != otherwise.getType())
+				throw new GuardConfigException("a challenge's 'else' must be reject or redirect, not '" + elseAction + "', in '" + line
+						+ "' - with the provider absent the rule acts as a dry run, which is what leaving 'else' out says");
+		}
+
+		if (!PROVIDER.matcher(provider).matches())
+			throw new GuardConfigException("'" + provider + "' is not a challenge provider name in '" + line
+					+ "' - lower case letters, digits and '-', as a plugin's manifest names it in 'challenges'");
+
+		return GuardAction.challenge(provider, otherwise);
+	}
+
+	private static int indexOfWhitespace(String value)
+	{
+		for (int i = 0; i < value.length(); i++)
+			if (Character.isWhitespace(value.charAt(i)))
+				return i;
+		return -1;
 	}
 
 	/**

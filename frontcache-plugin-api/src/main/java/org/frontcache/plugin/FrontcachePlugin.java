@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.frontcache.plugin.event.EventListener;
+import org.frontcache.plugin.serve.PluginEndpoint;
 
 import com.typesafe.config.Config;
 
@@ -108,6 +109,15 @@ public interface FrontcachePlugin {
 	 */
 	default List<EventListener> eventListeners() {
 		return List.of();
+	}
+
+	/**
+	 * {@link PluginKind#SERVE}: what answers the requests under {@code /fc-x/<id>/} - this plugin's own path, and no
+	 * other. Read after every start; null (the default) for a plugin that serves nothing. A plugin that hands one over
+	 * without declaring {@code serve} is refused at start.
+	 */
+	default PluginEndpoint endpoint() {
+		return null;
 	}
 
 	/**

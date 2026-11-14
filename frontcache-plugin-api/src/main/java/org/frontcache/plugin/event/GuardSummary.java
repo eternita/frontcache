@@ -42,8 +42,8 @@ public record GuardSummary(long time, String node, String site, long intervalMil
 
 	/**
 	 * @param rule        the rule's name
-	 * @param disposition what a match of it does: {@code rejected}, {@code redirected}, {@code allowed} or
-	 *                    {@code dry-run}
+	 * @param disposition what a match of it does: {@code rejected}, {@code redirected}, {@code challenged},
+	 *                    {@code allowed} or {@code dry-run}
 	 * @param matched     matches in the interval
 	 */
 	public record RuleCount(String rule, String disposition, long matched) {

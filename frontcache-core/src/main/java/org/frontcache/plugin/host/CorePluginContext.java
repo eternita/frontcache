@@ -27,8 +27,11 @@ import javax.crypto.spec.SecretKeySpec;
 import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
+import org.frontcache.core.EvidenceCookies;
 import org.frontcache.license.BuildInfo;
+import org.frontcache.plugin.PluginKind;
 import org.frontcache.plugin.PluginManifest;
+import org.frontcache.plugin.serve.EvidenceSigner;
 import org.frontcache.warmer.WarmRequest;
 
 /** The engine's {@link BundledPluginContext}: each answer is read when asked, so a plugin never holds a stale one. */
@@ -105,6 +108,13 @@ final class CorePluginContext implements BundledPluginContext {
 			return null;
 		byte[] mac = HMAC.get().doFinal(clientKey.getBytes(StandardCharsets.UTF_8));
 		return HexFormat.of().formatHex(mac, 0, 16);
+	}
+
+	@Override
+	public EvidenceSigner evidenceSigner() {
+		if (!manifest.declares(PluginKind.SERVE) || manifest.cookies().isEmpty() || !EvidenceCookies.isConfigured())
+			return null;
+		return new CoreEvidenceSigner(manifest);
 	}
 
 	@Override

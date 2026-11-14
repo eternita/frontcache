@@ -28,6 +28,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.frontcache.FCConfig;
 import org.frontcache.core.Cidr;
 import org.frontcache.core.EdgeToken;
+import org.frontcache.core.EvidenceCookies;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
 import org.frontcache.guard.ratelimit.RateLimitPredicate;
@@ -49,6 +50,7 @@ import org.frontcache.guard.ratelimit.RateLimitSpec;
  *   [!] method:&lt;GET|POST|...&gt;
  *   [!] client-type:&lt;bot|guest&gt;
  *   [!] cookie:&lt;name&gt;
+ *   [!] cookie-hmac:&lt;name&gt;               (a valid, unexpired evidence cookie - see EvidenceCookies)
  *   [!] header:&lt;name&gt;[~&lt;regex&gt;]
  *   [!] request-type:&lt;toplevel|include|include-async&gt;
  *   [!] edge-token                        (carries this node's front-cache.edge-token; guard-rules.conf only)
@@ -270,6 +272,9 @@ public class GuardPredicateFactory {
 			return simplePredicate(expr, ctx -> ctx.getCookieNames().contains(cookieName));
 		}
 
+		case "cookie-hmac":
+			return parseCookieHmac(arg, expr);
+
 		case "request-type":
 		{
 			// toplevel | include | include-async - set by FrontCacheEngine.init() from the
@@ -349,6 +354,30 @@ public class GuardPredicateFactory {
 					+ " - without a token no request carries one, so '!" + EDGE_TOKEN + "' would match every request");
 
 		return simplePredicate(expr, ctx -> ctx.isEdgeTokenValid());
+	}
+
+	/**
+	 * {@code cookie-hmac:<name>}: the request carries a cookie of that name whose value the node's secret signed and
+	 * whose expiry is ahead - evidence a client cannot produce, unlike {@code cookie:<name>}, which any client can set.
+	 * What a guard rule exempts or favours on a cookie must be decided by this one. In both files; see
+	 * {@link EvidenceCookies} for the value's format.
+	 *
+	 * Refused, so the rule is skipped with an ERROR, on a node with no usable
+	 * {@value EvidenceCookies#SECRET_PROPERTY}: nothing could verify, and a predicate that is silently always false
+	 * makes {@code !cookie-hmac:} match everyone - a challenge for every visitor, forever.
+	 */
+	private static GuardPredicate parseCookieHmac(String name, String expr)
+	{
+		if (0 == name.length())
+			throw new GuardConfigException("cookie-hmac predicate needs a cookie name in '" + expr + "'");
+		if (!EvidenceCookies.NAME.matcher(name).matches())
+			throw new GuardConfigException("'" + name + "' is not a cookie name in '" + expr + "'");
+		if (!EvidenceCookies.isConfigured())
+			throw new GuardConfigException("'" + expr + "' needs " + EvidenceCookies.SECRET_PROPERTY + " ("
+					+ EvidenceCookies.MIN_SECRET_LENGTH + " characters or more) in frontcache.properties - without a"
+					+ " secret no cookie can be verified, so '!" + expr + "' would match every request");
+
+		return simplePredicate(expr, ctx -> EvidenceCookies.holds(ctx, name));
 	}
 
 	/**

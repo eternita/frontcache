@@ -41,6 +41,15 @@ import java.util.regex.Pattern;
  * config = alerts.conf
  * </pre>
  *
+ * A plugin that serves {@code /fc-x/<id>/} ({@link PluginKind#SERVE}) may also name the cookies it reads and sets,
+ * and the challenge providers it offers to the core's {@code challenge} guard action:
+ *
+ * <pre>
+ * kinds = serve, observe
+ * cookies = fc_pass
+ * challenges = pow, turnstile
+ * </pre>
+ *
  * A {@code .properties} file has no trailing comments: everything after {@code =} is the value.
  */
 public final class PluginManifest {
@@ -56,11 +65,17 @@ public final class PluginManifest {
 
 	private static final Pattern CLASS_NAME = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*");
 
+	/** A cookie name a serving plugin may read and set: an RFC 6265 token, short. */
+	public static final Pattern COOKIE_NAME = Pattern.compile("[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}");
+
+	/** A challenge provider's name, as a {@code challenge <provider>} guard action names it. */
+	public static final Pattern PROVIDER = Pattern.compile("[a-z][a-z0-9-]{0,30}");
+
 	/** A plain HOCON file name under {@code conf/}: no directory, ends in {@code .conf}. */
 	private static final Pattern CONFIG_FILE = Pattern.compile("[A-Za-z0-9_][A-Za-z0-9._-]{0,58}\\.conf");
 
 	private static final Set<String> KEYS = Set.of("id", "class", "name", "version", "vendor", "license",
-			"plugin-api", "kinds", "config");
+			"plugin-api", "kinds", "config", "cookies", "challenges");
 
 	private final String id;
 	private final String entryClass;
@@ -71,11 +86,14 @@ public final class PluginManifest {
 	private final int pluginApi;
 	private final Set<PluginKind> kinds;
 	private final String config;
+	private final Set<String> cookies;
+	private final Set<String> challenges;
 	private final String source;
 	private final List<String> warnings;
 
 	private PluginManifest(String id, String entryClass, String name, String version, String vendor,
-			String license, int pluginApi, Set<PluginKind> kinds, String config, String source, List<String> warnings) {
+			String license, int pluginApi, Set<PluginKind> kinds, String config, Set<String> cookies,
+			Set<String> challenges, String source, List<String> warnings) {
 		this.id = id;
 		this.entryClass = entryClass;
 		this.name = name;
@@ -85,6 +103,8 @@ public final class PluginManifest {
 		this.pluginApi = pluginApi;
 		this.kinds = Collections.unmodifiableSet(kinds);
 		this.config = config;
+		this.cookies = Collections.unmodifiableSet(cookies);
+		this.challenges = Collections.unmodifiableSet(challenges);
 		this.source = source;
 		this.warnings = Collections.unmodifiableList(warnings);
 	}
@@ -152,6 +172,16 @@ public final class PluginManifest {
 		if (null != config && !CONFIG_FILE.matcher(config).matches())
 			errors.add("'config' must be a plain .conf file name under conf/ (HOCON): '" + config + "'");
 
+		Set<String> cookies = names(properties, "cookies", COOKIE_NAME, errors);
+		Set<String> challenges = names(properties, "challenges", PROVIDER, errors);
+		if (!kinds.contains(PluginKind.SERVE))
+		{
+			if (!cookies.isEmpty())
+				errors.add("'cookies' needs kind 'serve' - only a plugin serving /fc-x/<id>/ reads or sets a cookie");
+			if (!challenges.isEmpty())
+				errors.add("'challenges' needs kind 'serve' - a challenge is a page the plugin serves");
+		}
+
 		Set<String> unknown = new TreeSet<>();
 		for (String key : properties.stringPropertyNames())
 			if (!KEYS.contains(key))
@@ -164,13 +194,32 @@ public final class PluginManifest {
 
 		String name = value(properties, "name");
 		return new PluginManifest(id, entryClass, (null == name) ? id : name, version, value(properties, "vendor"),
-				value(properties, "license"), pluginApi, kinds, config, source, warnings);
+				value(properties, "license"), pluginApi, kinds, config, cookies, challenges, source, warnings);
+	}
+
+	/** A comma-separated list of names, each checked against {@code pattern}; empty when the key is absent. */
+	private static Set<String> names(Properties properties, String key, Pattern pattern, List<String> errors) {
+		Set<String> names = new java.util.LinkedHashSet<>();
+		String list = value(properties, key);
+		if (null == list)
+			return names;
+		for (String n : list.split(","))
+		{
+			String name = n.trim();
+			if (name.isEmpty())
+				continue;
+			if (!pattern.matcher(name).matches())
+				errors.add("'" + key + "' names '" + name + "', which does not match " + pattern.pattern());
+			else
+				names.add(name);
+		}
+		return names;
 	}
 
 	/** The manifest a pre-plugin {@code FrontcacheModule} is given: id, class and {@code manage}, nothing else. */
 	public static PluginManifest forLegacyModule(String id, String entryClass, String version, String source) {
 		return new PluginManifest(id, entryClass, id, version, null, null, PLUGIN_API,
-				EnumSet.of(PluginKind.MANAGE), null, source, List.of());
+				EnumSet.of(PluginKind.MANAGE), null, Set.of(), Set.of(), source, List.of());
 	}
 
 	private static String value(Properties properties, String key) {
@@ -238,6 +287,22 @@ public final class PluginManifest {
 	/** The plugin's config file under {@code conf/} - a plain {@code .conf} name, HOCON - or null. */
 	public String config() {
 		return config;
+	}
+
+	/**
+	 * {@link PluginKind#SERVE}: the cookies the plugin may read on its own requests and set on its own responses - and
+	 * the only names the node's evidence signer signs for it. Empty when it names none.
+	 */
+	public Set<String> cookies() {
+		return cookies;
+	}
+
+	/**
+	 * {@link PluginKind#SERVE}: the challenge providers this plugin offers - what a {@code challenge <provider>} guard
+	 * rule names. Empty when it offers none.
+	 */
+	public Set<String> challenges() {
+		return challenges;
 	}
 
 	/** Where the manifest was read. */

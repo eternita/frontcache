@@ -45,6 +45,12 @@ public class PluginStats {
 	private String configStatus;
 	private List<String> configErrors = new ArrayList<>();
 	private long configLoaded;
+	private boolean serves;
+	private List<String> cookies = new ArrayList<>();
+	private List<String> challenges = new ArrayList<>();
+	private long served;
+	private long serveRefused;
+	private long serveFailed;
 
 	public PluginStats() { // for JSON mapper
 	}
@@ -205,5 +211,59 @@ public class PluginStats {
 
 	public void setConfigLoaded(long configLoaded) {
 		this.configLoaded = configLoaded;
+	}
+
+	/** {@code serve}: whether its endpoint answers {@code /fc-x/<id>/} - false while it is not started. */
+	public boolean isServes() {
+		return serves;
+	}
+
+	public void setServes(boolean serves) {
+		this.serves = serves;
+	}
+
+	/** {@code serve}: the cookies its manifest names - the only ones it reads, sets and has signed. */
+	public List<String> getCookies() {
+		return cookies;
+	}
+
+	public void setCookies(List<String> cookies) {
+		this.cookies = (null == cookies) ? new ArrayList<>() : new ArrayList<>(cookies);
+	}
+
+	/** {@code serve}: the challenge providers its manifest offers to a {@code challenge <provider>} guard rule. */
+	public List<String> getChallenges() {
+		return challenges;
+	}
+
+	public void setChallenges(List<String> challenges) {
+		this.challenges = (null == challenges) ? new ArrayList<>() : new ArrayList<>(challenges);
+	}
+
+	/** {@code serve}: requests its endpoint answered. */
+	public long getServed() {
+		return served;
+	}
+
+	public void setServed(long served) {
+		this.served = served;
+	}
+
+	/** {@code serve}: requests refused before its endpoint - over its concurrency cap (503) or body limit (413). */
+	public long getServeRefused() {
+		return serveRefused;
+	}
+
+	public void setServeRefused(long serveRefused) {
+		this.serveRefused = serveRefused;
+	}
+
+	/** {@code serve}: requests its endpoint failed - it threw, or wrote more than the node buffers (503). */
+	public long getServeFailed() {
+		return serveFailed;
+	}
+
+	public void setServeFailed(long serveFailed) {
+		this.serveFailed = serveFailed;
 	}
 }

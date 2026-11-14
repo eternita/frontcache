@@ -270,7 +270,7 @@ public class FrontcachePluginsTest {
 
 	@Test
 	public void manifestsThatCannotBeHonouredAreRefusedAtLoadAndTheNodeStarts() throws IOException {
-		install(plugin("serve", manifest("server", Recording.class, "serve")),
+		install(plugin("serve", manifest("server", Recording.class, "decide")),
 				plugin("api2", manifest("future", Recording.class, "manage").replace("plugin-api = 1", "plugin-api = 2")),
 				plugin("dup", manifest("server", Recording.class, "manage")),
 				plugin("notaplugin", manifest("pojo", NotAPlugin.class, "manage")),

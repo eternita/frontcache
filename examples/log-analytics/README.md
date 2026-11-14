@@ -186,7 +186,7 @@ a scanner walking the node by IP shows up the same way under `ip-access`.
 
 **Request logs** (`frontcache-requests*.log`) — grok extracts `domain`, `request_method`,
 `request_type` (`toplevel` / `include` / `include-async`), `is_cacheable` (`cacheable` /
-`direct`), `is_cached` (`from-cache` / `dynamic` / `dynamic-soft`), `hystrix_error` (`success` /
+`direct`), `is_cached` (`from-cache` / `dynamic` / `dynamic-soft`, or `plugin:<id>` for a request under `/fc-x/` a plugin answered), `hystrix_error` (`success` /
 `error`), `runtime_millis`, `length_bytes` (`-1` when unknown), `url`, `clientip`, `server`,
 `browserBot` (`bot` / `guest`), `client_type_rule`, `agent`, plus flat `geoip.*` from the client
 IP (Logstash's bundled GeoLite2-City). `fc-ping.jsp` health checks are dropped.
@@ -217,13 +217,15 @@ request log plus a trailing quoted reason, so everything above (including `geoip
 `client_type_rule`) plus `reject_reason`, `http_status` and `failure_type`. The two rule names on
 a line answer different questions: `reject_reason` is the **guard** rule that acted,
 `client_type_rule` is the **bots.conf** rule behind the client type it may have matched on.
-The file holds two kinds of line, which `failure_type` separates:
+The file holds these kinds of line, which `failure_type` separates:
 
 | `failure_type` | Written by | `is_cached` | `reject_reason` values | `http_status` |
 | --- | --- | --- | --- | --- |
 | `rejected` | a guard rule's `reject` action | `rejected` | `bad-request`, `uri-too-long`, or any rule name from `guard-rules.conf` | `400`, `414`, … |
 | `redirected` | a guard rule's `redirect` action | `redirected` | rule name, e.g. `ip-access`, `anon-analytics` | `301`, `302`, … |
-| `dry-run` | a rule marked `dry-run` — matched and logged, request untouched | `dry-run` | `<rule>:dry-run` | *(dropped — nothing was sent)* |
+| `challenged` | a guard rule's `challenge` action — a redirect to a plugin's challenge page (2.13.0) | `challenged` | rule name | `302` |
+| `dry-run` | a rule marked `dry-run` — matched and logged, request untouched; also a `challenge` rule whose provider is absent | `dry-run` | `<rule>:dry-run` | *(dropped — nothing was sent)* |
+| `plugin` | a request under `/fc-x/` a plugin's path refused or failed (2.13.0) | `plugin:<id>` | `plugin:<id>` | `503`, `413` |
 | `hystrix-fallback` | a request that fell back | `from-cache` / `dynamic` / … | `short-circuited`, `timeout`, `rejected`, `failure`, `error` | *(unset)* |
 
 `http_status` is the status Frontcache actually sent, written as an extra unquoted column after

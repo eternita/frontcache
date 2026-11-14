@@ -552,6 +552,27 @@ public class FcMetricsExport {
 					.description("Events a plugin's listeners did not receive because their queue was full")
 					.tags(tags)
 					.register(registry);
+
+			org.frontcache.io.PluginStats declared = FrontcachePlugins.stats(id);
+			if (null == declared || !declared.getKinds().contains("serve"))
+				continue;
+			FunctionCounter.builder("plugin.serve.requests", id, p -> pluginStat(p, org.frontcache.io.PluginStats::getServed))
+					.description("Requests to /fc-x/<plugin>/ - answered by the plugin, refused before it (over its"
+							+ " concurrency cap or body limit), or failed by it")
+					.tags(tags.and("outcome", "served"))
+					.register(registry);
+			FunctionCounter.builder("plugin.serve.requests", id,
+					p -> pluginStat(p, org.frontcache.io.PluginStats::getServeRefused))
+					.description("Requests to /fc-x/<plugin>/ - answered by the plugin, refused before it (over its"
+							+ " concurrency cap or body limit), or failed by it")
+					.tags(tags.and("outcome", "refused"))
+					.register(registry);
+			FunctionCounter.builder("plugin.serve.requests", id,
+					p -> pluginStat(p, org.frontcache.io.PluginStats::getServeFailed))
+					.description("Requests to /fc-x/<plugin>/ - answered by the plugin, refused before it (over its"
+							+ " concurrency cap or body limit), or failed by it")
+					.tags(tags.and("outcome", "failed"))
+					.register(registry);
 		}
 	}
 

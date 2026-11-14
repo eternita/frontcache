@@ -26,6 +26,15 @@ final class PluginCounters {
 	/** Events dropped because a listener's queue was full, or still queued when the engine stopped. */
 	final LongAdder dropped = new LongAdder();
 
-	/** Anything the plugin threw: in start, stop, a listener, listing its actions. */
+	/** Anything the plugin threw: in start, stop, a listener, listing its actions, its endpoint. */
 	final LongAdder errors = new LongAdder();
+
+	/** Requests its endpoint answered. */
+	final LongAdder served = new LongAdder();
+
+	/** Requests refused before reaching its endpoint: over its concurrency cap (503) or its body limit (413). */
+	final LongAdder serveRefused = new LongAdder();
+
+	/** Requests its endpoint failed - it threw, or wrote more than the node buffers (503). */
+	final LongAdder serveFailed = new LongAdder();
 }

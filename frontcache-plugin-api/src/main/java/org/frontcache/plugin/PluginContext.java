@@ -17,6 +17,8 @@ package org.frontcache.plugin;
 
 import java.io.File;
 
+import org.frontcache.plugin.serve.EvidenceSigner;
+
 /**
  * What a {@link FrontcachePlugin} may read from the node - handed to {@link FrontcachePlugin#start}, one per
  * plugin. Every answer is read when asked, so a plugin holding the context never holds a stale value.
@@ -57,4 +59,13 @@ public interface PluginContext {
 	 * key is in memory only and differs per node and per run. Null in, null out.
 	 */
 	String hashClientKey(String clientKey);
+
+	/**
+	 * {@link PluginKind#SERVE}: the node's signer of evidence cookies - what the core's {@code cookie-hmac:} predicate
+	 * verifies. Null unless the node has a cookie secret ({@code front-cache.visitor.cookie-secret}) and this plugin
+	 * declares {@code serve} and names at least one cookie in its manifest.
+	 */
+	default EvidenceSigner evidenceSigner() {
+		return null;
+	}
 }

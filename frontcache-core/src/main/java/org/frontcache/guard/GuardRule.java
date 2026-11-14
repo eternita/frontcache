@@ -38,6 +38,9 @@ public class GuardRule {
 	// hit count since start; in-memory only, reset on restart (by design)
 	private final LongAdder hits = new LongAdder();
 
+	// a challenge rule whose provider was found absent has said so - once per rule object, i.e. once per reload
+	private final java.util.concurrent.atomic.AtomicBoolean unavailableReported = new java.util.concurrent.atomic.AtomicBoolean();
+
 	public GuardRule(String name, List<GuardPredicate> predicates, GuardAction action, boolean dryRun) {
 		this.name = name;
 		this.predicates = Collections.unmodifiableList(predicates);
@@ -79,6 +82,11 @@ public class GuardRule {
 
 	public void countHit() {
 		hits.increment();
+	}
+
+	/** @return true the first time it is called for this rule object, false after */
+	boolean firstUnavailableReport() {
+		return unavailableReported.compareAndSet(false, true);
 	}
 
 	public String getCondition()

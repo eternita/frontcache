@@ -26,7 +26,7 @@ public enum PluginKind {
 	/** E1: receives events after the fact, batched, on its own thread. Fails as: events dropped, counted. */
 	OBSERVE(false),
 
-	/** E2: answers requests under a path it owns. Fails as: its path answers 503. Not offered by this node yet. */
+	/** E2: answers requests under a path it owns, {@code /fc-x/<id>/}. Fails as: its path answers 503. */
 	SERVE(false),
 
 	/** E3: contributes a named guard predicate. Fails as: the rule is skipped. Not offered by this node yet. */
