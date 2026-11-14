@@ -102,7 +102,9 @@ public interface FrontcachePlugin {
 
 	/**
 	 * {@link PluginKind#OBSERVE}: the listeners the node delivers events to, each on its own thread, through its
-	 * own bounded queue. Read once per start.
+	 * own bounded queue. Read after every start, and again after {@link #configure} accepted a config on
+	 * {@code reload-plugin-config} - a config may change what the plugin observes. A listener handed back again
+	 * (the same instance, subscribing to the same types) keeps its queue; one no longer handed back is stopped.
 	 */
 	default List<EventListener> eventListeners() {
 		return List.of();

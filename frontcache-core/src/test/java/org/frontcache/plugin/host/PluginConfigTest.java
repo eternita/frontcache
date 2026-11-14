@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -40,7 +41,10 @@ import org.frontcache.plugin.FrontcachePlugin;
 import org.frontcache.plugin.PluginConfigException;
 import org.frontcache.plugin.PluginContext;
 import org.frontcache.plugin.PluginManifest;
+import org.frontcache.plugin.event.CacheInvalidated;
+import org.frontcache.plugin.event.CircuitStateChanged;
 import org.frontcache.plugin.event.ConfigReloaded;
+import org.frontcache.plugin.event.EventListener;
 import org.frontcache.plugin.event.FcEvent;
 import org.junit.After;
 import org.junit.Before;
@@ -136,14 +140,56 @@ public class PluginConfigTest {
 		}
 	}
 
+	/**
+	 * Observes what its config names - {@code watch = [circuit, invalidated]} - as an alerts plugin observes the
+	 * events its rules name. Hands back the same listener while the watched types do not change.
+	 */
+	public static class Watcher implements FrontcachePlugin {
+		static final List<FcEvent> received = java.util.Collections.synchronizedList(new ArrayList<>());
+		private volatile Set<Class<? extends FcEvent>> watched = Set.of();
+		private volatile EventListener listener;
+
+		@Override
+		public void configure(Config config) throws PluginConfigException {
+			Set<Class<? extends FcEvent>> types = new java.util.HashSet<>();
+			if (config.hasPath("watch"))
+				for (String name : config.getStringList("watch"))
+					if ("circuit".equals(name))
+						types.add(CircuitStateChanged.class);
+					else if ("invalidated".equals(name))
+						types.add(CacheInvalidated.class);
+					else
+						throw new PluginConfigException("watch: unknown '" + name + "'");
+			if (!types.equals(watched))
+			{
+				watched = Set.copyOf(types);
+				listener = types.isEmpty() ? null : FcEventBusTest.listener(watched, received::addAll);
+			}
+		}
+
+		@Override
+		public void start(PluginContext context) {
+		}
+
+		@Override
+		public List<EventListener> eventListeners() {
+			EventListener l = listener;
+			return (null == l) ? List.of() : List.of(l);
+		}
+	}
+
 	// ---- helpers -----------------------------------------------------------------------------------------------
 
 	private File plugin(String dir, String id, Class<?> type, String config) throws IOException {
+		return plugin(dir, id, type, config, "manage");
+	}
+
+	private File plugin(String dir, String id, Class<?> type, String config, String kinds) throws IOException {
 		File root = folder.newFolder(dir);
 		File file = new File(root, PluginManifest.RESOURCE);
 		file.getParentFile().mkdirs();
 		Files.writeString(file.toPath(), "id = " + id + "\nclass = " + type.getName()
-				+ "\nversion = 1.0.0\nplugin-api = 1\nkinds = manage\n" + ((null == config) ? "" : "config = " + config + "\n"),
+				+ "\nversion = 1.0.0\nplugin-api = 1\nkinds = " + kinds + "\n" + ((null == config) ? "" : "config = " + config + "\n"),
 				StandardCharsets.UTF_8);
 		return root;
 	}
@@ -284,6 +330,39 @@ public class PluginConfigTest {
 		assertEquals(-1, first.entries());
 		assertFalse(second.ok());
 		assertEquals(List.of("alerts.threshold must be positive"), second.reasons());
+	}
+
+	@Test
+	public void aReloadReadsTheListenersAgainSoANewConfigObservesWhatItNames() throws Exception {
+		Watcher.received.clear();
+		conf.put("watcher.conf", "watch = [circuit]");
+		install(plugin("w", "watcher", Watcher.class, "watcher.conf", "observe"));
+		FrontcachePlugins.start(null, List::of);
+		assertTrue(FcEventBus.wants(FcEventBus.CIRCUIT_STATE_CHANGED));
+		assertFalse(FcEventBus.wants(FcEventBus.CACHE_INVALIDATED));
+
+		conf.put("watcher.conf", "watch = [invalidated]");
+		assertTrue(FrontcachePlugins.reloadConfig("watcher").ok());
+		assertTrue("what the new config names is delivered", FcEventBus.wants(FcEventBus.CACHE_INVALIDATED));
+		assertFalse("what it no longer names is not built", FcEventBus.wants(FcEventBus.CIRCUIT_STATE_CHANGED));
+		CoreEvents.cacheInvalidated(CacheInvalidated.SCOPE_ALL, null);
+		FcEventBusTest.waitFor(() -> Watcher.received.stream().anyMatch(e -> e instanceof CacheInvalidated));
+
+		// the same types: the same listener keeps its queue and thread - one dispatcher, not two
+		assertTrue(FrontcachePlugins.reloadConfig("watcher").ok());
+		assertEquals(1, Thread.getAllStackTraces().keySet().stream()
+				.filter(t -> t.isAlive() && "fc-plugin-watcher-events".equals(t.getName())).count());
+		assertEquals(0, stats("watcher").getEventsDropped());
+
+		conf.put("watcher.conf", "watch = []");
+		assertTrue(FrontcachePlugins.reloadConfig("watcher").ok());
+		assertFalse("nothing is wanted once it watches nothing", FcEventBus.wants(FcEventBus.CACHE_INVALIDATED));
+		FcEventBusTest.waitFor(() -> 0 == Thread.getAllStackTraces().keySet().stream()
+				.filter(t -> t.isAlive() && "fc-plugin-watcher-events".equals(t.getName())).count());
+
+		conf.put("watcher.conf", "watch = [nonsense]");
+		assertFalse("a refused config changes nothing it observes", FrontcachePlugins.reloadConfig("watcher").ok());
+		assertFalse(FcEventBus.wants(FcEventBus.CACHE_INVALIDATED));
 	}
 
 	@Test

@@ -75,7 +75,8 @@ import org.slf4j.LoggerFactory;
  * A manifest's {@code config} names {@code conf/<file>}, which no other plugin and no core file may be. It is read,
  * parsed and resolved here ({@link PluginConfigs}) and handed to {@link FrontcachePlugin#configure} before every
  * start; a refusal there is a plugin that does not start. {@link #reloadConfig} re-reads it for a running plugin
- * (which keeps its old config when the new one is refused) and starts one that failed on its config.
+ * (which keeps its old config when the new one is refused, and has its event listeners read again when it accepts
+ * it) and starts one that failed on its config.
  */
 public final class FrontcachePlugins {
 
@@ -387,25 +388,7 @@ public final class FrontcachePlugins {
 			return false;
 		}
 
-		int capacity = queueCapacity(slot.id);
-		double sample = requestSample(slot.id);
-		boolean samplesRequests = false;
-		for (EventListener listener : listeners)
-		{
-			try {
-				long bits = FcEventBus.subscribe(slot.id, listener, capacity, sample, slot.counters);
-				samplesRequests |= 0L != (bits & FcEventBus.REQUEST_COMPLETED);
-			} catch (Throwable t) {
-				slot.counters.errors.increment();
-				logger.error("Plugin '" + slot.id + "' has an event listener that could not be subscribed", t);
-			}
-		}
-		if (samplesRequests && 1.0 <= sample)
-			logger.warn("Plugin '{}' receives every request as a RequestCompleted event ({} = 1.0) - one event per"
-					+ " request; a full queue drops and counts", slot.id, String.format(REQUEST_SAMPLE_PROPERTY, slot.id));
-		else if (samplesRequests)
-			logger.info("Plugin '{}' receives {}% of requests as RequestCompleted events ({})", slot.id, sample * 100,
-					String.format(REQUEST_SAMPLE_PROPERTY, slot.id));
+		subscribe(slot, listeners, false);
 
 		for (Map.Entry<String, ManagementAction> e : own.entrySet())
 		{
@@ -420,6 +403,72 @@ public final class FrontcachePlugins {
 		slot.reason = null;
 		logger.info("Plugin '{}' started: {}", slot.id, slot.manifest);
 		return true;
+	}
+
+	/**
+	 * Subscribes a started plugin's listeners to the event bus - or, on a reload of its config, re-subscribes them:
+	 * a new config may want other events, and {@link FrontcachePlugin#eventListeners()} is read again for it.
+	 */
+	private static void subscribe(Slot slot, List<EventListener> listeners, boolean replace) {
+
+		int capacity = queueCapacity(slot.id);
+		double sample = requestSample(slot.id);
+		long bits = 0L;
+		if (replace)
+		{
+			try {
+				bits = FcEventBus.resubscribe(slot.id, listeners, capacity, sample, slot.counters);
+			} catch (Throwable t) {
+				slot.counters.errors.increment();
+				logger.error("Plugin '" + slot.id + "' has an event listener that could not be subscribed", t);
+			}
+		}
+		else
+		{
+			for (EventListener listener : listeners)
+			{
+				try {
+					bits |= FcEventBus.subscribe(slot.id, listener, capacity, sample, slot.counters);
+				} catch (Throwable t) {
+					slot.counters.errors.increment();
+					logger.error("Plugin '" + slot.id + "' has an event listener that could not be subscribed", t);
+				}
+			}
+		}
+
+		boolean samplesRequests = 0L != (bits & FcEventBus.REQUEST_COMPLETED);
+		if (samplesRequests && 1.0 <= sample)
+			logger.warn("Plugin '{}' receives every request as a RequestCompleted event ({} = 1.0) - one event per"
+					+ " request; a full queue drops and counts", slot.id, String.format(REQUEST_SAMPLE_PROPERTY, slot.id));
+		else if (samplesRequests)
+			logger.info("Plugin '{}' receives {}% of requests as RequestCompleted events ({})", slot.id, sample * 100,
+					String.format(REQUEST_SAMPLE_PROPERTY, slot.id));
+	}
+
+	/**
+	 * After a running plugin accepted a new config: its listeners again, since what it observes may have changed. A
+	 * plugin that now hands over listeners without declaring {@code observe} keeps none - it is not stopped for it, as
+	 * it is running on a config it accepted.
+	 */
+	private static void resubscribe(Slot slot) {
+
+		List<EventListener> listeners;
+		try {
+			listeners = nonNull(slot.plugin.eventListeners());
+		} catch (Throwable t) {
+			slot.counters.errors.increment();
+			logger.error("Plugin '" + slot.id + "' threw listing its event listeners after a config reload - it keeps"
+					+ " the ones it had", t);
+			return;
+		}
+		if (!listeners.isEmpty() && !slot.manifest.declares(PluginKind.OBSERVE))
+		{
+			logger.error("Plugin '{}' has event listeners after a config reload but does not declare kind 'observe'"
+					+ " - none is subscribed", slot.id);
+			listeners = List.of();
+		}
+		subscribe(slot, listeners, true);
+		FcEventBus.startGuardSummary(runningGuardRules, GUARD_SUMMARY_INTERVAL_MILLIS);
 	}
 
 	/**
@@ -490,6 +539,8 @@ public final class FrontcachePlugins {
 		if (State.STARTED == slot.state)
 		{
 			ok = configure(slot);
+			if (ok)
+				resubscribe(slot);
 		}
 		else if (running && State.FAILED == slot.state && slot.failedOnConfig)
 		{

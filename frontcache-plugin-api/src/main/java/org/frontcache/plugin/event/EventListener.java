@@ -29,7 +29,10 @@ import java.util.Set;
  */
 public interface EventListener {
 
-	/** The event types to deliver - the node emits only what someone subscribed to. Read once per start. */
+	/**
+	 * The event types to deliver - the node emits only what someone subscribed to. Read when the listener is
+	 * subscribed: at the plugin's start, and on a reload of its config ({@code FrontcachePlugin#eventListeners}).
+	 */
 	Set<Class<? extends FcEvent>> subscribes();
 
 	/** Called on this listener's own thread, never on a request thread. May block: the thread is the listener's. */

@@ -63,8 +63,9 @@ import org.slf4j.LoggerFactory;
  * builds the event only when the draw is under the largest share wanted ({@link #requestSample()}); each subscriber
  * then takes it when the same draw is under its own share - so a subscriber's sample is a subset of any larger one.
  *
- * <p>Subscribers are replaced wholesale on every engine start ({@link FrontcachePlugins}); {@link #stopAll()} on
- * engine stop counts whatever is still queued as dropped.
+ * <p>Subscribers are replaced wholesale on every engine start ({@link FrontcachePlugins}), and one plugin's on a
+ * reload of its config ({@link #resubscribe}); {@link #stopAll()} on engine stop counts whatever is still queued as
+ * dropped.
  */
 public final class FcEventBus {
 
@@ -157,19 +158,7 @@ public final class FcEventBus {
 	static synchronized long subscribe(String pluginId, EventListener listener, int capacity, double requestSample,
 			PluginCounters counters) {
 
-		Set<Class<? extends FcEvent>> types = listener.subscribes();
-		long listenerMask = 0L;
-		if (null != types)
-			for (Class<? extends FcEvent> type : types)
-			{
-				Long bit = BITS.get(type);
-				if (null == bit)
-					logger.warn("Plugin '{}' subscribes to {}, which this node does not emit - ignored", pluginId,
-							(null == type) ? "null" : type.getName());
-				else
-					listenerMask |= bit;
-			}
-
+		long listenerMask = maskOf(pluginId, listener, true);
 		if (0L == listenerMask)
 		{
 			logger.warn("Plugin '{}' has an event listener that subscribes to nothing this node emits", pluginId);
@@ -185,6 +174,84 @@ public final class FcEventBus {
 		mask |= listenerMask;
 		subscriber.start();
 		return listenerMask;
+	}
+
+	/**
+	 * Replaces one plugin's listeners - what a reload of its config does, since a new config may want other events.
+	 * A listener the plugin hands back unchanged (the same instance, subscribing to the same types) keeps its queue
+	 * and thread; one it no longer hands back is stopped, and what was still queued for it is counted as dropped.
+	 *
+	 * @return the bits the plugin's listeners now subscribe to that this node emits
+	 */
+	static synchronized long resubscribe(String pluginId, List<EventListener> listeners, int capacity,
+			double requestSample, PluginCounters counters) {
+
+		List<Subscriber> kept = new ArrayList<>();
+		List<EventListener> added = new ArrayList<>();
+		for (EventListener listener : listeners)
+		{
+			Subscriber same = null;
+			for (Subscriber s : subscribers)
+				if (s.pluginId.equals(pluginId) && s.listener == listener && s.mask == maskOf(pluginId, listener, false))
+				{
+					same = s;
+					break;
+				}
+			if (null == same)
+				added.add(listener);
+			else
+				kept.add(same);
+		}
+
+		List<Subscriber> next = new ArrayList<>();
+		List<Subscriber> stopping = new ArrayList<>();
+		for (Subscriber s : subscribers)
+			if (!s.pluginId.equals(pluginId) || kept.contains(s))
+				next.add(s);
+			else
+				stopping.add(s);
+
+		subscribers = Collections.unmodifiableList(next);
+		recompute();
+		for (Subscriber s : stopping)
+			s.stop();
+
+		long bits = 0L;
+		for (Subscriber s : kept)
+			bits |= s.mask;
+		for (EventListener listener : added)
+			bits |= subscribe(pluginId, listener, capacity, requestSample, counters);
+		return bits;
+	}
+
+	/** The bits a listener subscribes to that this node emits; WARNs about the others when asked to. */
+	private static long maskOf(String pluginId, EventListener listener, boolean warn) {
+		Set<Class<? extends FcEvent>> types = listener.subscribes();
+		long listenerMask = 0L;
+		if (null != types)
+			for (Class<? extends FcEvent> type : types)
+			{
+				Long bit = BITS.get(type);
+				if (null != bit)
+					listenerMask |= bit;
+				else if (warn)
+					logger.warn("Plugin '{}' subscribes to {}, which this node does not emit - ignored", pluginId,
+							(null == type) ? "null" : type.getName());
+			}
+		return listenerMask;
+	}
+
+	/** The union mask and the largest request sample, from the subscribers left. */
+	private static void recompute() {
+		long union = 0L;
+		double sample = 0.0;
+		for (Subscriber s : subscribers)
+		{
+			union |= s.mask;
+			sample = Math.max(sample, s.requestSample);
+		}
+		mask = union;
+		requestSample = sample;
 	}
 
 	/** Starts the 10-second {@link GuardSummary} ticker - only when someone subscribed to it. */
