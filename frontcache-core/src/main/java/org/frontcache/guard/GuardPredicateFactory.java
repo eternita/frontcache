@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.frontcache.FCConfig;
 import org.frontcache.core.Cidr;
+import org.frontcache.core.CidrSet;
 import org.frontcache.core.EdgeToken;
 import org.frontcache.core.EvidenceCookies;
 import org.frontcache.core.FCHeaders;
@@ -261,7 +262,8 @@ public class GuardPredicateFactory {
 				return simplePredicate(expr, ctx -> list.contains(ctx.getResolvedClientIP()));
 			}
 
-			final List<Cidr> blocks = parseClientIpArgument(arg, expr);
+			// indexed: the address is parsed once and looked up, not compared with every block of an @file
+			final CidrSet blocks = CidrSet.of(parseClientIpArgument(arg, expr));
 			return simplePredicate(expr, ctx -> {
 				// Resolved through ClientIpResolver, NOT FCUtils.getClientIP(): the latter believes
 				// thirteen client-supplied headers, so a client could put itself inside any block
@@ -270,11 +272,7 @@ public class GuardPredicateFactory {
 				if (null == address)
 					return false; // undecidable (recycled request, no trusted proxy answer) - never a match
 
-				for (Cidr block : blocks)
-					if (block.contains(address))
-						return true;
-
-				return false;
+				return blocks.contains(address);
 			});
 		}
 

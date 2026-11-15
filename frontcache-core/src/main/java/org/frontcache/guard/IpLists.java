@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.frontcache.FCConfig;
 import org.frontcache.core.Cidr;
+import org.frontcache.core.CidrSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,8 @@ public final class IpLists {
 	public static final class LiveList {
 
 		private final String name;
-		private volatile List<Cidr> blocks = List.of();
+		// indexed, so a list of tens of thousands of addresses (a plugin's ban list) costs a request a few lookups
+		private volatile CidrSet blocks = CidrSet.EMPTY;
 		private volatile long modified = -1;
 		private volatile long size = -1;
 
@@ -62,12 +64,7 @@ public final class IpLists {
 
 		/** Whether an address is in one of the list's blocks; false for null. */
 		public boolean contains(String address) {
-			if (null == address)
-				return false;
-			for (Cidr block : blocks)
-				if (block.contains(address))
-					return true;
-			return false;
+			return blocks.contains(address);
 		}
 
 		public int size() {
@@ -107,7 +104,7 @@ public final class IpLists {
 				return list;
 			try {
 				List<Cidr> blocks = read(file, name, expr);
-				list.blocks = blocks;
+				list.blocks = CidrSet.of(blocks);
 				list.modified = file.lastModified();
 				list.size = file.length();
 				logger.info("conf/{} read: {} address block(s)", name, blocks.size());
@@ -123,7 +120,7 @@ public final class IpLists {
 	public static void publish(String name, List<Cidr> blocks, File file) {
 		LiveList list = LISTS.computeIfAbsent(name, LiveList::new);
 		synchronized (list) {
-			list.blocks = Collections.unmodifiableList(new ArrayList<>(blocks));
+			list.blocks = CidrSet.of(blocks);
 			list.modified = file.lastModified();
 			list.size = file.length();
 		}

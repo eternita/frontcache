@@ -50,6 +50,13 @@
 /frontcache-tests/FRONTCACHE_HOME_FILTER/warmer/*.failed-*.txt
 /frontcache-tests/FRONTCACHE_HOME_STANDALONE/warmer/*.failed-*.txt
 
+# What plugins write at runtime into the e2e homes: the lists they manage (conf/lists/, PluginContext.writeList) and
+# their data directories (plugins/<id>/data/)
+/frontcache-tests/FRONTCACHE_HOME_FILTER/conf/lists/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/conf/lists/
+/frontcache-tests/FRONTCACHE_HOME_FILTER/plugins/
+/frontcache-tests/FRONTCACHE_HOME_STANDALONE/plugins/
+
 # Runtime state a node or console with the (separately distributed) Pro modules writes - its instance id
 # and usage log under FRONTCACHE_HOME/usage. A Community build writes none of it, but a Pro end-to-end run
 # uses these very homes. Never checked in - an instance id in git would be cloned into every checkout.
