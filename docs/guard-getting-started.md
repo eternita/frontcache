@@ -284,6 +284,17 @@ googlebot-ok | ua~(?i)googlebot ; client-ip:@lists/googlebot.txt | allow
 banned       | client-ip:@lists/banned.txt                        | reject:403
 ```
 
+The crawler-feeder example plugin (`examples/plugins/crawler-feeder/`) keeps
+`googlebot.txt`, `bingbot.txt` and `applebot.txt` this way: the ranges the vendors publish,
+plus each address that claims to be the crawler, is reported by a rule you name, and passes
+the vendors' own check — its reverse DNS name is under the crawler's domain and resolves back
+to it. The rule that reports a claimant can be a dry run, so nobody is refused while the
+check runs:
+
+```
+googlebot-claim | ua~(?i)googlebot ; !client-ip:@lists/googlebot.txt | reject:403 | dry-run
+```
+
 Unlike any other `@file`, a missing `lists/` file is an empty list (a warning, not a
 skipped rule — the plugin may not have run yet), and an empty list is fine. A file a
 plugin writes starts with `# managed by plugin <id>`; a plugin never overwrites a list

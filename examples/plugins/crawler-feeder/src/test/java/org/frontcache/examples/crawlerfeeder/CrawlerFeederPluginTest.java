@@ -99,17 +99,32 @@ public class CrawlerFeederPluginTest extends PluginContract {
 		return CrawlerFeederPlugin.class;
 	}
 
-	/** The contract's own runs fetch nothing - no feed, so no network. */
+	private final FakeDns dns = new FakeDns();
+
+	/** The node constructs the plugin with the JDK's resolver; here every lookup is the test's. */
+	@Override
+	protected PluginHarness newHarness() {
+		return PluginHarness.of(new CrawlerFeederPlugin(dns, new FakeDns.MovableClock()),
+				PluginHarness.manifestOf(CrawlerFeederPlugin.class));
+	}
+
+	/**
+	 * The contract's own runs fetch nothing - no url, so no network - and observe: the sample events' {@code prove-it}
+	 * is a claim rule here, checked against the fake resolver.
+	 */
 	@Override
 	protected String startConfig() {
-		return "feeds = []";
+		return "feeds = [ { name = claimed, domains = [crawler.example], rules = [prove-it] } ]";
 	}
 
 	@Override
 	protected List<String> acceptedConfigs() {
 		// all loopback: the contract applies them to the running plugin, which fetches at once (port 9 refuses)
 		return List.of("feeds = []", "feeds = [ { name = googlebot, url = \"http://127.0.0.1:9/g.json\" } ]",
-				"feeds = [ { name = a.b_c-1, url = \"http://localhost:9/a\", every = 1m }, { name = b, url = \"http://[::1]:9/b\", every = 30d } ]\ntimeout = 2s");
+				"feeds = [ { name = a.b_c-1, url = \"http://localhost:9/a\", every = 1m }, { name = b, url = \"http://[::1]:9/b\", every = 30d } ]\ntimeout = 2s",
+				"feeds = [ { name = googlebot, url = \"http://127.0.0.1:9/g.json\", domains = [googlebot.com, Google.COM.] } ]",
+				"feeds = [ { name = yandexbot, domains = yandex.com, rules = [\"yandex claim\", fake-yandex] } ]\nkeep = 1h\nretry = 1m\nmax-verified = 10000",
+				"keep = 90d\nretry = 7d\nmax-verified = 1");
 	}
 
 	@Override
@@ -127,7 +142,22 @@ public class CrawlerFeederPluginTest extends PluginContract {
 				"feeds = \"googlebot\"",
 				"feeds = [ \"googlebot\" ]",
 				"timeout = 0s",
-				"feed = []");
+				"feed = []",
+				"feeds = [ { name = g } ]",
+				"feeds = [ { name = g, every = 1h, domains = [g.example] } ]",
+				"feeds = [ { name = g, domains = [com] } ]",
+				"feeds = [ { name = g, domains = [\"*.googlebot.com\"] } ]",
+				"feeds = [ { name = g, domains = [ 42 ] } ]",
+				"feeds = [ { name = g, domains = { a = b } } ]",
+				"feeds = [ { name = g, url = \"https://example.com/1\", rules = [g-claim] } ]",
+				"feeds = [ { name = g, domains = [g.example], rules = [] } ]",
+				"feeds = [ { name = g, domains = [g.example], rules = [\"a | b\"] } ]",
+				"feeds = [ { name = g, domains = [a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x, i.x, j.x, k.x] } ]",
+				"keep = 10m",
+				"retry = 0s",
+				"retry = forever",
+				"max-verified = 0",
+				"max-verified = 10001");
 	}
 
 	private void feeds(String... nameAndPath) throws Exception {
@@ -272,14 +302,62 @@ public class CrawlerFeederPluginTest extends PluginContract {
 	}
 
 	@Test
-	public void theDefaultsAreTheVendorsDaily() throws Exception {
+	public void theDefaultsAreTheVendorsDailyEachCheckingItsClaimants() throws Exception {
 		FeederConfig defaults = FeederConfig.parse(PluginHarness.parseConfig("", "conf/crawler-feeder.conf"));
-		assertEquals(2, defaults.feeds().size());
-		assertEquals("googlebot", defaults.feeds().get(0).name());
-		assertEquals(FeederConfig.GOOGLEBOT, defaults.feeds().get(0).url().toString());
-		assertEquals("bingbot", defaults.feeds().get(1).name());
-		assertEquals(FeederConfig.BINGBOT, defaults.feeds().get(1).url().toString());
-		assertEquals(java.time.Duration.ofHours(24), defaults.feeds().get(1).every());
+		assertEquals(3, defaults.feeds().size());
+		FeederConfig.Feed google = defaults.feed("googlebot");
+		assertEquals(FeederConfig.GOOGLEBOT, google.url().toString());
+		assertEquals(List.of("googlebot.com", "google.com"), google.domains());
+		assertEquals(List.of("googlebot-claim"), google.rules());
+		FeederConfig.Feed bing = defaults.feed("bingbot");
+		assertEquals(FeederConfig.BINGBOT, bing.url().toString());
+		assertEquals(List.of("search.msn.com"), bing.domains());
+		assertEquals(java.time.Duration.ofHours(24), bing.every());
+		FeederConfig.Feed apple = defaults.feed("applebot");
+		assertEquals(FeederConfig.APPLEBOT, apple.url().toString());
+		assertEquals(List.of("applebot.apple.com"), apple.domains());
+		assertEquals(List.of("applebot-claim"), apple.rules());
+		assertEquals(java.time.Duration.ofDays(7), defaults.keep());
+		assertEquals(java.time.Duration.ofHours(1), defaults.retry());
+		assertEquals(1_000, defaults.maxVerified());
+		assertEquals(defaults, FeederConfig.defaults());
+
+		// feeds written out: no check unless it names domains; with domains, rules default to <name>-claim
+		FeederConfig written = FeederConfig.parse(PluginHarness.parseConfig("feeds = [ { name = g, url = \"https://g.example/x\" },"
+				+ " { name = y, domains = [Yandex.COM.] } ]", "conf/crawler-feeder.conf"));
+		assertFalse(written.feed("g").verifies());
+		assertEquals(List.of(), written.feed("g").rules());
+		assertFalse(written.feed("y").fetches());
+		assertEquals(List.of("yandex.com"), written.feed("y").domains());
+		assertEquals(List.of("y-claim"), written.feed("y").rules());
+
+		// the README's example: the defaults written out, and a crawler without published ranges
+		FeederConfig readme = FeederConfig.parse(PluginHarness.parseConfig("""
+				feeds = [
+				  { name = googlebot, url = "https://developers.google.com/static/search/apis/ipranges/googlebot.json", every = 24h,
+				    domains = [googlebot.com, google.com] },
+				  { name = bingbot,   url = "https://www.bing.com/toolbox/bingbot.json", domains = [search.msn.com] },
+				  { name = applebot,  url = "https://search.developer.apple.com/applebot.json", domains = [applebot.apple.com] },
+				  # a crawler that publishes no ranges: a list of confirmed claimants only
+				  { name = yandexbot, domains = [yandex.ru, yandex.net, yandex.com], rules = [yandexbot-claim] }
+				]
+				timeout = 30s        # connecting, and the whole answer
+				keep = 7d            # 1h..90d
+				retry = 1h           # 1m..7d
+				max-verified = 1000  # per list, 1..10000
+				""", "conf/crawler-feeder.conf"));
+		assertEquals(defaults.feeds(), readme.feeds().subList(0, 3));
+		assertEquals(List.of("yandex.ru", "yandex.net", "yandex.com"), readme.feed("yandexbot").domains());
+	}
+
+	@Test
+	public void itObservesOnlyWhileAFeedChecksClaimants() throws Exception {
+		assertEquals(1, harness.listeners().size());
+		assertEquals(java.util.Set.of(org.frontcache.plugin.event.GuardMatched.class), harness.listeners().get(0).subscribes());
+		harness.configure("feeds = [ { name = googlebot, url = \"http://127.0.0.1:9/g.json\" } ]");
+		assertTrue("no feed checks claimants: no event is built for the plugin", harness.listeners().isEmpty());
+		harness.configure("feeds = [ { name = y, domains = [y.example] } ]");
+		assertEquals(1, harness.listeners().size());
 	}
 
 	@Test

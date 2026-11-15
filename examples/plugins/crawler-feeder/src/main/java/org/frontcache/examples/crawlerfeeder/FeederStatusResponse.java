@@ -21,10 +21,126 @@ import java.util.List;
 import org.frontcache.io.ActionResponse;
 
 /**
- * {@code crawler-feeder-status} (and {@code crawler-feeder-refresh}): one entry per feed. Written as JSON by the node
- * from the getters.
+ * {@code crawler-feeder-status} (and {@code crawler-feeder-refresh}): one entry per feed, and the claimant checks'
+ * counters. Written as JSON by the node from the getters. Never holds a claimant that was not confirmed - an address
+ * is personal data; a confirmed one is a crawler's, and is on the list anyway.
  */
 public class FeederStatusResponse extends ActionResponse {
+
+	/** A claimant confirmed by reverse DNS. Times are ISO-8601 instants. */
+	public record Confirmed(String address, String host, String confirmed, String until) {
+	}
+
+	/** What the reverse-DNS checks did since the plugin was loaded, and how they are configured. */
+	public static class Claimants {
+		private String keep;
+		private String retry;
+		private int maxVerified;
+		private long claims;
+		private long lookups;
+		private long confirmed;
+		private long refuted;
+		private long unknown;
+		private long dropped;
+		private long ignored;
+		private int pending;
+
+		/** How long a confirmation lasts. */
+		public String getKeep() {
+			return keep;
+		}
+
+		public void setKeep(String keep) {
+			this.keep = keep;
+		}
+
+		/** How long an address not confirmed is not looked up again. */
+		public String getRetry() {
+			return retry;
+		}
+
+		public void setRetry(String retry) {
+			this.retry = retry;
+		}
+
+		public int getMaxVerified() {
+			return maxVerified;
+		}
+
+		public void setMaxVerified(int maxVerified) {
+			this.maxVerified = maxVerified;
+		}
+
+		/** Matches of a claim rule delivered to the plugin. */
+		public long getClaims() {
+			return claims;
+		}
+
+		public void setClaims(long claims) {
+			this.claims = claims;
+		}
+
+		/** Checks made - each one or two lookups. */
+		public long getLookups() {
+			return lookups;
+		}
+
+		public void setLookups(long lookups) {
+			this.lookups = lookups;
+		}
+
+		public long getConfirmed() {
+			return confirmed;
+		}
+
+		public void setConfirmed(long confirmed) {
+			this.confirmed = confirmed;
+		}
+
+		/** A name outside the domains, or one that does not resolve back to the address. */
+		public long getRefuted() {
+			return refuted;
+		}
+
+		public void setRefuted(long refuted) {
+			this.refuted = refuted;
+		}
+
+		/** No name, or a lookup that failed. */
+		public long getUnknown() {
+			return unknown;
+		}
+
+		public void setUnknown(long unknown) {
+			this.unknown = unknown;
+		}
+
+		/** Claimants not checked because the queue was full. */
+		public long getDropped() {
+			return dropped;
+		}
+
+		public void setDropped(long dropped) {
+			this.dropped = dropped;
+		}
+
+		/** Claims whose address is not a public one (loopback, private, ...) - never looked up. */
+		public long getIgnored() {
+			return ignored;
+		}
+
+		public void setIgnored(long ignored) {
+			this.ignored = ignored;
+		}
+
+		public int getPending() {
+			return pending;
+		}
+
+		public void setPending(int pending) {
+			this.pending = pending;
+		}
+	}
 
 	/** One feed's state. Times are ISO-8601 instants, null when it never happened. */
 	public static class FeedStatus {
@@ -38,6 +154,11 @@ public class FeederStatusResponse extends ActionResponse {
 		private String lastError;
 		private int consecutiveFailures;
 		private long nextRunSeconds = -1;
+		private List<String> domains = List.of();
+		private List<String> rules = List.of();
+		private int verified;
+		private String writeError;
+		private List<Confirmed> confirmed = new ArrayList<>();
 
 		public String getName() {
 			return name;
@@ -122,9 +243,55 @@ public class FeederStatusResponse extends ActionResponse {
 		public void setNextRunSeconds(long nextRunSeconds) {
 			this.nextRunSeconds = nextRunSeconds;
 		}
+
+		/** The domains a claimant's reverse DNS name must be under; empty when the feed checks none. */
+		public List<String> getDomains() {
+			return domains;
+		}
+
+		public void setDomains(List<String> domains) {
+			this.domains = domains;
+		}
+
+		/** The guard rules whose matches report a claimant to this feed. */
+		public List<String> getRules() {
+			return rules;
+		}
+
+		public void setRules(List<String> rules) {
+			this.rules = rules;
+		}
+
+		/** Claimants confirmed by reverse DNS on the list now. */
+		public int getVerified() {
+			return verified;
+		}
+
+		public void setVerified(int verified) {
+			this.verified = verified;
+		}
+
+		/** Why the list was not rewritten after a confirmation or an expiry; null after a write. */
+		public String getWriteError() {
+			return writeError;
+		}
+
+		public void setWriteError(String writeError) {
+			this.writeError = writeError;
+		}
+
+		/** The newest confirmations, at most 20. */
+		public List<Confirmed> getConfirmed() {
+			return confirmed;
+		}
+
+		public void setConfirmed(List<Confirmed> confirmed) {
+			this.confirmed = confirmed;
+		}
 	}
 
 	private List<FeedStatus> feeds = new ArrayList<>();
+	private Claimants claimants = new Claimants();
 
 	public FeederStatusResponse() {
 	}
@@ -135,6 +302,14 @@ public class FeederStatusResponse extends ActionResponse {
 
 	public void setFeeds(List<FeedStatus> feeds) {
 		this.feeds = feeds;
+	}
+
+	public Claimants getClaimants() {
+		return claimants;
+	}
+
+	public void setClaimants(Claimants claimants) {
+		this.claimants = claimants;
 	}
 
 	/** The feed of that name, or null. */
