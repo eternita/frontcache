@@ -51,8 +51,22 @@ public interface RequestView {
 	 */
 	String clientAddress();
 
-	/** The {@code bots.conf} verdict - {@code bot}, {@code guest}, ... - or null while bots.conf itself is deciding. */
+	/**
+	 * The {@code bots.conf} verdict's ROOT - {@code bot} or {@code guest} - or null while bots.conf itself is deciding.
+	 * A request of a declared visitor type ({@code @type customer like guest}) is its base here; the type itself is
+	 * {@link #visitorType()}.
+	 */
 	String clientType();
+
+	/**
+	 * The {@code bots.conf} verdict as written - a type the node declares ({@code customer}), else the root, so equal
+	 * to {@link #clientType()} on a node that declares none - or null while bots.conf itself is deciding.
+	 *
+	 * @since 2.13.0; the default answers {@link #clientType()}, for a view built before it
+	 */
+	default String visitorType() {
+		return clientType();
+	}
 
 	/** {@code toplevel}, {@code include} or {@code include-async}. */
 	String requestType();

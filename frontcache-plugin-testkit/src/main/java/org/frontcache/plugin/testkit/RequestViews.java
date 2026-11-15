@@ -137,6 +137,7 @@ public final class RequestViews {
 		private Set<String> cookieNames;
 		private String clientAddress;
 		private String clientType;
+		private String visitorType;
 		private String requestType;
 
 		private Builder() {
@@ -188,6 +189,12 @@ public final class RequestViews {
 			return this;
 		}
 
+		/** A declared visitor type ({@code customer}); unset, the view's visitor type is its client type. */
+		public Builder visitorType(String visitorType) {
+			this.visitorType = visitorType;
+			return this;
+		}
+
 		/** {@code toplevel}, {@code include} or {@code include-async}. */
 		public Builder requestType(String requestType) {
 			this.requestType = requestType;
@@ -197,12 +204,13 @@ public final class RequestViews {
 		public RequestView build() {
 			return new View(method, uri, query, host, new TreeMap<>(headers),
 					(null == cookieNames) ? Set.of() : Collections.unmodifiableSet(new LinkedHashSet<>(cookieNames)),
-					clientAddress, clientType, requestType);
+					clientAddress, clientType, (null != visitorType) ? visitorType : clientType, requestType);
 		}
 	}
 
 	private record View(String method, String uri, String query, String host, Map<String, String> headers,
-			Set<String> cookieNames, String clientAddress, String clientType, String requestType) implements RequestView {
+			Set<String> cookieNames, String clientAddress, String clientType, String visitorType, String requestType)
+			implements RequestView {
 
 		@Override
 		public String header(String name) {

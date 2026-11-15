@@ -66,7 +66,8 @@ public final class CoreEvents {
 			return;
 		try {
 			FcEventBus.publish(new GuardMatched(System.currentTimeMillis(), node(), site, context.getRequestId(), rule,
-					disposition, status, uri(context), context.getClientType(), context.getRateLimitKey()));
+					disposition, status, uri(context), context.getClientType(), context.getRateLimitKey(),
+					context.getVisitorType()));
 		} catch (RuntimeException e) {
 			// a request view that cannot answer (a recycled request) is no reason to fail the request
 		}
@@ -78,7 +79,8 @@ public final class CoreEvents {
 			return;
 		try {
 			FcEventBus.publish(new ChallengeIssued(System.currentTimeMillis(), node(), site, context.getRequestId(), rule,
-					provider, plugin, uri(context), context.getClientType(), context.getRateLimitKey()));
+					provider, plugin, uri(context), context.getClientType(), context.getRateLimitKey(),
+					context.getVisitorType()));
 		} catch (RuntimeException e) {
 			// as above
 		}
@@ -198,7 +200,8 @@ public final class CoreEvents {
 			FcEventBus.publish(new RequestCompleted(System.currentTimeMillis(), node(), site, context.getRequestId(),
 					method, uri(context), error ? "error" : "success", cacheable, cache, runtimeMillis, lengthBytes,
 					context.getRateLimitKey(), context.getClientType(), context.getClientTypeRule(),
-					truncate(context.getUserAgent()), error ? context.getFallbackReason() : null), draw);
+					truncate(context.getUserAgent()), error ? context.getFallbackReason() : null,
+					context.getVisitorType()), draw);
 		} catch (RuntimeException e) {
 			// a request view that cannot answer (a recycled request) is no reason to fail the request
 		}

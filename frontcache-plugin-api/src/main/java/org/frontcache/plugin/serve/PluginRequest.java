@@ -81,8 +81,18 @@ public interface PluginRequest {
 	 */
 	String clientAddress();
 
-	/** The node's verdict on the visitor, from {@code bots.conf}: {@code bot}, {@code guest}, ... */
+	/** The node's verdict on the visitor, from {@code bots.conf}, as its root: {@code bot} or {@code guest}. */
 	String clientType();
+
+	/**
+	 * The node's verdict as written - a visitor type {@code bots.conf} declares ({@code captcha-passed}), else the
+	 * root, as {@link #clientType()}.
+	 *
+	 * @since 2.13.0; the default answers {@link #clientType()}, for a request built before it
+	 */
+	default String visitorType() {
+		return clientType();
+	}
 
 	/** The request's id, as the request log and every event carry it. */
 	String requestId();

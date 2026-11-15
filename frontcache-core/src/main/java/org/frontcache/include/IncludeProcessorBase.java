@@ -313,6 +313,33 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		return INCLUDE_TYPE_SYNC; // default
 	}
 
+	/**
+	 * The include's {@code client="..."} as a selector - names select by is-a, a comma list any of them, {@code !name}
+	 * excludes ({@link org.frontcache.bots.ClientSelector}).
+	 *
+	 * @return the selector, or null - resolve for everyone: no attribute, or no name this node knows
+	 */
+	protected org.frontcache.bots.ClientSelector getIncludeClientSelector(String content)
+	{
+		final String START_MARKER = "client=\"";
+		int startIdx = content.indexOf(START_MARKER);
+		if (-1 == startIdx)
+			return null; // no attribute - the common case
+
+		int endIdx = content.indexOf("\"", startIdx + START_MARKER.length());
+		if (-1 == endIdx)
+			return null; // can't find closing
+
+		return org.frontcache.bots.ClientSelector.parse(content.substring(startIdx + START_MARKER.length(), endIdx),
+				org.frontcache.bots.VisitorTypes.active());
+	}
+
+	/**
+	 * @return {@code bot} or {@code guest} when {@code client="..."} names exactly that root, else null
+	 * @deprecated a {@code client=} may name declared visitor types, a list and exclusions -
+	 *             {@link #getIncludeClientSelector(String)} reads all of it; this reads the two roots only
+	 */
+	@Deprecated
 	protected String getIncludeClientType(String content)
 	{
 		logger.debug("include tag - " + content);
@@ -443,11 +470,11 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			String clientType = context.getClientType(); // bot | guest
 			Map<String, Long> expireTimeMap = webResponse.getExpireTimeMap();
 
-			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);
+			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, context.getVisitorType(), clientType);
 
 			// if data is cacheable for client type -> check data for expiration (only)
 			// if data is dynamic for client type -> no expiration / invalidation check
-			if (isCacheableForClientType && FCUtils.isWebComponentExpired(expireTimeMap, clientType))
+			if (isCacheableForClientType && FCUtils.isWebComponentExpired(expireTimeMap, context.getVisitorType(), clientType))
 			{
 
 				String refreshType = webResponse.getRefreshType();
@@ -690,7 +717,7 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 		if (!webResponse.isCacheable())
 			return false;
 
-		if (!FCUtils.isWebComponentCacheableForClientType(webResponse.getExpireTimeMap(), context.getClientType()))
+		if (!FCUtils.isWebComponentCacheableForClientType(webResponse.getExpireTimeMap(), context.getVisitorType(), context.getClientType()))
 			return false;
 
 		return !isDynamicURL(webResponse.getUrl());

@@ -106,6 +106,17 @@ public class FCHeaders {
     public static final String X_FRONTCACHE_CLIENT_TYPE = "x-frontcache-client-type";
 
     /**
+     * The visitor type the node serving the PAGE decided - the leaf, a type bots.conf declares, beside its root in
+     * {@link #X_FRONTCACHE_CLIENT_TYPE} - on an {@code <fc:include>} fetch, and so also what the origin sees. Honoured
+     * under the same conditions as {@link #X_FRONTCACHE_CLIENT_TYPE}, plus one: the leaf's base on this node must be
+     * the root that came with it, else the root is adopted alone.
+     *
+     * <b>Dropped by {@code FCUtils.isIncludedHeader}</b>, like the root: a client that could send it would pick its own
+     * type - with a {@code captcha-passed} type, a guard bypass.
+     */
+    public static final String X_FRONTCACHE_VISITOR_TYPE = "x-frontcache-visitor-type";
+
+    /**
      * The cache warmer's credential on a warm request - see {@code org.frontcache.warmer.WarmRequest}.
      *
      * Every header whose name starts with this one is dropped by {@code FCUtils.isIncludedHeader}, so

@@ -204,8 +204,9 @@ public class BotClassifierTest {
 	// ---- what the file refuses ---------------------------------------------------------------
 
 	@Test
-	public void aThirdClientTypeIsRefused() {
-		assertRefused("suspect | ua~(?i)curl | suspect", "not a client type");
+	public void anUndeclaredVisitorTypeIsRefused() {
+		// a verdict is a root or a type the same file declares - never a free string (VisitorTypesTest has the rest)
+		assertRefused("suspect | ua~(?i)curl | suspect", "not a visitor type");
 	}
 
 	@Test

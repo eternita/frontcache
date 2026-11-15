@@ -57,6 +57,16 @@ shortest time sets how often the origin renders, and the longer ones say which c
 have to trigger a render - on a page with steady guest traffic bots ride along on the copy guests
 already paid for, and on a long tail page with no guest traffic the entry ages to the full bot time.
 
+Visitor types declared in `bots.conf` (`@type customer like guest`, 2.13.0) can be named the same way. A declared
+type the value does not name gets its base's time - not "not cached" - so an entry written before the type existed
+still serves it:
+
+        maxage="bot:30d, guest:1h, customer:0" - customers always reach the origin, every other guest-based type gets 1 hour
+        maxage="bot:30d, bot-whitelisted:forever" - verified crawlers forever, other bots 30 days, guests not cached
+
+If the origin renders a page differently for a type, that type must have `:0` on that page: there is one cached copy
+for everyone, and a customer's render stored in it would be served to every guest.
+
 Lists need 2.9.0 or later on every node. Reaching an older node, a list takes the page out of cache
 entirely, so upgrade the nodes before the pages.
 
@@ -81,17 +91,24 @@ Attributes:
 Attribute | Description
 --- | --- 
 **url** | data to be included, mandatory
-**client** | set if include is client type specific, optional, default value is "all"
+**client** | the visitor types the include is resolved for, optional, default value is "all"
 **call** | set if include is executed synchronously or asynchronously, optional, default is "sync"
 **combine** | set if the include may be batched with its siblings into one origin call, optional, default - not combinable
 
 * **url** - data to be included. Attribute is mandatory.
 
-* **client** - Set if include is client type specific. Options are "guest", "bot", "all". Attribute is optional, default value is "all".
+* **client** - Set if include is client type specific. Options are "guest", "bot", "all", and (2.13.0) any visitor type `bots.conf` declares, a comma-separated list of them, and a name prefixed `!` to exclude it. Attribute is optional, default value is "all".
 
-        client="bot" include is performed for bots only
-        client="guest" include is performed for guests only
+        client="bot" include is performed for bots only (and every type declared 'like bot')
+        client="guest" include is performed for guests only (and every type declared 'like guest')
         client="all" include is performed for all client types (default)
+        client="customer" include is performed for customers only
+        client="customer, captcha-passed" include is performed for either
+        client="!customer" include is performed for everyone but customers - the generic twin of a client="customer" fragment
+        client="guest, !customer" include is performed for guests who are not customers
+
+  A name the node does not know is ignored with a warning, and a value with no known name is "all" - so update the
+  nodes and `bots.conf` before the pages: an older node renders a `client="customer"` fragment for everyone.
 
 * **call** - Set if include is executed synchronously or asynchronously. Options are "sync", "async". Attribute is optional, default value is "sync".
 

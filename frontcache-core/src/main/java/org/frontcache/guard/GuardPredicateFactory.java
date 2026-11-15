@@ -125,6 +125,15 @@ public class GuardPredicateFactory {
 	 */
 	public static GuardPredicate parse(String expression, Scope scope)
 	{
+		return parse(expression, scope, org.frontcache.bots.VisitorTypes.active());
+	}
+
+	/**
+	 * @param visitorTypes the vocabulary {@code client-type:} is checked against - the node's loaded one, or, for a
+	 *                     validator with no node (the portal), the declarations of the bots.conf beside the rules
+	 */
+	public static GuardPredicate parse(String expression, Scope scope, org.frontcache.bots.VisitorTypes visitorTypes)
+	{
 		String expr = (null != expression) ? expression.trim() : "";
 		if (0 == expr.length())
 			throw new GuardConfigException("empty predicate");
@@ -136,7 +145,7 @@ public class GuardPredicateFactory {
 			expr = expr.substring(1).trim();
 		}
 
-		GuardPredicate predicate = parsePositive(expr, scope);
+		GuardPredicate predicate = parsePositive(expr, scope, visitorTypes);
 
 		if (!negated)
 			return predicate;
@@ -167,7 +176,7 @@ public class GuardPredicateFactory {
 		};
 	}
 
-	private static GuardPredicate parsePositive(String expr, Scope scope)
+	private static GuardPredicate parsePositive(String expr, Scope scope, org.frontcache.bots.VisitorTypes visitorTypes)
 	{
 		// The one predicate that takes no argument: it asks about the hop, not about the request's
 		// content. Checked first, so the type:value / type~regex parsing below never sees it.
@@ -233,8 +242,17 @@ public class GuardPredicateFactory {
 						+ " - classification is what computes the client type, so a rule reading it here is circular."
 						+ " Write the classification here and the reaction in guard-rules.conf");
 
-			final String clientType = arg;
-			return simplePredicate(expr, ctx -> clientType.equals(ctx.getClientType()));
+			// is-a: a request is its visitor type and that type's root, so client-type:guest keeps matching every
+			// type 'like guest' and no existing rule loses part of its population. "Plain guests" is a negation:
+			// client-type:guest ; !client-type:customer.
+			final String name = arg.toLowerCase(java.util.Locale.ROOT);
+			org.frontcache.bots.VisitorTypes types = visitorTypes;
+			if (!types.isKnown(name))
+				throw new GuardConfigException("'" + expr + "' names no visitor type this node knows - expected "
+						+ types.describeKnown() + ", or a type bots.conf declares with '"
+						+ org.frontcache.bots.VisitorTypes.DIRECTIVE + " " + name + " like <bot|guest>'"
+						+ ("browser".equals(name) ? " ('browser' was renamed to 'guest' in 2.9.0)" : ""));
+			return simplePredicate(expr, ctx -> org.frontcache.bots.VisitorTypes.isA(ctx.getVisitorType(), ctx.getClientType(), name));
 		}
 
 		case "ua-contains":

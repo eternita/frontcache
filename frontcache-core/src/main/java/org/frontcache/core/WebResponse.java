@@ -260,6 +260,14 @@ public class WebResponse implements Serializable {
 	 *
 	 * A value with no prefix at all is the exception, and stays the common case: one TTL, both types.
 	 *
+	 * <h2>Declared visitor types</h2>
+	 *
+	 * A type {@code bots.conf} declares ({@code @type customer like guest}) may be named like a root -
+	 * {@code bot:30d, guest:1h, customer:0} - and is stored only when named. <b>For a declared type absent means
+	 * inherit</b>: a request reads its own key, else its base's (VisitorTypes.ttl), and the roots are always in the
+	 * map, so an entry written before the type existed still answers it. An absent ROOT stays NO_CACHE. A type the
+	 * node does not declare is unknown, exactly as before.
+	 *
 	 * <h2>Two live TTLs share ONE entry</h2>
 	 *
 	 * The cache key has no client-type dimension, so {@code bot:30d, guest:1d} is one cached copy
@@ -339,6 +347,7 @@ public class WebResponse implements Serializable {
 		}
 
 		long expireTime = toExpireTimeMillis(maxAgeTime);
+		org.frontcache.bots.VisitorTypes visitorTypes = org.frontcache.bots.VisitorTypes.active();
 
 		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(maxAgeClientType))
 		{
@@ -350,14 +359,20 @@ public class WebResponse implements Serializable {
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, expireTime);
 			// bot stays NO_CACHE
 
+		} else if (null != maxAgeClientType && visitorTypes.isKnown(maxAgeClientType)) {
+
+			// a declared visitor type: its own key only - both roots stay NO_CACHE, so every other type (its
+			// base's included) goes to the origin. VisitorTypes.ttl reads the leaf first.
+			this.expireTimeMap.put(maxAgeClientType, expireTime);
+
 		} else {
 			// No prefix - the common case, same TTL for both. A prefix we do not recognize lands here
 			// too, and that is a config error worth naming: the caller asked for a split and is
 			// getting the opposite of one. 'browser:' is the likely spelling, renamed to 'guest:'.
 			if (null != maxAgeClientType)
 				logger.warn("Unknown client type '" + maxAgeClientType + "' in maxAge=\"" + maxAgeStr
-						+ "\" for " + url + " - expected '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '"
-						+ FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'. Caching for BOTH client types.");
+						+ "\" for " + url + " - expected " + visitorTypes.describeKnown()
+						+ ". Caching for BOTH client types.");
 
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_BOT, expireTime);
 			this.expireTimeMap.put(FCHeaders.REQUEST_CLIENT_TYPE_GUEST, expireTime);
@@ -373,6 +388,7 @@ public class WebResponse implements Serializable {
 	private void setListExpireTime(String maxAgeStr, String value) {
 
 		Set<String> seenClientTypes = new HashSet<String>();
+		org.frontcache.bots.VisitorTypes visitorTypes = org.frontcache.bots.VisitorTypes.active();
 
 		for (String rawEntry : value.split(","))
 		{
@@ -394,14 +410,13 @@ public class WebResponse implements Serializable {
 			if ("".equals(maxAgeTime))
 				maxAgeTime = "0";
 
-			if (!FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(clientType)
-					&& !FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equals(clientType))
+			if (!visitorTypes.isKnown(clientType))
 			{
 				// NOT the single-value behaviour of caching for both: a list is an explicit request
 				// for a split, so 'cache for everyone' is the one outcome the author did not ask for.
 				logger.warn("Unknown client type '" + clientType + "' in maxAge=\"" + maxAgeStr + "\" for "
-						+ url + " - expected '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '"
-						+ FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'. Entry ignored, that client type is NOT cached.");
+						+ url + " - expected " + visitorTypes.describeKnown()
+						+ ". Entry ignored, that client type is NOT cached.");
 				continue;
 			}
 

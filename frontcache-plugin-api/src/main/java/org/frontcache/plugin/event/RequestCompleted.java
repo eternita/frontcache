@@ -32,16 +32,26 @@ package org.frontcache.plugin.event;
  * @param runtimeMillis how long it took
  * @param lengthBytes   the response body's length
  * @param clientKey     the client's resolved address; personal data, see {@link FcEvent}
- * @param clientType    the bots.conf verdict - {@code bot}, {@code guest}, ...; may be null
+ * @param clientType    the bots.conf verdict's root - {@code bot} or {@code guest}; may be null
  * @param clientRule    the bots.conf rule that decided it, or null
  * @param userAgent     the User-Agent header, truncated to {@value FcEvent#MAX_URI_LENGTH}; may be null
  * @param fallbackReason why a fallback was served, when {@code outcome} is {@code error}; null otherwise
+ * @param visitorType   the bots.conf verdict as written - a declared type, else {@code clientType}; may be null
+ *                      (2.13.0)
  */
 public record RequestCompleted(long time, String node, String site, String requestId, String method, String uri,
 		String outcome, boolean cacheable, String cache, long runtimeMillis, long lengthBytes, String clientKey,
-		String clientType, String clientRule, String userAgent, String fallbackReason) implements FcEvent {
+		String clientType, String clientRule, String userAgent, String fallbackReason, String visitorType) implements FcEvent {
 
 	public static final String TYPE = "request.completed";
+
+	/** The constructor before {@code visitorType}: a request of a root type, {@code visitorType} = {@code clientType}. */
+	public RequestCompleted(long time, String node, String site, String requestId, String method, String uri,
+			String outcome, boolean cacheable, String cache, long runtimeMillis, long lengthBytes, String clientKey,
+			String clientType, String clientRule, String userAgent, String fallbackReason) {
+		this(time, node, site, requestId, method, uri, outcome, cacheable, cache, runtimeMillis, lengthBytes, clientKey,
+				clientType, clientRule, userAgent, fallbackReason, clientType);
+	}
 
 	/** The share of requests a subscriber receives unless {@code front-cache.plugins.<id>.request-sample} says. */
 	public static final double DEFAULT_SAMPLE = 0.01;

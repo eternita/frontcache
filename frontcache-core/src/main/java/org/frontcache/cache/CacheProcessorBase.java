@@ -131,7 +131,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 			String clientType = context.getClientType(); // bot | guest
 			Map<String, Long> expireTimeMap = cachedWebResponse.getExpireTimeMap();
 
-			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);
+			isCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, context.getVisitorType(), clientType);
 
 			if (isCacheableForClientType && isWarmRequest && WarmRequest.MODE_REFRESH.equals(context.getWarmMode()))
 			{
@@ -143,7 +143,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 			// if data is cacheable for client type -> check data for expiration (only)
 			// if data is dynamic for client type -> no expiration / invalidation check
-			} else if (isCacheableForClientType && FCUtils.isWebComponentExpired(expireTimeMap, clientType))
+			} else if (isCacheableForClientType && FCUtils.isWebComponentExpired(expireTimeMap, context.getVisitorType(), clientType))
 			{
 
 				String refreshType = cachedWebResponse.getRefreshType();
@@ -194,7 +194,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 				String clientType = context.getClientType(); // bot | guest
 				Map<String, Long> expireTimeMap = cachedWebResponse.getExpireTimeMap();
 
-				boolean isFreshDataCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, clientType);
+				boolean isFreshDataCacheableForClientType = FCUtils.isWebComponentCacheableForClientType(expireTimeMap, context.getVisitorType(), clientType);
 
 				lengthBytes = cachedWebResponse.getContentLenth();
 
