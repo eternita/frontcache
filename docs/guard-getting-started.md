@@ -39,7 +39,7 @@ curl -H "Authorization: Bearer <your-api-key>" "http://<edge>/frontcache-io?acti
 ## 2. The format
 
 ```
-<name> | <condition> | <action> [| dry-run] [| on-error=allow]
+<name> | <condition> | <action> [| dry-run] [| on-error=allow] [| trap]
 ```
 
 - **name** — a short slug you choose. It is what you will see in the console, in the
@@ -51,6 +51,9 @@ curl -H "Authorization: Bearer <your-api-key>" "http://<edge>/frontcache-io?acti
   alone. Always start here (§6).
 - **on-error=allow** — only on an `allow` rule naming a plugin's `ext:` condition, and
   required there (§4.3).
+- **trap** — optional. The rule is a honeypot: it matches a visitor's own requests only, and
+  its log line names the address the node resolved (§4.4, since 2.13.0). Not on an `allow`
+  rule.
 
 Rules run **top to bottom, first match wins**, after the two built-ins. Blank lines
 and `#` comments are ignored.
@@ -287,6 +290,68 @@ plugin writes starts with `# managed by plugin <id>`; a plugin never overwrites 
 without its own marker, so a list you keep by hand is safe there. A rule reload re-reads a
 `lists/` file whose size or date changed.
 
+### 4.4 A honeypot: `trap`
+
+A honeypot is a path **no visitor is ever sent to**: a link nobody can see, to a path your
+`robots.txt` forbids. A person never follows it, a search engine is told not to — so
+whoever fetches it is a crawler that ignores `robots.txt` (many read it precisely to find
+such paths) or a scanner walking your site. One request is enough to know.
+
+1. **`robots.txt`** (your origin's) — and then **wait a day** before step 2: crawlers keep
+   a copy of `robots.txt`, and one that has not seen the new line yet is not misbehaving.
+
+   ```
+   User-agent: *
+   Disallow: /no-crawl/
+   ```
+
+2. **The bait**, in your page template — hidden from people, from screen readers and from
+   the keyboard, and marked not to be followed:
+
+   ```html
+   <a href="/no-crawl/" rel="nofollow" style="display:none" aria-hidden="true" tabindex="-1">.</a>
+   ```
+
+3. **The rule**, below your exemptions (§3) — and below any `allow` rule for the crawlers
+   you verify (§4.3), so a verified crawler that strays there is never counted:
+
+   ```
+   honeypot | uri~^/no-crawl/ | reject:404 Not Found | trap
+   ```
+
+The node answers the trap itself — a one-line 404, `no-store`, the origin never asked —
+and `trap` does two things:
+
+- **The log names the address you can act on.** The guard log's reason is
+  `honeypot#203.0.113.7`: the address the node resolved through
+  `front-cache.client-ip.trusted-proxies` (§5.1), the one a `client-ip:` rule matches. The
+  line's client-IP column is best effort — the first forwarding header, whoever wrote it —
+  so a scanner sending `X-Forwarded-For: <someone else>` would otherwise have you block
+  someone else. Set the trusted proxies first, or every visitor is your proxy.
+- **Only a visitor's request is a hit.** An `<fc:include>` of the path re-enters the engine
+  with the visitor's address but is your origin's page asking, so it never matches a trap
+  rule: a template that included the trap path by mistake would otherwise catch everyone
+  who opened that page.
+
+With `| dry-run` the trap observes only — the request goes to your origin as before, and the
+log line still names the address (`honeypot:dry-run#203.0.113.7`).
+
+**What happens to the address** is up to you. The rule refuses the trap and nothing else,
+by design: one fetch of a hidden link is strong evidence, but a shared address (an office, a
+mobile carrier's NAT) holds many people. The log line says who; the rule's **Hits** on the
+console's Guard Rules screen and `frontcache_guard_actions_total{name="honeypot"}` say how
+often. A plugin observing `guard.matched` events can put the address on a list for a while
+(§4.3), and a rule of yours decides what a listed address gets — `reject:403`, or, gentler
+for a shared address, a challenge (§4.2):
+
+```
+honeypot | uri~^/no-crawl/             | reject:404 Not Found | trap
+listed   | client-ip:@lists/banned.txt | challenge pow else reject:403
+```
+
+Never point a trap at a path a real page links to visibly, and never at one your own tools
+fetch (a link checker, a warmer list, an uptime monitor) — they would be the first caught.
+
 ---
 
 ## 5. Rate limiting: how often, not what
@@ -473,7 +538,8 @@ status sent:
 For a **rate rule** the reason field carries the address that was counted, as
 `<rule>#<address>` — `"ip-flood#203.0.113.7"` — because the limiter's resolved address
 (§5.1) and the log's own client-IP column can legitimately differ, and telling them apart
-is the whole of debugging a 429. A Kibana pipeline aggregating on `reason` should split it
+is the whole of debugging a 429. A **trap** (§4.4) records its address the same way, dry-run
+included (`"honeypot:dry-run#203.0.113.7"`). A Kibana pipeline aggregating on `reason` should split it
 on `#` so the by-rule panels keep counting rules rather than one term per client.
 
 **Metrics** — with `front-cache.metrics.export` on

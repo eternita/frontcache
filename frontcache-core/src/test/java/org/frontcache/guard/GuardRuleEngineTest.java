@@ -441,6 +441,111 @@ public class GuardRuleEngineTest {
 			assertEquals("rule " + rule.getName() + " counted a startup probe", 0, rule.getHits());
 	}
 
+	// ---- trap: a honeypot rule ---------------------------------------------------------------
+
+	private static final GuardRuleParser PARSER = new GuardRuleParser(java.util.Collections.<String>emptySet());
+
+	/**
+	 * A trap is a client's request to a path no visitor is ever sent to. An {@code <fc:include>} of it carries the
+	 * visitor's address but is the origin's page asking - an origin page that included the trap path would otherwise
+	 * tag every visitor of that page.
+	 */
+	@Test
+	public void aTrapMatchesAClientsRequestNeverAnInclude() {
+		GuardRule trap = PARSER.parse("honeypot | uri~^/no-crawl/ | reject:404 | trap");
+		GuardRule plain = PARSER.parse("plain | uri~^/no-crawl/ | reject:404");
+
+		RequestContext request = probeRequestContext("/no-crawl/a.htm", "203.0.113.7");
+		assertTrue("a load-time probe has no request type, and sees a trap as any other rule", trap.matches(request));
+
+		request.setRequestType(FCHeaders.COMPONENT_TOPLEVEL);
+		assertTrue(trap.matches(request));
+
+		for (String include : List.of(FCHeaders.COMPONENT_INCLUDE, "include-async"))
+		{
+			request.setRequestType(include);
+			assertFalse(include, trap.matches(request));
+			assertTrue("only a trap skips includes", plain.matches(request));
+		}
+	}
+
+	/**
+	 * Who fell into the trap is the one thing a trap answers, so its log line names the address this node resolved -
+	 * through the trusted proxies, as the limiter and client-ip: do - never the log's best-effort client-IP column,
+	 * which is whatever the first forwarding header says, i.e. whatever the scanner wrote.
+	 */
+	@Test
+	public void aTrapsLogReasonNamesTheResolvedAddressNotAForgedOne() {
+		ClientIpResolver.install(new ClientIpResolver("", "X-Forwarded-For"));
+		try {
+			GuardRule trap = PARSER.parse("honeypot | uri~^/no-crawl/ | reject:404 | trap");
+			RequestContext forged = request("/no-crawl/a.htm", "203.0.113.7", "192.0.2.66");
+
+			assertEquals("honeypot#203.0.113.7", trap.logReason(forged, false));
+			assertEquals("a dry-run trap names the address too", "honeypot:dry-run#203.0.113.7",
+					trap.logReason(forged, true));
+
+			GuardRule plain = PARSER.parse("plain | uri~^/no-crawl/ | reject:404");
+			assertEquals("any other rule's reason is its name, as before", "plain", plain.logReason(forged, false));
+			assertEquals("plain:dry-run", plain.logReason(forged, true));
+		} finally {
+			ClientIpResolver.reload();
+		}
+
+		ClientIpResolver.install(new ClientIpResolver("127.0.0.1", "X-Forwarded-For"));
+		try {
+			GuardRule trap = PARSER.parse("honeypot | uri~^/no-crawl/ | reject:404 | trap");
+			assertEquals("from a trusted proxy, the address it forwarded", "honeypot#192.0.2.66",
+					trap.logReason(request("/no-crawl/a.htm", "127.0.0.1", "192.0.2.66"), false));
+		} finally {
+			ClientIpResolver.reload();
+		}
+	}
+
+	/** The rate rule's reason is unchanged by the trap: its address on a refusal, none on a dry-run line. */
+	@Test
+	public void aRateRulesLogReasonIsAsItWas() {
+		ClientIpResolver.install(new ClientIpResolver("", "X-Forwarded-For"));
+		try {
+			GuardRule apiFlood = ruleByName("api-flood");
+			RequestContext refused = apiRequest("203.0.113.8");
+			assertEquals("api-flood", apiFlood.logReason(refused, false));
+			refused.setGuardRetryAfterSeconds(5);
+			assertEquals("api-flood#203.0.113.8", apiFlood.logReason(refused, false));
+			assertEquals("api-flood:dry-run", apiFlood.logReason(refused, true));
+		} finally {
+			ClientIpResolver.reload();
+		}
+	}
+
+	/** A top-level request from {@code remoteAddr} carrying {@code X-Forwarded-For: forwardedFor}. */
+	private static RequestContext request(String uri, final String remoteAddr, final String forwardedFor) {
+		RequestContext context = new RequestContext();
+		context.setFrontCacheProtocol("https");
+		context.setFrontCacheHost("www.example-site.com");
+		context.setRequestURI(uri);
+		context.setRequestQueryString("");
+		context.setRequestType(FCHeaders.COMPONENT_TOPLEVEL);
+		context.setRequest((HttpServletRequest) Proxy.newProxyInstance(GuardRuleEngineTest.class.getClassLoader(),
+				new Class[] { HttpServletRequest.class }, (proxy, method, args) -> {
+					switch (method.getName())
+					{
+					case "getRemoteAddr":
+						return remoteAddr;
+					case "getHeader":
+						return "X-Forwarded-For".equalsIgnoreCase((String) args[0]) ? forwardedFor : null;
+					case "getHeaders":
+						return java.util.Collections.enumeration("X-Forwarded-For".equalsIgnoreCase((String) args[0])
+								? List.of(forwardedFor) : List.<String>of());
+					case "getMethod":
+						return "GET";
+					default:
+						return null;
+					}
+				}));
+		return context;
+	}
+
 	/**
 	 * A top-level request to /api from one address. Rate limiting keys on the socket peer here (the
 	 * test installs a resolver with no trusted proxies), and only counts toplevel requests.

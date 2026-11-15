@@ -1140,7 +1140,7 @@ public class FrontCacheEngine {
 		// dry-run rules only observe: they are logged, then the request carries on
 		for (GuardRule dryRunRule : guardOutcome.getDryRunMatches())
 		{
-			logGuardAction(context, dryRunRule.getName() + ":dry-run", 0, GuardAction.DISPOSITION_DRY_RUN);
+			logGuardAction(context, dryRunRule.logReason(context, true), 0, GuardAction.DISPOSITION_DRY_RUN);
 			CoreEvents.guardMatched(context, dryRunRule.getName(), GuardAction.DISPOSITION_DRY_RUN, 0);
 		}
 
@@ -1203,31 +1203,12 @@ public class FrontCacheEngine {
 			logger.debug("Error writing guard rule '" + rule.getName() + "' response (" + status + "): " + e);
 		}
 
-		logGuardAction(context, guardReason(context, rule), status, action.getDisposition());
+		logGuardAction(context, rule.logReason(context, false), status, action.getDisposition());
 		// after the response is written: an observing plugin learns of it, it never takes part in it
 		CoreEvents.guardMatched(context, rule.getName(), action.getDisposition(), status);
 		if (GuardAction.Type.CHALLENGE == action.getType())
 			CoreEvents.challengeIssued(context, rule.getName(), action.getProvider(), outcome.getChallengePlugin());
 		return;
-	}
-
-	/**
-	 * The reason column of the guard log line: the rule name, and for a rate-limit rule the address
-	 * that was actually counted, as "&lt;rule&gt;#&lt;address&gt;".
-	 *
-	 * The limiter resolves the client address differently from FCUtils.getClientIP() - it reads a
-	 * forwarding header only from a configured trusted proxy - so the two CAN disagree, and the log's
-	 * own client-IP column may name an address the limiter refused to trust. "Which address was
-	 * counted?" is the first question anyone debugging a 429 asks, so it is recorded rather than left
-	 * to be inferred.
-	 */
-	private String guardReason(RequestContext context, GuardRule rule)
-	{
-		if (0 == context.getGuardRetryAfterSeconds())
-			return rule.getName();
-
-		String limiterKey = context.getRateLimitKey();
-		return (null != limiterKey) ? rule.getName() + "#" + limiterKey : rule.getName();
 	}
 
 	/**

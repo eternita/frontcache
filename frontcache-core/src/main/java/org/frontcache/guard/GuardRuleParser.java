@@ -28,7 +28,7 @@ import org.frontcache.guard.ratelimit.RateLimitPredicate;
  *
  * Line format (see docs/guard-getting-started.md):
  *
- *   &lt;name&gt; | &lt;predicate&gt; ; &lt;predicate&gt; ... | &lt;action&gt; [| dry-run] [| on-error=allow]
+ *   &lt;name&gt; | &lt;predicate&gt; ; &lt;predicate&gt; ... | &lt;action&gt; [| dry-run] [| on-error=allow] [| trap]
  *
  * A {@code rate:} predicate is moved to the END of its condition here (see
  * {@link #parseCondition}); a rule may hold at most one.
@@ -52,6 +52,13 @@ public class GuardRuleParser {
 	 * so the exemption does not apply to that request.
 	 */
 	public static final String ON_ERROR_ALLOW = "on-error=allow";
+
+	/**
+	 * The flag of a honeypot rule - a path no visitor is ever sent to, whose fetch identifies the client: the rule
+	 * matches a client's request only, never an include, and its log line names the address this node resolved
+	 * ({@link GuardRule#logReason}). Refused on an {@code allow} rule, which records nothing.
+	 */
+	public static final String TRAP = "trap";
 
 	/** A provider's name - as a plugin's manifest names it in {@code challenges}. */
 	private static final java.util.regex.Pattern PROVIDER = java.util.regex.Pattern.compile("[a-z][a-z0-9-]{0,30}");
@@ -89,6 +96,7 @@ public class GuardRuleParser {
 
 		boolean dryRun = false;
 		boolean onErrorAllow = false;
+		boolean trap = false;
 		for (int i = 3; i < parts.size(); i++)
 		{
 			String flag = parts.get(i).trim();
@@ -96,14 +104,19 @@ public class GuardRuleParser {
 				dryRun = true;
 			else if (ON_ERROR_ALLOW.equalsIgnoreCase(flag.replace(" ", "")) && !onErrorAllow)
 				onErrorAllow = true;
+			else if (TRAP.equalsIgnoreCase(flag) && !trap)
+				trap = true;
 			else if (0 < flag.length())
-				throw new GuardConfigException("unknown or repeated flag '" + flag + "' in '" + line + "' (the flags are 'dry-run' and '"
-						+ ON_ERROR_ALLOW + "')");
+				throw new GuardConfigException("unknown or repeated flag '" + flag + "' in '" + line + "' (the flags are 'dry-run', '"
+						+ ON_ERROR_ALLOW + "' and '" + TRAP + "')");
 		}
 
 		checkPluginPredicates(predicates, action, onErrorAllow, line);
+		if (trap && GuardAction.Type.ALLOW == action.getType())
+			throw new GuardConfigException("'" + TRAP + "' is for a rule that answers the request - reject, redirect or"
+					+ " challenge, or a dry run of one - not an allow rule, which records nothing, in '" + line + "'");
 
-		return new GuardRule(name, predicates, action, dryRun, onErrorAllow);
+		return new GuardRule(name, predicates, action, dryRun, onErrorAllow, trap);
 	}
 
 	/**
