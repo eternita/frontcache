@@ -15,9 +15,6 @@
  */
 package org.frontcache.console.web.controllers;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -27,8 +24,10 @@ import org.frontcache.console.auth.ConsoleAuditor;
 import org.frontcache.console.auth.ConsolePermissions;
 import org.frontcache.console.auth.ConsolePermit;
 import org.frontcache.console.auth.EdgeScope;
+import org.frontcache.console.model.CacheEntryExpiry;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.console.service.UnknownEdgeException;
+import org.frontcache.bots.VisitorTypeEntry;
 import org.frontcache.core.WebResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.servlet.http.HttpServletRequest;
@@ -45,8 +44,6 @@ public class CacheViewController {
 
 	@Autowired
 	private FrontcacheService frontcacheService;
-
-	private static final DateFormat YYYY_MM_dd_HH_mm_ss_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
 
 	@RequestMapping(method = RequestMethod.GET)
@@ -89,26 +86,12 @@ public class CacheViewController {
 
 			model.addAttribute("invalidationTags", webResponse.getTags());
 
-			Map<String, Long> expireTimeMap = webResponse.getExpireTimeMap();
-			StringBuffer expirationDateSb = new StringBuffer();
-
-			for (String clientType : expireTimeMap.keySet())
-			{
-				long expirationDate = expireTimeMap.get(clientType);
-
-				String expirationDateStr = "UNDEFINED";
-				if (-1 == expirationDate)
-					expirationDateStr = "DOES NOT EXPIRE";
-				else if (0 == expirationDate)
-					expirationDateStr = "DYNAMIC"; // never cached (should never happened)
-				else
-					expirationDateStr = YYYY_MM_dd_HH_mm_ss_DF.format(new Date(expirationDate));
-
-				expirationDateSb.append(expirationDateStr).append(" ");
-
-			}
-
-			model.addAttribute("expirationDateStr", expirationDateSb.toString());
+			// A row per type the edge knows, with the stamp its requests resolve to - a declared type the page did
+			// not name reads its base's, and listing the stored keys alone would show it as not cached
+			// (CacheEntryExpiry). The edge is the one getFromCache was just allowed to read.
+			List<VisitorTypeEntry> types = frontcacheService.getVisitorTypeEntries(scope, cacheViewForm.getEdge());
+			model.addAttribute("expiryRows", CacheEntryExpiry.rows(webResponse.getExpireTimeMap(), types,
+					System.currentTimeMillis()));
 
 		}
 

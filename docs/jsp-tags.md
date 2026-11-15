@@ -65,7 +65,9 @@ still serves it:
         maxage="bot:30d, bot-whitelisted:forever" - verified crawlers forever, other bots 30 days, guests not cached
 
 If the origin renders a page differently for a type, that type must have `:0` on that page: there is one cached copy
-for everyone, and a customer's render stored in it would be served to every guest.
+for everyone, and a customer's render stored in it would be served to every guest. Declaring the type `no-store`
+(`@type customer like guest no-store`) makes that the type's rule rather than every page's: its requests never write an
+entry, whatever `maxage` says, and are still served the copy other visitors stored.
 
 Lists need 2.9.0 or later on every node. Reaching an older node, a list takes the page out of cache
 entirely, so upgrade the nodes before the pages.

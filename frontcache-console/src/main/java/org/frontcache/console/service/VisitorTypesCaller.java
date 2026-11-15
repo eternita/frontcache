@@ -38,6 +38,7 @@ public class VisitorTypesCaller implements Callable<VisitorTypesConfig> {
 		if (null == response)
 			return new VisitorTypesConfig(fcClient.getName(), null, null);
 
-		return new VisitorTypesConfig(fcClient.getName(), response.getBotKeywords(), response.getBotRules());
+		return new VisitorTypesConfig(fcClient.getName(), response.getBotKeywords(), response.getBotRules(),
+				response.getVisitorTypes());
     }
 }

@@ -145,6 +145,30 @@ public class FCUtils {
 	}
 
 	/**
+	 * Is the request's visitor type declared {@code no-store} ({@code @type customer like guest no-store})? Such a
+	 * request <b>never writes an entry</b> - whatever the page's {@code maxage} - and it may still read one per its
+	 * resolved TTL. Asked at every place a request can cause a write: the miss in
+	 * {@code CacheProcessorBase.processRequest}, {@code IncludeProcessorBase.isIncludeResponseCacheable} (the single
+	 * include and the combine path), and the soft-refresh branches of both processors, which must not queue a
+	 * background fetch that carries this visitor's request headers and stores what comes back.
+	 *
+	 * Read from the running vocabulary, not carried on the request: a reload that adds the flag stops writes by the
+	 * requests already in flight. A root is never no-store, so a node that declares nothing pays one compare.
+	 *
+	 * With {@code front-cache.include-fetch-target=edge} a fragment is written by the node it loops back to, which
+	 * knows the page's type only when it adopts it ({@link #propagatedVisitorType} - a trusted peer); otherwise it
+	 * classifies the fragment on its own evidence. The default, {@code origin}, writes here.
+	 */
+	public static boolean isNoStoreVisitorType(RequestContext context)
+	{
+		String visitorType = context.getVisitorType();
+		if (null == visitorType || visitorType.equals(context.getClientType()))
+			return false;
+
+		return org.frontcache.bots.VisitorTypes.active().isNoStore(visitorType);
+	}
+
+	/**
 	 * Check with current time if expired
 	 *
 	 * @param clientType {bot | guest}

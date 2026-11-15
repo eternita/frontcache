@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.frontcache.bots.BotRuleEntry;
+import org.frontcache.bots.VisitorTypeEntry;
 
 /**
  * Bot classification config from ./conf/bots.conf: the ordered rules, and the bare User-Agent
@@ -36,12 +37,18 @@ import org.frontcache.bots.BotRuleEntry;
  * the BARE keyword lines, nothing else - so a console older than the rules still renders the list it
  * knows; a newer console reading an older node finds botRules absent and falls back to the same
  * list. The console is deployed separately from the fleet and upgrades in either order.
+ *
+ * {@code visitorTypes} is additive likewise, as of 2.13.0: the roots and the declared types, each with its base, its
+ * {@code no-store} flag and the hits of the rules deciding it. An older node leaves it absent; an older console
+ * ignores it and renders a declared type as the string in a rule's verdict column.
  */
 public class GetBotsActionResponse extends ActionResponse {
 
 	private Set<String> botKeywords;
 
 	private List<BotRuleEntry> botRules;
+
+	private List<VisitorTypeEntry> visitorTypes;
 
 	public GetBotsActionResponse() { // for JSON mapper
 		setResponseStatus(RESPONSE_STATUS_OK);
@@ -65,6 +72,15 @@ public class GetBotsActionResponse extends ActionResponse {
 
 	public void setBotRules(List<BotRuleEntry> botRules) {
 		this.botRules = botRules;
+	}
+
+	/** The roots, then the declared types. Null from a node older than 2.13.0 - it knows bot and guest only. */
+	public List<VisitorTypeEntry> getVisitorTypes() {
+		return visitorTypes;
+	}
+
+	public void setVisitorTypes(List<VisitorTypeEntry> visitorTypes) {
+		this.visitorTypes = visitorTypes;
 	}
 
 	/**

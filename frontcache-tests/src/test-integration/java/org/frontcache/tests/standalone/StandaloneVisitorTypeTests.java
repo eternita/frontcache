@@ -41,14 +41,15 @@ import org.junit.Test;
 
 /**
  * Declared visitor types, end to end on the standalone node, whose {@code bots.conf} declares {@code customer like
- * guest} (cookie {@code fc_e2e_customer}) and {@code monitor-e2e like bot} (User-Agent {@code fc-e2e-monitor}) - the
- * rules naming them above the {@code @type} lines. The filter node behind it declares nothing, and it does not matter:
+ * guest} (cookie {@code fc_e2e_customer}), {@code monitor-e2e like bot} (User-Agent {@code fc-e2e-monitor}) and
+ * {@code member-e2e like guest no-store} (cookie {@code fc_e2e_member}) - the rules naming them above the {@code @type}
+ * lines. The filter node behind it declares nothing, and it does not matter:
  * the page's node decides the TTL and which includes resolve.
  *
  * What is pinned: a type with {@code :0} reaches the origin on every request while guests share a cached copy it never
  * overwrites; {@code client="customer"} / {@code client="!customer"} / {@code client="guest"} by is-a; a TTL only a
- * declared type has caches for it alone (not for its base); and the trace header's last column is the leaf while the
- * client-type column keeps the root.
+ * declared type has caches for it alone (not for its base); a {@code no-store} type reads the guests' copy and never
+ * writes one; and the trace header's last column is the leaf while the client-type column keeps the root.
  */
 public class StandaloneVisitorTypeTests extends TestsBase {
 
@@ -57,6 +58,7 @@ public class StandaloneVisitorTypeTests extends TestsBase {
 	private static final String CHROME = "Mozilla/5.0 (Macintosh) Chrome/140";
 	private static final String CUSTOMER_COOKIE = "fc_e2e_customer=1";
 	private static final String MONITOR = "fc-e2e-monitor/1.0";
+	private static final String MEMBER_COOKIE = "fc_e2e_member=1";
 
 	private CloseableHttpClient client;
 
@@ -127,6 +129,29 @@ public class StandaloneVisitorTypeTests extends TestsBase {
 		assertTrue("and a bot's request does not take the copy away", get(page, MONITOR, null).cached());
 	}
 
+	/**
+	 * d.jsp: maxage="60" - cacheable for everyone, member-e2e included, yet a member never writes the entry
+	 * ({@code @type member-e2e like guest no-store}); it is served the copy a guest stored.
+	 */
+	@Test
+	public void aNoStoreTypeReadsTheCopyButNeverWritesIt() throws Exception {
+		String page = "standalone/visitor-types/d.jsp";
+
+		for (int i = 0; i < 2; i++)
+		{
+			Fetched member = get(page, CHROME, MEMBER_COOKIE);
+			assertEquals("d", member.body);
+			assertEquals("the visitor type is the last column: " + member.trace, "member-e2e", member.column(-1));
+			assertFalse("nothing to read yet, and a member's render is never stored: " + member.trace, member.cached());
+		}
+
+		assertFalse("so the first guest misses too", get(page, CHROME, null).cached());
+		assertTrue("and stores the copy", get(page, CHROME, null).cached());
+
+		Fetched member = get(page, CHROME, MEMBER_COOKIE);
+		assertTrue("a member reads it per its base's TTL: " + member.trace, member.cached());
+	}
+
 	/** get-bots carries the verdict as written - what the console's Visitor Types screen renders. */
 	@Test
 	public void getBotsReportsTheDeclaredVerdict() throws Exception {
@@ -139,6 +164,11 @@ public class StandaloneVisitorTypeTests extends TestsBase {
 		assertTrue(body, body.contains("\"name\":\"customer-e2e\""));
 		assertTrue(body, body.contains("\"clientType\":\"customer\""));
 		assertTrue(body, body.contains("\"clientType\":\"monitor-e2e\""));
+
+		// and visitorTypes (2.13.0): the roots, then the declared types with their base and flag
+		assertTrue(body, body.contains("{\"name\":\"guest\",\"base\":\"guest\",\"noStore\":false"));
+		assertTrue(body, body.contains("{\"name\":\"customer\",\"base\":\"guest\",\"noStore\":false"));
+		assertTrue(body, body.contains("{\"name\":\"member-e2e\",\"base\":\"guest\",\"noStore\":true"));
 	}
 
 	// ---- helpers --------------------------------------------------------------------------

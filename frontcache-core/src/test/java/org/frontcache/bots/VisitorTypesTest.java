@@ -111,10 +111,58 @@ public class VisitorTypesTest {
 		}
 	}
 
-	/** Not built in phase 1: refusing the declaration leaves its requests their base type - the safe direction. */
 	@Test
-	public void noStoreIsRefusedUntilItIsBuilt() {
-		assertRefusedDeclaration("@type customer like guest no-store", "not built yet");
+	public void noStoreFlagsTheTypeAndNothingElse() {
+		VisitorTypes types = VisitorTypes.of("@type customer like guest no-store   # session cookie",
+				"@type bot-monitoring like bot no-store", "@type captcha-passed like guest");
+
+		assertTrue(types.isNoStore("customer"));
+		assertTrue("a bot-based type may be no-store too", types.isNoStore("bot-monitoring"));
+		assertEquals("the flag changes nothing about the base", "guest", types.rootOf("customer"));
+		assertFalse(types.isNoStore("captcha-passed"));
+		assertFalse("a root is never no-store", types.isNoStore("guest"));
+		assertFalse(types.isNoStore("bot"));
+		assertFalse("an unknown name is not", types.isNoStore("partner"));
+		assertFalse(types.isNoStore(null));
+		assertFalse(VisitorTypes.ROOTS.isNoStore("guest"));
+	}
+
+	/** A misspelt no-store must not declare a type that stores: the whole line is refused. */
+	@Test
+	public void anUnknownFlagRefusesTheDeclaration() {
+		assertRefusedDeclaration("@type customer like guest nostore", "unknown flag 'nostore'");
+		assertRefusedDeclaration("@type customer like guest no-store store", "unknown flag 'store'");
+	}
+
+	/** First wins - the duplicate's flag included, either way round. */
+	@Test
+	public void aDuplicatesFlagIsIgnoredWithIt() {
+		VisitorTypes.Builder builder = VisitorTypes.builder();
+		builder.add("@type customer like guest");
+		assertTrue(builder.add("@type customer like guest no-store").contains("first wins"));
+		assertFalse(builder.build().isNoStore("customer"));
+
+		builder = VisitorTypes.builder();
+		builder.add("@type customer like guest no-store");
+		builder.add("@type customer like guest");
+		assertTrue(builder.build().isNoStore("customer"));
+	}
+
+	/** Decided when an entry would be written, from the running vocabulary - for the leaf only. */
+	@Test
+	public void aRequestIsNoStoreOnlyAsTheFlaggedLeaf() {
+		BotClassifier.install(BotClassifier.of(new ArrayList<BotRule>(),
+				VisitorTypes.of("@type customer like guest no-store", "@type captcha-passed like guest")));
+
+		assertTrue(org.frontcache.core.FCUtils.isNoStoreVisitorType(context("customer", "guest")));
+		assertFalse(org.frontcache.core.FCUtils.isNoStoreVisitorType(context("captcha-passed", "guest")));
+		assertFalse("the base of a no-store type is not no-store",
+				org.frontcache.core.FCUtils.isNoStoreVisitorType(context("guest", "guest")));
+
+		// a reload that drops the flag lets the next write through - nothing about it was kept on the request
+		RequestContext inFlight = context("customer", "guest");
+		BotClassifier.install(BotClassifier.of(new ArrayList<BotRule>(), VisitorTypes.of("@type customer like guest")));
+		assertFalse(org.frontcache.core.FCUtils.isNoStoreVisitorType(inFlight));
 	}
 
 	@Test
@@ -281,6 +329,28 @@ public class VisitorTypesTest {
 		assertTrue(errors.get(1), errors.get(1).startsWith("line 4:"));
 	}
 
+	/** get-bots' visitorTypes: the roots first, then the declared types, each with the hits of the rules deciding it. */
+	@Test
+	public void theTypeEntriesListEveryTypeWithItsDecidingHits() {
+		VisitorTypes types = VisitorTypes.of("@type customer like guest no-store", "@type bot-whitelisted like bot");
+		BotRule customer = BotRuleParser.parse("customer | cookie:hruc | customer", types);
+		BotRule shadow = BotRuleParser.parse("customer-dry | cookie:x | customer | dry-run", types);
+		BotRule seo = BotRuleParser.parse("seo | ua~(?i)ahrefs | bot", types);
+		List<BotRule> rules = new ArrayList<BotRule>(List.of(customer, shadow, seo, BotClassifier.defaultRule()));
+		customer.countHit();
+		customer.countHit();
+		shadow.countHit();
+		seo.countHit();
+		rules.get(3).countHit(); // the built-in default
+
+		List<VisitorTypeEntry> entries = BotClassifier.of(rules, types).getVisitorTypeEntries();
+
+		assertEquals("[bot like bot (1 hits), guest like guest (1 hits),"
+				+ " customer like guest no-store (2 hits), bot-whitelisted like bot (0 hits)]", entries.toString());
+		assertTrue(entries.get(0).isBuiltIn());
+		assertFalse(entries.get(2).isBuiltIn());
+	}
+
 	@Test
 	public void theInstalledClassifiersVocabularyIsActive() {
 		VisitorTypes types = VisitorTypes.of("@type customer like guest");
@@ -303,6 +373,12 @@ public class VisitorTypesTest {
 	}
 
 	// ---- helpers --------------------------------------------------------------------------
+
+	private static RequestContext context(String visitorType, String clientType) {
+		RequestContext context = new RequestContext();
+		context.setVisitorType(visitorType, clientType);
+		return context;
+	}
 
 	private static void assertRefusedDeclaration(String line, String reason) {
 		try {

@@ -1123,6 +1123,19 @@ public class FrontcacheService {
 	}
 
 
+	/**
+	 * The visitor types an edge knows, for the Cache View's per-type expiry rows - the roots and its declared types.
+	 *
+	 * @return null when the edge is older than 2.13.0 or did not answer: the view then lists the stored keys alone
+	 * @throws UnknownEdgeException for an edge not in the request's scope, as every edge parameter
+	 */
+	public List<org.frontcache.bots.VisitorTypeEntry> getVisitorTypeEntries(EdgeScope scope, String edgeURL)
+	{
+		FrontCacheClient fcClient = requireEdgeClient(scope, edgeURL);
+		org.frontcache.io.GetBotsActionResponse response = fcClient.getBotsActionResponse();
+		return (null == response) ? null : response.getVisitorTypes();
+	}
+
 	/** Nothing when {@link #isEdgeEditingEnabled()} is off - the controller says so, this keeps it so. */
 	public void addEdge(String edge) {
 		if (null != edge && isEdgeEditingEnabled() && !isKeyedEdge(edge))

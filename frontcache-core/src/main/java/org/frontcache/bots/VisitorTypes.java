@@ -17,6 +17,7 @@ package org.frontcache.bots;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -36,6 +37,14 @@ import org.frontcache.guard.GuardConfigException;
  * only the leaf and the root the request carries, never this object, so a {@code reload-bots} that removes a type
  * cannot leave a request in flight without an answer.
  *
+ * A declaration may end with {@code no-store} ({@code @type customer like guest no-store}): a request of that type
+ * <b>never writes</b> an entry, whatever the page's {@code maxage} says - it still reads one per its resolved TTL
+ * ({@link #isNoStore}). One cached copy serves every type, so a type the origin renders differently for (a session
+ * or tracking cookie) would otherwise have its render stored and served to everyone; the flag closes that by
+ * configuration instead of by every page author remembering {@code customer:0}. It is decided when an entry would
+ * be written, from the running vocabulary - not carried on the request - so a reload that adds it protects the
+ * requests already in flight too.
+ *
  * Immutable. One snapshot per {@link BotClassifier}; {@link #active()} is the running classifier's.
  */
 public final class VisitorTypes {
@@ -45,6 +54,9 @@ public final class VisitorTypes {
 
 	/** The directive's keyword. */
 	public static final String DIRECTIVE = "@type";
+
+	/** The one flag a declaration may carry - see {@link #isNoStore}. */
+	public static final String NO_STORE = "no-store";
 
 	/** a type name: it becomes a JSON key, a log value and an HTML attribute value */
 	private static final Pattern NAME = Pattern.compile("[a-z][a-z0-9-]{0,31}");
@@ -57,13 +69,17 @@ public final class VisitorTypes {
 			FCHeaders.REQUEST_CLIENT_TYPE_GUEST, "browser", "all", "none");
 
 	/** No declarations - the two roots only. What a node without {@code @type} lines runs, and every node before. */
-	public static final VisitorTypes ROOTS = new VisitorTypes(Collections.emptyMap());
+	public static final VisitorTypes ROOTS = new VisitorTypes(Collections.emptyMap(), Collections.emptySet());
 
 	// declared name -> its base (a root), in declaration order
 	private final Map<String, String> declared;
 
-	private VisitorTypes(Map<String, String> declared) {
+	// the declared names flagged no-store, in declaration order
+	private final Set<String> noStore;
+
+	private VisitorTypes(Map<String, String> declared, Set<String> noStore) {
 		this.declared = declared;
+		this.noStore = noStore;
 	}
 
 	/**
@@ -93,6 +109,20 @@ public final class VisitorTypes {
 	/** @return the declared types (roots excluded), name -> base, in declaration order */
 	public Map<String, String> declared() {
 		return declared;
+	}
+
+	/**
+	 * @return true when {@code name} is a type declared {@code no-store}: a request of it never writes an entry - not
+	 *         on a miss, not by a soft refresh - and reads one per its resolved TTL. Never true of a root, nor of a
+	 *         name this node does not know
+	 */
+	public boolean isNoStore(String name) {
+		return null != name && noStore.contains(name);
+	}
+
+	/** @return the declared types flagged {@code no-store}, in declaration order */
+	public Set<String> noStore() {
+		return noStore;
 	}
 
 	/** @return the known names, roots first, for messages */
@@ -136,6 +166,8 @@ public final class VisitorTypes {
 
 		private final Map<String, String> declared = new LinkedHashMap<String, String>();
 
+		private final Set<String> noStore = new LinkedHashSet<String>();
+
 		/**
 		 * @param line one trimmed bots.conf line that {@link #isDeclaration starts with the directive}
 		 * @return a warning to log when the line was accepted with a remark (a duplicate - first wins), else null
@@ -147,16 +179,16 @@ public final class VisitorTypes {
 
 			if (3 > tokens.length || !"like".equals(tokens[1]))
 				throw new GuardConfigException("expected '" + DIRECTIVE + " <name> like <" + FCHeaders.REQUEST_CLIENT_TYPE_BOT
-						+ "|" + FCHeaders.REQUEST_CLIENT_TYPE_GUEST + ">' but got '" + line + "'");
+						+ "|" + FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "> [" + NO_STORE + "]' but got '" + line + "'");
 
-			if (3 < tokens.length)
+			// an unknown flag refuses the whole line: a misspelt no-store must not declare a type that stores
+			boolean flaggedNoStore = false;
+			for (int i = 3; i < tokens.length; i++)
 			{
-				String flag = tokens[3];
-				if ("no-store".equals(flag))
-					throw new GuardConfigException("'no-store' is not built yet in '" + line + "' - the type is not"
-							+ " declared, so its rules are refused and its requests stay their base type. Until it"
-							+ " is, a page that renders differently for a type gives that type '<type>:0' in maxage");
-				throw new GuardConfigException("unknown flag '" + flag + "' in '" + line + "'");
+				if (!NO_STORE.equals(tokens[i]))
+					throw new GuardConfigException("unknown flag '" + tokens[i] + "' in '" + line + "' - the one flag is '"
+							+ NO_STORE + "'");
+				flaggedNoStore = true;
 			}
 
 			String name = tokens[0];
@@ -185,11 +217,14 @@ public final class VisitorTypes {
 				throw new GuardConfigException("more than " + MAX_DECLARED + " types declared - '" + line + "' refused");
 
 			declared.put(name, base);
+			if (flaggedNoStore)
+				noStore.add(name);
 			return null;
 		}
 
 		public VisitorTypes build() {
-			return declared.isEmpty() ? ROOTS : new VisitorTypes(Collections.unmodifiableMap(new LinkedHashMap<String, String>(declared)));
+			return declared.isEmpty() ? ROOTS : new VisitorTypes(Collections.unmodifiableMap(new LinkedHashMap<String, String>(declared)),
+					Collections.unmodifiableSet(new LinkedHashSet<String>(noStore)));
 		}
 	}
 
@@ -222,6 +257,6 @@ public final class VisitorTypes {
 
 	@Override
 	public String toString() {
-		return "VisitorTypes" + declared;
+		return "VisitorTypes" + declared + (noStore.isEmpty() ? "" : " " + NO_STORE + noStore);
 	}
 }

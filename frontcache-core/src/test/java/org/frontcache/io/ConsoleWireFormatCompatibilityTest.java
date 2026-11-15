@@ -123,6 +123,33 @@ public class ConsoleWireFormatCompatibilityTest {
 
 	// ---- 2.6 node -> 2.7 console (deserialization) ------------------------------------------
 
+	/**
+	 * visitorTypes (2.13.0) is additive: the four fields travel, the derived builtIn does not, and a node older than
+	 * 2.13.0 - no field - reads as null, which the console renders as "no types table".
+	 */
+	@Test
+	public void visitorTypesTravelAndAreAbsentFromAnOlderNode() throws Exception
+	{
+		GetBotsActionResponse response = new GetBotsActionResponse();
+		response.setVisitorTypes(java.util.List.of(new org.frontcache.bots.VisitorTypeEntry("customer", "guest", true, 7)));
+
+		String json = jsonMapper.writeValueAsString(response);
+		assertEquals("[{\"name\":\"customer\",\"base\":\"guest\",\"noStore\":true,\"hits\":7}]",
+				jsonMapper.readTree(json).get("visitorTypes").toString());
+
+		GetBotsActionResponse read = jsonMapper.readValue(json, GetBotsActionResponse.class);
+		assertEquals("customer like guest no-store (7 hits)", read.getVisitorTypes().get(0).toString());
+
+		GetBotsActionResponse older = jsonMapper.readValue("{\"responseStatus\":\"OK\",\"botKeywords\":[\"x\"],\"botRules\":[]}",
+				GetBotsActionResponse.class);
+		assertNull(older.getVisitorTypes());
+
+		// and a later node's entry with a field this console does not know still reads
+		GetBotsActionResponse later = jsonMapper.readValue("{\"responseStatus\":\"OK\",\"visitorTypes\":"
+				+ "[{\"name\":\"customer\",\"base\":\"guest\",\"partition\":true}]}", GetBotsActionResponse.class);
+		assertEquals("guest", later.getVisitorTypes().get(0).getBase());
+	}
+
 	@Test
 	public void readsA26NodesBotsResponse() throws Exception
 	{

@@ -191,6 +191,27 @@ public class BotClassifier {
 	}
 
 	/**
+	 * Every type this node knows - the two roots, then the declared types in declaration order - each with the hits of
+	 * the rules whose verdict it is (dry-run rules decide nothing and are left out). What {@code get-bots} reports as
+	 * {@code visitorTypes} and the console's types table renders: one flat list with a behaves-like column.
+	 */
+	public List<VisitorTypeEntry> getVisitorTypeEntries() {
+		java.util.Map<String, Long> hits = new java.util.HashMap<String, Long>();
+		for (BotRule rule : rules)
+			if (!rule.isDryRun())
+				hits.merge(rule.getVisitorType(), rule.getHits(), Long::sum);
+
+		List<VisitorTypeEntry> entries = new ArrayList<VisitorTypeEntry>();
+		for (String root : new String[] { org.frontcache.core.FCHeaders.REQUEST_CLIENT_TYPE_BOT,
+				org.frontcache.core.FCHeaders.REQUEST_CLIENT_TYPE_GUEST })
+			entries.add(new VisitorTypeEntry(root, root, false, hits.getOrDefault(root, 0L)));
+		for (java.util.Map.Entry<String, String> declared : visitorTypes.declared().entrySet())
+			entries.add(new VisitorTypeEntry(declared.getKey(), declared.getValue(),
+					visitorTypes.isNoStore(declared.getKey()), hits.getOrDefault(declared.getKey(), 0L)));
+		return entries;
+	}
+
+	/**
 	 * Bare User-Agent keywords from the file, in file order. Reported separately from the rules
 	 * because a console older than 2.9.0 knows only this shape.
 	 */
@@ -265,7 +286,8 @@ public class BotClassifier {
 		loaded.add(defaultRule());
 
 		if (!visitorTypes.declared().isEmpty())
-			logger.info("Visitor types declared: " + visitorTypes.declared());
+			logger.info("Visitor types declared: " + visitorTypes.declared()
+					+ (visitorTypes.noStore().isEmpty() ? "" : ", never stored: " + visitorTypes.noStore()));
 		logger.info("Bot classification rules loaded: " + loaded.size() + " (" + keywords.size() + " from bare keywords)");
 		for (BotRule rule : loaded)
 			logger.info("   " + rule);

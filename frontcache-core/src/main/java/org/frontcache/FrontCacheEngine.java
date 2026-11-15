@@ -1105,6 +1105,10 @@ public class FrontCacheEngine {
 		BotRule rule = BotClassifier.getInstance().classify(context);
 		context.setVisitorType(rule.getVisitorType(), rule.getClientType());
 		context.setClientTypeRule(rule.getName());
+
+		// frontcache_visitor_requests_total{type} - a visitor once per page, not once per fragment
+		if (FCHeaders.COMPONENT_TOPLEVEL.equals(context.getRequestType()))
+			org.frontcache.bots.VisitorTypeRequests.count(rule.getVisitorType());
 	}
 
 

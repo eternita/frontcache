@@ -126,6 +126,9 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 		boolean isWarmRequest = context.isWarmRequest();
 
+		// @type <name> like <root> no-store - this request reads entries per its resolved TTL and writes none
+		boolean isNoStore = FCUtils.isNoStoreVisitorType(context);
+
 		if (null != cachedWebResponse)
 		{
 			String clientType = context.getClientType(); // bot | guest
@@ -156,6 +159,15 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 						// warmer would read "fresh" at loopback speed while queueing one background origin
 						// fetch per key - single-flight dedupes a key, not a list - and the delay between
 						// warm calls would pace nothing.
+						// IncludeProcessorBase.getIncludeFromCache carries the same branch.
+						cachedWebResponse = null;
+					} else if (isNoStore)
+					{
+						// A no-store visitor type never writes, and a soft refresh is a write: the background
+						// fetch carries THIS request's headers - the very cookie that made it a customer - and
+						// stores what the origin renders for it, for everyone. So the stale copy is not
+						// served on the promise of a refresh this request may not make: it is a miss, fetched
+						// below and not stored, and the entry stays for the next visitor who may refresh it.
 						// IncludeProcessorBase.getIncludeFromCache carries the same branch.
 						cachedWebResponse = null;
 					} else {
@@ -200,6 +212,7 @@ public abstract class CacheProcessorBase implements CacheProcessor {
 
 				// save to cache
 				if (!context.isFallbackUsed() // don't cache fallbacks
+						&& !isNoStore // a no-store visitor type never writes - its render may be its own
 						&& isCacheableForClientType
 						&& isFreshDataCacheableForClientType
 						&& cachedWebResponse.isCacheable()

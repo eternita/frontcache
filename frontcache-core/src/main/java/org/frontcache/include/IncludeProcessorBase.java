@@ -478,8 +478,15 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			{
 
 				String refreshType = webResponse.getRefreshType();
-				if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType) && context.isWarmRequest())
+				if (FCHeaders.COMPONENT_REFRESH_TYPE_SOFT.equalsIgnoreCase(refreshType)
+						&& (context.isWarmRequest() || FCUtils.isNoStoreVisitorType(context)))
 				{
+					// A no-store visitor type takes this branch too: a soft refresh is a write, made with this
+					// page's request headers - the customer's cookie - so it must not be queued; the fragment
+					// is a miss, fetched and not stored (isIncludeResponseCacheable), and the stale entry stays
+					// for a visitor who may refresh it. CacheProcessorBase.processRequest carries the same
+					// branch for the page.
+					//
 					// A warm request refreshes a soft-expired fragment on this thread, through the origin
 					// path, without removing the entry - the same branch CacheProcessorBase.processRequest
 					// has for the page, and for the same reason: a background refresh escapes the warmer's
@@ -700,9 +707,9 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 	}
 
 	/**
-	 * The four conditions an include response must meet before it is stored, shared by the single
+	 * The conditions an include response must meet before it is stored, shared by the single
 	 * include path and the combine path so the two cannot drift on what "cacheable" means. They are
-	 * the same decision.
+	 * the same decision - including that a {@code no-store} visitor type writes nothing.
 	 *
 	 * {@code isCacheable()} on its own is NOT the guard, and that is the trap: it answers true for a
 	 * response whose expireTimeMap says NO_CACHE for every client type, because it only checks that
@@ -715,6 +722,11 @@ public abstract class IncludeProcessorBase implements IncludeProcessor {
 			return false;
 
 		if (!webResponse.isCacheable())
+			return false;
+
+		// @type <name> like <root> no-store: the fragment may have been rendered for this visitor - it is never
+		// stored, whatever its maxage. The page's own write has the same check in CacheProcessorBase.processRequest.
+		if (FCUtils.isNoStoreVisitorType(context))
 			return false;
 
 		if (!FCUtils.isWebComponentCacheableForClientType(webResponse.getExpireTimeMap(), context.getVisitorType(), context.getClientType()))
