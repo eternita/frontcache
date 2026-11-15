@@ -17,7 +17,9 @@
 	<%-- save-config is in this list because the Configs screens render their POST result in place
 	     rather than redirecting (as cache-invalidation does), so the forward URI is /save-config and
 	     the top menu would otherwise lose its highlight on exactly the page that just did something. --%>
-	<c:when test="${fn:contains(uri, 'fallbacks') or fn:contains(uri, 'bot-configs') or fn:contains(uri, 'dynamic-urls') or fn:contains(uri, 'resilience') or fn:contains(uri, 'hystrix') or fn:contains(uri, 'guard-configs') or fn:contains(uri, 'save-config')}"><c:set var="topActive" value="configs"/></c:when>
+	<c:when test="${fn:contains(uri, 'fallbacks') or fn:contains(uri, 'bot-configs') or fn:contains(uri, 'dynamic-urls') or fn:contains(uri, 'resilience') or fn:contains(uri, 'hystrix') or fn:contains(uri, 'guard-configs') or fn:contains(uri, 'plugin-configs') or fn:contains(uri, 'save-config')}"><c:set var="topActive" value="configs"/></c:when>
+	<%-- plugins-reload re-renders the Plugins screen in place, as save-config does a Configs screen --%>
+	<c:when test="${fn:contains(uri, 'plugins')}"><c:set var="topActive" value="plugins"/></c:when>
 	<c:when test="${fn:contains(uri, 'cache-')}"><c:set var="topActive" value="cache"/></c:when>
 	<c:when test="${fn:contains(uri, 'guard')}"><c:set var="topActive" value="guard"/></c:when>
 	<c:when test="${fn:contains(uri, 'visitor-types')}"><c:set var="topActive" value="visitor"/></c:when>
@@ -56,6 +58,7 @@
                 <li><a href="guard-rules" class="${topActive == 'guard' ? 'active-top' : ''}">Guard </a></li>
                 <li><a href="visitor-types" class="${topActive == 'visitor' ? 'active-top' : ''}">Visitor Types </a></li>
 				<li><a href="edges" class="${topActive == 'edges' ? 'active-top' : ''}">Edges </a></li>
+				<li><a href="plugins" class="${topActive == 'plugins' ? 'active-top' : ''}">Plugins </a></li>
 				<%-- an entry naming a permission only for a principal holding it (fcPermits - ConsoleSecurity) --%>
 				<c:forEach var="nav" items="${fcPlugins.topNav}">
 				<c:if test="${empty nav.permission or fcPermits[nav.permission]}">

@@ -84,6 +84,15 @@ public class WindowLimiter {
 	private final int indexMask;
 	private final LongAdder takeovers = new LongAdder();
 
+	// clients that went over the limit - each once per window: the guard summary's over-limit count
+	private final LongAdder overLimit = new LongAdder();
+
+	/**
+	 * Set in {@link #checkAndCountFlagged}'s answer on the request that took a key over the limit - the first
+	 * refused one of its window. Far above any window's millis, so masking it off leaves the Retry-After.
+	 */
+	public static final long FIRST_OVER_LIMIT = 1L << 62;
+
 	/**
 	 * @param slotCount number of array slots; rounded up to a power of two by the caller
 	 */
@@ -108,6 +117,15 @@ public class WindowLimiter {
 	 *         current window rolls over (i.e. the Retry-After the client should be told)
 	 */
 	public long checkAndCount(long keyHash, long nowMillis)
+	{
+		return checkAndCountFlagged(keyHash, nowMillis) & ~FIRST_OVER_LIMIT;
+	}
+
+	/**
+	 * {@link #checkAndCount}, with {@link #FIRST_OVER_LIMIT} set on the one request per key and window that crossed
+	 * the limit - what makes "a client went over" an event that happens once, not once per refused request.
+	 */
+	public long checkAndCountFlagged(long keyHash, long nowMillis)
 	{
 		long window = (nowMillis / windowMillis) & WINDOW_MASK;
 		int index = (int) (keyHash & indexMask);
@@ -148,7 +166,14 @@ public class WindowLimiter {
 				if (takeover)
 					takeovers.increment();
 
-				return (next > limit) ? millisToWindowEnd(nowMillis) : 0L;
+				if (next <= limit)
+					return 0L;
+				if (count == limit) // not next == limit + 1: a saturated count stays there
+				{
+					overLimit.increment();
+					return millisToWindowEnd(nowMillis) | FIRST_OVER_LIMIT;
+				}
+				return millisToWindowEnd(nowMillis);
 			}
 		}
 
@@ -216,6 +241,11 @@ public class WindowLimiter {
 	 */
 	public long getTakeovers() {
 		return takeovers.sum();
+	}
+
+	/** Clients that went over the limit since this limiter was created, each counted once per window. */
+	public long getOverLimitCount() {
+		return overLimit.sum();
 	}
 
 	@Override

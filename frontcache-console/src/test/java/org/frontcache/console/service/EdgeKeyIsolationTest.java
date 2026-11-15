@@ -103,6 +103,7 @@ public class EdgeKeyIsolationTest {
 		NOT_EDGE_PARAMETERS.put("filter", "/x");
 		NOT_EDGE_PARAMETERS.put("name", "x");
 		NOT_EDGE_PARAMETERS.put("grep", "x");
+		NOT_EDGE_PARAMETERS.put("plugin", "alerts");
 	}
 
 	/** What Spring reads to serve any handler: content negotiation's {@code view} (WebMVCConfig). */

@@ -31,10 +31,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.model.EdgeConfigFile;
+import org.frontcache.console.model.EdgePlugins;
+import org.frontcache.console.model.PluginView;
 import org.frontcache.console.model.VisitorTypesConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.GuardRulesConfig;
@@ -43,7 +46,13 @@ import org.frontcache.console.plugin.ConsolePlugins;
 import org.frontcache.core.WebResponse;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.BackupActionResponse;
+import org.frontcache.io.ActionResponse;
 import org.frontcache.io.ConfigFile;
+import org.frontcache.io.GetPluginConfigActionResponse;
+import org.frontcache.io.NodeStatsActionResponse;
+import org.frontcache.io.PluginStats;
+import org.frontcache.io.FrontcacheAction;
+import org.frontcache.io.ReloadPluginConfigActionResponse;
 import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.replication.CacheReplicator;
@@ -830,11 +839,18 @@ public class FrontcacheService {
 	 * @return the node's answer, or a synthetic refusal when the node could not be reached at all
 	 */
 	public SetConfigActionResponse saveConfigFile(EdgeScope scope, String edgeURL, ConfigFile configFile, String content, String baseHash) {
+		return save(scope, edgeURL, configFile.getFileName(),
+				fcClient -> fcClient.setConfig(configFile, content, baseHash, true));
+	}
+
+	/** The write behind both Configs saves: the console's switch, the scope's edge, an answer per edge. */
+	private SetConfigActionResponse save(EdgeScope scope, String edgeURL, String fileName,
+			Function<FrontCacheClient, SetConfigActionResponse> write) {
 
 		if (!isConfigEditingEnabled())
 		{
 			SetConfigActionResponse refused = new SetConfigActionResponse();
-			refused.setFile(configFile.getFileName());
+			refused.setFile(fileName);
 			refused.refuse("config editing is disabled on this console");
 			return refused;
 		}
@@ -843,12 +859,12 @@ public class FrontcacheService {
 		if (null == fcClient)
 		{
 			SetConfigActionResponse refused = new SetConfigActionResponse();
-			refused.setFile(configFile.getFileName());
+			refused.setFile(fileName);
 			refused.refuse(UnknownEdgeException.messageFor(edgeURL));
 			return refused;
 		}
 
-		SetConfigActionResponse response = fcClient.setConfig(configFile, content, baseHash, true);
+		SetConfigActionResponse response = write.apply(fcClient);
 
 		if (null == response)
 		{
@@ -856,7 +872,7 @@ public class FrontcacheService {
 			// becomes a refusal rather than a blank - "nothing happened" and "we don't know" would
 			// otherwise look identical.
 			SetConfigActionResponse unreachable = new SetConfigActionResponse();
-			unreachable.setFile(configFile.getFileName());
+			unreachable.setFile(fileName);
 			unreachable.refuse("edge " + edgeURL + " is not available");
 			return unreachable;
 		}
@@ -894,6 +910,176 @@ public class FrontcacheService {
 		}
 
 		return results;
+	}
+
+	// ---- plugin configs (the Plugin Configs screen) ---------------------------------------------------------------
+
+	/**
+	 * Every plugin with a config that an edge of the scope runs - id -> its file under conf/, by id - from each edge's
+	 * {@code get-node-stats}. A refused plugin is left out: the node will not write its config. An edge that does not
+	 * answer adds nothing; one that predates plugins reports none.
+	 */
+	public Map<String, String> getPluginConfigs(EdgeScope scope) {
+
+		Map<String, String> configs = new java.util.TreeMap<String, String>();
+		for (NodeStatsActionResponse stats : fanOut(scope.clients(), FrontCacheClient::getNodeStatsActionResponse))
+		{
+			if (null == stats || null == stats.getPlugins())
+				continue;
+			for (PluginStats plugin : stats.getPlugins())
+				if (null != plugin.getId() && null != plugin.getConfig() && !"refused".equals(plugin.getState()))
+					configs.putIfAbsent(plugin.getId(), plugin.getConfig());
+		}
+		return configs;
+	}
+
+	/**
+	 * One plugin's config from every edge of the scope that runs the plugin - the Plugin Configs screen's tabs, in the
+	 * console config's edge order. An edge without the plugin has no tab (it has no such file to show, and a save
+	 * there would be refused); one that did not answer keeps its tab, marked unreachable.
+	 */
+	public List<EdgeConfigFile> getPluginConfigFiles(EdgeScope scope, String pluginId) {
+
+		List<FrontCacheClient> fcClients = scope.clients();
+		List<GetPluginConfigActionResponse> answers = fanOut(fcClients, fcClient -> fcClient.getPluginConfig(pluginId));
+
+		List<EdgeConfigFile> result = new ArrayList<EdgeConfigFile>();
+		for (int i = 0; i < fcClients.size(); i++)
+		{
+			FrontCacheClient fcClient = fcClients.get(i);
+			GetPluginConfigActionResponse answer = answers.get(i);
+			if (null == answer)
+				result.add(EdgeConfigFile.unreachable(fcClient.getName(), fcClient.getFrontCacheURL()));
+			else if (ActionResponse.RESPONSE_STATUS_OK.equals(answer.getResponseStatus()))
+				result.add(new EdgeConfigFile(fcClient.getName(), fcClient.getFrontCacheURL(), answer.getPluginConfig(), true));
+		}
+		return result;
+	}
+
+	/**
+	 * Writes a plugin's config to one edge and applies it - {@code set-config} with {@code file=plugin:<id>}.
+	 *
+	 * @param fileName the file as the edges report it, for messages only
+	 */
+	public SetConfigActionResponse savePluginConfigFile(EdgeScope scope, String edgeURL, String pluginId,
+			String fileName, String content, String baseHash) {
+		return save(scope, edgeURL, fileName,
+				fcClient -> fcClient.setPluginConfig(pluginId, fileName, content, baseHash, true));
+	}
+
+	/**
+	 * Writes a plugin's config to every edge of the scope that runs the plugin - the edges its screen shows - one
+	 * after the other, for the reason {@link #saveConfigFileToAllEdges} gives.
+	 */
+	public Map<String, SetConfigActionResponse> savePluginConfigFileToAllEdges(EdgeScope scope, String pluginId,
+			String fileName, String content, String baseHash, String baseHashEdgeURL) {
+
+		Map<String, SetConfigActionResponse> results = new LinkedHashMap<String, SetConfigActionResponse>();
+		for (EdgeConfigFile edge : getPluginConfigFiles(scope, pluginId))
+		{
+			String edgeURL = edge.getUrl();
+			String hashForEdge = edgeURL.equals(baseHashEdgeURL) ? baseHash : null;
+			results.put(edgeURL, savePluginConfigFile(scope, edgeURL, pluginId, fileName, content, hashForEdge));
+		}
+		return results;
+	}
+
+	// ---- plugins (the Plugins screen) ----------------------------------------------------------------------------
+
+	/**
+	 * Every edge of the scope with the plugins its {@code get-node-stats} reports - the Plugins screen's tabs, in the
+	 * console config's edge order. An edge that did not answer keeps its tab, marked unreachable; one that answered
+	 * {@code get-cache-state} instead (it predates {@code get-node-stats}) is marked as reporting no plugin information.
+	 */
+	public List<EdgePlugins> getEdgePlugins(EdgeScope scope) {
+
+		List<FrontCacheClient> fcClients = scope.clients();
+		List<NodeStatsActionResponse> answers = fanOut(fcClients, FrontCacheClient::getNodeStatsActionResponse);
+
+		List<EdgePlugins> result = new ArrayList<EdgePlugins>();
+		for (int i = 0; i < fcClients.size(); i++)
+		{
+			FrontCacheClient fcClient = fcClients.get(i);
+			NodeStatsActionResponse stats = answers.get(i);
+			if (null == stats)
+			{
+				result.add(EdgePlugins.unreachable(fcClient.getName(), fcClient.getFrontCacheURL()));
+				continue;
+			}
+
+			boolean reported = FrontcacheAction.GET_NODE_STATS.equals(stats.getAction());
+			List<PluginView> plugins = new ArrayList<PluginView>();
+			if (reported)
+				for (PluginStats plugin : stats.getPlugins())
+					if (null != plugin)
+						plugins.add(new PluginView(plugin));
+			result.add(new EdgePlugins(fcClient.getName(), fcClient.getFrontCacheURL(), true, reported, plugins));
+		}
+		return result;
+	}
+
+	/**
+	 * Re-reads a plugin's config on one edge of the scope - {@code reload-plugin-config}: what is already on the node's
+	 * disk, applied. Gated as a config save is: the console's {@code config-editing} switch here, the handler's
+	 * permission before it, and an edge outside the scope is refused before any client exists.
+	 *
+	 * @return the node's answer, or a synthetic refusal (status ERROR, the reason in {@code errorDescription}) when
+	 *         editing is off, the edge is not in the scope, or it could not be reached
+	 */
+	public ReloadPluginConfigActionResponse reloadPluginConfig(EdgeScope scope, String edgeURL, String pluginId) {
+
+		if (!isConfigEditingEnabled())
+			return reloadRefused(pluginId, "config editing is disabled on this console");
+
+		FrontCacheClient fcClient = scope.client(edgeURL);
+		if (null == fcClient)
+			return reloadRefused(pluginId, UnknownEdgeException.messageFor(edgeURL));
+
+		if (null == pluginId || pluginId.isBlank())
+			return reloadRefused(pluginId, "no plugin selected");
+
+		ReloadPluginConfigActionResponse response = fcClient.reloadPluginConfig(pluginId);
+		if (null == response)
+			return reloadRefused(pluginId, "edge " + edgeURL + " is not available");
+
+		return response;
+	}
+
+	private static ReloadPluginConfigActionResponse reloadRefused(String pluginId, String reason) {
+		ReloadPluginConfigActionResponse refused = new ReloadPluginConfigActionResponse();
+		refused.setPlugin(pluginId);
+		refused.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+		refused.setErrorDescription(reason);
+		return refused;
+	}
+
+	/**
+	 * One call per edge, in parallel, with the console's timeouts: each edge's answer in edge order, null for one
+	 * that did not answer (in time).
+	 */
+	private <T> List<T> fanOut(List<FrontCacheClient> fcClients, Function<FrontCacheClient, T> call) {
+
+		List<Future<T>> futureList = new ArrayList<Future<T>>();
+		for (FrontCacheClient fcClient : fcClients)
+			futureList.add(executor.submit(() -> call.apply(fcClient)));
+
+		List<T> result = new ArrayList<T>();
+		boolean timeoutReached = false;
+		for (int i = 0; i < futureList.size(); i++)
+		{
+			Future<T> f = futureList.get(i);
+			try {
+				result.add(timeoutReached
+						? f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS)
+						: f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS));
+			} catch (TimeoutException | InterruptedException | ExecutionException e) {
+				f.cancel(true);
+				timeoutReached = true;
+				logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for " + fcClients.get(i).getFrontCacheURL());
+				result.add(null);
+			}
+		}
+		return result;
 	}
 
 	/**

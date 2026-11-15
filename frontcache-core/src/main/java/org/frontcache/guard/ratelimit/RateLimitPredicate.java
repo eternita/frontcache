@@ -18,6 +18,7 @@ package org.frontcache.guard.ratelimit;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
 import org.frontcache.guard.GuardPredicate;
+import org.frontcache.plugin.host.CoreEvents;
 
 /**
  * The {@code rate:} predicate - true when this request's client IP has already used up its budget
@@ -50,6 +51,8 @@ public class RateLimitPredicate implements GuardPredicate {
 
 	private volatile WindowLimiter limiter; // resolved when the rule parser binds the bucket name
 
+	private volatile String ruleName; // the rule that bound it - named by the RateLimitExceeded event
+
 	public RateLimitPredicate(RateLimitSpec spec) {
 		this.spec = spec;
 		this.enabled = GuardRateLimiterRegistry.isEnabled();
@@ -66,6 +69,7 @@ public class RateLimitPredicate implements GuardPredicate {
 	{
 		RateLimitPredicate bound = new RateLimitPredicate(spec.withDefaultBucket(ruleName));
 		bound.limiter = GuardRateLimiterRegistry.limiter(bound.spec);
+		bound.ruleName = ruleName;
 		return bound;
 	}
 
@@ -99,9 +103,15 @@ public class RateLimitPredicate implements GuardPredicate {
 		if (null == key)
 			return false; // address undecidable (recycled request, unparseable header) - fail open
 
-		long retryMillis = current.checkAndCount(WindowLimiter.hash(spec.getBucket(), key), WindowLimiter.nowMillis());
+		long answer = current.checkAndCountFlagged(WindowLimiter.hash(spec.getBucket(), key), WindowLimiter.nowMillis());
+		long retryMillis = answer & ~WindowLimiter.FIRST_OVER_LIMIT;
 		if (0 == retryMillis)
 			return false;
+
+		// once per client and window, on the request that crossed the limit - for an observing plugin only
+		if (0 != (answer & WindowLimiter.FIRST_OVER_LIMIT))
+			CoreEvents.rateLimitExceeded(context, current.getBucket(), ruleName, current.getLimit(),
+					current.getWindowMillis(), key);
 
 		// carried to applyGuardAction, which turns it into Retry-After on the 429
 		context.setGuardRetryAfterSeconds((int) Math.max(1, (retryMillis + 999) / 1000));

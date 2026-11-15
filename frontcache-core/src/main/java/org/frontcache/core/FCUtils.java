@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -505,7 +506,7 @@ public class FCUtils {
 		{
 //			logger.error(new String(respData));
 			// error
-			throw new FrontCacheException("Wrong response code " + httpResponseCode + " for " + url);
+			throw FrontCacheException.originStatus(httpResponseCode, "Wrong response code " + httpResponseCode + " for " + url);
 		}
 
 		// process redirects
@@ -763,13 +764,34 @@ public class FCUtils {
 		return map;
 	}
 
-	private static boolean isIncludedHeaderToResponse(String headerName) {
-		String name = headerName.toLowerCase();
+	/**
+	 * Whether an origin response header is kept - in the response this node sends and in the cache entry it stores.
+	 * Also applied where an entry's headers are written to a client ({@code FrontCacheEngine}), so an entry cached
+	 * before 2.13.0, which may still hold a hop-by-hop header, does not replay it.
+	 */
+	public static boolean isIncludedHeaderToResponse(String headerName) {
+		String name = headerName.toLowerCase(Locale.ROOT);
 
 		switch (name) {
 			case "content-length": // do not use 'content-length' because 'transfer-encoding' is used
 			case "transfer-encoding": // put it here to avoid duplicates
 				return false;
+
+			// Hop-by-hop (RFC 9110 section 7.6.1): about the origin's connection to this node, never the
+			// client's. Kept, they were stored in the cache entry and replayed to every client - an origin's
+			// "Connection: close" or "Keep-Alive: timeout=5" describing a connection the client never had.
+			// Proxy-Authenticate is a challenge for the next hop only (section 11.7.1). The same fixed list
+			// as the request side (isIncludedHeader).
+			case "connection":
+			case "keep-alive":
+			case "proxy-connection":
+			case "te":
+			case "trailer":
+			case "upgrade":
+			case "http2-settings":
+			case "proxy-authenticate":
+				return false;
+
 			default:
 				return true;
 		}
@@ -1210,15 +1232,31 @@ public class FCUtils {
 	}
 
 	private static boolean isIncludedHeader(String headerName) {
-		String name = headerName.toLowerCase();
+		String name = headerName.toLowerCase(Locale.ROOT);
 
 		switch (name) {
 			case "host":
-			case "connection":
 			case "content-length":
 			case "content-encoding":
 			case "server":
+				return false;
+
+			// Hop-by-hop (RFC 9110 section 7.6.1): about the client's connection to this node, never the
+			// origin's. Relayed, they break the origin call - an h2c upgrade (Upgrade + HTTP2-Settings, sent
+			// on plain http by the JDK's HttpClient and curl --http2) without the Connection that came with it
+			// is a 400 at the origin, on every forwarded path. Proxy-Authorization is a credential for a
+			// proxy, never for the origin. A fixed list, as nginx and HAProxy keep: the names a client lists
+			// in Connection are NOT dropped too, because that would let a client strip a header an upstream
+			// proxy added (X-Forwarded-For, say) before the origin reads it.
+			case "connection":
+			case "keep-alive":
+			case "proxy-connection":
+			case "te":
+			case "trailer":
 			case "transfer-encoding":
+			case "upgrade":
+			case "http2-settings":
+			case "proxy-authorization":
 				return false;
 
 			// Dropped, not forwarded: this one is Frontcache telling Frontcache how a request was

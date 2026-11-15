@@ -37,4 +37,17 @@ public interface GuardPredicate {
 	 */
 	String describe();
 
+	/**
+	 * Whether a plugin answers this predicate ({@code ext:}, negated or not) - code the node does not own, which may
+	 * have no answer ({@link PredicateUndecided}). An {@code allow} rule naming one must say {@code on-error=allow}.
+	 */
+	default boolean isPluginPredicate() {
+		return null != pluginPredicate();
+	}
+
+	/** The plugin's predicate this one is, or negates; null for a core predicate. */
+	default ExtPredicate pluginPredicate() {
+		return null;
+	}
+
 }

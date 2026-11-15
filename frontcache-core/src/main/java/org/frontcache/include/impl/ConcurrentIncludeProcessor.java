@@ -50,6 +50,7 @@ import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorBase;
 
+import org.frontcache.plugin.host.CoreEvents;
 import org.frontcache.resilience.FcCommandException;
 
 /**
@@ -61,6 +62,12 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 
 	private int threadAmount = 10; // default 10 thread
 	private long timeout = 6*1000; // default 6 second
+
+	/**
+	 * What a {@code FallbackServed} event names as the command for an include fallback resolved here, outside any
+	 * command: a sync include that did not resolve in time, or one whose command's own fallback failed.
+	 */
+	static final String FALLBACK_COMMAND = "include";
 
 	/** Content type given to a combined part whose own headers name none. */
 	private static final String DEFAULT_PART_CONTENT_TYPE = "text/html;charset=UTF-8";
@@ -560,6 +567,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 				{
 		        	logger.debug("include detais "  + inc.includeURL + " content is not resolved due to timeout (" + timeout + ")  getting defaults");
 		        	inc.webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), inc.includeURL);
+		        	CoreEvents.fallbackServed(inc.context, FALLBACK_COMMAND, "timeout", inc.includeURL, null);
 				}
 	        }
 
@@ -687,7 +695,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					// when async call -> webResponse is null because we don't wait for response
 					// get fallback for SYNC includes only
 					if (!INCLUDE_TYPE_ASYNC.equals(includeType))
+					{
 						this.webResponse = FallbackResolverFactory.getInstance().getFallback(this.getClass().getName(), includeURL);
+						CoreEvents.fallbackServed(context, FALLBACK_COMMAND, "fallback-failed", includeURL, null);
+					}
 				}
 			}
 

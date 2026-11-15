@@ -88,8 +88,9 @@ import org.frontcache.include.IncludeProcessor;
 import org.frontcache.include.IncludeProcessorManager;
 import org.frontcache.metrics.FcMetricsExport;
 import org.frontcache.reqlog.RequestLogger;
-import org.frontcache.module.CoreModuleContext;
-import org.frontcache.module.FrontcacheModules;
+import org.frontcache.plugin.host.CoreEvents;
+import org.frontcache.plugin.host.FrontcachePlugins;
+import org.frontcache.plugin.host.PluginEndpoints;
 import org.frontcache.warmer.WarmRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -683,11 +684,17 @@ public class FrontCacheEngine {
 		});
 		t.start();
 
-		// Modules from their own jars (the Pro module: licensing, the warmer's orchestration), found
-		// through FrontcacheModule's ServiceLoader. After the cache and before metrics export, so a
-		// module's meters bind to a started module. Never on the request path, and a module that throws is
-		// dropped rather than stopping the node.
-		FrontcacheModules.start(new CoreModuleContext(getPublicDomain()));
+		// Plugins from their own jars (the Pro plugin: licensing, the warmer's orchestration), found by their
+		// META-INF/frontcache-plugin.properties. After the cache and before metrics export, so a plugin's meters
+		// bind to a started plugin. A plugin that throws is dropped rather than stopping the node. The guard
+		// rules are handed over for the guard summary an observing plugin may subscribe to.
+		FrontcachePlugins.start(getPublicDomain(), () -> guardRuleEngine.getRules());
+		// the rules loaded before the plugins started, so whether each challenge rule's provider is there is known
+		// only now
+		guardRuleEngine.checkChallengeProviders();
+		// the rules loaded before the plugins started: bind their ext: predicates now, so a mistake is logged at once
+		guardRuleEngine.checkPluginPredicates();
+		BotClassifier.getInstance().checkPluginPredicates();
 
 		// Prometheus / OTLP export. A no-op unless front-cache.metrics.export says otherwise, which is
 		// why this is called unconditionally: the node's lifecycle owner is the right place to start a
@@ -835,7 +842,7 @@ public class FrontCacheEngine {
 	 */
 	private void stop(boolean shutdown) {
 
-		FrontcacheModules.stop(shutdown);
+		FrontcachePlugins.stop(shutdown);
 
 		// FCConfig is deliberately NOT torn down here. It used to be (FCConfig.destroy() nulled the
 		// properties and emptied dynamic-urls.conf), but FCConfig is initialized by its static
@@ -1115,7 +1122,11 @@ public class FrontCacheEngine {
 		// client-ip: block could refuse it outright - the guard protects the origin from clients.
 		if (context.isWarmRequest())
 		{
-			new FC_Total(this, context).execute();
+			// /fc-x/ is never cached, so there is nothing to warm there - but it is never the origin's either
+			if (PluginEndpoints.isReserved(context.getRequestURI()))
+				PluginEndpoints.serve(context, guardRuleEngine::isAllowedRedirectTarget);
+			else
+				new FC_Total(this, context).execute();
 			return;
 		}
 
@@ -1128,11 +1139,23 @@ public class FrontCacheEngine {
 
 		// dry-run rules only observe: they are logged, then the request carries on
 		for (GuardRule dryRunRule : guardOutcome.getDryRunMatches())
-			logGuardAction(context, dryRunRule.getName() + ":dry-run", 0, GuardAction.DISPOSITION_DRY_RUN);
+		{
+			logGuardAction(context, dryRunRule.logReason(context, true), 0, GuardAction.DISPOSITION_DRY_RUN);
+			CoreEvents.guardMatched(context, dryRunRule.getName(), GuardAction.DISPOSITION_DRY_RUN, 0);
+		}
 
 		if (guardOutcome.isTerminal())
 		{
 			applyGuardAction(context, guardOutcome);
+			return;
+		}
+
+		// E2: the paths plugins own, /fc-x/<id>/ - after the guard, so a rate: rule protects them like any other
+		// path, and before the cache, so they are never cached, never forwarded and never a key. A path no started
+		// plugin owns answers 404, what a node without the plugin answers.
+		if (PluginEndpoints.isReserved(context.getRequestURI()))
+		{
+			PluginEndpoints.serve(context, guardRuleEngine::isAllowedRedirectTarget);
 			return;
 		}
 
@@ -1169,7 +1192,7 @@ public class FrontCacheEngine {
 			if (0 < retryAfterSeconds)
 				servletResponse.setHeader(FCHeaders.RETRY_AFTER, Integer.toString(retryAfterSeconds));
 
-			if (GuardAction.Type.REDIRECT == action.getType())
+			if (GuardAction.Type.REDIRECT == action.getType() || GuardAction.Type.CHALLENGE == action.getType())
 			{
 				servletResponse.setHeader("Location", outcome.getResolvedTarget());
 			} else {
@@ -1180,27 +1203,12 @@ public class FrontCacheEngine {
 			logger.debug("Error writing guard rule '" + rule.getName() + "' response (" + status + "): " + e);
 		}
 
-		logGuardAction(context, guardReason(context, rule), status, action.getDisposition());
+		logGuardAction(context, rule.logReason(context, false), status, action.getDisposition());
+		// after the response is written: an observing plugin learns of it, it never takes part in it
+		CoreEvents.guardMatched(context, rule.getName(), action.getDisposition(), status);
+		if (GuardAction.Type.CHALLENGE == action.getType())
+			CoreEvents.challengeIssued(context, rule.getName(), action.getProvider(), outcome.getChallengePlugin());
 		return;
-	}
-
-	/**
-	 * The reason column of the guard log line: the rule name, and for a rate-limit rule the address
-	 * that was actually counted, as "&lt;rule&gt;#&lt;address&gt;".
-	 *
-	 * The limiter resolves the client address differently from FCUtils.getClientIP() - it reads a
-	 * forwarding header only from a configured trusted proxy - so the two CAN disagree, and the log's
-	 * own client-IP column may name an address the limiter refused to trust. "Which address was
-	 * counted?" is the first question anyone debugging a 429 asks, so it is recorded rather than left
-	 * to be inferred.
-	 */
-	private String guardReason(RequestContext context, GuardRule rule)
-	{
-		if (0 == context.getGuardRetryAfterSeconds())
-			return rule.getName();
-
-		String limiterKey = context.getRateLimitKey();
-		return (null != limiterKey) ? rule.getName() + "#" + limiterKey : rule.getName();
 	}
 
 	/**
@@ -1600,6 +1608,10 @@ public class FrontCacheEngine {
 
 		if (webResponse.getHeaders() != null) {
 			for (String name : webResponse.getHeaders().keySet()) {
+				// An entry cached before 2.13.0 may still hold an origin's hop-by-hop header - never replayed.
+				if (!FCUtils.isIncludedHeaderToResponse(name))
+					continue;
+
 				for (String value : webResponse.getHeaders().get(name)) {
 
 					if (null == servletResponse.getHeader(name)) // if header already exist (e.g. in case of WebFilter) - do not duplicate

@@ -136,4 +136,10 @@ public class FC_Total extends FcCommand<Object> {
 		}
         return null;
     }
+
+	@Override
+	protected RequestContext eventContext()
+	{
+		return context;
+	}
 }

@@ -32,6 +32,7 @@ import org.frontcache.core.RequestContext;
 import org.frontcache.guard.GuardConfigException;
 import org.frontcache.guard.GuardPredicate;
 import org.frontcache.guard.GuardPredicateFactory;
+import org.frontcache.plugin.host.CoreEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,10 +122,29 @@ public class BotClassifier {
 			// Cannot happen while the built-in default rule exists, but if it ever could: an empty
 			// classifier calls every crawler a guest and takes the origin with it. Keep what works.
 			logger.error("Reloading " + BOTS_CONFIG_FILE + " produced no usable rules - keeping the previous ones");
+			CoreEvents.configReloaded(BOTS_CONFIG_FILE, false, -1, List.of("no usable rules - the previous ones stay"));
 			return;
 		}
 
 		instance = reloaded;
+		CoreEvents.configReloaded(BOTS_CONFIG_FILE, true, reloaded.rules.size(), List.of());
+	}
+
+	/**
+	 * Binds every rule's {@code ext:} predicates to the started plugins now, so a mistake is in the log at once - see
+	 * {@code GuardRuleEngine.checkPluginPredicates}.
+	 */
+	public void checkPluginPredicates()
+	{
+		if (!org.frontcache.plugin.host.PluginPredicates.isRunning())
+			return;
+		for (BotRule rule : this.rules)
+			for (GuardPredicate predicate : rule.getPredicates())
+			{
+				org.frontcache.guard.ExtPredicate ext = predicate.pluginPredicate();
+				if (null != ext)
+					org.frontcache.plugin.host.PluginPredicates.check(ext, BOTS_CONFIG_FILE + ": " + rule.getName());
+			}
 	}
 
 	/** for tests - installs a classifier without going through FCConfig */
@@ -225,6 +245,7 @@ public class BotClassifier {
 
 		BotClassifier classifier = new BotClassifier(loaded, keywords);
 		classifier.warnOnClientIpWithoutTrustedProxies();
+		classifier.checkPluginPredicates();
 		return classifier;
 	}
 
@@ -315,7 +336,9 @@ public class BotClassifier {
 				continue;
 
 			try {
-				BotRuleParser.parse(trimmed);
+				BotRule rule = BotRuleParser.parse(trimmed);
+				for (String refusal : org.frontcache.guard.GuardRuleEngine.pluginPredicateRefusals(rule.getPredicates()))
+					errors.add("line " + (i + 1) + ": " + refusal);
 			} catch (GuardConfigException e) {
 				errors.add("line " + (i + 1) + ": " + e.getMessage());
 			}

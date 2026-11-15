@@ -27,7 +27,9 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.frontcache.FCConfig;
 import org.frontcache.core.Cidr;
+import org.frontcache.core.CidrSet;
 import org.frontcache.core.EdgeToken;
+import org.frontcache.core.EvidenceCookies;
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
 import org.frontcache.guard.ratelimit.RateLimitPredicate;
@@ -49,9 +51,11 @@ import org.frontcache.guard.ratelimit.RateLimitSpec;
  *   [!] method:&lt;GET|POST|...&gt;
  *   [!] client-type:&lt;bot|guest&gt;
  *   [!] cookie:&lt;name&gt;
+ *   [!] cookie-hmac:&lt;name&gt;               (a valid, unexpired evidence cookie - see EvidenceCookies)
  *   [!] header:&lt;name&gt;[~&lt;regex&gt;]
  *   [!] request-type:&lt;toplevel|include|include-async&gt;
  *   [!] edge-token                        (carries this node's front-cache.edge-token; guard-rules.conf only)
+ *   [!] ext:&lt;name&gt;[:&lt;argument&gt;]           (a started plugin's predicate - see ExtPredicate)
  *       rate:&lt;limit&gt;/&lt;window&gt; [bucket=&lt;name&gt;] [scope=&lt;toplevel|all&gt;]   (never negated)
  *
  * Regexes are compiled once, here, and matched with find() semantics - the same behaviour as
@@ -155,6 +159,11 @@ public class GuardPredicateFactory {
 			public String describe() {
 				return described;
 			}
+
+			@Override
+			public ExtPredicate pluginPredicate() {
+				return delegate.pluginPredicate();
+			}
 		};
 	}
 
@@ -245,7 +254,16 @@ public class GuardPredicateFactory {
 
 		case "client-ip":
 		{
-			final List<Cidr> blocks = parseClientIpArgument(arg, expr);
+			if (arg.startsWith("@") && IpLists.isLive(arg.substring(1).trim()))
+			{
+				// a list under conf/lists/: read through IpLists, so a plugin's writeList reaches this rule at once
+				checkConfPath(arg.substring(1).trim(), expr);
+				final IpLists.LiveList list = IpLists.get(arg.substring(1).trim(), expr);
+				return simplePredicate(expr, ctx -> list.contains(ctx.getResolvedClientIP()));
+			}
+
+			// indexed: the address is parsed once and looked up, not compared with every block of an @file
+			final CidrSet blocks = CidrSet.of(parseClientIpArgument(arg, expr));
 			return simplePredicate(expr, ctx -> {
 				// Resolved through ClientIpResolver, NOT FCUtils.getClientIP(): the latter believes
 				// thirteen client-supplied headers, so a client could put itself inside any block
@@ -254,11 +272,7 @@ public class GuardPredicateFactory {
 				if (null == address)
 					return false; // undecidable (recycled request, no trusted proxy answer) - never a match
 
-				for (Cidr block : blocks)
-					if (block.contains(address))
-						return true;
-
-				return false;
+				return blocks.contains(address);
 			});
 		}
 
@@ -269,6 +283,13 @@ public class GuardPredicateFactory {
 				throw new GuardConfigException("cookie predicate needs a name in '" + expr + "'");
 			return simplePredicate(expr, ctx -> ctx.getCookieNames().contains(cookieName));
 		}
+
+		case "cookie-hmac":
+			return parseCookieHmac(arg, expr);
+
+		case "ext":
+			// a plugin's predicate (E3): the name and argument here, the plugin's own parse once plugins have started
+			return ExtPredicate.parse(arg, expr);
 
 		case "request-type":
 		{
@@ -352,6 +373,30 @@ public class GuardPredicateFactory {
 	}
 
 	/**
+	 * {@code cookie-hmac:<name>}: the request carries a cookie of that name whose value the node's secret signed and
+	 * whose expiry is ahead - evidence a client cannot produce, unlike {@code cookie:<name>}, which any client can set.
+	 * What a guard rule exempts or favours on a cookie must be decided by this one. In both files; see
+	 * {@link EvidenceCookies} for the value's format.
+	 *
+	 * Refused, so the rule is skipped with an ERROR, on a node with no usable
+	 * {@value EvidenceCookies#SECRET_PROPERTY}: nothing could verify, and a predicate that is silently always false
+	 * makes {@code !cookie-hmac:} match everyone - a challenge for every visitor, forever.
+	 */
+	private static GuardPredicate parseCookieHmac(String name, String expr)
+	{
+		if (0 == name.length())
+			throw new GuardConfigException("cookie-hmac predicate needs a cookie name in '" + expr + "'");
+		if (!EvidenceCookies.NAME.matcher(name).matches())
+			throw new GuardConfigException("'" + name + "' is not a cookie name in '" + expr + "'");
+		if (!EvidenceCookies.isConfigured())
+			throw new GuardConfigException("'" + expr + "' needs " + EvidenceCookies.SECRET_PROPERTY + " ("
+					+ EvidenceCookies.MIN_SECRET_LENGTH + " characters or more) in frontcache.properties - without a"
+					+ " secret no cookie can be verified, so '!" + expr + "' would match every request");
+
+		return simplePredicate(expr, ctx -> EvidenceCookies.holds(ctx, name));
+	}
+
+	/**
 	 * Parses the argument of a {@code client-ip:} predicate: one or more comma-separated blocks, or
 	 * {@code @<file>} naming a list under FRONTCACHE_HOME/conf.
 	 *
@@ -396,13 +441,7 @@ public class GuardPredicateFactory {
 
 	private static List<Cidr> loadClientIpFile(String name, String expr)
 	{
-		// A config file names a list to read, not a capability to read the filesystem: the name is
-		// resolved under FRONTCACHE_HOME/conf by FCConfig, so anything that could climb out of it is
-		// refused before it gets there.
-		if (0 == name.length() || name.startsWith("/") || name.startsWith("\\")
-				|| -1 < name.indexOf("..") || -1 < name.indexOf(':'))
-			throw new GuardConfigException("'@" + name + "' in '" + expr
-					+ "' must be a plain path under FRONTCACHE_HOME/conf, e.g. @bot-networks/googlebot.txt");
+		checkConfPath(name, expr);
 
 		List<Cidr> blocks = new ArrayList<Cidr>();
 		InputStream is = null;
@@ -450,6 +489,18 @@ public class GuardPredicateFactory {
 					+ " - a client-ip rule with an empty list matches nothing, silently");
 
 		return blocks;
+	}
+
+	/**
+	 * A config file names a list to read, not a capability to read the filesystem: the name is resolved under
+	 * FRONTCACHE_HOME/conf by FCConfig, so anything that could climb out of it is refused before it gets there.
+	 */
+	private static void checkConfPath(String name, String expr)
+	{
+		if (0 == name.length() || name.startsWith("/") || name.startsWith("\\")
+				|| -1 < name.indexOf("..") || -1 < name.indexOf(':') || -1 < name.indexOf('\\'))
+			throw new GuardConfigException("'@" + name + "' in '" + expr
+					+ "' must be a plain path under FRONTCACHE_HOME/conf, e.g. @bot-networks/googlebot.txt");
 	}
 
 	private static void close(java.io.Closeable closeable)

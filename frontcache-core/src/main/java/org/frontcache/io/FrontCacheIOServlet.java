@@ -51,9 +51,11 @@ import org.frontcache.core.ApiKey;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRule;
 import org.frontcache.guard.GuardRuleEntry;
-import org.frontcache.module.FrontcacheModules;
-import org.frontcache.module.ManagementAction;
-import org.frontcache.module.ManagementRequest;
+import org.frontcache.plugin.ManagementAction;
+import org.frontcache.plugin.ManagementRequest;
+import org.frontcache.plugin.event.CacheInvalidated;
+import org.frontcache.plugin.host.CoreEvents;
+import org.frontcache.plugin.host.FrontcachePlugins;
 import org.frontcache.resilience.FcResilienceReload;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
@@ -224,6 +226,14 @@ public class FrontCacheIOServlet extends HttpServlet {
 			aResponse = reloadDynamicURLs(request);
 			break;
 
+		case FrontcacheAction.GET_PLUGIN_CONFIG:
+			aResponse = getPluginConfig(request);
+			break;
+
+		case FrontcacheAction.RELOAD_PLUGIN_CONFIG:
+			aResponse = reloadPluginConfig(request);
+			break;
+
 		case FrontcacheAction.PATCH:
 			aResponse = patch(request);
 			break;
@@ -241,11 +251,11 @@ public class FrontCacheIOServlet extends HttpServlet {
 			break;
 
 		default:
-			// A module's action (the Pro jar's license and warmer actions) - consulted only after every
-			// name the core owns, so a module can never shadow one. No module answering it means the
+			// A plugin's action (the Pro jar's license and warmer actions) - consulted only after every
+			// name the core owns, so a plugin can never shadow one. No plugin answering it means the
 			// ping below: the "unknown action" contract, which a console already reads as "this node
 			// does not have it".
-			ManagementAction moduleAction = FrontcacheModules.managementAction(action);
+			ManagementAction moduleAction = FrontcachePlugins.managementAction(action);
 			if (null != moduleAction)
 			{
 				aResponse = moduleAction.handle(new ServletManagementRequest(action, request, response));
@@ -279,6 +289,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 			// survive it because they carry the SOURCE edge's domain and the delete was domain-scoped.
 			CacheManager.getInstance().removeFromCacheAll();
 			logger.info("Invalidation for filter: {} (whole node)", filter);
+			CoreEvents.cacheInvalidated(CacheInvalidated.SCOPE_ALL, null);
 
 			return aResponse;
 		}
@@ -286,6 +297,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		CacheManager.getInstance().removeFromCache(filter);
 
 		logger.info("Invalidation for filter: " + filter);
+		CoreEvents.cacheInvalidated(CacheInvalidated.SCOPE_FILTER, filter);
 		return aResponse;
 	}
 
@@ -320,7 +332,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 		CacheStats cacheStats = (null == processor) ? CacheStats.NOT_TRACKED : processor.getCacheStats();
 
 		NodeStatsActionResponse stats = new NodeStatsActionResponse(cacheStats, FcNodeStats.current());
-		stats.setModules(FrontcacheModules.ids());
+		stats.setModules(FrontcachePlugins.ids());
+		stats.setPlugins(FrontcachePlugins.stats());
 		return stats;
 	}
 
@@ -752,6 +765,49 @@ public class FrontCacheIOServlet extends HttpServlet {
 		return aResponse;
 	}
 
+	/** The raw file a plugin's manifest names - never a name the caller sent. */
+	private ActionResponse getPluginConfig(HttpServletRequest req)
+	{
+		GetPluginConfigActionResponse aResponse = new GetPluginConfigActionResponse();
+		String plugin = req.getParameter("plugin");
+		aResponse.setPlugin(plugin);
+
+		String fileName = FrontcachePlugins.configFile(plugin);
+		if (null == fileName)
+		{
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription((null == plugin) ? "'plugin' is required"
+					: "no plugin '" + plugin + "' with a config on this node");
+			return aResponse;
+		}
+		aResponse.setFile(fileName);
+		aResponse.setPluginConfig(readConfigFile(fileName));
+		return aResponse;
+	}
+
+	/**
+	 * Like the core's own reload actions, gated by the API key only: it applies what is already on disk, which only
+	 * a write - {@code set-config}, gated more strictly - or the node's operator can have put there.
+	 */
+	private ActionResponse reloadPluginConfig(HttpServletRequest req)
+	{
+		ReloadPluginConfigActionResponse aResponse = new ReloadPluginConfigActionResponse();
+		String plugin = req.getParameter("plugin");
+		aResponse.setPlugin(plugin);
+
+		FrontcachePlugins.ConfigReload reload = FrontcachePlugins.reloadConfig(plugin);
+		aResponse.setFile(reload.file());
+		aResponse.setApplied(reload.ok());
+		aResponse.setState(reload.state());
+		aResponse.setErrors(reload.errors());
+		if (!reload.ok())
+		{
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription(String.join("; ", reload.errors()));
+		}
+		return aResponse;
+	}
+
 	private ActionResponse reloadDynamicURLs(HttpServletRequest req)
 	{
 		ReloadDynamicUrlsActionResponse aResponse = new ReloadDynamicUrlsActionResponse();
@@ -842,6 +898,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		Runnable r = new Runnable() {
 			public void run() {
 				CacheManager.getInstance().purge();
+				CoreEvents.cacheInvalidated(CacheInvalidated.SCOPE_PURGE, null);
 			}
 		};
 
@@ -895,7 +952,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 	/** The core's actions and every started module's, for {@code help}. */
 	private static Map<String, String> helpDescriptions()
 	{
-		Map<String, String> descriptions = new java.util.TreeMap<>(FrontcacheModules.managementActionDescriptions());
+		Map<String, String> descriptions = new java.util.TreeMap<>(FrontcachePlugins.managementActionDescriptions());
 		descriptions.putAll(FrontcacheAction.actionsDescriptionMap); // the core's description wins a clash
 		return descriptions;
 	}

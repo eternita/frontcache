@@ -124,6 +124,18 @@ public abstract class FrontcacheAction {
 	 */
 	public static final String RELOAD_DYNAMIC_URLS = "reload-dynamic-urls";
 
+	/**
+	 * A plugin's {@code conf/<config>}, raw - {@code plugin=<id>}. Its file name comes from the plugin's manifest,
+	 * never from the caller.
+	 */
+	public static final String GET_PLUGIN_CONFIG = "get-plugin-config";
+
+	/**
+	 * Re-reads a plugin's {@code conf/<config>} and hands it to the plugin - {@code plugin=<id>}. A running plugin
+	 * keeps the config it had when it refuses the new one; one whose start failed on its config is started.
+	 */
+	public static final String RELOAD_PLUGIN_CONFIG = "reload-plugin-config";
+
 	public static final String PATCH = "patch";
 
 	public static final String PURGE = "purge";
@@ -157,9 +169,11 @@ public abstract class FrontcacheAction {
 		actionsDescriptionMap.put(FrontcacheAction.GET_GUARD_RULES, "get guard rules (checks running before cache & origin) in evaluation order, with hit counts - built-ins plus ./conf/guard-rules.conf");
 		actionsDescriptionMap.put(FrontcacheAction.GET_GUARD_CONFIG, "get raw guard rules configuration from ./conf/guard-rules.conf");
 		actionsDescriptionMap.put(FrontcacheAction.RELOAD_GUARD_RULES, "reload guard rules from ./conf/guard-rules.conf (resets hit counters)");
-		actionsDescriptionMap.put(FrontcacheAction.SET_CONFIG, "write one config file and apply it; accepts 'file' (resilience|guard-rules|bots|dynamic-urls|fallbacks), 'content', optional 'baseHash' (sha-256 of the content being replaced) and optional 'apply' (default true). Requires a configured API key");
+		actionsDescriptionMap.put(FrontcacheAction.SET_CONFIG, "write one config file and apply it; accepts 'file' (resilience|guard-rules|bots|dynamic-urls|fallbacks, or plugin:<id> for a plugin's config), 'content', optional 'baseHash' (sha-256 of the content being replaced) and optional 'apply' (default true). Requires a configured API key");
 		actionsDescriptionMap.put(FrontcacheAction.RELOAD_RESILIENCE, "reload ./conf/resilience.properties (resets circuit-breaker state; a changed threadpool maxQueueSize still needs a restart)");
 		actionsDescriptionMap.put(FrontcacheAction.RELOAD_DYNAMIC_URLS, "reload dynamic URL patterns from ./conf/dynamic-urls.conf");
+		actionsDescriptionMap.put(FrontcacheAction.GET_PLUGIN_CONFIG, "get a plugin's raw configuration, the ./conf file its manifest names; accepts 'plugin' (its id)");
+		actionsDescriptionMap.put(FrontcacheAction.RELOAD_PLUGIN_CONFIG, "reload a plugin's configuration from the ./conf file its manifest names - a running plugin keeps its old config when it refuses the new one, a plugin that failed on its config is started; accepts 'plugin' (its id)");
 		actionsDescriptionMap.put(FrontcacheAction.PURGE, "purge expired entries from the cache (keeps non-expired and cache-forever entries)");
 		actionsDescriptionMap.put(FrontcacheAction.BACKUP_INDEX, "backup the L2 (Lucene) index to a zip archive at the edge (l2-lucene-index.backup-{yyyyMMdd_HHmmss}.zip)");
 		actionsDescriptionMap.put(FrontcacheAction.PING, "ping for GSLB");

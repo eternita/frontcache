@@ -59,6 +59,8 @@ public class NodeStatsActionResponse extends ActionResponse {
 
 	private List<String> modules = new ArrayList<>();
 
+	private List<PluginStats> plugins = new ArrayList<>();
+
 	public NodeStatsActionResponse() { // for JSON mapper
 
 	}
@@ -182,9 +184,9 @@ public class NodeStatsActionResponse extends ActionResponse {
 	}
 
 	/**
-	 * The ids of the modules this node runs ({@code ["pro"]} with the Pro jar) - see
-	 * {@code org.frontcache.module.FrontcacheModule}. Empty on a Community node, and absent from a node
-	 * that predates modules, which a reader gets as empty too.
+	 * The ids of the plugins this node runs ({@code ["pro"]} with the Pro jar) - the started ones of
+	 * {@link #getPlugins()}. Empty on a Community node, and absent from a node that predates modules (2.11.0),
+	 * which a reader gets as empty too. Kept beside {@code plugins} for the readers that know only this.
 	 */
 	public List<String> getModules() {
 		return modules;
@@ -192,6 +194,18 @@ public class NodeStatsActionResponse extends ActionResponse {
 
 	public void setModules(List<String> modules) {
 		this.modules = (null == modules) ? new ArrayList<>() : modules;
+	}
+
+	/**
+	 * Every plugin the node found, started or not - its manifest's facts, its state and its counters (as of
+	 * 2.13.0). Empty on a node without plugins, and on a node that predates them.
+	 */
+	public List<PluginStats> getPlugins() {
+		return plugins;
+	}
+
+	public void setPlugins(List<PluginStats> plugins) {
+		this.plugins = (null == plugins) ? new ArrayList<>() : plugins;
 	}
 
 }

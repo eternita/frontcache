@@ -172,4 +172,16 @@ public class FC_ThroughCache_HttpClient extends FcCommand<WebResponse> {
     	return includeCurrentURL;
     }
 
+	@Override
+	protected RequestContext eventContext()
+	{
+		return context;
+	}
+
+	/** The public URL of the page or include being fetched, never the origin-facing one. */
+	@Override
+	protected String eventUri()
+	{
+		return currentRequestURL;
+	}
 }

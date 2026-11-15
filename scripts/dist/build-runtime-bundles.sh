@@ -127,7 +127,8 @@ verify_modules() {
 
   local jars=""
   local j
-  for j in "$REPO_ROOT"/frontcache-core/build/libs/frontcache-core-"$VERSION".jar \
+  for j in "$REPO_ROOT"/frontcache-plugin-api/build/libs/frontcache-plugin-api-"$VERSION".jar \
+           "$REPO_ROOT"/frontcache-core/build/libs/frontcache-core-"$VERSION".jar \
            "$REPO_ROOT"/frontcache-agent/build/libs/frontcache-agent-"$VERSION".jar \
            "$REPO_ROOT"/frontcache-server/build/libs/frontcache-server-"$VERSION".jar \
            "$REPO_ROOT"/frontcache-console/build/libs/frontcache-console-"$VERSION".jar; do

@@ -10,6 +10,9 @@
 <%@ include file="/WEB-INF/views/inc/header.jsp"%>
 
 <%@ include file="/WEB-INF/views/inc/config_menu.jsp"%>
+<%-- the Plugin Configs screen of a scope with no plugin config has nothing to edit --%>
+<c:if test="${activeConfig != 'plugin' or not empty activePlugin}">
 <%@ include file="/WEB-INF/views/inc/config_file_editor.jsp"%>
+</c:if>
 
 <%@ include file="/WEB-INF/views/inc/footer.jsp"%>

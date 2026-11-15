@@ -18,10 +18,13 @@ package org.frontcache.io;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.frontcache.FCConfig;
 import org.frontcache.FrontCacheEngine;
 import org.frontcache.bots.BotClassifier;
+import org.frontcache.plugin.host.FrontcachePlugins;
 import org.frontcache.resilience.FcResilienceReload;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
@@ -52,6 +55,17 @@ public class ConfigWriteAction {
 	interface Applier {
 		/** @return warnings worth reporting; throws when the file was written but could not be applied */
 		List<String> apply(ConfigFile configFile);
+	}
+
+	/**
+	 * The {@code file} id of a plugin's config: {@code plugin:<id>}. The file it writes is the one the plugin's
+	 * manifest names - read from the loaded manifest, never from the caller - so the allowlist is still closed: the
+	 * five core files, and the config of each plugin this node loaded.
+	 */
+	public static final String PLUGIN_PREFIX = "plugin:";
+
+	/** What one write is about: the file, how it is validated, how it is applied. */
+	private record Target(String fileName, Function<String, List<String>> validator, Supplier<List<String>> applier) {
 	}
 
 	private ConfigWriteAction() { }
@@ -95,13 +109,15 @@ public class ConfigWriteAction {
 			return aResponse;
 		}
 
-		ConfigFile configFile = ConfigFile.byId(fileId);
-		if (null == configFile)
+		Target target = target(fileId, applier);
+		if (null == target)
 		{
-			aResponse.refuse("unknown 'file' - expected one of " + ConfigFile.ids());
+			aResponse.refuse("unknown 'file' - expected one of " + ConfigFile.ids() + ", or " + PLUGIN_PREFIX
+					+ "<id> for a loaded plugin with a config");
 			return aResponse;
 		}
-		aResponse.setFile(configFile.getFileName());
+		String fileName = target.fileName();
+		aResponse.setFile(fileName);
 
 		if (null == content)
 		{
@@ -110,8 +126,8 @@ public class ConfigWriteAction {
 		}
 		String normalized = ConfigFileStore.normalize(content);
 
-		File target = FCConfig.getWritableConfigFile(configFile.getFileName());
-		if (null == target)
+		File file = FCConfig.getWritableConfigFile(fileName);
+		if (null == file)
 		{
 			// Not a fallback situation: FCConfig.getConfigInputStream reads the classpath too, so the
 			// file the console is DISPLAYING may not be a file on disk at all. There is then nothing to
@@ -121,17 +137,17 @@ public class ConfigWriteAction {
 			return aResponse;
 		}
 
-		List<String> validationErrors = ConfigFileValidator.validate(configFile, normalized);
+		List<String> validationErrors = target.validator().apply(normalized);
 		if (!validationErrors.isEmpty())
 		{
 			aResponse.setValidationErrors(validationErrors);
-			aResponse.refuse(configFile.getFileName() + " was NOT written - " + validationErrors.size()
-					+ " line(s) cannot be used");
+			aResponse.refuse(fileName + " was NOT written - " + validationErrors.size()
+					+ ((null == ConfigFile.byId(fileId)) ? " reason(s) the plugin refuses it" : " line(s) cannot be used"));
 			return aResponse;
 		}
 
 		try {
-			String onDisk = ConfigFileStore.readOnDisk(target);
+			String onDisk = ConfigFileStore.readOnDisk(file);
 
 			// Optimistic concurrency. An absent baseHash means the caller could not compute one (see
 			// fc-config-editor.js: crypto.subtle is undefined on a plain-http non-loopback page), so the
@@ -141,7 +157,7 @@ public class ConfigWriteAction {
 				if (!baseHash.trim().equalsIgnoreCase(ConfigFileStore.hash(onDisk)))
 				{
 					aResponse.setCurrentContent(onDisk);
-					aResponse.refuse(configFile.getFileName() + " changed on this node since it was read"
+					aResponse.refuse(fileName + " changed on this node since it was read"
 							+ " - nothing was written. The current content is in 'currentContent'.");
 					return aResponse;
 				}
@@ -150,7 +166,7 @@ public class ConfigWriteAction {
 						+ " change made on this node since the file was read would have been overwritten");
 			}
 
-			boolean created = !target.exists();
+			boolean created = !file.exists();
 
 			if (normalized.equals(onDisk))
 			{
@@ -159,23 +175,23 @@ public class ConfigWriteAction {
 				// make that a restart.
 				aResponse.addWarning("the content is identical to what is on disk - nothing was written");
 			} else {
-				aResponse.setBackupFile(ConfigFileStore.backup(target));
-				ConfigFileStore.write(target, normalized);
+				aResponse.setBackupFile(ConfigFileStore.backup(file));
+				ConfigFileStore.write(file, normalized);
 				aResponse.setWritten(true);
 			}
 
 			if (created)
-				aResponse.addWarning("conf/" + configFile.getFileName() + " did not exist and was created"
+				aResponse.addWarning("conf/" + fileName + " did not exist and was created"
 						+ " - if this node was using a bundled default of the same name, this file now"
 						+ " shadows it");
 
-			logger.info("set-config wrote conf/" + configFile.getFileName() + " ("
+			logger.info("set-config wrote conf/" + fileName + " ("
 					+ normalized.getBytes(StandardCharsets.UTF_8).length + " bytes, written="
 					+ aResponse.isWritten() + ", backup=" + aResponse.getBackupFile() + ")");
 
 		} catch (Exception e) {
-			logger.error("Can't write conf/" + configFile.getFileName(), e);
-			aResponse.refuse("can't write conf/" + configFile.getFileName() + " - " + e.getMessage());
+			logger.error("Can't write conf/" + fileName, e);
+			aResponse.refuse("can't write conf/" + fileName + " - " + e.getMessage());
 			return aResponse;
 		}
 
@@ -187,11 +203,11 @@ public class ConfigWriteAction {
 		}
 
 		try {
-			aResponse.getWarnings().addAll(applier.apply(configFile));
+			aResponse.getWarnings().addAll(target.applier().get());
 			aResponse.setApplied(true);
 
 		} catch (Exception e) {
-			logger.error("conf/" + configFile.getFileName() + " was written but could not be applied", e);
+			logger.error("conf/" + fileName + " was written but could not be applied", e);
 			// NOT a refusal: the file IS written, and saying otherwise would send the operator looking
 			// for a change that is on disk. The status stays OK with applied=false, which is a state the
 			// response models on purpose.
@@ -200,6 +216,35 @@ public class ConfigWriteAction {
 		}
 
 		return aResponse;
+	}
+
+	/** @return the write's target, or null when {@code fileId} names none of ours */
+	private static Target target(String fileId, Applier applier)
+	{
+		ConfigFile configFile = ConfigFile.byId(fileId);
+		if (null != configFile)
+			return new Target(configFile.getFileName(),
+					content -> ConfigFileValidator.validate(configFile, content),
+					() -> applier.apply(configFile));
+
+		if (null == fileId || !fileId.trim().startsWith(PLUGIN_PREFIX))
+			return null;
+		String pluginId = fileId.trim().substring(PLUGIN_PREFIX.length());
+		String fileName = FrontcachePlugins.configFile(pluginId);
+		if (null == fileName)
+			return null;
+		return new Target(fileName,
+				content -> FrontcachePlugins.validateConfig(pluginId, content),
+				() -> applyPluginConfig(pluginId));
+	}
+
+	/** {@code reload-plugin-config}, as the apply step of a write: a refusal is a write that was not applied. */
+	private static List<String> applyPluginConfig(String pluginId)
+	{
+		FrontcachePlugins.ConfigReload reload = FrontcachePlugins.reloadConfig(pluginId);
+		if (!reload.ok())
+			throw new IllegalStateException(String.join("; ", reload.errors()));
+		return List.of("plugin '" + pluginId + "' is " + reload.state() + " on the new config");
 	}
 
 	/**

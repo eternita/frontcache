@@ -22,7 +22,10 @@ import org.frontcache.cache.CacheProcessor;
 /**
  * What a {@link FrontcacheModule} may read from the node - the things module code would otherwise reach
  * for through a core class's statics.
+ *
+ * @deprecated since 2.13.0: {@link org.frontcache.plugin.PluginContext}.
  */
+@Deprecated
 public interface ModuleContext {
 
 	/**

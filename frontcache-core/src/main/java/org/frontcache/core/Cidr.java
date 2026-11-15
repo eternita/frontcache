@@ -79,6 +79,16 @@ public final class Cidr {
 		return new Cidr(bytes, prefixBits, text.trim());
 	}
 
+	/** The block's address bytes as written (not masked) - {@link CidrSet} masks them. Never modify. */
+	byte[] networkBytes() {
+		return network;
+	}
+
+	/** The prefix length: 32 or 128 for a single address. */
+	int prefixBits() {
+		return prefixBits;
+	}
+
 	public boolean contains(InetAddress address)
 	{
 		if (null == address)

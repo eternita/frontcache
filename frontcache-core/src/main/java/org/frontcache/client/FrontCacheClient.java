@@ -61,7 +61,10 @@ import org.frontcache.bots.BotRuleEntry;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.io.ActionResponse;
 import org.frontcache.io.ConfigFile;
+import org.frontcache.io.ConfigWriteAction;
+import org.frontcache.io.GetPluginConfigActionResponse;
 import org.frontcache.io.ReloadDynamicUrlsActionResponse;
+import org.frontcache.io.ReloadPluginConfigActionResponse;
 import org.frontcache.io.ReloadResilienceActionResponse;
 import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.BackupActionResponse;
@@ -858,9 +861,72 @@ public class FrontCacheClient {
 	 */
 	public SetConfigActionResponse setConfig(ConfigFile configFile, String content, String baseHash, boolean apply)
 	{
+		return setConfig(configFile.getId(), configFile.getFileName(), content, baseHash, apply);
+	}
+
+	/**
+	 * Writes a plugin's config on the edge and applies it - {@code set-config} with {@code file=plugin:<id>}, so
+	 * every gate of {@link #setConfig(ConfigFile, String, String, boolean)} applies. A node that predates plugin
+	 * configs refuses the id as an unknown file.
+	 *
+	 * @param fileName the file as {@link #getPluginConfig} named it, for messages only
+	 * @return the outcome, or null when the edge could not be reached at all
+	 */
+	public SetConfigActionResponse setPluginConfig(String pluginId, String fileName, String content, String baseHash,
+			boolean apply)
+	{
+		return setConfig(ConfigWriteAction.PLUGIN_PREFIX + pluginId, fileName, content, baseHash, apply);
+	}
+
+	/**
+	 * A plugin's raw config on the edge.
+	 *
+	 * @return the answer - status ERROR when the edge has no such plugin, {@code pluginConfig} null when its file is
+	 *         absent - or null when the edge could not be reached. A node that predates the action (a ping) is
+	 *         answered as one with no such plugin.
+	 */
+	public GetPluginConfigActionResponse getPluginConfig(String pluginId)
+	{
+		GetPluginConfigActionResponse response = call(Map.of("action", FrontcacheAction.GET_PLUGIN_CONFIG,
+				"plugin", (null == pluginId) ? "" : pluginId), GetPluginConfigActionResponse.class);
+		if (null == response || !isPing(response))
+			return response;
+
+		GetPluginConfigActionResponse none = new GetPluginConfigActionResponse();
+		none.setPlugin(pluginId);
+		none.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+		none.setErrorDescription("this node predates plugin configs");
+		return none;
+	}
+
+	/**
+	 * Re-reads a plugin's config on the edge - {@code reload-plugin-config?plugin=<id>}: the file already on the node's
+	 * disk, applied (a running plugin keeps the config it had when it refuses the new one; one whose last start failed
+	 * on its config is started).
+	 *
+	 * @return the answer - {@code applied} false with status ERROR and the reasons in {@code errors} when the plugin
+	 *         refused it or has no config - or null when the edge could not be reached. A node that predates the
+	 *         action (a ping) is answered as an ERROR, never as a reload that succeeded.
+	 */
+	public ReloadPluginConfigActionResponse reloadPluginConfig(String pluginId)
+	{
+		ReloadPluginConfigActionResponse response = call(Map.of("action", FrontcacheAction.RELOAD_PLUGIN_CONFIG,
+				"plugin", (null == pluginId) ? "" : pluginId), ReloadPluginConfigActionResponse.class);
+		if (null == response || !isPing(response))
+			return response;
+
+		ReloadPluginConfigActionResponse none = new ReloadPluginConfigActionResponse();
+		none.setPlugin(pluginId);
+		none.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+		none.setErrorDescription("this node predates plugin configs");
+		return none;
+	}
+
+	private SetConfigActionResponse setConfig(String fileId, String fileName, String content, String baseHash, boolean apply)
+	{
 		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
 		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.SET_CONFIG));
-		urlParameters.add(new BasicNameValuePair("file", configFile.getId()));
+		urlParameters.add(new BasicNameValuePair("file", fileId));
 		urlParameters.add(new BasicNameValuePair("content", (null == content) ? "" : content));
 		urlParameters.add(new BasicNameValuePair("apply", Boolean.toString(apply)));
 
@@ -878,9 +944,9 @@ public class FrontCacheClient {
 						+ " - it predates config editing");
 
 				SetConfigActionResponse unsupported = new SetConfigActionResponse();
-				unsupported.setFile(configFile.getFileName());
+				unsupported.setFile(fileName);
 				unsupported.refuse("this node does not support editing config files - upgrade it, or edit"
-						+ " conf/" + configFile.getFileName() + " on the node and reload");
+						+ " conf/" + fileName + " on the node and reload");
 				return unsupported;
 			}
 

@@ -37,4 +37,18 @@ public class FrontCacheException extends Exception {
 		super(message, cause, enableSuppression, writableStackTrace);
 	}
 
+	/** The origin answered with a status the node does not serve (outside 2xx-4xx). */
+	public static FrontCacheException originStatus(int status, String message) {
+		FrontCacheException e = new FrontCacheException(message);
+		e.originStatus = status;
+		return e;
+	}
+
+	private int originStatus = 0;
+
+	/** The origin's status when that is why this was thrown ({@link #originStatus(int, String)}); 0 otherwise. */
+	public int getOriginStatus() {
+		return originStatus;
+	}
+
 }

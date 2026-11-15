@@ -39,7 +39,7 @@ curl -H "Authorization: Bearer <your-api-key>" "http://<edge>/frontcache-io?acti
 ## 2. The format
 
 ```
-<name> | <condition> | <action> [| dry-run]
+<name> | <condition> | <action> [| dry-run] [| on-error=allow] [| trap]
 ```
 
 - **name** — a short slug you choose. It is what you will see in the console, in the
@@ -49,6 +49,11 @@ curl -H "Authorization: Bearer <your-api-key>" "http://<edge>/frontcache-io?acti
 - **action** — `allow`, `reject:…`, or `redirect:…`.
 - **dry-run** — optional. The rule is evaluated and logged, but the request is left
   alone. Always start here (§6).
+- **on-error=allow** — only on an `allow` rule naming a plugin's `ext:` condition, and
+  required there (§4.3).
+- **trap** — optional. The rule is a honeypot: it matches a visitor's own requests only, and
+  its log line names the address the node resolved (§4.4, since 2.13.0). Not on an `allow`
+  rule.
 
 Rules run **top to bottom, first match wins**, after the two built-ins. Blank lines
 and `#` comments are ignored.
@@ -65,6 +70,9 @@ and `#` comments are ignored.
 | `method:GET` | the HTTP method is GET (POST, HEAD, …) |
 | `client-type:bot` \| `client-type:guest` | how Frontcache classified the visitor, using `bots.conf` |
 | `cookie:<name>` | that cookie is present (presence only — values are never read) |
+| `cookie-hmac:<name>` | that cookie carries a value signed with this node's secret, not yet expired — evidence a client cannot forge (§4.1, since 2.13.0) |
+| `client-ip:<address or CIDR>[,…]` or `client-ip:@<file>` | the client's address (as resolved through `front-cache.client-ip.trusted-proxies`, §5.1) is in one of the blocks; `@<file>` is a list under `conf/`, one block per line — and `@lists/<file>` one that may change while the node runs (§4.3) |
+| `ext:<name>[:<argument>]` | a plugin's condition — `ext:geo:country=DE` — answered by a `decide` plugin the node runs (§4.3, since 2.13.0) |
 | `header:<name>` or `header:<name>~<regex>` | the header is present / matches |
 | `request-type:<toplevel\|include\|include-async>` | `toplevel` is a request from a client; the others are `<fc:include>` fragments re-entering the engine |
 | `rate:<limit>/<window>` | one client IP has already sent `<limit>` requests in the current `<window>` — **§5**, and it needs one property set first |
@@ -79,6 +87,7 @@ same behaviour as `dynamic-urls.conf`. Anchor with `^` when you mean "starts wit
 | `allow` | stop checking, let the request through — this is how you write exemptions |
 | `reject:<status> [message]` | send the status and a short plain-text body (default body: `"<status> Rejected"`) |
 | `redirect:<301\|302\|303\|307\|308> <target>` | send a `Location` header, plus `Cache-Control: no-store` so nobody caches the decision |
+| `challenge <provider> [else <reject:…\|redirect:…>]` | send the visitor to a challenge provider's page, served by a plugin under `/fc-x/` — and, when no plugin offers the provider, act as a dry run or as the `else` action (§4.2, since 2.13.0) |
 
 A redirect target can be relative (`/login.htm`) or absolute. Absolute targets must
 point at a host you serve — see §8 if a rule is refused.
@@ -148,6 +157,211 @@ Worth knowing:
   render normally, add `; client-type:guest` to the condition.
 - **Presence only.** Frontcache checks that the cookie *exists*; it never validates a
   session. Deciding whether a session is real stays your app's job.
+
+---
+
+### 4.1 A cookie a client cannot forge: `cookie-hmac:`
+
+`cookie:` tests presence, and any client can send any cookie. That is fine for §4 — a
+forged session cookie only gets someone to a page the origin then refuses — and wrong
+for anything a rule **exempts or favours**: "visitors who solved the CAPTCHA skip the
+rate limit" cannot be decided on a cookie a scraper can set itself.
+
+`cookie-hmac:<name>` is true only when the cookie's value was signed with this node's
+secret and has not expired:
+
+```
+# frontcache.properties - at least 32 characters, the same on every node (and on the origin, if it signs)
+front-cache.visitor.cookie-secret=<32 or more random characters>
+```
+
+```
+search-limit | uri~^/search ; client-type:guest ; !cookie-hmac:fc_pass ; rate:30/1m | redirect:302 /challenge?return=${url:enc}
+```
+
+Whoever completes the challenge sets the cookie — your origin's own challenge page, with
+the same secret, or a Frontcache plugin (§4.2). The value is
+
+```
+<expiry>.<mac>
+  expiry = epoch seconds, decimal
+  mac    = base64url (no padding) of HMAC-SHA256(secret, "<cookie name>|<expiry>")
+```
+
+so the origin needs a dozen lines in any language. The name is part of the MAC, so a
+value is worthless under another cookie's name. A plugin may also **bind** a pass to the
+visitor's address or user agent (`<expiry>.<ip|ua|ip_ua>.<mac>`, the MAC then covering
+those too); a bound pass is refused from anywhere else. The address is the one §5.1
+resolves, never a header the client sets.
+
+- **No secret, no predicate.** On a node without `front-cache.visitor.cookie-secret` (or
+  with one shorter than 32 characters) the rule is skipped with an error at load — never
+  "always false", which would make `!cookie-hmac:` match everyone.
+- **Rotating** the secret: put the old one in `front-cache.visitor.cookie-secret.previous`
+  while the fleet moves to the new one. The previous secret verifies; only the current one signs.
+- Works in `bots.conf` too — a rule there can classify a visitor with a pass.
+- Values are verified, never logged.
+
+### 4.2 Sending a visitor to a challenge: `challenge`
+
+```
+search-challenge | uri~^/search ; client-type:guest ; rate:30/1m | challenge pow
+```
+
+`challenge <provider>` is a redirect that knows what it is for. When a plugin on the node
+offers the provider (a plugin names its providers in its manifest) **and** the node has a
+cookie secret, a matching `GET` gets a `302` to the plugin's page,
+`/fc-x/<plugin>/?p=<provider>&return=<path and query>`, with `Cache-Control: no-store`.
+The plugin renders the challenge, checks the answer, and has the node sign a pass; the
+next request carries it and the rule no longer matches. Logged with disposition
+`challenged`. On top of a redirect it knows that:
+
+- **a visitor already holding a pass is not challenged** — a valid `cookie-hmac:` pass
+  from the provider's plugin counts, so forgetting `!cookie-hmac:fc_pass` in the rule
+  does not send people round in circles. Writing it anyway is clearer;
+- **a non-GET is never redirected** (a redirect would lose its body): it gets `429` with
+  `Retry-After` — the rate limiter's, or 60 seconds;
+- **an `<fc:include>` and anything under `/fc-x/` are never challenged** — the rule does
+  not act on them, and counts no hit.
+
+**With the provider absent** — a Community node, a plugin not installed or failed, no
+cookie secret — the rule **acts as a dry run**: logged as `<rule>:dry-run`, the request
+served as if the rule were not there, and one error in the log per reload saying why.
+A challenge nobody can pass is never issued. To refuse instead, say so:
+
+```
+search-challenge | uri~^/search ; client-type:guest ; rate:30/1m | challenge pow else reject:429 Too many searches
+```
+
+The `else` action is a `reject:` or a `redirect:`, never `allow`.
+
+**`/fc-x/` is reserved** for plugins: a request under it is never cached and never sent
+to the origin, and a path no plugin owns answers a one-line `404`. If your site serves
+pages under `/fc-x/`, they are no longer reachable through Frontcache.
+
+### 4.3 A plugin's condition: `ext:`, and lists a plugin keeps
+
+A plugin of kind `decide` adds conditions of its own, written `ext:<name>:<argument>` in
+`guard-rules.conf` and `bots.conf` alike, and negated with `!` like any other:
+
+```
+# the plugin 'geoip' offers ext:geo; the argument is the plugin's own syntax
+eu-checkout | uri~^/checkout ; !ext:geo:country=DE,FR,PL | reject:403
+```
+
+The node decides what a failure means, never the plugin. When the condition **has no
+answer** — no running plugin offers the name, the plugin refused the argument, it threw,
+or it is switched off (below) — **the rule does not match** that request, whichever way
+it is negated: an `!ext:` that fails is never "true". For a `reject`, `redirect` or
+`challenge` rule that means the request is served as if the rule were not there. For an
+`allow` rule it means the **exemption stops applying** — so such a rule loads only when
+it says it accepts that:
+
+```
+office | ext:geo:office ; uri~^/admin | allow | on-error=allow
+```
+
+A name no plugin offers, or an argument the plugin refuses, is an error in the log once
+the plugins have started (and `set-config` refuses the file on such a node); the console
+and the portal accept any `ext:` they cannot check.
+
+**The budget.** A plugin's conditions run on the request thread, so every call is timed.
+Over a minute, a plugin whose p99 is over its budget — 200 µs unless
+`front-cache.plugins.<id>.decide-budget` says otherwise (`500us`, `1ms`) — or that threw
+on more than 1 % of calls (judged on 100 calls or more) is **switched off for five
+minutes**: its rules do not match, the console's Plugins screen says *over budget*, and
+`frontcache_plugin_decide_over_budget` is `1`. Then it is tried again.
+
+**Lists a plugin keeps — `client-ip:@lists/<file>`.** A list under `conf/lists/` is one
+that changes while the node runs: a plugin (kind `manage`) can replace it, and every rule
+naming it sees the new content at once, with no reload — the sanctioned way for a plugin
+to change what the node decides:
+
+```
+# lists/googlebot.txt is kept current by the crawler-feeder plugin
+googlebot-ok | ua~(?i)googlebot ; client-ip:@lists/googlebot.txt | allow
+# lists/banned.txt by whatever bans
+banned       | client-ip:@lists/banned.txt                        | reject:403
+```
+
+The crawler-feeder example plugin (`examples/plugins/crawler-feeder/`) keeps
+`googlebot.txt`, `bingbot.txt` and `applebot.txt` this way: the ranges the vendors publish,
+plus each address that claims to be the crawler, is reported by a rule you name, and passes
+the vendors' own check — its reverse DNS name is under the crawler's domain and resolves back
+to it. The rule that reports a claimant can be a dry run, so nobody is refused while the
+check runs:
+
+```
+googlebot-claim | ua~(?i)googlebot ; !client-ip:@lists/googlebot.txt | reject:403 | dry-run
+```
+
+Unlike any other `@file`, a missing `lists/` file is an empty list (a warning, not a
+skipped rule — the plugin may not have run yet), and an empty list is fine. A file a
+plugin writes starts with `# managed by plugin <id>`; a plugin never overwrites a list
+without its own marker, so a list you keep by hand is safe there. A rule reload re-reads a
+`lists/` file whose size or date changed.
+
+### 4.4 A honeypot: `trap`
+
+A honeypot is a path **no visitor is ever sent to**: a link nobody can see, to a path your
+`robots.txt` forbids. A person never follows it, a search engine is told not to — so
+whoever fetches it is a crawler that ignores `robots.txt` (many read it precisely to find
+such paths) or a scanner walking your site. One request is enough to know.
+
+1. **`robots.txt`** (your origin's) — and then **wait a day** before step 2: crawlers keep
+   a copy of `robots.txt`, and one that has not seen the new line yet is not misbehaving.
+
+   ```
+   User-agent: *
+   Disallow: /no-crawl/
+   ```
+
+2. **The bait**, in your page template — hidden from people, from screen readers and from
+   the keyboard, and marked not to be followed:
+
+   ```html
+   <a href="/no-crawl/" rel="nofollow" style="display:none" aria-hidden="true" tabindex="-1">.</a>
+   ```
+
+3. **The rule**, below your exemptions (§3) — and below any `allow` rule for the crawlers
+   you verify (§4.3), so a verified crawler that strays there is never counted:
+
+   ```
+   honeypot | uri~^/no-crawl/ | reject:404 Not Found | trap
+   ```
+
+The node answers the trap itself — a one-line 404, `no-store`, the origin never asked —
+and `trap` does two things:
+
+- **The log names the address you can act on.** The guard log's reason is
+  `honeypot#203.0.113.7`: the address the node resolved through
+  `front-cache.client-ip.trusted-proxies` (§5.1), the one a `client-ip:` rule matches. The
+  line's client-IP column is best effort — the first forwarding header, whoever wrote it —
+  so a scanner sending `X-Forwarded-For: <someone else>` would otherwise have you block
+  someone else. Set the trusted proxies first, or every visitor is your proxy.
+- **Only a visitor's request is a hit.** An `<fc:include>` of the path re-enters the engine
+  with the visitor's address but is your origin's page asking, so it never matches a trap
+  rule: a template that included the trap path by mistake would otherwise catch everyone
+  who opened that page.
+
+With `| dry-run` the trap observes only — the request goes to your origin as before, and the
+log line still names the address (`honeypot:dry-run#203.0.113.7`).
+
+**What happens to the address** is up to you. The rule refuses the trap and nothing else,
+by design: one fetch of a hidden link is strong evidence, but a shared address (an office, a
+mobile carrier's NAT) holds many people. The log line says who; the rule's **Hits** on the
+console's Guard Rules screen and `frontcache_guard_actions_total{name="honeypot"}` say how
+often. A plugin observing `guard.matched` events can put the address on a list for a while
+(§4.3), and a rule of yours decides what a listed address gets — `reject:403`, or, gentler
+for a shared address, a challenge (§4.2):
+
+```
+honeypot | uri~^/no-crawl/             | reject:404 Not Found | trap
+listed   | client-ip:@lists/banned.txt | challenge pow else reject:403
+```
+
+Never point a trap at a path a real page links to visibly, and never at one your own tools
+fetch (a link checker, a warmer list, an uptime monitor) — they would be the first caught.
 
 ---
 
@@ -335,7 +549,8 @@ status sent:
 For a **rate rule** the reason field carries the address that was counted, as
 `<rule>#<address>` — `"ip-flood#203.0.113.7"` — because the limiter's resolved address
 (§5.1) and the log's own client-IP column can legitimately differ, and telling them apart
-is the whole of debugging a 429. A Kibana pipeline aggregating on `reason` should split it
+is the whole of debugging a 429. A **trap** (§4.4) records its address the same way, dry-run
+included (`"honeypot:dry-run#203.0.113.7"`). A Kibana pipeline aggregating on `reason` should split it
 on `#` so the by-rule panels keep counting rules rather than one term per client.
 
 **Metrics** — with `front-cache.metrics.export` on
@@ -463,6 +678,8 @@ re-reads live:
 | `front-cache.guard-rules.rate-limit.enabled` | `true` | emergency off switch for rate limiting only; every `rate:` predicate returns false and the rules stay visible |
 | `front-cache.guard-rules.rate-limit.slots` | `262144` | counter slots per bucket, 8 bytes each — 2 MB. Undersizing costs accuracy, never a wrongly refused visitor |
 | `front-cache.guard-rules.rate-limit.max-total-slots` | `4194304` | ceiling across all buckets; a rule that would exceed it is skipped with an error |
+| `front-cache.visitor.cookie-secret` | *(empty)* | the key `cookie-hmac:` verifies with and a plugin's passes are signed with — at least 32 characters, the same on every node. Without it `cookie-hmac:` rules are skipped and `challenge` rules act as a dry run (§4.1). Read per request, so a reload is not needed — but `cookie-hmac:` rules refused for its absence load only at the next `reload-guard-rules` |
+| `front-cache.visitor.cookie-secret.previous` | *(empty)* | accepted, never signed with — the overlap while a fleet rotates the secret |
 
 Management actions (both need the `Authorization: Bearer <api-key>` header when an api key is
 configured):

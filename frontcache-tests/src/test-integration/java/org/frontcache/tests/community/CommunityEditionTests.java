@@ -83,6 +83,7 @@ public class CommunityEditionTests extends TestsBase {
 			NodeStatsActionResponse stats = node.getNodeStatsActionResponse();
 			assertNotNull(node.getFrontCacheURL(), stats);
 			assertEquals(node.getFrontCacheURL(), List.of(), stats.getModules());
+			assertEquals(node.getFrontCacheURL(), List.of(), stats.getPlugins());
 		}
 	}
 

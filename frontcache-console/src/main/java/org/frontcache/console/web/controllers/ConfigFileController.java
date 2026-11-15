@@ -20,6 +20,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +32,7 @@ import org.frontcache.console.auth.ConsolePermit;
 import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.service.FrontcacheService;
 import org.frontcache.io.ConfigFile;
+import org.frontcache.io.ConfigWriteAction;
 import org.frontcache.io.SetConfigActionResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -48,7 +50,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
  * {@code DynamicURLConfigController}, {@code GuardConfigController} and
  * {@code ResilienceConfigController}, which were the same nine lines five times. All five URLs are
  * unchanged, including the pre-2.7 {@code /hystrix-configs} alias - a person can have any of them
- * bookmarked.
+ * bookmarked. As of 2.13.0 a sixth, {@code /plugin-configs}, edits the config of a node's plugins with the
+ * same editor and the same {@code /save-config} ({@code file=plugin:<id>}).
  *
  * <h2>Why the raw file, still</h2>
  *
@@ -93,6 +96,38 @@ public class ConfigFileController {
 	}
 
 	/**
+	 * A plugin's config file - {@code conf/<config>} as the plugin's manifest names it - on every edge of the scope
+	 * that runs the plugin: the same editor, the same Save through {@code set-config}. {@code plugin} picks one when
+	 * several plugins have a config; the first otherwise.
+	 */
+	@RequestMapping(value = "/plugin-configs", method = RequestMethod.GET)
+	public String pluginConfigs(ModelMap model, HttpServletRequest request, EdgeScope scope) {
+		return pluginScreen(model, scope, request.getParameter("plugin"));
+	}
+
+	private String pluginScreen(ModelMap model, EdgeScope scope, String pluginId) {
+
+		Map<String, String> plugins = frontcacheService.getPluginConfigs(scope);
+		if (null == pluginId || !plugins.containsKey(pluginId))
+			pluginId = plugins.isEmpty() ? null : plugins.keySet().iterator().next();
+
+		model.put("activeConfig", "plugin");
+		model.put("pluginConfigs", plugins);
+		model.put("activePlugin", pluginId);
+		model.put("configEditingEnabled", frontcacheService.isConfigEditingEnabled());
+		if (null == pluginId)
+		{
+			model.put("configEdges", List.of());
+			return "config_file";
+		}
+
+		model.put("configFileId", ConfigWriteAction.PLUGIN_PREFIX + pluginId);
+		model.put("configFileName", plugins.get(pluginId));
+		model.put("configEdges", frontcacheService.getPluginConfigFiles(scope, pluginId));
+		return "config_file";
+	}
+
+	/**
 	 * Renders one Configs screen. Shared by the five GETs and by the POST, so the page an operator
 	 * sees after a Save is built by exactly the same code as the page they saved from.
 	 */
@@ -128,7 +163,10 @@ public class ConfigFileController {
 	@RequestMapping(value = "/save-config", method = RequestMethod.POST)
 	public String save(ModelMap model, HttpServletRequest request, EdgeScope scope) {
 
-		ConfigFile configFile = ConfigFile.byId(request.getParameter("file"));
+		String file = request.getParameter("file");
+		ConfigFile configFile = ConfigFile.byId(file);
+		if (null == configFile && null != file && file.startsWith(ConfigWriteAction.PLUGIN_PREFIX))
+			return savePluginConfig(model, request, scope, file.substring(ConfigWriteAction.PLUGIN_PREFIX.length()));
 		if (null == configFile)
 			return "redirect:fallbacks";
 
@@ -155,6 +193,33 @@ public class ConfigFileController {
 		model.put("activeEdgeURL", edgeURL);
 
 		return screen(model, scope, configFile);
+	}
+
+	/** {@link #save} for a plugin's config: the same audit, the same per-edge answer, its own screen afterwards. */
+	private String savePluginConfig(ModelMap model, HttpServletRequest request, EdgeScope scope, String pluginId) {
+
+		String fileName = frontcacheService.getPluginConfigs(scope).get(pluginId);
+		if (null == fileName)
+			return "redirect:plugin-configs";
+
+		String content = request.getParameter("content");
+		String baseHash = request.getParameter("baseHash");
+		String edgeURL = request.getParameter("edge");
+
+		Map<String, SetConfigActionResponse> results;
+		if ("all".equals(request.getParameter("scope")))
+			results = frontcacheService.savePluginConfigFileToAllEdges(scope, pluginId, fileName, content, baseHash, edgeURL);
+		else
+		{
+			results = new LinkedHashMap<String, SetConfigActionResponse>();
+			results.put(edgeURL, frontcacheService.savePluginConfigFile(scope, edgeURL, pluginId, fileName, content, baseHash));
+		}
+
+		model.put("saveResults", results);
+		auditSave(request, content, baseHash, results);
+		model.put("activeEdgeURL", edgeURL);
+
+		return pluginScreen(model, scope, pluginId);
 	}
 
 	/**

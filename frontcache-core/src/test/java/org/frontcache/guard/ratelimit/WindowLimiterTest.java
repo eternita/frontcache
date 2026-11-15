@@ -207,4 +207,41 @@ public class WindowLimiterTest {
 		assertTrue("admitted " + admitted + ", expected no more than everything sent", threads * perThread >= admitted);
 	}
 
+	// ---- the first request over the limit is flagged, once per key and window --------------------------------
+
+	@Test
+	public void theRequestThatCrossesTheLimitIsFlaggedOncePerWindow() {
+		WindowLimiter limiter = new WindowLimiter("test-bucket", 3, WINDOW, SLOTS);
+		long ip = key("203.0.113.7");
+
+		for (int i = 0; i < 3; i++)
+			assertEquals(0L, limiter.checkAndCountFlagged(ip, 1000));
+		long crossing = limiter.checkAndCountFlagged(ip, 1000);
+		assertTrue("the fourth request crosses the limit", 0 != (crossing & WindowLimiter.FIRST_OVER_LIMIT));
+		assertEquals("the flag masks off to the Retry-After", WINDOW - 1000, crossing & ~WindowLimiter.FIRST_OVER_LIMIT);
+		for (int i = 0; i < 5; i++)
+			assertEquals("later refusals are not flagged", 0L,
+					limiter.checkAndCountFlagged(ip, 1000) & WindowLimiter.FIRST_OVER_LIMIT);
+		assertEquals("checkAndCount never shows the flag", WINDOW - 1000, limiter.checkAndCount(ip, 1000));
+		assertEquals(1, limiter.getOverLimitCount());
+
+		// the next window: a fresh count, and a fresh crossing
+		for (int i = 0; i < 3; i++)
+			limiter.checkAndCountFlagged(ip, WINDOW + 1);
+		assertTrue(0 != (limiter.checkAndCountFlagged(ip, WINDOW + 1) & WindowLimiter.FIRST_OVER_LIMIT));
+		assertEquals(2, limiter.getOverLimitCount());
+	}
+
+	@Test
+	public void aSaturatedCountIsNotFlaggedAgain() {
+		WindowLimiter limiter = new WindowLimiter("test-bucket", WindowLimiter.MAX_LIMIT, WINDOW, 16);
+		long ip = key("203.0.113.7");
+
+		int flagged = 0;
+		for (int i = 0; i < WindowLimiter.MAX_LIMIT + 10; i++)
+			if (0 != (limiter.checkAndCountFlagged(ip, 1) & WindowLimiter.FIRST_OVER_LIMIT))
+				flagged++;
+		assertEquals(1, flagged);
+	}
+
 }

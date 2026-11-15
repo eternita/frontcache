@@ -20,7 +20,7 @@ set -uo pipefail
 EXPECT="${1:-}"
 BUCKET="s3://repo.eternita.co/maven2/org/frontcache"
 BASE="https://repo.eternita.co/maven2/org/frontcache"
-MODULES="frontcache-core frontcache-agent frontcache-server frontcache-console"
+MODULES="frontcache-plugin-api frontcache-core frontcache-agent frontcache-server frontcache-console"
 
 release_of() { grep -o '<release>[^<]*</release>' | sed 's/<[^>]*>//g'; }
 

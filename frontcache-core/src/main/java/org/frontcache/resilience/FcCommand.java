@@ -25,6 +25,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
+import org.frontcache.core.FrontCacheException;
+import org.frontcache.core.RequestContext;
+import org.frontcache.plugin.host.CoreEvents;
 import org.frontcache.resilience.FcCommandConfig.Isolation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,6 +142,19 @@ public abstract class FcCommand<T> {
 		throw new NoFallbackAvailable();
 	}
 
+	/** The request this command serves, for the events it emits; null when it serves none (a management lookup). */
+	protected RequestContext eventContext()
+	{
+		return null;
+	}
+
+	/** The URL this command calls, for the events it emits: the request's own unless a command knows better. */
+	protected String eventUri()
+	{
+		RequestContext context = eventContext();
+		return (null == context) ? null : CoreEvents.uri(context);
+	}
+
 	/** What the watchdog names in its log line. Overridable so a command can add the URL it is on. */
 	protected String getExecutionDescription()
 	{
@@ -169,6 +185,11 @@ public abstract class FcCommand<T> {
 
 			if (FcEventType.FAILURE == failure)
 				this.failedExecutionException = cause;
+
+			// An FcCommandException is a nested command's failure (no fallback there) seen again by the one around
+			// it - FC_Total over an include, say - and that command has reported it already.
+			if (!(cause instanceof FcCommandException))
+				originError(failure, cause, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
 
 			return resolveFallback(failure, cause);
 		} finally {
@@ -223,6 +244,7 @@ public abstract class FcCommand<T> {
 		try {
 			T fallback = getFallback();
 			recordEvent(FcEventType.FALLBACK_SUCCESS);
+			fallbackServed(failure, cause);
 			return fallback;
 		} catch (NoFallbackAvailable e) {
 			recordEvent(FcEventType.FALLBACK_FAILURE);
@@ -235,6 +257,29 @@ public abstract class FcCommand<T> {
 			logger.error("Fallback for " + commandKey + " failed", fallbackFailure);
 			throw new FcCommandException(commandKey, failure,
 					commandKey + " failed and its fallback failed too: " + failure, cause);
+		}
+	}
+
+	/** The E1 event for a failed origin call - after the fact; costs one volatile read when nobody observes it. */
+	private void originError(FcEventType failure, Throwable cause, long latencyMillis)
+	{
+		try {
+			Throwable thrown = (FcEventType.FAILURE == failure) ? cause : null;
+			int status = (thrown instanceof FrontCacheException fce) ? fce.getOriginStatus() : 0;
+			CoreEvents.originError(eventContext(), commandKey, CoreEvents.failureName(failure), status, eventUri(),
+					thrown, latencyMillis);
+		} catch (RuntimeException e) {
+			// an event is never a reason to change what the command does
+		}
+	}
+
+	private void fallbackServed(FcEventType failure, Throwable cause)
+	{
+		try {
+			CoreEvents.fallbackServed(eventContext(), commandKey, CoreEvents.failureName(failure), eventUri(),
+					(FcEventType.FAILURE == failure) ? cause : null);
+		} catch (RuntimeException e) {
+			// as above
 		}
 	}
 
