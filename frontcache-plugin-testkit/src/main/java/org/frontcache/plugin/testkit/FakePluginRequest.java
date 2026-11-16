@@ -62,6 +62,7 @@ public final class FakePluginRequest implements PluginRequest {
 	private Set<String> visibleCookies = Set.of();
 	private String clientAddress = "203.0.113.7";
 	private String clientType = "guest";
+	private String visitorType;
 	private String requestId = "test-request-" + IDS.incrementAndGet();
 	private String scheme = "https";
 	private InputStream bodyStream;
@@ -134,6 +135,12 @@ public final class FakePluginRequest implements PluginRequest {
 
 	public FakePluginRequest clientType(String clientType) {
 		this.clientType = clientType;
+		return this;
+	}
+
+	/** A declared visitor type ({@code captcha-passed}); unset, the request's visitor type is its client type. */
+	public FakePluginRequest visitorType(String visitorType) {
+		this.visitorType = visitorType;
 		return this;
 	}
 
@@ -221,6 +228,11 @@ public final class FakePluginRequest implements PluginRequest {
 	@Override
 	public String clientType() {
 		return clientType;
+	}
+
+	@Override
+	public String visitorType() {
+		return (null != visitorType) ? visitorType : clientType;
 	}
 
 	@Override

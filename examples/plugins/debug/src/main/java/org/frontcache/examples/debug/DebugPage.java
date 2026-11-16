@@ -62,7 +62,8 @@ final class DebugPage {
 		html.append("<table>");
 		row(html, "Client address", request.clientAddress(),
 				"resolved through front-cache.client-ip.trusted-proxies only - never a header a client could set");
-		row(html, "Client type", request.clientType(), "the bots.conf verdict");
+		row(html, "Client type", request.clientType(), "the bots.conf verdict's root - bot or guest");
+		row(html, "Visitor type", request.visitorType(), "the bots.conf verdict as written - a declared type, else the root");
 		row(html, "Scheme", request.scheme(), null);
 		row(html, "Request id", request.requestId(), "as the request log and every event carry it");
 		row(html, "Method", request.method(), null);

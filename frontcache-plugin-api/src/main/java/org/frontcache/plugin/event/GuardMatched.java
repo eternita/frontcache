@@ -26,13 +26,21 @@ package org.frontcache.plugin.event;
  * @param disposition {@code rejected}, {@code redirected}, {@code challenged} or {@code dry-run}
  * @param status      the status the node answered with; 0 for a dry run
  * @param uri         host + path + query as the request carried them, truncated to {@value FcEvent#MAX_URI_LENGTH}
- * @param clientType  the bots.conf verdict - {@code bot}, {@code guest}, ...; may be null
+ * @param clientType  the bots.conf verdict's root - {@code bot} or {@code guest}; may be null
  * @param clientKey   the address the rate limiter counts this client by; personal data, see {@link FcEvent}
+ * @param visitorType the bots.conf verdict as written - a declared type ({@code customer}), else {@code clientType};
+ *                    may be null (2.13.0)
  */
 public record GuardMatched(long time, String node, String site, String requestId, String rule, String disposition,
-		int status, String uri, String clientType, String clientKey) implements FcEvent {
+		int status, String uri, String clientType, String clientKey, String visitorType) implements FcEvent {
 
 	public static final String TYPE = "guard.matched";
+
+	/** The constructor before {@code visitorType}: a request of a root type, {@code visitorType} = {@code clientType}. */
+	public GuardMatched(long time, String node, String site, String requestId, String rule, String disposition,
+			int status, String uri, String clientType, String clientKey) {
+		this(time, node, site, requestId, rule, disposition, status, uri, clientType, clientKey, clientType);
+	}
 
 	@Override
 	public String type() {

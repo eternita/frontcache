@@ -73,8 +73,19 @@ public class GuardRuleParser {
 	 *                             stray config line cannot point the whole site at another host.
 	 */
 	public GuardRuleParser(Set<String> allowedRedirectHosts) {
-		this.allowedRedirectHosts = (null != allowedRedirectHosts) ? allowedRedirectHosts : Collections.<String>emptySet();
+		this(allowedRedirectHosts, null);
 	}
+
+	/**
+	 * @param visitorTypes what {@code client-type:} is checked against; null - the node's loaded vocabulary, read
+	 *                     when each line is parsed. A validator with no node passes the bots.conf declarations.
+	 */
+	public GuardRuleParser(Set<String> allowedRedirectHosts, org.frontcache.bots.VisitorTypes visitorTypes) {
+		this.allowedRedirectHosts = (null != allowedRedirectHosts) ? allowedRedirectHosts : Collections.<String>emptySet();
+		this.visitorTypes = visitorTypes;
+	}
+
+	private final org.frontcache.bots.VisitorTypes visitorTypes;
 
 	public GuardRule parse(String line)
 	{
@@ -191,7 +202,8 @@ public class GuardRuleParser {
 			if (0 == expr.trim().length())
 				continue;
 
-			predicates.add(GuardPredicateFactory.parse(expr));
+			predicates.add(GuardPredicateFactory.parse(expr, GuardPredicateFactory.Scope.GUARD,
+					(null != visitorTypes) ? visitorTypes : org.frontcache.bots.VisitorTypes.active()));
 		}
 
 		if (predicates.isEmpty())

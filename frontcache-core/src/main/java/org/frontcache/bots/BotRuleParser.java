@@ -54,6 +54,21 @@ public class BotRuleParser {
 	 */
 	public static BotRule parse(String line)
 	{
+		return parse(line, VisitorTypes.ROOTS);
+	}
+
+	/**
+	 * @param line  one non-blank, non-comment line that is not an {@code @type} declaration
+	 * @param types the declarations of the same file - the verdict is validated against them. The one-argument form
+	 *              passes none, so a caller that parses a lone line fails closed on a declared type
+	 * @return the compiled rule
+	 * @throws GuardConfigException when the line cannot be used
+	 */
+	public static BotRule parse(String line, VisitorTypes types)
+	{
+		if (VisitorTypes.isDeclaration(line.trim()))
+			throw new GuardConfigException("'" + line + "' is a type declaration, not a rule");
+
 		List<String> parts = GuardRuleParser.splitFields(line);
 
 		if (2 > parts.size())
@@ -68,7 +83,7 @@ public class BotRuleParser {
 			throw new GuardConfigException("rule name is empty in '" + line + "'");
 
 		List<GuardPredicate> predicates = parseCondition(parts.get(1), line);
-		String clientType = parseClientType(parts.get(2).trim(), line);
+		String visitorType = parseVisitorType(parts.get(2).trim(), line, types);
 
 		boolean dryRun = false;
 		if (3 < parts.size())
@@ -80,7 +95,7 @@ public class BotRuleParser {
 				throw new GuardConfigException("unknown flag '" + flag + "' in '" + line + "' (only 'dry-run' is supported)");
 		}
 
-		return new BotRule(name, predicates, clientType, dryRun);
+		return new BotRule(name, predicates, visitorType, types.rootOf(visitorType), dryRun);
 	}
 
 	/**
@@ -124,13 +139,12 @@ public class BotRuleParser {
 	}
 
 	/**
-	 * The verdict field. Exactly two values parse, and that is a storage contract rather than a
-	 * stylistic choice: a WebResponse's expireTimeMap is stored in the L2 index keyed by client
-	 * type, so a third value would leave every entry already on disk without a key for it - which
-	 * FCUtils.isWebComponentCacheableForClientType answers by logging an error and never caching
-	 * that URL again.
+	 * The verdict field: a root, or a type the same file declares. Never a free string, and that is a
+	 * storage contract rather than a stylistic choice: a WebResponse's expireTimeMap is stored in the L2
+	 * index keyed by type, and only a type with a base can be looked up in an entry that does not name it
+	 * - the base's key is always there (VisitorTypes.ttl).
 	 */
-	private static String parseClientType(String value, String line)
+	private static String parseVisitorType(String value, String line, VisitorTypes types)
 	{
 		if (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equalsIgnoreCase(value))
 			return FCHeaders.REQUEST_CLIENT_TYPE_BOT;
@@ -138,8 +152,13 @@ public class BotRuleParser {
 		if (FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equalsIgnoreCase(value))
 			return FCHeaders.REQUEST_CLIENT_TYPE_GUEST;
 
-		throw new GuardConfigException("'" + value + "' is not a client type in '" + line + "' - expected '"
-				+ FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '" + FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'"
+		String lower = value.toLowerCase(java.util.Locale.ROOT);
+		if (types.isKnown(lower))
+			return lower;
+
+		throw new GuardConfigException("'" + value + "' is not a visitor type in '" + line + "' - expected "
+				+ types.describeKnown() + ", or a type declared with '" + VisitorTypes.DIRECTIVE + " " + value
+				+ " like <bot|guest>'"
 				+ ("browser".equalsIgnoreCase(value)
 					? " ('browser' was renamed to '" + FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "' in 2.9.0)"
 					: ""));

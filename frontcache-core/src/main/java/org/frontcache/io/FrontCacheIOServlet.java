@@ -549,6 +549,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		// the rules renders that one and must not suddenly see rule names in it.
 		aResponse.setBotKeywords(classifier.getKeywords());
 		aResponse.setBotRules(botRules);
+		aResponse.setVisitorTypes(classifier.getVisitorTypeEntries());
 
 		return aResponse;
 	}

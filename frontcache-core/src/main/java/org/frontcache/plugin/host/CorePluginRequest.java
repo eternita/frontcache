@@ -181,6 +181,11 @@ final class CorePluginRequest implements PluginRequest {
 	}
 
 	@Override
+	public String visitorType() {
+		return context.getVisitorType();
+	}
+
+	@Override
 	public String requestId() {
 		return context.getRequestId();
 	}

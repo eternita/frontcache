@@ -84,22 +84,44 @@ public class FCUtils {
             "REMOTE_ADDR"
     };
 
+	/**
+	 * @return true when some visitor type may be served this entry from cache - any key, a declared type's included
+	 *         ({@code maxage="customer:5m"} alone is subject to cache), not NO_CACHE
+	 */
 	public static boolean isWebComponentSubjectToCache(Map<String, Long> expireTimeMap)
 	{
 		if (null == expireTimeMap)
 			return false;
 
-		if (null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && null == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST))
-			return false;
+		for (Long expireTimeMillis : expireTimeMap.values())
+			if (null != expireTimeMillis && CacheProcessor.NO_CACHE != expireTimeMillis)
+				return true;
 
-		if (0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_BOT) && 0 == expireTimeMap.get(FCHeaders.REQUEST_CLIENT_TYPE_GUEST))
-			return false;
+		return false;
+	}
 
-		return true;
+	/**
+	 * The root of a type named alone - for a caller that has a type but not a request (the Pro warmer's preflight):
+	 * a declared type's base on this node, else the name itself.
+	 */
+	private static String rootOf(String type)
+	{
+		String root = (null == type) ? null : org.frontcache.bots.VisitorTypes.active().rootOf(type);
+		return (null != root) ? root : type;
 	}
 
 	// true - save to cache
 	public static boolean isWebComponentCacheableForClientType(Map<String, Long> expireTimeMap, String clientType)
+	{
+		return isWebComponentCacheableForClientType(expireTimeMap, clientType, rootOf(clientType));
+	}
+
+	/**
+	 * @param visitorType the request's leaf ({@code RequestContext.getVisitorType()}) - its key if the entry names it
+	 * @param clientType  its root ({@code RequestContext.getClientType()}) - else the root's key, always present
+	 * @return true - the entry may be saved to and served from cache for this visitor type
+	 */
+	public static boolean isWebComponentCacheableForClientType(Map<String, Long> expireTimeMap, String visitorType, String clientType)
 	{
 		if (expireTimeMap.isEmpty())
 		{
@@ -108,10 +130,10 @@ public class FCUtils {
 			return false;
 		}
 
-		Long expireTimeMillis = expireTimeMap.get(clientType);
+		Long expireTimeMillis = org.frontcache.bots.VisitorTypes.ttl(expireTimeMap, visitorType, clientType);
 		if (null == expireTimeMillis)
 		{
-			// not a case -> log it
+			// not a case -> log it: the root is in every map WebResponse builds
 			logger.error("isWebComponentCacheableForClientType() - expireTimeMillis must be in expireTimeMap for clientType=" + clientType);
 			return false;
 		}
@@ -123,12 +145,45 @@ public class FCUtils {
 	}
 
 	/**
+	 * Is the request's visitor type declared {@code no-store} ({@code @type customer like guest no-store})? Such a
+	 * request <b>never writes an entry</b> - whatever the page's {@code maxage} - and it may still read one per its
+	 * resolved TTL. Asked at every place a request can cause a write: the miss in
+	 * {@code CacheProcessorBase.processRequest}, {@code IncludeProcessorBase.isIncludeResponseCacheable} (the single
+	 * include and the combine path), and the soft-refresh branches of both processors, which must not queue a
+	 * background fetch that carries this visitor's request headers and stores what comes back.
+	 *
+	 * Read from the running vocabulary, not carried on the request: a reload that adds the flag stops writes by the
+	 * requests already in flight. A root is never no-store, so a node that declares nothing pays one compare.
+	 *
+	 * With {@code front-cache.include-fetch-target=edge} a fragment is written by the node it loops back to, which
+	 * knows the page's type only when it adopts it ({@link #propagatedVisitorType} - a trusted peer); otherwise it
+	 * classifies the fragment on its own evidence. The default, {@code origin}, writes here.
+	 */
+	public static boolean isNoStoreVisitorType(RequestContext context)
+	{
+		String visitorType = context.getVisitorType();
+		if (null == visitorType || visitorType.equals(context.getClientType()))
+			return false;
+
+		return org.frontcache.bots.VisitorTypes.active().isNoStore(visitorType);
+	}
+
+	/**
 	 * Check with current time if expired
 	 *
 	 * @param clientType {bot | guest}
 	 * @return
 	 */
 	public static boolean isWebComponentExpired(Map<String, Long> expireTimeMap, String clientType)
+	{
+		return isWebComponentExpired(expireTimeMap, clientType, rootOf(clientType));
+	}
+
+	/**
+	 * @param visitorType the request's leaf - its stamp if the entry names it, else the root's
+	 * @param clientType  its root
+	 */
+	public static boolean isWebComponentExpired(Map<String, Long> expireTimeMap, String visitorType, String clientType)
 	{
 		if (expireTimeMap.isEmpty())
 		{
@@ -137,7 +192,7 @@ public class FCUtils {
 			return true;
 		}
 
-		Long expireTimeMillis = expireTimeMap.get(clientType);
+		Long expireTimeMillis = org.frontcache.bots.VisitorTypes.ttl(expireTimeMap, visitorType, clientType);
 		if (null == expireTimeMillis)
 		{
 			// not a case -> log it
@@ -206,6 +261,10 @@ public class FCUtils {
 		{
 			requestHeaders.remove(FCHeaders.X_FRONTCACHE_CLIENT_TYPE);
 			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_CLIENT_TYPE, clientType);
+			// and the leaf beside it - read back by propagatedVisitorType(), and what the origin can render a
+			// declared type's variant on
+			requestHeaders.remove(FCHeaders.X_FRONTCACHE_VISITOR_TYPE);
+			addHeader(requestHeaders, FCHeaders.X_FRONTCACHE_VISITOR_TYPE, context.getVisitorType());
 		}
 
 		return client.fetchOverHttp(urlStr, requestHeaders, context);
@@ -282,6 +341,45 @@ public class FCUtils {
 		logger.warn("Ignoring unknown client type '" + clientType + "' in " + FCHeaders.X_FRONTCACHE_CLIENT_TYPE
 				+ " - expected '" + FCHeaders.REQUEST_CLIENT_TYPE_BOT + "' or '" + FCHeaders.REQUEST_CLIENT_TYPE_GUEST + "'");
 		return null;
+	}
+
+	// values propagatedVisitorType() has warned about - once each, bounded so a peer cannot grow it
+	private static final java.util.Set<String> warnedVisitorTypes = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+	/**
+	 * The visitor type (the leaf) decided for the PAGE, on a request whose client type (the root) was adopted by
+	 * {@link #propagatedClientType} - so the peer is trusted and the request is an include; this adds only that the
+	 * leaf must be a type this node declares on the same root. When it is not - an unknown type, or one this node
+	 * bases differently - the root is adopted alone and the disagreement WARNed once per value: a fleet whose
+	 * bots.conf files disagree degrades to the two client types, never to re-classifying fragments on their own
+	 * evidence.
+	 *
+	 * @param clientType the root propagatedClientType() returned
+	 * @return the leaf, or {@code clientType} itself
+	 */
+	public static String propagatedVisitorType(RequestContext context, String clientType)
+	{
+		HttpServletRequest request = context.getRequest();
+		String value;
+		try {
+			value = (null == request) ? null : request.getHeader(FCHeaders.X_FRONTCACHE_VISITOR_TYPE);
+		} catch (Exception e) {
+			return clientType;
+		}
+
+		if (null == value)
+			return clientType; // an older page node sends the root alone
+
+		String visitorType = value.trim();
+		if (visitorType.equals(clientType) || clientType.equals(org.frontcache.bots.VisitorTypes.active().rootOf(visitorType)))
+			return visitorType;
+
+		if (warnedVisitorTypes.size() < 64 && warnedVisitorTypes.add(clientType + "/" + visitorType))
+			logger.warn("Ignoring visitor type '" + visitorType + "' in " + FCHeaders.X_FRONTCACHE_VISITOR_TYPE
+					+ " with client type '" + clientType + "' - this node's " + org.frontcache.bots.BotClassifier.BOTS_CONFIG_FILE
+					+ " does not declare it 'like " + clientType + "'. Adopting '" + clientType + "' alone;"
+					+ " every node should declare the same types (logged once per value)");
+		return clientType;
 	}
 
 	public static String getClientIP(HttpServletRequest request) {
@@ -1265,6 +1363,10 @@ public class FCUtils {
 			// our address as the peer - i.e. it would pick its own client type. The include path puts
 			// the real value back in FCUtils.includeDynamicCallHttpClient, after this filter has run.
 			case "x-frontcache-client-type":
+				return false;
+
+			// The leaf beside it, for the same reason - a client choosing 'captcha-passed' is a guard bypass.
+			case "x-frontcache-visitor-type":
 				return false;
 
 			// Dropped for the same reason: it is the chain's shared secret (FCHeaders.X_FRONTCACHE_EDGE_TOKEN).

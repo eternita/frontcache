@@ -117,7 +117,7 @@ public final class WarmRequest {
 			return false;
 
 		context.setWarmRequest(mode);
-		context.setClientType(clientType);
+		context.setVisitorType(clientType, org.frontcache.bots.VisitorTypes.active().rootOf(clientType));
 		context.setClientTypeRule(CLIENT_TYPE_RULE);
 		return true;
 	}
@@ -170,13 +170,17 @@ public final class WarmRequest {
 		return (MODE_FILL.equals(m) || MODE_REFRESH.equals(m)) ? m : null;
 	}
 
-	/** @return {@code bot} | {@code guest}, or null for anything else */
+	/**
+	 * @return {@code bot} | {@code guest} | a visitor type this node's bots.conf declares - warming "as" a declared
+	 *         type fills the entries a page gives that type (a {@code bot-whitelisted:30d} with no {@code bot:}) - or
+	 *         null for anything else
+	 */
 	public static String normalizeClientType(String clientType)
 	{
 		if (null == clientType)
 			return null;
 
 		String t = clientType.trim().toLowerCase();
-		return (FCHeaders.REQUEST_CLIENT_TYPE_BOT.equals(t) || FCHeaders.REQUEST_CLIENT_TYPE_GUEST.equals(t)) ? t : null;
+		return org.frontcache.bots.VisitorTypes.active().isKnown(t) ? t : null;
 	}
 }

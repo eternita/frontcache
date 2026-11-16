@@ -610,6 +610,10 @@ public class FrontCacheEngine {
             logger.info("Bypass (non-cacheable) responses will pass the origin's Content-Encoding "
                     + "through untouched (" + BYPASS_PASSTHROUGH_ENCODING_KEY + "=true)");
 
+        // bots.conf first: its @type declarations are the vocabulary guard-rules.conf's client-type: is
+        // checked against, and an unknown name there is refused at load
+        BotClassifier.getInstance();
+
         // built from the current config; reload() rebuilds the engine, so it picks up both a changed
         // max-request-uri-length and an edited guard-rules.conf
         guardRuleEngine = new GuardRuleEngine(maxRequestURILength);
@@ -1092,14 +1096,19 @@ public class FrontCacheEngine {
 		String propagated = FCUtils.propagatedClientType(context);
 		if (null != propagated)
 		{
-			context.setClientType(propagated);
+			context.setVisitorType(FCUtils.propagatedVisitorType(context, propagated), propagated);
 			context.setClientTypeRule(CLIENT_TYPE_PROPAGATED);
 			return;
 		}
 
+		// the leaf (a declared type, or the root) and its root - getClientType() stays the root
 		BotRule rule = BotClassifier.getInstance().classify(context);
-		context.setClientType(rule.getClientType());
+		context.setVisitorType(rule.getVisitorType(), rule.getClientType());
 		context.setClientTypeRule(rule.getName());
+
+		// frontcache_visitor_requests_total{type} - a visitor once per page, not once per fragment
+		if (FCHeaders.COMPONENT_TOPLEVEL.equals(context.getRequestType()))
+			org.frontcache.bots.VisitorTypeRequests.count(rule.getVisitorType());
 	}
 
 

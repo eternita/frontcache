@@ -210,6 +210,7 @@ public class FcMetricsExport {
 		bindCacheMetrics();
 		bindCombineMetrics();
 		bindGuardMetrics();
+		bindVisitorTypeMetrics();
 		bindJvmMetrics();
 
 		bindPluginMetrics();
@@ -447,6 +448,7 @@ public class FcMetricsExport {
 
 	private final Map<String, Boolean> boundGuardRules = new HashMap<String, Boolean>();
 	private final Map<String, Boolean> boundRateLimitBuckets = new HashMap<String, Boolean>();
+	private final Map<String, Boolean> boundVisitorTypes = new HashMap<String, Boolean>();
 
 	private boolean combineBound = false;
 
@@ -672,6 +674,34 @@ public class FcMetricsExport {
 	}
 
 	/**
+	 * {@code frontcache_visitor_requests_total{type}}: top-level requests by visitor type (the leaf). One series per
+	 * root and declared type the node runs - bound before its first request, so a type reads 0 rather than missing -
+	 * and per type ever counted, so a type a reload removed keeps its monotonic series. Bounded by
+	 * {@code VisitorTypes.MAX_DECLARED} + 2 at a time and {@code VisitorTypeRequests.MAX_NAMES} ever; never a
+	 * client-sent value.
+	 */
+	private synchronized void bindVisitorTypeMetrics()
+	{
+		java.util.Set<String> names = new java.util.LinkedHashSet<String>();
+		names.add(org.frontcache.core.FCHeaders.REQUEST_CLIENT_TYPE_BOT);
+		names.add(org.frontcache.core.FCHeaders.REQUEST_CLIENT_TYPE_GUEST);
+		names.addAll(org.frontcache.bots.VisitorTypes.active().declared().keySet());
+		names.addAll(org.frontcache.bots.VisitorTypeRequests.names());
+
+		for (String type : names)
+		{
+			if (Boolean.TRUE.equals(boundVisitorTypes.get(type)))
+				continue;
+			boundVisitorTypes.put(type, Boolean.TRUE);
+
+			FunctionCounter.builder("visitor.requests", type, t -> org.frontcache.bots.VisitorTypeRequests.requests(t))
+					.description("Top-level requests by visitor type - the type bots.conf decided, a declared type or bot / guest")
+					.tags(Tags.of("type", type))
+					.register(registry);
+		}
+	}
+
+	/**
 	 * Hits of every currently loaded rule with this name.
 	 *
 	 * Summed rather than first-match because nothing stops two rules sharing a name, and two meters with
@@ -759,6 +789,7 @@ public class FcMetricsExport {
 		local.bindThreadPools();
 		local.bindCacheMetrics();
 		local.bindGuardMetrics();
+		local.bindVisitorTypeMetrics();
 	}
 
 	// ---- config -------------------------------------------------------------

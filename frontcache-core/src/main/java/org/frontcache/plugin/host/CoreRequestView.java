@@ -119,6 +119,11 @@ final class CoreRequestView implements RequestView {
 	}
 
 	@Override
+	public String visitorType() {
+		return safe(() -> context.getVisitorType());
+	}
+
+	@Override
 	public String requestType() {
 		return safe(() -> context.getRequestType());
 	}

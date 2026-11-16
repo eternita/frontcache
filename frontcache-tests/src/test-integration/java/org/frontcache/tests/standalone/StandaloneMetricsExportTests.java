@@ -283,6 +283,41 @@ public class StandaloneMetricsExportTests extends TestsBase {
 	 * /common/rate-limit/ (see FRONTCACHE_HOME_STANDALONE/conf/guard-rules.conf), so driving that path
 	 * over its limit is what makes the counter move.
 	 */
+	/**
+	 * frontcache_visitor_requests_total{type}: top-level requests by visitor type. b.jsp carries three includes, and a
+	 * visitor is still counted once per page; a declared type with no request yet is a series at 0, not missing.
+	 */
+	@Test
+	public void scrapeCountsTopLevelRequestsByVisitorType() throws Exception
+	{
+		String before = scrapeBody();
+
+		CloseableHttpClient client = HttpClients.createDefault();
+		try {
+			for (int i = 0; i < 2; i++)
+			{
+				HttpGet page = new HttpGet(TestConfig.FRONTCACHE_STANDALONE_TEST_BASE_URI_LOCALHOST + "standalone/visitor-types/b.jsp");
+				page.addHeader("User-Agent", "Mozilla/5.0 (Macintosh) Chrome/140");
+				page.addHeader("Cookie", "fc_e2e_customer=1");
+				ClassicHttpResponse response = client.execute(page);
+				try {
+					assertEquals(200, response.getCode());
+					EntityUtils.consume(response.getEntity());
+				} finally {
+					response.close();
+				}
+			}
+		} finally {
+			client.close();
+		}
+
+		String after = scrapeBody();
+		assertEquals("two customer pages with three fragments each - counted once per page:\n" + head(after), 2,
+				delta(before, after, "frontcache_visitor_requests_total{type=\"customer\"}"));
+		assertTrue("a declared type is a series before its first request:\n" + head(after),
+				after.contains("frontcache_visitor_requests_total{type=\"member-e2e\"}"));
+	}
+
 	@Test
 	public void scrapeExposesGuardRuleCountsAndRateLimitBuckets() throws Exception
 	{

@@ -68,7 +68,7 @@ and `#` comments are ignored.
 | `query~<regex>` | the query string matches (`?` included) |
 | `url~<regex>` | the whole URL matches |
 | `method:GET` | the HTTP method is GET (POST, HEAD, …) |
-| `client-type:bot` \| `client-type:guest` | how Frontcache classified the visitor, using `bots.conf` |
+| `client-type:bot` \| `client-type:guest` \| `client-type:<declared type>` | how Frontcache classified the visitor, using `bots.conf`. A type declared there (`@type customer like guest`) is also its base, so `client-type:guest` matches customers too; "guests who are not customers" is `client-type:guest ; !client-type:customer`. A name `bots.conf` does not declare is refused at load |
 | `cookie:<name>` | that cookie is present (presence only — values are never read) |
 | `cookie-hmac:<name>` | that cookie carries a value signed with this node's secret, not yet expired — evidence a client cannot forge (§4.1, since 2.13.0) |
 | `client-ip:<address or CIDR>[,…]` or `client-ip:@<file>` | the client's address (as resolved through `front-cache.client-ip.trusted-proxies`, §5.1) is in one of the blocks; `@<file>` is a list under `conf/`, one block per line — and `@lists/<file>` one that may change while the node runs (§4.3) |

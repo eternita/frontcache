@@ -181,7 +181,7 @@ public abstract class CommonTests extends TestsBase {
 		webClient.addRequestHeader("User-Agent", "Googlebot");
 		webClient.addRequestHeader(FCHeaders.X_FRONTCACHE_TRACE, "true");
 
-//		x-frontcache-trace-request.0: success toplevel dynamic 1 1 "http://localhost:9080/common/debug/a.jsp" frontcache-localhost-1 bot "Googlebot"
+//		x-frontcache-trace-request.0: success toplevel dynamic 1 1 "http://localhost:9080/common/debug/a.jsp" frontcache-localhost-1 bot "Googlebot" "bot"
 		HtmlPage page = webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/debug/a.jsp");
 		assertEquals("a", page.getPage().asNormalizedText());
 
@@ -189,8 +189,8 @@ public abstract class CommonTests extends TestsBase {
 
 		assertNotEquals("no client type in: " + logStr, -1,
 				logStr.indexOf(" " + FCHeaders.REQUEST_CLIENT_TYPE_BOT + " "));
-		assertTrue("the deciding bot rule must be the last column of: " + logStr,
-				logStr.endsWith("\"Googlebot\""));
+		assertTrue("the deciding bot rule, then the visitor type (2.13.0), must end: " + logStr,
+				logStr.endsWith("\"Googlebot\" \"bot\""));
 	}
 
 	@Test

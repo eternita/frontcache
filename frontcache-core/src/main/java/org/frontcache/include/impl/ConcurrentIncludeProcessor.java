@@ -187,20 +187,10 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
         	IncludeResolutionPlaceholder inc = includes.get(i);
         	inc.includeLevel = "" + recursionLevel + "." + i;
 
-			boolean performInclude = false; // check for client specific include
-			if (null == inc.includeClientType)
-			{
-				performInclude = true;
-
-			} else if (inc.includeClientType.equalsIgnoreCase(context.getClientType())) {
-
-				// client type specific include
-				performInclude = true;
-			} else {
-
-				// client type for include and request doesnt match
-				performInclude = false;
-			}
+			// client="..." - null resolves for everyone; else by is-a on the request's visitor type (the
+			// leaf) and client type (its root), so client="guest" still reaches a type 'like guest'
+			boolean performInclude = (null == inc.includeClientSelector)
+					|| inc.includeClientSelector.selects(context.getVisitorType(), context.getClientType());
 
         	inc.performInclude = performInclude; // save for include resolution
 
@@ -500,7 +490,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 								Arrays.asList(new String[]{ context.getClientIP() }));
 					}
 
-					String includeClientType = getIncludeClientType(includeTagStr);
+					org.frontcache.bots.ClientSelector includeClientSelector = getIncludeClientSelector(includeTagStr);
 
 					// null unless the markup says combine="..."; an async include is never combined,
 					// because nothing waits for it and its content never reaches the client, so
@@ -518,7 +508,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 					String publicIncludeURL = hostURL + includeURL;
 					includes.add(new IncludeResolutionPlaceholder(startIdx, endIdx, publicIncludeURL,
 							FCUtils.rebaseURL(publicIncludeURL, fetchBaseURL),
-							includeType, includeClientType, combineGroup, includeRequestHeaders, client, context));
+							includeType, includeClientSelector, combineGroup, includeRequestHeaders, client, context));
 
 					scanIdx = endIdx;
 				} else {
@@ -629,7 +619,7 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		/** What goes on the wire. Same as includeURL unless includes are fetched from the origin. */
 		String fetchURL;
 		String includeType; // sync|async
-		String includeClientType; // bot|guest
+		org.frontcache.bots.ClientSelector includeClientSelector; // client="..."; null - everyone
 		String combineGroup; // null unless the markup says combine="..."
 		WebResponse webResponse;
 		Map<String, List<String>> requestHeaders;
@@ -638,14 +628,14 @@ public class ConcurrentIncludeProcessor extends IncludeProcessorBase implements 
 		boolean performInclude = true;
 		String includeLevel = null;
 
-		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String fetchURL, String includeType, String includeClientType, String combineGroup, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) {
+		public IncludeResolutionPlaceholder(int startIdx, int endIdx, String includeURL, String fetchURL, String includeType, org.frontcache.bots.ClientSelector includeClientSelector, String combineGroup, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context) {
 			super();
 			this.startIdx = startIdx;
 			this.endIdx = endIdx;
 			this.includeURL = includeURL;
 			this.fetchURL = fetchURL;
 			this.includeType = includeType;
-			this.includeClientType = includeClientType;
+			this.includeClientSelector = includeClientSelector;
 			this.combineGroup = combineGroup;
 			this.requestHeaders = requestHeaders;
 			this.client = client;
