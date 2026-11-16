@@ -8,6 +8,7 @@ do, and what deliberately kept its old name so you do not have to do anything.
 
 | Release | What is in it | Do you have to do anything? |
 | --- | --- | --- |
+| **[2.13.0](2.13.0.md)** | **Plugins** - a plugin API, events after the fact, a path of their own under `/fc-x/`, plugins dropped into a directory, `ext:` conditions in guard rules; **declared visitor types** in `bots.conf`; a **`challenge`** guard action, a **`cookie-hmac:`** predicate and **honeypot rules** (`\| trap`); the console calls some edges **with a key of their own** | **No, unless your site serves pages under `/fc-x/`** (the node answers it now) **or `guard-rules.conf` names a `client-type:` the node does not know** (refused at load). The request logs gain a last column. No cache flush |
 | **[2.12.0](2.12.0.md)** | The console can be served **under a path** and **bound to one address**; its edge list can be made **read-only** (`edge-editing = false`); its sign-in, permissions, edge access and an audit hook are a **documented extension point** for plugins; two edges on **one host name** are no longer merged | **No, unless your console config has a `users`, `sso`, `tenants`, `tenants-file` or `audit` block without the plugin that reads it** — such a console now refuses to start. Console sessions from an older build sign in again. Nothing changed on the wire, on a node or in the cache |
 | **[2.11.0](2.11.0.md)** | Frontcache is **open source, Apache-2.0**; an **edge token** lets a second-layer node refuse traffic that skipped its edge; `action=reload` **no longer takes the node down**; a guard redirect can target **the same path on another host**; the **cache warmer** and the console's **cluster rate** left the Community bundles | **No, unless you use the cache warmer or `frontcache.console.clusters`** — both are gone from the Community bundles. Nothing changed on the wire or in a config file, and there is no cache flush |
 | **[2.10.0](2.10.0.md)** | A **cache warmer** on the node, run from the console's new **Cache → Cache Warmer** screen; the realtime monitor shows a **cluster's total rate** on every card; the request log **names the `bots.conf` rule** behind each client type; the per-platform bundles report **JVM CPU** again; the console acts only on **its own edges** | **No, unless you parse the request logs by position.** One column is inserted after the client type, so the user-agent and everything after it move right by one. No cache flush, no config change on any node |
@@ -36,6 +37,8 @@ release's grace periods are written against the one before it. In particular:
   the console's cluster line are no longer in the Community bundles: decide about them first.
 - **2.11.x → 2.12.0 needs nothing on the wire or in the cache** either. Only the console changed:
   check its config for a block no installed plugin reads before you restart it.
+- **2.12.x → 2.13.0 needs no cache flush.** Check `/fc-x/` and `client-type:` names first, and upgrade every node
+  before `bots.conf` declares a type, a page names one or a rule uses `| trap`.
 
 What kept its pre-2.7 name indefinitely — `/hystrix.stream`, the `hystrix.command.*` /
 `hystrix.threadpool.*` property prefixes, and the JSON type literals the dashboard dispatches on —
