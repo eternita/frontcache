@@ -1,0 +1,93 @@
+// The debug example plugin (examples/plugins/debug): one jar, dropped into FRONTCACHE_HOME/plugins/debug/ on a node.
+// Built like the plugin template (examples/plugin-template) - see its build.gradle for the reasons.
+//
+//   ./gradlew build        compile, run the tests (the testkit's PluginContract included), build the jar
+//   build/libs/<name>-<version>.jar   the one jar to deploy
+//
+// The class-loader rule this build is shaped by: a dropped-in plugin gets a class loader of its own whose parent
+// shows ONLY the JDK, the plugin API (org.frontcache.plugin.*, org.frontcache.io.ActionResponse), Typesafe Config
+// (com.typesafe.config), Jackson's annotations (com.fasterxml.jackson.annotation), slf4j (org.slf4j) and Micrometer
+// (io.micrometer). Those are compileOnly here - the node provides them, and a second copy in the jar would be
+// shadowed by the node's anyway. Every other library (jackson-databind included) the plugin must carry itself:
+// add it as `implementation` and the Shadow plugin below puts it inside the jar. Each plugin has a loader of its
+// own, so two plugins may carry two versions of one library; the parent is asked first, so a library whose classes
+// share a package with one the node shows (jackson-databind beside the node's annotations) is safest relocated.
+
+plugins {
+	id 'java'
+	id 'com.gradleup.shadow' version '9.6.1'
+}
+
+group = 'org.frontcache.examples'
+version = '0.1.0'   // keep equal to version in src/main/resources/META-INF/frontcache-plugin.properties
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.release = 25
+	options.encoding = 'UTF-8'
+}
+
+repositories {
+	mavenCentral()
+	// The Frontcache artifacts - the plugin API and the testkit - from one place only: the release repository, or
+	// with -PfrontcacheMavenLocal the local Maven repository (an unreleased core, after its publishToMavenLocal).
+	exclusiveContent {
+		forRepository {
+			project.hasProperty('frontcacheMavenLocal') ? mavenLocal() : maven { url = 'https://repo.eternita.co/maven2' }
+		}
+		filter {
+			includeGroup 'org.frontcache'
+		}
+	}
+}
+
+dependencies {
+	// What the node provides - never in the jar.
+	compileOnly "org.frontcache:frontcache-plugin-api:${frontcacheVersion}"
+	compileOnly 'org.slf4j:slf4j-api:2.0.17'
+
+	// No library of its own: this plugin needs nothing the node does not show it.
+
+	// The testkit brings the plugin API, JUnit 4 and PluginContract.
+	testImplementation "org.frontcache:frontcache-plugin-testkit:${frontcacheVersion}"
+	testImplementation 'org.slf4j:slf4j-api:2.0.17'
+}
+
+// One jar: the plugin's classes, its manifest, and every `implementation` library (relocate one when the comment at
+// the top says so). The plain jar is kept aside (classifier 'plain'); deploy the shaded one.
+tasks.named('shadowJar') {
+	archiveClassifier = ''
+	configurations = [project.configurations.runtimeClasspath]
+	mergeServiceFiles()
+}
+tasks.named('jar') {
+	archiveClassifier = 'plain'
+}
+tasks.named('assemble') {
+	dependsOn 'shadowJar'
+}
+
+// The jar's SHA-256, for a node that pins it: front-cache.plugins.<id>.sha256 = <this>
+tasks.register('sha256') {
+	group = 'build'
+	description = 'Print the SHA-256 of the plugin jar (front-cache.plugins.<id>.sha256)'
+	dependsOn 'shadowJar'
+	def jar = tasks.named('shadowJar').flatMap { it.archiveFile }
+	doLast {
+		def file = jar.get().asFile
+		def digest = java.security.MessageDigest.getInstance('SHA-256').digest(file.bytes)
+		println "${file.name}  ${digest.encodeHex()}"
+	}
+}
+
+tasks.named('test', Test) {
+	useJUnit()
+	testLogging {
+		exceptionFormat = 'full'
+	}
+}

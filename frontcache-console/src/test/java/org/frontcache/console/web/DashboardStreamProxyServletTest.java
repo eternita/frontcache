@@ -88,7 +88,7 @@ public class DashboardStreamProxyServletTest {
 	@Test
 	public void aKnownEdgeResolvesToItsStreamUrl()
 	{
-		assertEquals("http://edge-1.example.com:8080/hystrix.stream",
+		assertEquals("http://edge-1.example.com:8080/fc-dashboard.stream",
 				DashboardStreamProxyServlet.resolveStreamUrl("http://edge-1.example.com:8080/",
 						edges("http://edge-1.example.com:8080/")));
 	}
@@ -107,15 +107,21 @@ public class DashboardStreamProxyServletTest {
 		assertNotNull(DashboardStreamProxyServlet.resolveStreamUrl(" http://edge-1.example.com:8080/ ", configured));
 
 		assertEquals("one slash, however it was written",
-				"http://edge-1.example.com:8080/hystrix.stream",
+				"http://edge-1.example.com:8080/fc-dashboard.stream",
 				DashboardStreamProxyServlet.resolveStreamUrl("http://edge-1.example.com:8080//", configured));
 	}
 
-	/** Older bookmarks and the pre-2.7 page passed the full stream URL. Accept it, resolve the same. */
+	/**
+	 * Older bookmarks and the pre-2.7 page passed the full stream URL. Accept it, on either path, and resolve
+	 * the same - the current path, never the legacy one (2.13.0).
+	 */
 	@Test
 	public void theFullStreamUrlAlsoResolves()
 	{
-		assertEquals("http://edge-1.example.com:8080/hystrix.stream",
+		assertEquals("http://edge-1.example.com:8080/fc-dashboard.stream",
+				DashboardStreamProxyServlet.resolveStreamUrl("http://edge-1.example.com:8080/fc-dashboard.stream",
+						edges("http://edge-1.example.com:8080/")));
+		assertEquals("http://edge-1.example.com:8080/fc-dashboard.stream",
 				DashboardStreamProxyServlet.resolveStreamUrl("http://edge-1.example.com:8080/hystrix.stream",
 						edges("http://edge-1.example.com:8080/")));
 	}
@@ -193,7 +199,7 @@ public class DashboardStreamProxyServletTest {
 
 		assertEquals(HttpServletResponse.SC_FORBIDDEN, unknown.getStatus());
 		assertEquals("Unknown edge", unknown.getErrorMessage());
-		assertEquals(DashboardStreamProxyServlet.resolveEdge("http://edge-1.example.com:8080/hystrix.stream", scope).apiKey(),
+		assertEquals(DashboardStreamProxyServlet.resolveEdge("http://edge-1.example.com:8080/fc-dashboard.stream", scope).apiKey(),
 				"the-edge-key");
 		assertNull(DashboardStreamProxyServlet.resolveEdge("http://edge-9.example.com:8080/", scope));
 		assertEquals(200, inScope.getStatus());

@@ -29,7 +29,7 @@ import java.util.Map;
  *
  * <h2>A module cannot stop a node</h2>
  *
- * {@link FrontcacheModules} catches everything a module throws. A module that throws in {@link #start} is
+ * {@code org.frontcache.plugin.host.FrontcachePlugins} catches everything a module throws. A module that throws in {@link #start} is
  * logged and dropped until the next start; the node starts regardless.
  *
  * <h2>One instance per process</h2>
@@ -37,7 +37,12 @@ import java.util.Map;
  * A module is instantiated once, like {@code FCConfig} and the cache processor, and outlives an engine:
  * the {@code reload} action calls {@code stop(false)} then {@code start(...)} on the same instance. The
  * constructor must be cheap and side-effect free - it may run from a servlet's init, before any engine.
+ *
+ * @deprecated since 2.13.0: implement {@link org.frontcache.plugin.FrontcachePlugin} and ship a
+ *             {@code META-INF/frontcache-plugin.properties} manifest. A module without one still runs, through an
+ *             adapter, as a {@code manage} plugin - for one release.
  */
+@Deprecated
 public interface FrontcacheModule {
 
 	/** A short, stable id - for logs and the {@code modules} list of {@code get-node-stats}. */

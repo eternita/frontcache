@@ -219,6 +219,36 @@ public class FcMetricsExportTest {
 	}
 
 	/**
+	 * {@code frontcache_visitor_requests_total{type}}: one series per root and declared type, there before the type's
+	 * first request (so it reads 0, not missing), counting what classification counted.
+	 */
+	@Test
+	public void visitorRequestsAreCountedByType()
+	{
+		org.frontcache.bots.BotClassifier.install(org.frontcache.bots.BotClassifier.of(
+				new java.util.ArrayList<org.frontcache.bots.BotRule>(),
+				org.frontcache.bots.VisitorTypes.of("@type customer like guest", "@type bot-whitelisted like bot")));
+		org.frontcache.bots.VisitorTypeRequests.reset();
+		try {
+			enable("prometheus");
+			org.frontcache.bots.VisitorTypeRequests.count("customer");
+			org.frontcache.bots.VisitorTypeRequests.count("customer");
+			org.frontcache.bots.VisitorTypeRequests.count("guest");
+			FcMetricsExport.refresh();
+
+			String scrape = FcMetricsExport.scrape();
+			assertTrue(scrape, scrape.contains("frontcache_visitor_requests_total{type=\"customer\"} 2.0"));
+			assertTrue(scrape, scrape.contains("frontcache_visitor_requests_total{type=\"guest\"} 1.0"));
+			assertTrue("a root with no request yet reads 0", scrape.contains("frontcache_visitor_requests_total{type=\"bot\"} 0.0"));
+			assertTrue("a declared type with no request yet reads 0",
+					scrape.contains("frontcache_visitor_requests_total{type=\"bot-whitelisted\"} 0.0"));
+		} finally {
+			org.frontcache.bots.BotClassifier.install(null);
+			org.frontcache.bots.VisitorTypeRequests.reset();
+		}
+	}
+
+	/**
 	 * The cardinality guard. {@code RequestLogger} has URL-level data and labelling with it would be
 	 * tempting; on a page cache the URL space is unbounded by construction, so a per-URL label is not an
 	 * observability feature but a way to take down a Prometheus server. Asserted as an allowlist of tag
@@ -238,12 +268,14 @@ public class FcMetricsExportTest {
 		//   name -> ALSO the guard rule / rate-limit bucket names, which come from a config file and are
 		//           therefore bounded by it; result -> ALSO the guard dispositions (a fixed set of four)
 		//   area -> heap|nonheap        id -> JVM memory pool names   (JvmMemoryMetrics)
+		//   type -> the visitor types: bot, guest and those bots.conf declares - at most 16 + 2 at a time and
+		//           VisitorTypeRequests.MAX_NAMES ever, and only ever a classifier's verdict, never a request's value
 		// area and id come from the JVM, not from anything request-shaped: the memory pool set is fixed
 		// by the collector at startup and is under a dozen entries, so it cannot grow with traffic -
 		// which is the property this list exists to protect.
 		TreeSet<String> allowed = new TreeSet<String>(java.util.Arrays.asList(
 				"command", "event", "quantile", "pool", "name", "kind", "state", "result", "tier",
-				"area", "id"));
+				"area", "id", "type"));
 
 		TreeSet<String> seen = new TreeSet<String>();
 		for (Meter meter : FcMetricsExport.registry().getMeters())

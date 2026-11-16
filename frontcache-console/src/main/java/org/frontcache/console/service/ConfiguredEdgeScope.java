@@ -15,14 +15,22 @@
  */
 package org.frontcache.console.service;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.frontcache.console.auth.ConsoleEdgeScope;
 import org.frontcache.console.auth.ConsolePrincipal;
 import org.frontcache.console.auth.EdgeScope;
 
 /**
  * The default {@link ConsoleEdgeScope}: every principal sees the console's configured {@code urls}, each called with
- * the one {@code apiKey} - the console as it has always been. Read live, so an edge added on the Edges screen is in
- * scope from then on. In this package because it is the only reader of {@link FrontcacheService}'s edge list.
+ * the one {@code apiKey} - the console as it has always been - and then, as of 2.13.0, every {@code edges} entry, each
+ * called with <b>its own</b> key. Read live, so an edge added on the Edges screen is in scope from then on. In this
+ * package because it is the only reader of {@link FrontcacheService}'s edge list and keys.
+ *
+ * <b>This is what keeps each key to its own edges</b>: every request reaches an edge through the scope's
+ * {@link EdgeScope.Edge}, which carries that edge's key - never through the console-wide one.
+ * {@code EdgeKeyIsolationTest} calls every handler with every edge and has each node check the key it was sent.
  */
 public final class ConfiguredEdgeScope implements ConsoleEdgeScope {
 
@@ -42,7 +50,13 @@ public final class ConfiguredEdgeScope implements ConsoleEdgeScope {
 
 	@Override
 	public EdgeScope everyEdge() {
-		return EdgeScope.of(ID, frontcacheService.configuredEdgeURLs(), frontcacheService.configuredApiKey());
+		String apiKey = frontcacheService.configuredApiKey();
+		List<EdgeScope.Edge> edges = new ArrayList<EdgeScope.Edge>();
+		for (String url : frontcacheService.configuredEdgeURLs())
+			if (null != url)
+				edges.add(new EdgeScope.Edge(url, apiKey));
+		edges.addAll(frontcacheService.configuredKeyedEdges());
+		return EdgeScope.of(ID, edges);
 	}
 
 	@Override

@@ -22,7 +22,10 @@ import java.io.OutputStream;
 /**
  * A management call as a module sees it. It has already passed {@code ApiKey.isAuthorized}; a module
  * never sees an unauthenticated call and never re-implements the gate.
+ *
+ * @deprecated since 2.13.0: {@link org.frontcache.plugin.ManagementRequest}.
  */
+@Deprecated
 public interface ManagementRequest {
 
 	String action();

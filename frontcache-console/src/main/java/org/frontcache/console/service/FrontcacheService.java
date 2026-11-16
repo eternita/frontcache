@@ -31,10 +31,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 import org.frontcache.client.FrontCacheClient;
 import org.frontcache.console.auth.EdgeScope;
 import org.frontcache.console.model.EdgeConfigFile;
+import org.frontcache.console.model.EdgePlugins;
+import org.frontcache.console.model.PluginView;
 import org.frontcache.console.model.VisitorTypesConfig;
 import org.frontcache.console.model.FrontCacheStatus;
 import org.frontcache.console.model.GuardRulesConfig;
@@ -43,7 +46,13 @@ import org.frontcache.console.plugin.ConsolePlugins;
 import org.frontcache.core.WebResponse;
 import org.frontcache.resilience.fr.FallbackConfigEntry;
 import org.frontcache.io.BackupActionResponse;
+import org.frontcache.io.ActionResponse;
 import org.frontcache.io.ConfigFile;
+import org.frontcache.io.GetPluginConfigActionResponse;
+import org.frontcache.io.NodeStatsActionResponse;
+import org.frontcache.io.PluginStats;
+import org.frontcache.io.FrontcacheAction;
+import org.frontcache.io.ReloadPluginConfigActionResponse;
 import org.frontcache.io.SetConfigActionResponse;
 import org.frontcache.io.DumpKeysActionResponse;
 import org.frontcache.replication.CacheReplicator;
@@ -80,6 +89,12 @@ public class FrontcacheService {
 	private final Set<String> frontcacheAgentURLs = new CopyOnWriteArraySet<String>();
 
 	private String apiKey = "default-api-key";
+
+	/**
+	 * The {@code edges} entries, as of 2.13.0: edges called with their OWN API key rather than {@link #apiKey}, in
+	 * config order, after {@code urls}. Fixed at start - the Edges screen neither adds nor removes them.
+	 */
+	private volatile List<EdgeScope.Edge> keyedEdges = List.of();
 
 	/**
 	 * The console's single login, from conf/frontcache-console.conf. Both null = authentication is
@@ -161,11 +176,107 @@ public class FrontcacheService {
 			logger.info(" -- Loading apiKey from console config");
 		}
 
+		keyedEdges = parseKeyedEdges(fcConsoleConfig, frontcacheAgentURLs);
+		for (EdgeScope.Edge edge : keyedEdges)
+			logger.info(" -- Loading edge {} with its own apiKey from console config", edge.url());
+
 		readCredentials();
 
 		// a key only a console plugin reads, set on a console without that plugin, warns rather than
 		// being silently ignored
 		ConsolePlugins.warnUnclaimedKeys(fcConsoleConfig);
+	}
+
+	/** HOCON key under frontcache.console: edges with their own API key. */
+	static final String EDGES_KEY = "edges";
+
+	/** What an {@code edges} entry may say. */
+	private static final Set<String> EDGE_ENTRY_KEYS = Set.of("url", "apiKey", "label");
+
+	/**
+	 * Reads {@code edges} (2.13.0): a list of {@code { url = "...", apiKey = "...", label = "..." }}, each edge called
+	 * with its own key - a console watching nodes of two key domains (an edge tier and an origin's filter, say) sends
+	 * neither key to the other's nodes.
+	 *
+	 * <b>Read whole or refused whole</b>, as the console's other blocks are: an entry without {@code url} or
+	 * {@code apiKey}, an unknown key (a misspelt {@code apiKey} would otherwise send no key at all), and one canonical
+	 * URL twice - in {@code edges}, or in {@code urls} and {@code edges} - refuse to start. The last is not pedantry: one
+	 * URL with two keys is refused by {@link EdgeScope#of} on every request, and which key it got must never depend on
+	 * order. No message quotes a key.
+	 *
+	 * @param urls the {@code urls} already read
+	 * @return the entries in config order; empty without the key
+	 */
+	static List<EdgeScope.Edge> parseKeyedEdges(Config config, Collection<String> urls) {
+
+		if (null == config || !config.hasPath(EDGES_KEY))
+			return List.of();
+
+		List<? extends ConfigObject> entries;
+		try {
+			entries = config.getObjectList(EDGES_KEY);
+		} catch (RuntimeException e) {
+			throw new IllegalStateException("frontcache-console.conf: edges must be a list of"
+					+ " { url = \"...\", apiKey = \"...\" }");
+		}
+
+		Set<String> claimed = new LinkedHashSet<String>();
+		for (String url : urls)
+			claimed.add(canonicalEdgeURL(url));
+
+		List<String> errors = new ArrayList<String>();
+		List<EdgeScope.Edge> edges = new ArrayList<EdgeScope.Edge>();
+		Set<String> seen = new LinkedHashSet<String>();
+		for (int i = 0; i < entries.size(); i++)
+		{
+			ConfigObject object = entries.get(i);
+			String where = "edges[" + i + "]";
+			for (String key : object.keySet())
+				if (!EDGE_ENTRY_KEYS.contains(key))
+					errors.add(where + ": unknown key '" + key + "' (an entry has url, apiKey and label)");
+
+			Config entry = object.toConfig();
+			String url = string(entry, "url", where, errors);
+			String key = string(entry, "apiKey", where, errors);
+			String label = entry.hasPath("label") ? string(entry, "label", where, errors) : null;
+			if (null == url || null == key)
+				continue;
+
+			String canonical = canonicalEdgeURL(url);
+			if (claimed.contains(canonical))
+				errors.add(where + ": " + canonical + " is in urls too - an edge is called with one key");
+			else if (!seen.add(canonical))
+				errors.add(where + ": " + canonical + " is in edges twice");
+			else
+				edges.add(new EdgeScope.Edge(url.trim(), key, label));
+		}
+
+		if (!errors.isEmpty())
+			throw new IllegalStateException("frontcache-console.conf: " + String.join("; ", errors));
+
+		return List.copyOf(edges);
+	}
+
+	/** A required, non-blank string of an {@code edges} entry; null with the error recorded - never its value. */
+	private static String string(Config entry, String key, String where, List<String> errors) {
+
+		if (!entry.hasPath(key))
+		{
+			errors.add(where + ": " + key + " is missing");
+			return null;
+		}
+		try {
+			String value = entry.getString(key);
+			if (value.isBlank())
+			{
+				errors.add(where + ": " + key + " is empty");
+				return null;
+			}
+			return value;
+		} catch (RuntimeException e) {
+			errors.add(where + ": " + key + " must be a string");
+			return null;
+		}
 	}
 
 	/**
@@ -312,6 +423,27 @@ public class FrontcacheService {
 		return apiKey;
 	}
 
+	/** The {@code edges} entries, each with its own key - for {@link ConfiguredEdgeScope} only. */
+	List<EdgeScope.Edge> configuredKeyedEdges() {
+		return keyedEdges;
+	}
+
+	/**
+	 * The {@code edges} entries, as configured URL -> label ("" for none), in config order: what the Edges screen
+	 * shows read-only. No key.
+	 */
+	public Map<String, String> keyedEdgeLabels() {
+		Map<String, String> labels = new LinkedHashMap<String, String>();
+		for (EdgeScope.Edge edge : keyedEdges)
+			labels.put(edge.url(), null == edge.label() ? "" : edge.label());
+		return labels;
+	}
+
+	/**
+	 * Whether {@code frontcacheURL} answers {@code get-cache-state} with the console-wide key - for the one caller that
+	 * probes a URL no config names, {@code IndexController}'s local edge, and only while edge editing is on. Never for
+	 * an edge of a scope: that edge has its own key.
+	 */
 	public boolean isFrontCacheEdgeAvailable(String frontcacheURL)
 	{
 		boolean available = false;
@@ -707,11 +839,18 @@ public class FrontcacheService {
 	 * @return the node's answer, or a synthetic refusal when the node could not be reached at all
 	 */
 	public SetConfigActionResponse saveConfigFile(EdgeScope scope, String edgeURL, ConfigFile configFile, String content, String baseHash) {
+		return save(scope, edgeURL, configFile.getFileName(),
+				fcClient -> fcClient.setConfig(configFile, content, baseHash, true));
+	}
+
+	/** The write behind both Configs saves: the console's switch, the scope's edge, an answer per edge. */
+	private SetConfigActionResponse save(EdgeScope scope, String edgeURL, String fileName,
+			Function<FrontCacheClient, SetConfigActionResponse> write) {
 
 		if (!isConfigEditingEnabled())
 		{
 			SetConfigActionResponse refused = new SetConfigActionResponse();
-			refused.setFile(configFile.getFileName());
+			refused.setFile(fileName);
 			refused.refuse("config editing is disabled on this console");
 			return refused;
 		}
@@ -720,12 +859,12 @@ public class FrontcacheService {
 		if (null == fcClient)
 		{
 			SetConfigActionResponse refused = new SetConfigActionResponse();
-			refused.setFile(configFile.getFileName());
+			refused.setFile(fileName);
 			refused.refuse(UnknownEdgeException.messageFor(edgeURL));
 			return refused;
 		}
 
-		SetConfigActionResponse response = fcClient.setConfig(configFile, content, baseHash, true);
+		SetConfigActionResponse response = write.apply(fcClient);
 
 		if (null == response)
 		{
@@ -733,7 +872,7 @@ public class FrontcacheService {
 			// becomes a refusal rather than a blank - "nothing happened" and "we don't know" would
 			// otherwise look identical.
 			SetConfigActionResponse unreachable = new SetConfigActionResponse();
-			unreachable.setFile(configFile.getFileName());
+			unreachable.setFile(fileName);
 			unreachable.refuse("edge " + edgeURL + " is not available");
 			return unreachable;
 		}
@@ -771,6 +910,176 @@ public class FrontcacheService {
 		}
 
 		return results;
+	}
+
+	// ---- plugin configs (the Plugin Configs screen) ---------------------------------------------------------------
+
+	/**
+	 * Every plugin with a config that an edge of the scope runs - id -> its file under conf/, by id - from each edge's
+	 * {@code get-node-stats}. A refused plugin is left out: the node will not write its config. An edge that does not
+	 * answer adds nothing; one that predates plugins reports none.
+	 */
+	public Map<String, String> getPluginConfigs(EdgeScope scope) {
+
+		Map<String, String> configs = new java.util.TreeMap<String, String>();
+		for (NodeStatsActionResponse stats : fanOut(scope.clients(), FrontCacheClient::getNodeStatsActionResponse))
+		{
+			if (null == stats || null == stats.getPlugins())
+				continue;
+			for (PluginStats plugin : stats.getPlugins())
+				if (null != plugin.getId() && null != plugin.getConfig() && !"refused".equals(plugin.getState()))
+					configs.putIfAbsent(plugin.getId(), plugin.getConfig());
+		}
+		return configs;
+	}
+
+	/**
+	 * One plugin's config from every edge of the scope that runs the plugin - the Plugin Configs screen's tabs, in the
+	 * console config's edge order. An edge without the plugin has no tab (it has no such file to show, and a save
+	 * there would be refused); one that did not answer keeps its tab, marked unreachable.
+	 */
+	public List<EdgeConfigFile> getPluginConfigFiles(EdgeScope scope, String pluginId) {
+
+		List<FrontCacheClient> fcClients = scope.clients();
+		List<GetPluginConfigActionResponse> answers = fanOut(fcClients, fcClient -> fcClient.getPluginConfig(pluginId));
+
+		List<EdgeConfigFile> result = new ArrayList<EdgeConfigFile>();
+		for (int i = 0; i < fcClients.size(); i++)
+		{
+			FrontCacheClient fcClient = fcClients.get(i);
+			GetPluginConfigActionResponse answer = answers.get(i);
+			if (null == answer)
+				result.add(EdgeConfigFile.unreachable(fcClient.getName(), fcClient.getFrontCacheURL()));
+			else if (ActionResponse.RESPONSE_STATUS_OK.equals(answer.getResponseStatus()))
+				result.add(new EdgeConfigFile(fcClient.getName(), fcClient.getFrontCacheURL(), answer.getPluginConfig(), true));
+		}
+		return result;
+	}
+
+	/**
+	 * Writes a plugin's config to one edge and applies it - {@code set-config} with {@code file=plugin:<id>}.
+	 *
+	 * @param fileName the file as the edges report it, for messages only
+	 */
+	public SetConfigActionResponse savePluginConfigFile(EdgeScope scope, String edgeURL, String pluginId,
+			String fileName, String content, String baseHash) {
+		return save(scope, edgeURL, fileName,
+				fcClient -> fcClient.setPluginConfig(pluginId, fileName, content, baseHash, true));
+	}
+
+	/**
+	 * Writes a plugin's config to every edge of the scope that runs the plugin - the edges its screen shows - one
+	 * after the other, for the reason {@link #saveConfigFileToAllEdges} gives.
+	 */
+	public Map<String, SetConfigActionResponse> savePluginConfigFileToAllEdges(EdgeScope scope, String pluginId,
+			String fileName, String content, String baseHash, String baseHashEdgeURL) {
+
+		Map<String, SetConfigActionResponse> results = new LinkedHashMap<String, SetConfigActionResponse>();
+		for (EdgeConfigFile edge : getPluginConfigFiles(scope, pluginId))
+		{
+			String edgeURL = edge.getUrl();
+			String hashForEdge = edgeURL.equals(baseHashEdgeURL) ? baseHash : null;
+			results.put(edgeURL, savePluginConfigFile(scope, edgeURL, pluginId, fileName, content, hashForEdge));
+		}
+		return results;
+	}
+
+	// ---- plugins (the Plugins screen) ----------------------------------------------------------------------------
+
+	/**
+	 * Every edge of the scope with the plugins its {@code get-node-stats} reports - the Plugins screen's tabs, in the
+	 * console config's edge order. An edge that did not answer keeps its tab, marked unreachable; one that answered
+	 * {@code get-cache-state} instead (it predates {@code get-node-stats}) is marked as reporting no plugin information.
+	 */
+	public List<EdgePlugins> getEdgePlugins(EdgeScope scope) {
+
+		List<FrontCacheClient> fcClients = scope.clients();
+		List<NodeStatsActionResponse> answers = fanOut(fcClients, FrontCacheClient::getNodeStatsActionResponse);
+
+		List<EdgePlugins> result = new ArrayList<EdgePlugins>();
+		for (int i = 0; i < fcClients.size(); i++)
+		{
+			FrontCacheClient fcClient = fcClients.get(i);
+			NodeStatsActionResponse stats = answers.get(i);
+			if (null == stats)
+			{
+				result.add(EdgePlugins.unreachable(fcClient.getName(), fcClient.getFrontCacheURL()));
+				continue;
+			}
+
+			boolean reported = FrontcacheAction.GET_NODE_STATS.equals(stats.getAction());
+			List<PluginView> plugins = new ArrayList<PluginView>();
+			if (reported)
+				for (PluginStats plugin : stats.getPlugins())
+					if (null != plugin)
+						plugins.add(new PluginView(plugin));
+			result.add(new EdgePlugins(fcClient.getName(), fcClient.getFrontCacheURL(), true, reported, plugins));
+		}
+		return result;
+	}
+
+	/**
+	 * Re-reads a plugin's config on one edge of the scope - {@code reload-plugin-config}: what is already on the node's
+	 * disk, applied. Gated as a config save is: the console's {@code config-editing} switch here, the handler's
+	 * permission before it, and an edge outside the scope is refused before any client exists.
+	 *
+	 * @return the node's answer, or a synthetic refusal (status ERROR, the reason in {@code errorDescription}) when
+	 *         editing is off, the edge is not in the scope, or it could not be reached
+	 */
+	public ReloadPluginConfigActionResponse reloadPluginConfig(EdgeScope scope, String edgeURL, String pluginId) {
+
+		if (!isConfigEditingEnabled())
+			return reloadRefused(pluginId, "config editing is disabled on this console");
+
+		FrontCacheClient fcClient = scope.client(edgeURL);
+		if (null == fcClient)
+			return reloadRefused(pluginId, UnknownEdgeException.messageFor(edgeURL));
+
+		if (null == pluginId || pluginId.isBlank())
+			return reloadRefused(pluginId, "no plugin selected");
+
+		ReloadPluginConfigActionResponse response = fcClient.reloadPluginConfig(pluginId);
+		if (null == response)
+			return reloadRefused(pluginId, "edge " + edgeURL + " is not available");
+
+		return response;
+	}
+
+	private static ReloadPluginConfigActionResponse reloadRefused(String pluginId, String reason) {
+		ReloadPluginConfigActionResponse refused = new ReloadPluginConfigActionResponse();
+		refused.setPlugin(pluginId);
+		refused.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+		refused.setErrorDescription(reason);
+		return refused;
+	}
+
+	/**
+	 * One call per edge, in parallel, with the console's timeouts: each edge's answer in edge order, null for one
+	 * that did not answer (in time).
+	 */
+	private <T> List<T> fanOut(List<FrontCacheClient> fcClients, Function<FrontCacheClient, T> call) {
+
+		List<Future<T>> futureList = new ArrayList<Future<T>>();
+		for (FrontCacheClient fcClient : fcClients)
+			futureList.add(executor.submit(() -> call.apply(fcClient)));
+
+		List<T> result = new ArrayList<T>();
+		boolean timeoutReached = false;
+		for (int i = 0; i < futureList.size(); i++)
+		{
+			Future<T> f = futureList.get(i);
+			try {
+				result.add(timeoutReached
+						? f.get(CONSOLE_TIMEOUT, TimeUnit.MILLISECONDS)
+						: f.get(FRONTCACHE_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS));
+			} catch (TimeoutException | InterruptedException | ExecutionException e) {
+				f.cancel(true);
+				timeoutReached = true;
+				logger.debug("timeout (" + FRONTCACHE_CLIENT_TIMEOUT + ") reached for " + fcClients.get(i).getFrontCacheURL());
+				result.add(null);
+			}
+		}
+		return result;
 	}
 
 	/**
@@ -814,10 +1123,35 @@ public class FrontcacheService {
 	}
 
 
+	/**
+	 * The visitor types an edge knows, for the Cache View's per-type expiry rows - the roots and its declared types.
+	 *
+	 * @return null when the edge is older than 2.13.0 or did not answer: the view then lists the stored keys alone
+	 * @throws UnknownEdgeException for an edge not in the request's scope, as every edge parameter
+	 */
+	public List<org.frontcache.bots.VisitorTypeEntry> getVisitorTypeEntries(EdgeScope scope, String edgeURL)
+	{
+		FrontCacheClient fcClient = requireEdgeClient(scope, edgeURL);
+		org.frontcache.io.GetBotsActionResponse response = fcClient.getBotsActionResponse();
+		return (null == response) ? null : response.getVisitorTypes();
+	}
+
 	/** Nothing when {@link #isEdgeEditingEnabled()} is off - the controller says so, this keeps it so. */
 	public void addEdge(String edge) {
-		if (null != edge && isEdgeEditingEnabled())
+		if (null != edge && isEdgeEditingEnabled() && !isKeyedEdge(edge))
 			frontcacheAgentURLs.add(edge);
+	}
+
+	/**
+	 * Whether an {@code edges} entry has this canonical URL. The Edges screen never adds one to {@code urls}: the
+	 * same URL with the console-wide key and with its own is refused by {@link EdgeScope#of}, on every request.
+	 */
+	boolean isKeyedEdge(String edge) {
+		String canonical = canonicalEdgeURL(edge);
+		for (EdgeScope.Edge keyed : configuredKeyedEdges())
+			if (canonicalEdgeURL(keyed.url()).equals(canonical))
+				return true;
+		return false;
 	}
 
 	public void removeEdge(String edge) {

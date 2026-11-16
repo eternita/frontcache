@@ -51,6 +51,9 @@ public class CoreBoundaryTest {
 
 	private static final Path SOURCES = Paths.get("src/main/java");
 
+	/** The plugin API ships in every Community node too - a Pro class there would be as wrong as in the core. */
+	private static final Path API_SOURCES = Paths.get("../frontcache-plugin-api/src/main/java");
+
 	/** The Pro modules' sources, beside this module in the private repository. */
 	private static final List<Path> PRO_SOURCES = List.of(
 			Paths.get("../frontcache-pro-license/src/main/java"),
@@ -87,11 +90,19 @@ public class CoreBoundaryTest {
 		for (String fqn : sources(SOURCES).keySet())
 			if (isPro(fqn))
 				back.add(fqn);
+		for (String fqn : sources(API_SOURCES).keySet())
+			if (isPro(fqn))
+				back.add(fqn);
 
 		assertTrue("Pro classes in frontcache-core - they belong in frontcache-pro / frontcache-pro-license:\n  "
 				+ String.join("\n  ", back), back.isEmpty());
 		assertFalse("the Pro module's services file is in frontcache-core - it is frontcache-pro's",
-				Files.exists(Paths.get("src/main/resources/META-INF/services/" + FrontcacheModule.class.getName())));
+				Files.exists(Paths.get("src/main/resources/META-INF/services/org.frontcache.module.FrontcacheModule")));
+		// a plugin manifest in a core jar would make every Community node load the plugin it names
+		assertFalse("a plugin manifest is in frontcache-core - a plugin's manifest is in the plugin's own jar",
+				Files.exists(Paths.get("src/main/resources/" + org.frontcache.plugin.PluginManifest.RESOURCE)));
+		assertFalse("a plugin manifest is in frontcache-plugin-api - a plugin's manifest is in the plugin's own jar",
+				Files.exists(Paths.get("../frontcache-plugin-api/src/main/resources/" + org.frontcache.plugin.PluginManifest.RESOURCE)));
 	}
 
 	@Test
@@ -128,7 +139,7 @@ public class CoreBoundaryTest {
 			}
 		}
 
-		assertTrue("Core classes name Pro classes (go through the org.frontcache.module SPI instead):\n  "
+		assertTrue("Core classes name Pro classes (go through the plugin SPI, org.frontcache.plugin, instead):\n  "
 				+ String.join("\n  ", violations), violations.isEmpty());
 
 		List<String> stale = new ArrayList<>();
@@ -141,9 +152,9 @@ public class CoreBoundaryTest {
 				+ String.join("\n  ", stale), stale.isEmpty());
 	}
 
-	/** The core's own module SPI must not depend on anything Pro either - it is what Pro compiles against. */
+	/** The core's own plugin SPI must not depend on anything Pro either - it is what Pro compiles against. */
 	@Test
-	public void theServicesFileIsTheOnlyPlaceTheProModuleIsNamed() throws IOException {
+	public void theManifestIsTheOnlyPlaceTheProPluginIsNamed() throws IOException {
 
 		Map<String, Path> all = sources(SOURCES);
 		for (Map.Entry<String, Path> e : all.entrySet())

@@ -21,6 +21,7 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import jakarta.servlet.FilterChain;
@@ -48,6 +49,7 @@ import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
 import org.frontcache.core.WebResponse;
+import org.frontcache.plugin.host.CoreEvents;
 import org.frontcache.resilience.fr.FallbackResolverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,12 +160,17 @@ public class FC_BypassCache extends FcCommand<Object> {
 			InputStream requestEntity = getRequestBody(request);
 			String uri = context.getRequestURI();
 
+			long started = System.nanoTime();
 			try {
 				ClassicHttpResponse response = forward(client, verb, uri, request, headers, requestEntity, passthroughEncoding);
 
 				// response 2 context
 				setResponse(response);
 
+				// relayed to the client as it is, but an origin answering 5xx is still an origin error
+				if (response.getCode() >= 500)
+					CoreEvents.originError(context, getCommandKey(), "failure", response.getCode(), eventUri(), null,
+							TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
 			}
 			catch (Exception ex) {
 				ex.printStackTrace();
@@ -173,6 +180,9 @@ public class FC_BypassCache extends FcCommand<Object> {
 				context.setFallbackUsed();
 				logger.error("FC - ORIGIN ERROR - " + uri);
 
+				// caught here, so FcCommand never sees it: this command reports it itself
+				CoreEvents.originError(context, getCommandKey(), "failure", 0, eventUri(), ex,
+						TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
 			}
 		}
 
@@ -328,4 +338,9 @@ public class FC_BypassCache extends FcCommand<Object> {
 		}
 	}
 
+	@Override
+	protected RequestContext eventContext()
+	{
+		return context;
+	}
 }

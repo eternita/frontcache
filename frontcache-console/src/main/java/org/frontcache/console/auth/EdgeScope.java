@@ -43,10 +43,24 @@ import org.frontcache.client.FrontCacheClient;
  */
 public final class EdgeScope {
 
-	/** One edge: the URL as configured, and its API key (null = the node needs none). */
-	public record Edge(String url, String apiKey) {
+	/**
+	 * One edge: the URL as configured, its API key (null = the node needs none) and, as of 2.13.0, an optional label
+	 * the console shows beside it (an {@code edges} entry's {@code label}; null = none). Two edges differing only in
+	 * label are the same edge to {@link #of}.
+	 */
+	public record Edge(String url, String apiKey, String label) {
 		public Edge {
 			Objects.requireNonNull(url, "url");
+		}
+
+		public Edge(String url, String apiKey) {
+			this(url, apiKey, null);
+		}
+
+		/** The key is never printed. */
+		@Override
+		public String toString() {
+			return "Edge[" + url + (null == label ? "" : ", " + label) + "]";
 		}
 	}
 

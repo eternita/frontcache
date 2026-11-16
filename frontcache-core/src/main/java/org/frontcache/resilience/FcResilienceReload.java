@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.frontcache.plugin.host.CoreEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +76,8 @@ public class FcResilienceReload {
 
 		logger.info("conf/resilience.properties reloaded from " + config.loadedFrom()
 				+ ", " + warnings.size() + " note(s)");
+
+		CoreEvents.configReloaded("resilience.properties", true, -1, warnings);
 
 		return new Result(config.loadedFrom(), Collections.unmodifiableList(warnings));
 	}

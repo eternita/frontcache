@@ -58,6 +58,8 @@ public class EdgesController {
 		    }});
 		model.put("edges", edges);
 		model.put("edgeEditingEnabled", consoleSecurity.edgeEditing());
+		// the edges entries (configured URL -> label): shown, never removable here - they are the config's
+		model.put("keyedEdges", frontcacheService.keyedEdgeLabels());
 
 		return "edges";
 	}

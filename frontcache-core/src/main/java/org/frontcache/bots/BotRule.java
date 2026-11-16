@@ -25,7 +25,9 @@ import org.frontcache.guard.GuardPredicate;
 /**
  * One classification rule from conf/bots.conf: name | condition | verdict [| dry-run].
  *
- * The verdict is a CLIENT TYPE - {@code bot} or {@code guest}, nothing else. It is not a judgement
+ * The verdict is a VISITOR TYPE - {@code bot}, {@code guest}, or a type the same file declares with
+ * {@code @type <name> like <bot|guest>} - and so also a CLIENT TYPE, its root ({@link #getClientType()}: {@code bot}
+ * or {@code guest}, nothing else). It is not a judgement
  * about the client: it selects a behaviour profile (which branch of a WebResponse's expireTimeMap
  * applies, so a different TTL or a cached response vs. an origin call, and whether an
  * {@code <fc:include client="...">} fragment is resolved). Guard rules can read it back through
@@ -38,15 +40,26 @@ public class BotRule {
 
 	private final String name;
 	private final List<GuardPredicate> predicates;
+	private final String visitorType;
 	private final String clientType;
 	private final boolean dryRun;
 
 	// hit count since load; in-memory only, reset on restart and on reload-bots (by design)
 	private final LongAdder hits = new LongAdder();
 
+	/** A rule whose verdict is a root, {@code bot} or {@code guest}. */
 	public BotRule(String name, List<GuardPredicate> predicates, String clientType, boolean dryRun) {
+		this(name, predicates, clientType, clientType, dryRun);
+	}
+
+	/**
+	 * @param visitorType the verdict as written - a root or a declared type
+	 * @param clientType  its root
+	 */
+	public BotRule(String name, List<GuardPredicate> predicates, String visitorType, String clientType, boolean dryRun) {
 		this.name = name;
 		this.predicates = Collections.unmodifiableList(predicates);
+		this.visitorType = visitorType;
 		this.clientType = clientType;
 		this.dryRun = dryRun;
 	}
@@ -56,9 +69,13 @@ public class BotRule {
 	 */
 	public boolean matches(RequestContext context)
 	{
-		for (GuardPredicate predicate : predicates)
-			if (!predicate.test(context))
-				return false;
+		try {
+			for (GuardPredicate predicate : predicates)
+				if (!predicate.test(context))
+					return false;
+		} catch (org.frontcache.guard.PredicateUndecided e) {
+			return false; // a plugin's predicate had no answer: the rule does not match, negated or not
+		}
 
 		return true;
 	}
@@ -71,9 +88,14 @@ public class BotRule {
 		return predicates;
 	}
 
-	/** {@code bot} or {@code guest} */
+	/** {@code bot} or {@code guest} - the root of {@link #getVisitorType()} */
 	public String getClientType() {
 		return clientType;
+	}
+
+	/** the verdict as written: a root, or a declared type */
+	public String getVisitorType() {
+		return visitorType;
 	}
 
 	public boolean isDryRun() {
@@ -104,12 +126,14 @@ public class BotRule {
 	 * @return flat, JSON-friendly snapshot of this rule for the management API and the console
 	 */
 	public BotRuleEntry toEntry() {
-		return new BotRuleEntry(name, getCondition(), clientType, dryRun, getHits());
+		// the verdict as written, so the console's verdict column says 'customer' - an older console renders it as the
+		// string it is
+		return new BotRuleEntry(name, getCondition(), visitorType, dryRun, getHits());
 	}
 
 	@Override
 	public String toString() {
-		return name + " | " + getCondition() + " | " + clientType + (dryRun ? " | dry-run" : "");
+		return name + " | " + getCondition() + " | " + visitorType + (dryRun ? " | dry-run" : "");
 	}
 
 }

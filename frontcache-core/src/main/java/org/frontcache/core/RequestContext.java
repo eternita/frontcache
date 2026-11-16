@@ -728,14 +728,70 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 		return names;
 	}
 
-	// bot | guest
+	/**
+	 * The values of the cookies the client sent under one name - for the two readers allowed to see a value: the
+	 * {@code cookie-hmac:} predicate, which verifies it and logs nothing of it ({@link EvidenceCookies}), and a
+	 * serving plugin's view of its own request, for a cookie its manifest names. Not memoized, so no value is kept on
+	 * the context (an include's context is a copy of its page's).
+	 *
+	 * @return every value sent under the name, in order - empty when there is none, or no longer a usable servlet
+	 *         request (an async include)
+	 */
+	public List<String> getCookieValues(String name) {
+
+		List<String> values = new ArrayList<String>(1);
+		HttpServletRequest request = getRequest();
+		if (null == request || null == name)
+			return values;
+
+		try {
+			Cookie[] cookies = request.getCookies();
+			if (null != cookies)
+				for (Cookie cookie : cookies)
+					if (name.equals(cookie.getName()) && null != cookie.getValue())
+						values.add(cookie.getValue());
+		} catch (Exception e) {
+			// recycled request - undecidable, treat as absent
+		}
+		return values;
+	}
+
+	/**
+	 * {@code bot} | {@code guest} - the ROOT of the request's visitor type, always. A consumer that does not know about
+	 * declared visitor types reads this and sees what it saw before they existed; one that does opts in to
+	 * {@link #getVisitorType()} deliberately.
+	 */
 	public String getClientType() {
 		return (String) get("currentClientType");
 	}
 
-	// bot | guest
+	/** Sets the client type to a root, and the visitor type with it - see {@link #setVisitorType}. */
 	public void setClientType(String currentClientType) {
         set("currentClientType", currentClientType);
+        remove(VISITOR_TYPE);
+	}
+
+	private static final String VISITOR_TYPE = "visitorType";
+
+	/**
+	 * The request's visitor type: the leaf - a type bots.conf declares ({@code customer}) or, when none decided, the
+	 * root itself. Equal to {@link #getClientType()} for every request on a node that declares no type.
+	 */
+	public String getVisitorType() {
+		String visitorType = (String) get(VISITOR_TYPE);
+		return (null != visitorType) ? visitorType : getClientType();
+	}
+
+	/**
+	 * @param visitorType the leaf - a root or a declared type
+	 * @param clientType  its root, {@code bot} | {@code guest}
+	 */
+	public void setVisitorType(String visitorType, String clientType) {
+        set("currentClientType", clientType);
+        if (null == visitorType || visitorType.equals(clientType))
+            remove(VISITOR_TYPE);
+        else
+            set(VISITOR_TYPE, visitorType);
 	}
 
     private static final String CLIENT_IP = "clientIP";
@@ -984,6 +1040,7 @@ public class RequestContext extends ConcurrentHashMap<String, Object> {
 			.append(", type=").append(getRequestType())
 			.append(", includeLevel=").append(getIncludeLevel())
 			.append(", clientType=").append(getClientType())
+			.append(", visitorType=").append(getVisitorType())
 			.append(", uri=").append(clip(getRequestURI()))
 			.append(clip(getRequestQueryString()))
 			.append(", fallbackUsed=").append(isFallbackUsed());

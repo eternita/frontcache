@@ -118,11 +118,14 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 	 * The path the node serves the stream on. Appended to an allowlisted edge URL - never taken from the
 	 * request, so the browser cannot choose what is fetched from the edge.
 	 *
-	 * Deliberately still the pre-2.7 path, not {@code /fc-dashboard.stream}: the console is deployed
-	 * separately from the nodes it monitors, so it has to work against a mixed fleet, and only the old
-	 * path exists on a 2.6 node. 2.7+ serves both. Switch this when the oldest supported node is 2.7.
+	 * The current path since 2.13.0. Until then the console called the pre-2.7 {@code /hystrix.stream},
+	 * which every node still serves, so as to read a 2.6 node too; a 2.6 node's realtime card is now
+	 * empty. A request naming the old path is still taken for its edge ({@link #LEGACY_STREAM_PATH}).
 	 */
-	static final String STREAM_PATH = "hystrix.stream";
+	static final String STREAM_PATH = "fc-dashboard.stream";
+
+	/** The pre-2.7 path, which a bookmarked or scripted proxy URL may still end in. Never fetched. */
+	static final String LEGACY_STREAM_PATH = "hystrix.stream";
 
 	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
 
@@ -314,9 +317,10 @@ public class DashboardStreamProxyServlet extends HttpServlet {
 
 		String normalized = url.trim();
 
-		// the page asks for "<edge>/hystrix.stream"; compare on the edge itself
-		if (normalized.endsWith(STREAM_PATH))
-			normalized = normalized.substring(0, normalized.length() - STREAM_PATH.length());
+		// the page may ask for "<edge>/fc-dashboard.stream" (or the pre-2.7 path); compare on the edge itself
+		for (String path : new String[] { STREAM_PATH, LEGACY_STREAM_PATH })
+			if (normalized.endsWith(path))
+				normalized = normalized.substring(0, normalized.length() - path.length());
 
 		while (normalized.endsWith("/"))
 			normalized = normalized.substring(0, normalized.length() - 1);

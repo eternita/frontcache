@@ -87,5 +87,9 @@ public class FC_ThroughCache_WebFilter extends FcCommand<WebResponse> {
 		return webResponse;
     }
 
-
+	@Override
+	protected RequestContext eventContext()
+	{
+		return context;
+	}
 }

@@ -164,6 +164,35 @@ public class GuardRuleParserTest {
 	}
 
 	@Test
+	public void aTrapIsAFlagOfARuleThatAnswers() {
+		GuardRule trap = parser.parse("honeypot | uri~^/no-crawl/ | reject:404 Not Found | trap");
+		assertTrue(trap.isTrap());
+		assertFalse(trap.isDryRun());
+		assertTrue(trap.toString(), trap.toString().endsWith(" | trap"));
+
+		GuardRule dryRun = parser.parse("honeypot | uri~^/no-crawl/ | reject:404 | TRAP | dry-run");
+		assertTrue("flags in any order, any case", dryRun.isTrap());
+		assertTrue(dryRun.isDryRun());
+
+		assertTrue(parser.parse("honeypot | uri~^/no-crawl/ | redirect:302 /welcome.htm | trap").isTrap());
+		assertFalse(parser.parse("plain | uri~^/no-crawl/ | reject:404").isTrap());
+
+		assertRejected("honeypot | uri~^/no-crawl/ | allow | trap");               // an allow records nothing
+		assertRejected("honeypot | uri~^/no-crawl/ | reject:404 | trap | trap");   // repeated
+		assertRejected("honeypot | uri~^/no-crawl/ | reject:404 | traps");         // typo
+	}
+
+	@Test
+	public void aTrapRefusedOnAnAllowSaysWhy() {
+		try {
+			parser.parse("honeypot | uri~^/no-crawl/ | allow | trap");
+			fail("a trap on an allow rule");
+		} catch (GuardConfigException expected) {
+			assertTrue(expected.getMessage(), expected.getMessage().contains("not an allow rule"));
+		}
+	}
+
+	@Test
 	public void unparseableLineNeverEscapesAsSomethingElse() {
 		// every rejection is a GuardConfigException so the engine can skip exactly one line
 		try {

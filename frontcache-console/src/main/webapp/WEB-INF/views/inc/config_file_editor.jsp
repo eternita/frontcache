@@ -1,7 +1,7 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core"%>
 <%@ taglib prefix="fn" uri="jakarta.tags.functions"%>
-<!-- One editor for all five Configs screens - conf/resilience.properties, guard-rules.conf,
-     bots.conf, dynamic-urls.conf and fallbacks.conf. Before this the five JSPs were byte-for-byte
+<!-- One editor for every Configs screen - conf/resilience.properties, guard-rules.conf,
+     bots.conf, dynamic-urls.conf, fallbacks.conf, and a plugin's config (plugin:<id>). Before this the five JSPs were byte-for-byte
      identical apart from the model key, which meant five copies of any change made here; the fifth
      is the one that would have been missed.
 

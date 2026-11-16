@@ -70,5 +70,16 @@ public class FC_ThroughCache extends FcCommand<WebResponse> {
 		return null;
     }
 
+	@Override
+	protected RequestContext eventContext()
+	{
+		return context;
+	}
 
+	/** The cache key's URL - a management lookup has no request to take one from. */
+	@Override
+	protected String eventUri()
+	{
+		return originUrlStr;
+	}
 }

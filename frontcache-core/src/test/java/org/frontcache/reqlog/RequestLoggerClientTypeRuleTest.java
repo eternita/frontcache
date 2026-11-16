@@ -51,6 +51,10 @@ import ch.qos.logback.core.read.ListAppender;
  *
  * The same position holds in frontcache-failed-requests.log, across both of that file's line shapes,
  * whose failure reason (and, for a guard action, the HTTP status) still trail the base line.
+ *
+ * And since 2.13.0 every line ENDS with the visitor type - the leaf of the client type when bots.conf
+ * declares visitor types - after whatever trails the base line, so no column a consumer reads by
+ * position moves.
  */
 public class RequestLoggerClientTypeRuleTest {
 
@@ -59,6 +63,8 @@ public class RequestLoggerClientTypeRuleTest {
 	private static final int CLIENT_TYPE_RULE = 15;
 	private static final int USER_AGENT = 16;
 	private static final int BASE_LINE_COLUMNS = 16;
+	/** the request line: the base line, then the visitor type */
+	private static final int REQUEST_LINE_COLUMNS = BASE_LINE_COLUMNS + 1;
 
 	private static final String BINGBOT =
 			"Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)";
@@ -105,7 +111,7 @@ public class RequestLoggerClientTypeRuleTest {
 
 		List<String> columns = onlyLine(requestAppender);
 
-		assertEquals("the base line gained exactly one column: " + columns, BASE_LINE_COLUMNS, columns.size());
+		assertEquals("the base line gained exactly one column, then the visitor type: " + columns, REQUEST_LINE_COLUMNS, columns.size());
 		assertEquals("bot", columns.get(CLIENT_TYPE - 1));
 		assertEquals("bingbot", columns.get(CLIENT_TYPE_RULE - 1));
 		assertEquals("the user-agent column moved right by one, and no further", BINGBOT,
@@ -126,7 +132,7 @@ public class RequestLoggerClientTypeRuleTest {
 		List<String> columns = onlyLine(requestAppender);
 
 		assertEquals("a space in the rule name must not add a column: " + columns,
-				BASE_LINE_COLUMNS, columns.size());
+				REQUEST_LINE_COLUMNS, columns.size());
 		assertEquals("Yahoo! Slurp", columns.get(CLIENT_TYPE_RULE - 1));
 	}
 
@@ -143,7 +149,7 @@ public class RequestLoggerClientTypeRuleTest {
 
 		List<String> columns = onlyLine(requestAppender);
 
-		assertEquals(BASE_LINE_COLUMNS, columns.size());
+		assertEquals(REQUEST_LINE_COLUMNS, columns.size());
 		assertEquals("-", columns.get(CLIENT_TYPE_RULE - 1));
 	}
 
@@ -173,9 +179,12 @@ public class RequestLoggerClientTypeRuleTest {
 
 		List<String> columns = onlyLine(failedAppender);
 
-		assertEquals(BASE_LINE_COLUMNS + 1, columns.size());
+		assertEquals(BASE_LINE_COLUMNS + 2, columns.size());
 		assertEquals("default", columns.get(CLIENT_TYPE_RULE - 1));
-		assertEquals("timeout", columns.get(BASE_LINE_COLUMNS));
+		assertEquals("the reason stays where it was", "timeout", columns.get(BASE_LINE_COLUMNS));
+		assertEquals("the visitor type follows it, once", "guest", columns.get(BASE_LINE_COLUMNS + 1));
+		assertEquals("the request line's copy ends with it too", "guest",
+				onlyLine(requestAppender).get(REQUEST_LINE_COLUMNS - 1));
 	}
 
 	/**
@@ -191,10 +200,54 @@ public class RequestLoggerClientTypeRuleTest {
 
 		List<String> columns = onlyLine(failedAppender);
 
-		assertEquals(BASE_LINE_COLUMNS + 2, columns.size());
+		assertEquals(BASE_LINE_COLUMNS + 3, columns.size());
 		assertEquals("bingbot", columns.get(CLIENT_TYPE_RULE - 1));
 		assertEquals("bad-request", columns.get(BASE_LINE_COLUMNS));
 		assertEquals("400", columns.get(BASE_LINE_COLUMNS + 1));
+		assertEquals("bot", columns.get(BASE_LINE_COLUMNS + 2));
+	}
+
+	/**
+	 * A declared visitor type: the client-type column keeps the root - a dashboard splitting on bot / guest stays
+	 * right - and the leaf is the last token, on every line kind.
+	 */
+	@Test
+	public void aDeclaredTypeIsTheLastTokenAndTheClientTypeColumnKeepsItsRoot() {
+
+		RequestContext context = context("bot", "googlebot-verified", BINGBOT);
+		context.setVisitorType("bot-whitelisted", "bot");
+
+		RequestLogger.logRequest("https://www.example-site.com/index.htm", true, true, 1, 50874, context);
+		List<String> columns = onlyLine(requestAppender);
+		assertEquals(REQUEST_LINE_COLUMNS, columns.size());
+		assertEquals("bot", columns.get(CLIENT_TYPE - 1));
+		assertEquals(BINGBOT, columns.get(USER_AGENT - 1));
+		assertEquals("bot-whitelisted", columns.get(REQUEST_LINE_COLUMNS - 1));
+
+		RequestLogger.logGuardedRequest("https://www.example-site.com/login.htm", "bad-request", 400, "rejected", context);
+		columns = onlyLine(failedAppender);
+		assertEquals("400", columns.get(BASE_LINE_COLUMNS + 1));
+		assertEquals("bot-whitelisted", columns.get(columns.size() - 1));
+	}
+
+	/** The plugin-served line (/fc-x/) and its failed copy, which ends "plugin:<id>" <status> before the visitor type. */
+	@Test
+	public void aPluginServedLineEndsWithTheVisitorTypeOnBothLogs() {
+
+		RequestContext context = context("guest", "captcha-passed", "curl/8.4.0");
+		context.setVisitorType("captcha-passed", "guest");
+
+		RequestLogger.logServedRequest("https://www.example-site.com/fc-x/challenge/", "plugin:challenge", 503, 2, 10, context);
+
+		List<String> columns = onlyLine(requestAppender);
+		assertEquals(REQUEST_LINE_COLUMNS, columns.size());
+		assertEquals("captcha-passed", columns.get(REQUEST_LINE_COLUMNS - 1));
+
+		columns = onlyLine(failedAppender);
+		assertEquals(BASE_LINE_COLUMNS + 3, columns.size());
+		assertEquals("plugin:challenge", columns.get(BASE_LINE_COLUMNS));
+		assertEquals("503", columns.get(BASE_LINE_COLUMNS + 1));
+		assertEquals("captcha-passed", columns.get(BASE_LINE_COLUMNS + 2));
 	}
 
 	/**
@@ -214,8 +267,9 @@ public class RequestLoggerClientTypeRuleTest {
 		assertTrue("nothing was buffered for the trace header", null != header);
 
 		List<String> columns = split(header);
-		assertEquals("bingbot", columns.get(columns.size() - 1));
-		assertEquals("bot", columns.get(columns.size() - 2));
+		assertEquals("bot", columns.get(columns.size() - 1));
+		assertEquals("bingbot", columns.get(columns.size() - 2));
+		assertEquals("bot", columns.get(columns.size() - 3));
 	}
 
 	private static RequestContext context(String clientType, String clientTypeRule, String userAgent) {

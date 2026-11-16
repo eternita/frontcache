@@ -21,7 +21,10 @@ import org.frontcache.io.ActionResponse;
 
 /**
  * One management action a {@link FrontcacheModule} answers on {@code /frontcache-io}.
+ *
+ * @deprecated since 2.13.0: {@link org.frontcache.plugin.ManagementAction}.
  */
+@Deprecated
 public interface ManagementAction {
 
 	/** One line for the {@code help} action. */

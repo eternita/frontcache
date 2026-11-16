@@ -1,0 +1,41 @@
+# Builds the plugin and runs its tests - the testkit's PluginContract included - on every push and pull request,
+# and keeps the jar (with its SHA-256) as the run's artifact. A plugin that passes PluginContract on the current
+# plugin-api is what the Frontcache plugin registry calls "verified".
+name: build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      # The wrapper when the repository has one (`gradle wrapper --gradle-version 9.7.0` once, and commit it);
+      # otherwise this Gradle.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.7.0'
+      - name: build
+        run: |
+          if [ -x ./gradlew ]; then ./gradlew build sha256; else gradle build sha256; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-jar
+          path: build/libs/*.jar
+          retention-days: 30
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/reports/
+          retention-days: 7

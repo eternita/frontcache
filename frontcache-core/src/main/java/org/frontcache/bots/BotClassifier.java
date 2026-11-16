@@ -32,11 +32,14 @@ import org.frontcache.core.RequestContext;
 import org.frontcache.guard.GuardConfigException;
 import org.frontcache.guard.GuardPredicate;
 import org.frontcache.guard.GuardPredicateFactory;
+import org.frontcache.plugin.host.CoreEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Decides a request's client type - {@code bot} or {@code guest} - from conf/bots.conf.
+ * Decides a request's visitor type - {@code bot}, {@code guest} or a type the file declares with
+ * {@code @type <name> like <bot|guest>} ({@link VisitorTypes}) - and so its client type, the root - from
+ * conf/bots.conf. Declarations are collected in a first pass, so a rule may name a type declared below it.
  *
  * Evaluation order, first match wins:
  *
@@ -80,13 +83,31 @@ public class BotClassifier {
 
 	private final List<BotRule> rules;
 
+	// the file's @type declarations - swapped with the rules, as one instance
+	private final VisitorTypes visitorTypes;
+
 	// bare keyword lines only, in file order - what get-bots reports as botKeywords, which is the
 	// field an older console knows how to render
 	private final Set<String> keywords;
 
-	private BotClassifier(List<BotRule> rules, Set<String> keywords) {
+	private BotClassifier(List<BotRule> rules, Set<String> keywords, VisitorTypes visitorTypes) {
 		this.rules = Collections.unmodifiableList(rules);
 		this.keywords = Collections.unmodifiableSet(keywords);
+		this.visitorTypes = visitorTypes;
+	}
+
+	/**
+	 * The vocabulary of the classifier that is loaded, or {@link VisitorTypes#ROOTS} before one is - without
+	 * loading one (see {@link VisitorTypes#active()}).
+	 */
+	static VisitorTypes loadedVisitorTypes() {
+		BotClassifier current = instance;
+		return (null == current) ? VisitorTypes.ROOTS : current.visitorTypes;
+	}
+
+	/** @return the types this classifier's file declares, with the roots */
+	public VisitorTypes getVisitorTypes() {
+		return visitorTypes;
 	}
 
 	/**
@@ -121,10 +142,29 @@ public class BotClassifier {
 			// Cannot happen while the built-in default rule exists, but if it ever could: an empty
 			// classifier calls every crawler a guest and takes the origin with it. Keep what works.
 			logger.error("Reloading " + BOTS_CONFIG_FILE + " produced no usable rules - keeping the previous ones");
+			CoreEvents.configReloaded(BOTS_CONFIG_FILE, false, -1, List.of("no usable rules - the previous ones stay"));
 			return;
 		}
 
 		instance = reloaded;
+		CoreEvents.configReloaded(BOTS_CONFIG_FILE, true, reloaded.rules.size(), List.of());
+	}
+
+	/**
+	 * Binds every rule's {@code ext:} predicates to the started plugins now, so a mistake is in the log at once - see
+	 * {@code GuardRuleEngine.checkPluginPredicates}.
+	 */
+	public void checkPluginPredicates()
+	{
+		if (!org.frontcache.plugin.host.PluginPredicates.isRunning())
+			return;
+		for (BotRule rule : this.rules)
+			for (GuardPredicate predicate : rule.getPredicates())
+			{
+				org.frontcache.guard.ExtPredicate ext = predicate.pluginPredicate();
+				if (null != ext)
+					org.frontcache.plugin.host.PluginPredicates.check(ext, BOTS_CONFIG_FILE + ": " + rule.getName());
+			}
 	}
 
 	/** for tests - installs a classifier without going through FCConfig */
@@ -134,7 +174,12 @@ public class BotClassifier {
 
 	/** for tests - builds a classifier over an explicit rule list */
 	public static BotClassifier of(List<BotRule> rules) {
-		return new BotClassifier(new ArrayList<BotRule>(rules), new LinkedHashSet<String>());
+		return of(rules, VisitorTypes.ROOTS);
+	}
+
+	/** for tests - builds a classifier over an explicit rule list and vocabulary */
+	public static BotClassifier of(List<BotRule> rules, VisitorTypes visitorTypes) {
+		return new BotClassifier(new ArrayList<BotRule>(rules), new LinkedHashSet<String>(), visitorTypes);
 	}
 
 	/**
@@ -143,6 +188,27 @@ public class BotClassifier {
 	 */
 	public List<BotRule> getRules() {
 		return rules;
+	}
+
+	/**
+	 * Every type this node knows - the two roots, then the declared types in declaration order - each with the hits of
+	 * the rules whose verdict it is (dry-run rules decide nothing and are left out). What {@code get-bots} reports as
+	 * {@code visitorTypes} and the console's types table renders: one flat list with a behaves-like column.
+	 */
+	public List<VisitorTypeEntry> getVisitorTypeEntries() {
+		java.util.Map<String, Long> hits = new java.util.HashMap<String, Long>();
+		for (BotRule rule : rules)
+			if (!rule.isDryRun())
+				hits.merge(rule.getVisitorType(), rule.getHits(), Long::sum);
+
+		List<VisitorTypeEntry> entries = new ArrayList<VisitorTypeEntry>();
+		for (String root : new String[] { org.frontcache.core.FCHeaders.REQUEST_CLIENT_TYPE_BOT,
+				org.frontcache.core.FCHeaders.REQUEST_CLIENT_TYPE_GUEST })
+			entries.add(new VisitorTypeEntry(root, root, false, hits.getOrDefault(root, 0L)));
+		for (java.util.Map.Entry<String, String> declared : visitorTypes.declared().entrySet())
+			entries.add(new VisitorTypeEntry(declared.getKey(), declared.getValue(),
+					visitorTypes.isNoStore(declared.getKey()), hits.getOrDefault(declared.getKey(), 0L)));
+		return entries;
 	}
 
 	/**
@@ -213,22 +279,27 @@ public class BotClassifier {
 
 		boolean rulesEnabled = Boolean.parseBoolean(FCConfig.getProperty(RULES_ENABLED_PROPERTY, "true"));
 
-		readConfigFile(loaded, keywordRules, keywords, rulesEnabled);
+		VisitorTypes visitorTypes = readConfigFile(loaded, keywordRules, keywords, rulesEnabled);
 
 		// Keywords last, so an explicit rule wins over a keyword no matter how the file is ordered.
 		loaded.addAll(keywordRules);
 		loaded.add(defaultRule());
 
+		if (!visitorTypes.declared().isEmpty())
+			logger.info("Visitor types declared: " + visitorTypes.declared()
+					+ (visitorTypes.noStore().isEmpty() ? "" : ", never stored: " + visitorTypes.noStore()));
 		logger.info("Bot classification rules loaded: " + loaded.size() + " (" + keywords.size() + " from bare keywords)");
 		for (BotRule rule : loaded)
 			logger.info("   " + rule);
 
-		BotClassifier classifier = new BotClassifier(loaded, keywords);
+		BotClassifier classifier = new BotClassifier(loaded, keywords, visitorTypes);
 		classifier.warnOnClientIpWithoutTrustedProxies();
+		classifier.checkPluginPredicates();
 		return classifier;
 	}
 
-	private static void readConfigFile(List<BotRule> rules, List<BotRule> keywordRules, Set<String> keywords, boolean rulesEnabled)
+	/** @return the file's declarations - {@link VisitorTypes#ROOTS} with no file */
+	private static VisitorTypes readConfigFile(List<BotRule> rules, List<BotRule> keywordRules, Set<String> keywords, boolean rulesEnabled)
 	{
 		InputStream is = null;
 		try {
@@ -237,22 +308,36 @@ public class BotClassifier {
 			is = FCConfig.getConfigInputStream(BOTS_CONFIG_FILE);
 		} catch (Throwable e) {
 			logger.info("No " + BOTS_CONFIG_FILE + " found - no user agent is classified as a bot");
-			return;
+			return VisitorTypes.ROOTS;
 		}
 
 		if (null == is)
-			return;
+			return VisitorTypes.ROOTS;
 
+		// Read whole first: declarations are a first pass, so a rule may name a type declared below it.
+		List<String> lines = new ArrayList<String>();
 		BufferedReader reader = null;
 		try {
 			reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
 			String line;
-			int lineNumber = 0;
 			while (null != (line = reader.readLine()))
+				lines.add(line);
+		} catch (Exception e) {
+			logger.error("Can't read " + BOTS_CONFIG_FILE + " - using the " + lines.size() + " line(s) read before the failure", e);
+		} finally {
+			close(reader);
+			close(is);
+		}
+
+		VisitorTypes visitorTypes = declarations(lines, null);
+
+		try {
+			int lineNumber = 0;
+			for (String line : lines)
 			{
 				lineNumber++;
 				String trimmed = line.trim();
-				if (0 == trimmed.length() || trimmed.startsWith("#"))
+				if (0 == trimmed.length() || trimmed.startsWith("#") || VisitorTypes.isDeclaration(trimmed))
 					continue;
 
 				boolean isRule = 1 < org.frontcache.guard.GuardRuleParser.splitFields(trimmed).size();
@@ -265,7 +350,7 @@ public class BotClassifier {
 				}
 
 				try {
-					BotRule rule = BotRuleParser.parse(trimmed);
+					BotRule rule = BotRuleParser.parse(trimmed, visitorTypes);
 
 					if (isRule)
 						rules.add(rule);
@@ -282,10 +367,36 @@ public class BotClassifier {
 		} catch (Exception e) {
 			logger.error("Can't read " + BOTS_CONFIG_FILE + " - loaded " + (rules.size() + keywordRules.size())
 					+ " rule(s) before the failure", e);
-		} finally {
-			close(reader);
-			close(is);
 		}
+
+		return visitorTypes;
+	}
+
+	/**
+	 * The first pass: every {@code @type} line, each bad one refused alone.
+	 *
+	 * @param errors where a validator collects {@code "line N: ..."}; null to log instead, as the loader does
+	 */
+	private static VisitorTypes declarations(List<String> lines, List<String> errors)
+	{
+		VisitorTypes.Builder builder = VisitorTypes.builder();
+		for (int i = 0; i < lines.size(); i++)
+		{
+			String trimmed = lines.get(i).trim();
+			if (!VisitorTypes.isDeclaration(trimmed))
+				continue;
+			try {
+				String warning = builder.add(trimmed);
+				if (null != warning && null == errors)
+					logger.warn(BOTS_CONFIG_FILE + ":" + (i + 1) + ": " + warning);
+			} catch (GuardConfigException e) {
+				if (null == errors)
+					logger.error("Skipping type declaration (" + BOTS_CONFIG_FILE + ":" + (i + 1) + "): " + e.getMessage());
+				else
+					errors.add("line " + (i + 1) + ": " + e.getMessage());
+			}
+		}
+		return builder.build();
 	}
 
 	/**
@@ -308,19 +419,24 @@ public class BotClassifier {
 			return errors;
 
 		String[] lines = content.split("\n", -1);
+		VisitorTypes visitorTypes = declarations(Arrays.asList(lines), errors);
 		for (int i = 0; i < lines.length; i++)
 		{
 			String trimmed = lines[i].trim();
-			if (0 == trimmed.length() || trimmed.startsWith("#"))
+			if (0 == trimmed.length() || trimmed.startsWith("#") || VisitorTypes.isDeclaration(trimmed))
 				continue;
 
 			try {
-				BotRuleParser.parse(trimmed);
+				BotRule rule = BotRuleParser.parse(trimmed, visitorTypes);
+				for (String refusal : org.frontcache.guard.GuardRuleEngine.pluginPredicateRefusals(rule.getPredicates()))
+					errors.add("line " + (i + 1) + ": " + refusal);
 			} catch (GuardConfigException e) {
 				errors.add("line " + (i + 1) + ": " + e.getMessage());
 			}
 		}
 
+		// the declarations' pass reported first; file order is the contract (a stable sort keeps a line's own order)
+		errors.sort(java.util.Comparator.comparingInt(e -> Integer.parseInt(e.substring("line ".length(), e.indexOf(':')))));
 		return errors;
 	}
 

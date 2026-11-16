@@ -70,6 +70,18 @@ sum(rate(frontcache_cache_reads_total{result="hit",tier="L2"}[5m]))
 
 A high ratio served almost entirely from `tier="L2"` means requests are hitting, but off
 disk; a rising `frontcache_cache_evictions_total{tier="L1"}` confirms it.
+
+Traffic by visitor type (2.13.0) — the type `bots.conf` decided, counted once per page (fragments
+are not counted again) and never for warm requests:
+
+```promql
+# share of pages served to each type: bot, guest, and any type bots.conf declares
+sum(rate(frontcache_visitor_requests_total[5m])) by (type)
+```
+
+`bot` and `guest` there exclude the types declared on them: `customer like guest` is counted as
+`customer`, not as `guest`. Every root and declared type is a series from startup, at 0 until its
+first request.
 `frontcache_cache_disk_bytes` answers "will the cache volume fill up", which the entry count
 cannot — page sizes vary by orders of magnitude.
 
@@ -86,7 +98,7 @@ Before wiring a scraper:
   read counters as zeros and no size series, rather than having its Lucene index opened by
   the scrape.
 - **Labels are a small fixed set** — `command`, `event`, `quantile`, `pool`, `name`, `kind`,
-  `state`, `result`, `tier`. **Nothing is labelled by URL**, deliberately: on a page cache the
+  `state`, `result`, `tier`, `type` (the visitor types: at most 18 at a time). **Nothing is labelled by URL**, deliberately: on a page cache the
   URL space is unbounded, so a per-URL label is a way to take down a Prometheus server.
 
 ## 3. OTLP push — collectors, Grafana Alloy, vendor backends

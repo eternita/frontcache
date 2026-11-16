@@ -40,7 +40,25 @@
                         <b>Expiration date:</b>
                    </td>
                    <td>
-                        ${expirationDateStr}
+                        <%-- one row per visitor type: an unnamed declared type reads its base's stamp, so it is
+                             shown as inherited - never as absent, which would read as "not cached" --%>
+                        <table class="table table-condensed" style="width: auto; margin-bottom: 5px;">
+                          <c:forEach var="row" items="${expiryRows}">
+                            <tr>
+                              <td><code><c:out value="${row.type}"/></code></td>
+                              <td><c:out value="${row.expiry}"/></td>
+                              <td>
+                                <c:choose>
+                                  <c:when test="${not row.known}"><span class="text-muted">not declared on this edge &mdash; never read</span></c:when>
+                                  <c:when test="${not empty row.inheritedFrom}"><span class="text-muted">inherited from <c:out value="${row.inheritedFrom}"/></span></c:when>
+                                </c:choose>
+                                <c:if test="${'expired' == row.state}"> <span class="label label-default">expired</span></c:if>
+                                <c:if test="${'not cached' == row.state}"> <span class="label label-default">not cached</span></c:if>
+                                <c:if test="${row.noStore}"> <span class="label label-info">no-store</span></c:if>
+                              </td>
+                            </tr>
+                          </c:forEach>
+                        </table>
                    </td>
             </tr>
             <tr>

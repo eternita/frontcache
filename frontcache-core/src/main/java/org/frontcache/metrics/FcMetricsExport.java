@@ -35,7 +35,7 @@ import org.frontcache.guard.ratelimit.WindowLimiter;
 import org.frontcache.resilience.FcCommandMetrics;
 import org.frontcache.resilience.FcEventType;
 import org.frontcache.resilience.FcThreadPools;
-import org.frontcache.module.FrontcacheModules;
+import org.frontcache.plugin.host.FrontcachePlugins;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,11 +210,14 @@ public class FcMetricsExport {
 		bindCacheMetrics();
 		bindCombineMetrics();
 		bindGuardMetrics();
+		bindVisitorTypeMetrics();
 		bindJvmMetrics();
 
-		// what a module (the Pro jar's license and warmer series) adds - after the core's own, so a
-		// module can never be what a core series' name or description is decided by
-		FrontcacheModules.bindMeters(registry);
+		bindPluginMetrics();
+
+		// what a plugin (the Pro jar's license and warmer series) adds - after the core's own, so a
+		// plugin can never be what a core series' name or description is decided by
+		FrontcachePlugins.bindMeters(registry);
 	}
 
 	/**
@@ -445,6 +448,7 @@ public class FcMetricsExport {
 
 	private final Map<String, Boolean> boundGuardRules = new HashMap<String, Boolean>();
 	private final Map<String, Boolean> boundRateLimitBuckets = new HashMap<String, Boolean>();
+	private final Map<String, Boolean> boundVisitorTypes = new HashMap<String, Boolean>();
 
 	private boolean combineBound = false;
 
@@ -527,6 +531,102 @@ public class FcMetricsExport {
 	 * {@code CacheManager.existingInstance()}. The reset that a reload causes is real and is reported as
 	 * one: these are counters, and Prometheus already understands a counter going backwards as a reset.
 	 */
+	/**
+	 * Per plugin: its state, its errors and the events its listeners dropped - {@code frontcache_plugin_*}. Plugins
+	 * are found once per process, so the set is fixed by the time this runs; each meter reads the plugin's stats at
+	 * scrape time. A node without plugins exports none of these series.
+	 */
+	private void bindPluginMetrics()
+	{
+		for (String id : FrontcachePlugins.loadedIds())
+		{
+			Tags tags = Tags.of("plugin", id);
+			Gauge.builder("plugin.state", id, p -> pluginStarted(p))
+					.description("1 while the plugin is started, 0 when it failed, was refused or is stopped")
+					.tags(tags)
+					.register(registry);
+			FunctionCounter.builder("plugin.errors", id, p -> pluginStat(p, org.frontcache.io.PluginStats::getErrors))
+					.description("Exceptions a plugin threw into the node - start, stop, its listeners, its contributions")
+					.tags(tags)
+					.register(registry);
+			FunctionCounter.builder("plugin.events.dropped", id,
+					p -> pluginStat(p, org.frontcache.io.PluginStats::getEventsDropped))
+					.description("Events a plugin's listeners did not receive because their queue was full")
+					.tags(tags)
+					.register(registry);
+
+			org.frontcache.io.PluginStats declared = FrontcachePlugins.stats(id);
+			if (null != declared && declared.getKinds().contains("decide"))
+				bindDecideMetrics(id, tags);
+			if (null == declared || !declared.getKinds().contains("serve"))
+				continue;
+			FunctionCounter.builder("plugin.serve.requests", id, p -> pluginStat(p, org.frontcache.io.PluginStats::getServed))
+					.description("Requests to /fc-x/<plugin>/ - answered by the plugin, refused before it (over its"
+							+ " concurrency cap or body limit), or failed by it")
+					.tags(tags.and("outcome", "served"))
+					.register(registry);
+			FunctionCounter.builder("plugin.serve.requests", id,
+					p -> pluginStat(p, org.frontcache.io.PluginStats::getServeRefused))
+					.description("Requests to /fc-x/<plugin>/ - answered by the plugin, refused before it (over its"
+							+ " concurrency cap or body limit), or failed by it")
+					.tags(tags.and("outcome", "refused"))
+					.register(registry);
+			FunctionCounter.builder("plugin.serve.requests", id,
+					p -> pluginStat(p, org.frontcache.io.PluginStats::getServeFailed))
+					.description("Requests to /fc-x/<plugin>/ - answered by the plugin, refused before it (over its"
+							+ " concurrency cap or body limit), or failed by it")
+					.tags(tags.and("outcome", "failed"))
+					.register(registry);
+		}
+	}
+
+	/**
+	 * A {@code decide} plugin's predicates - their calls, the calls that threw, the p99 of the last minute judged
+	 * against its budget, and whether it is switched off for going over it ({@code frontcache_plugin_decide_*}).
+	 */
+	private void bindDecideMetrics(String id, Tags tags)
+	{
+		FunctionCounter.builder("plugin.decide.calls", id, p -> pluginStat(p, org.frontcache.io.PluginStats::getDecideCalls))
+				.description("Calls into a plugin's ext: predicates, on the request thread")
+				.tags(tags)
+				.register(registry);
+		FunctionCounter.builder("plugin.decide.errors", id, p -> pluginStat(p, org.frontcache.io.PluginStats::getDecideErrors))
+				.description("Calls into a plugin's ext: predicates that threw - the rule did not match")
+				.tags(tags)
+				.register(registry);
+		FunctionCounter.builder("plugin.decide.switched.off", id,
+				p -> pluginStat(p, org.frontcache.io.PluginStats::getDecideSwitchedOff))
+				.description("Times a plugin was switched off for going over its decide budget or throwing")
+				.tags(tags)
+				.register(registry);
+		Gauge.builder("plugin.decide.p99", id, p -> {
+					org.frontcache.io.PluginStats stats = FrontcachePlugins.stats(p);
+					return (null == stats || 0 > stats.getDecideP99Micros()) ? Double.NaN : stats.getDecideP99Micros() / 1e6;
+				})
+				.description("The p99 of a plugin's ext: predicates over the last minute judged, against its decide budget")
+				.baseUnit("seconds")
+				.tags(tags)
+				.register(registry);
+		Gauge.builder("plugin.decide.over.budget", id, p -> {
+					org.frontcache.io.PluginStats stats = FrontcachePlugins.stats(p);
+					return (null != stats && org.frontcache.io.PluginStats.DECIDE_OVER_BUDGET.equals(stats.getDecideState())) ? 1 : 0;
+				})
+				.description("1 while a plugin is switched off for going over its decide budget - the rules naming its"
+						+ " predicates do not match")
+				.tags(tags)
+				.register(registry);
+	}
+
+	private static double pluginStarted(String id) {
+		org.frontcache.io.PluginStats stats = FrontcachePlugins.stats(id);
+		return (null != stats && "started".equals(stats.getState())) ? 1 : 0;
+	}
+
+	private static double pluginStat(String id, java.util.function.ToLongFunction<org.frontcache.io.PluginStats> stat) {
+		org.frontcache.io.PluginStats stats = FrontcachePlugins.stats(id);
+		return (null == stats) ? 0 : stat.applyAsLong(stats);
+	}
+
 	private synchronized void bindGuardMetrics()
 	{
 		// existingInstance(), not getFrontCache(): a scrape must not be what starts the node. Early in
@@ -569,6 +669,34 @@ public class FcMetricsExport {
 			FunctionCounter.builder("guard.ratelimit.takeovers", bucket, b -> rateLimitTakeovers(b))
 					.description("Rate-limit slot takeovers - a rising rate means the slot array is undersized")
 					.tags(Tags.of("name", bucket))
+					.register(registry);
+		}
+	}
+
+	/**
+	 * {@code frontcache_visitor_requests_total{type}}: top-level requests by visitor type (the leaf). One series per
+	 * root and declared type the node runs - bound before its first request, so a type reads 0 rather than missing -
+	 * and per type ever counted, so a type a reload removed keeps its monotonic series. Bounded by
+	 * {@code VisitorTypes.MAX_DECLARED} + 2 at a time and {@code VisitorTypeRequests.MAX_NAMES} ever; never a
+	 * client-sent value.
+	 */
+	private synchronized void bindVisitorTypeMetrics()
+	{
+		java.util.Set<String> names = new java.util.LinkedHashSet<String>();
+		names.add(org.frontcache.core.FCHeaders.REQUEST_CLIENT_TYPE_BOT);
+		names.add(org.frontcache.core.FCHeaders.REQUEST_CLIENT_TYPE_GUEST);
+		names.addAll(org.frontcache.bots.VisitorTypes.active().declared().keySet());
+		names.addAll(org.frontcache.bots.VisitorTypeRequests.names());
+
+		for (String type : names)
+		{
+			if (Boolean.TRUE.equals(boundVisitorTypes.get(type)))
+				continue;
+			boundVisitorTypes.put(type, Boolean.TRUE);
+
+			FunctionCounter.builder("visitor.requests", type, t -> org.frontcache.bots.VisitorTypeRequests.requests(t))
+					.description("Top-level requests by visitor type - the type bots.conf decided, a declared type or bot / guest")
+					.tags(Tags.of("type", type))
 					.register(registry);
 		}
 	}
@@ -661,6 +789,7 @@ public class FcMetricsExport {
 		local.bindThreadPools();
 		local.bindCacheMetrics();
 		local.bindGuardMetrics();
+		local.bindVisitorTypeMetrics();
 	}
 
 	// ---- config -------------------------------------------------------------

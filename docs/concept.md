@@ -53,6 +53,12 @@ the guard rules — the checks that answer a request before it reaches cache or 
 ([guard-getting-started.md](guard-getting-started.md)).
 <img src="diagrams/02-request-lifecycle.svg" alt="Request lifecycle" width="820"/>
 
+One path is answered between the guard rules and the cache, as of 2.13.0: **`/fc-x/` is reserved for
+plugins**. A request under `/fc-x/<plugin>/` is answered by the plugin that owns that path — a challenge page,
+say — and is never cached, never forwarded to the origin and never a cache key; a path no plugin owns answers a
+one-line `404`. Being after the guard, a `rate:` rule protects it like any other path
+([guard-getting-started.md](guard-getting-started.md) §4.2).
+
 The resilience command names in that flow (`FC_Total`, `FC_ThroughCache*`, `FC_BypassCache`), their
 group keys and their isolation strategies are covered in
 [resilience-command-flow.md](resilience-command-flow.md).
@@ -104,7 +110,7 @@ split, and a cache miss on one fragment does not cost the others.
 |---|---|---|
 | `url` | required | the fragment to resolve (relative to the same origin) |
 | `call` | `sync` (default), `async` | `sync` fragments are fetched in parallel and waited for, and their content goes into the page. `async` is fire-and-forget: the call is made but nothing is waited for and **nothing is inserted** — for counters and pings that must not slow a page served from cache |
-| `client` | `bot`, `guest` | include the fragment only for that client class (per `bots.conf`); for the other class the marker is replaced with an empty string |
+| `client` | `bot`, `guest`, a declared visitor type, a list, `!type` | include the fragment only for those visitors (per `bots.conf`; `guest` includes every type declared `like guest`, `!customer` everyone but customers); for the others the marker is replaced with an empty string |
 | `combine` | `true`, or a group name | batch this fragment with its siblings into **one** origin call when they miss the cache — see [include-combining.md](include-combining.md) |
 
 `sync` includes that time out (`front-cache.include-processor.impl.concurrent.timeout`) fall back
@@ -132,7 +138,7 @@ Not in the application's own config. The directory is located via `-Dfrontcache.
 | `conf/` file | Owns |
 |---|---|
 | `frontcache.properties` | subsystem impls, origin host/ports, domains, api key, ports |
-| `bots.conf` | UA keywords treated as bots (per domain) → `client="bot"` / `bot:` TTL splits |
+| `bots.conf` | UA keywords and rules deciding `bot` / `guest`, and visitor types declared on them (`@type customer like guest`) → `client="…"` / `maxage` TTL splits |
 | `dynamic-urls.conf` | regex of never-cache URLs (carts, login, admin) → routed via `FC_BypassCache` |
 | `fallbacks.conf` | `URI_PATTERN \| fallback_file \| optional_origin_request`; served when the origin 5XXs or the circuit is open. Files seed at startup |
 | `guard-rules.conf` | request-rejection rules — see [guard-getting-started.md](guard-getting-started.md) |

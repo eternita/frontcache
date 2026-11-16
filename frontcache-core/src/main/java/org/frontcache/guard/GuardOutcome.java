@@ -29,27 +29,47 @@ import java.util.List;
 public class GuardOutcome {
 
 	/** no rule matched - the request continues as usual */
-	public static final GuardOutcome CONTINUE = new GuardOutcome(null, null, Collections.<GuardRule>emptyList());
+	public static final GuardOutcome CONTINUE = new GuardOutcome(null, null, null, null, Collections.<GuardRule>emptyList());
 
 	private final GuardRule rule;
-	private final String resolvedTarget; // redirect only: target with placeholders expanded
+	private final GuardAction action;    // what is done - the rule's own, or what a challenge rule fell back to
+	private final String resolvedTarget; // redirect / challenge only: target with placeholders expanded
+	private final String challengePlugin; // challenge only: the plugin whose page the visitor is sent to
 	private final List<GuardRule> dryRunMatches;
 
-	private GuardOutcome(GuardRule rule, String resolvedTarget, List<GuardRule> dryRunMatches) {
+	private GuardOutcome(GuardRule rule, GuardAction action, String resolvedTarget, String challengePlugin,
+			List<GuardRule> dryRunMatches) {
 		this.rule = rule;
+		this.action = action;
 		this.resolvedTarget = resolvedTarget;
+		this.challengePlugin = challengePlugin;
 		this.dryRunMatches = (null != dryRunMatches) ? dryRunMatches : Collections.<GuardRule>emptyList();
 	}
 
 	public static GuardOutcome terminal(GuardRule rule, String resolvedTarget, List<GuardRule> dryRunMatches) {
-		return new GuardOutcome(rule, resolvedTarget, dryRunMatches);
+		return new GuardOutcome(rule, rule.getAction(), resolvedTarget, null, dryRunMatches);
+	}
+
+	/**
+	 * @param action what is done instead of the rule's own action - a challenge rule's {@code else}, or the 429 a
+	 *               challenge answers a request it cannot redirect
+	 */
+	public static GuardOutcome terminal(GuardRule rule, GuardAction action, String resolvedTarget,
+			List<GuardRule> dryRunMatches) {
+		return new GuardOutcome(rule, action, resolvedTarget, null, dryRunMatches);
+	}
+
+	/** A challenge: a redirect to {@code challengePlugin}'s page, at {@code target}. */
+	public static GuardOutcome challenge(GuardRule rule, String target, String challengePlugin,
+			List<GuardRule> dryRunMatches) {
+		return new GuardOutcome(rule, rule.getAction(), target, challengePlugin, dryRunMatches);
 	}
 
 	public static GuardOutcome cont(List<GuardRule> dryRunMatches) {
 		if (null == dryRunMatches || dryRunMatches.isEmpty())
 			return CONTINUE;
 
-		return new GuardOutcome(null, null, dryRunMatches);
+		return new GuardOutcome(null, null, null, null, dryRunMatches);
 	}
 
 	public boolean isTerminal() {
@@ -60,8 +80,17 @@ public class GuardOutcome {
 		return rule;
 	}
 
+	/**
+	 * @return what is done - the rule's action, except where a challenge rule fell back to its {@code else} action or
+	 *         answered a non-GET with a 429; null for CONTINUE
+	 */
 	public GuardAction getAction() {
-		return (null != rule) ? rule.getAction() : null;
+		return action;
+	}
+
+	/** @return the plugin a challenge sends the visitor to; null for every other outcome */
+	public String getChallengePlugin() {
+		return challengePlugin;
 	}
 
 	/**

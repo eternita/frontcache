@@ -44,6 +44,10 @@
                      </td>
                      <td align="left" style="padding: 5px;">
                         <c:out value="${edge.name}"/>
+                        <%-- an edges entry (its own API key): the config's, so never removable here --%>
+                        <c:if test="${keyedEdges.containsKey(edge.url) and not empty keyedEdges[edge.url]}">
+                          <span class="text-muted" style="font-size: 14px;">(<c:out value="${keyedEdges[edge.url]}"/>)</span>
+                        </c:if>
                      </td>
                      <td align="left" style="padding-left: 20px;">
                         <span data-field="cachedEntries">&mdash;</span> items cached
@@ -51,6 +55,7 @@
                      </td>
                      <c:if test="${edgeEditingEnabled}">
                      <td align="left" style="padding: 5px;">
+                      <c:if test="${not keyedEdges.containsKey(edge.url)}">
                       <%-- a POST, not a link: removing an edge changes console state, and a GET that
                            does so can be triggered from any page the operator has open - the browser
                            attaches the console's Basic credentials by itself. Styled as the button it
@@ -59,6 +64,7 @@
                         <input type="hidden" name="edge" value="<c:out value='${edge.url}'/>"/>
                         <button type="submit" class="btn btn-warning">remove</button>
                       </form>
+                      </c:if>
                      </td>
                      </c:if>
                  </tr>

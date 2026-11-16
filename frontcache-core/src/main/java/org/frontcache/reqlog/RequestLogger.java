@@ -23,6 +23,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.frontcache.core.FCHeaders;
 import org.frontcache.core.RequestContext;
+import org.frontcache.plugin.host.CoreEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
  *  cacheable_flag - true/1 if request is run through FrontCache engine (e.g. GET method, text data). false/0 - otherwise (request forwarded to origin)
  *  dynamic_flag{1|0} - true if origin has been requested. false/0 - otherwise (it's cacheable & cached).
  *
- *	log-timestamp request-id    domain   http-method   is-fallback-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache|dynamic-soft}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|guest}    client-type-rule    user-agent
+ *	log-timestamp request-id    domain   http-method   is-fallback-error{success|error}   request-type {toplevel|include|include-async}   is-cacheable{cacheable|direct}   is-cached{dynamic|from-cache|dynamic-soft|plugin:<id>}     runtime-millis    datalength-bytes   url   client-IP    frontcache-ID    client-type{bot|guest}    client-type-rule    user-agent    visitor-type
  *
  *  EXAMPLE
  *  2016-06-03T15:06:35,092-0600 1649b11f-8acf-4718-8e0b-abdcf7356212 example.com GET success toplevel cacheable from-cache 0 50874 "http://myfc.example.com:8080/en/coin_definition-1_Thaler-Silver-Kingdom_of_Prussia_(1701_1918)-c_sK.GJAIx4AAAEvnTTi7NnT.htm" 0:0:0:0:0:0:0:1 front-cache-local-1 guest
@@ -51,7 +52,7 @@ import org.slf4j.LoggerFactory;
  *  client IP); a current line ends with the client type, the conf/bots.conf rule that decided it, and
  *  the evidence:
  *
- *  2026-09-21T09:14:02,118-0600 55ba8287-cedd-43b6-ae47-357292664cb3 example.com GET success toplevel cacheable from-cache 0 50874 "https://www.example.com/index.htm" "203.0.113.7" front-cache-local-1 bot "bingbot" "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)"
+ *  2026-09-21T09:14:02,118-0600 55ba8287-cedd-43b6-ae47-357292664cb3 example.com GET success toplevel cacheable from-cache 0 50874 "https://www.example.com/index.htm" "203.0.113.7" front-cache-local-1 bot "bingbot" "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)" "bot-whitelisted"
  *
  *  <b>client-type-rule was INSERTED, not appended</b>, and it is the only column ever to have been:
  *  it is unreadable apart from the client type it explains, so the two are kept side by side and the
@@ -59,6 +60,11 @@ import org.slf4j.LoggerFactory;
  *  always was, and an ELK pipeline reading from the left keeps working - but the request log is
  *  parsed by position outside this jar (2.7.0 pins the layout), so a NEXT column goes on the END
  *  unless there is as strong a reason as this one.
+ *
+ *  <b>visitor-type</b> (2.13.0) is such a next column: the leaf of the client type when bots.conf declares visitor
+ *  types ({@code @type bot-whitelisted like bot}), the client type itself otherwise. The client-type column keeps
+ *  the root, so a dashboard splitting on bot / guest stays right. It is the last token of every line - on the
+ *  failed-requests log too, after the reason and the status (see {@link #appendVisitorType}).
  *
  */
 public class RequestLogger {
@@ -142,6 +148,7 @@ public class RequestLogger {
 			.append(SEPARATOR).append("\"").append(userAgent).append("\"")
 			.append(SEPARATOR).append("\"").append(reason).append("\"")
 			.append(SEPARATOR).append(status);
+		appendVisitorType(sb, context);
 
 		failedRequestLogger.trace(sb.toString());
 		return;
@@ -212,6 +219,21 @@ public class RequestLogger {
 	}
 
 	/**
+	 * The visitor type - the leaf ({@code customer}) of the root the client-type column keeps logging, the same value
+	 * when bots.conf declares no type - as the LAST token of every line that has a client-type column: the request
+	 * line, the plugin-served line, the guard line, the fallback lines and the trace header. Appended, never inserted
+	 * (the 2.7.0 contract): on the failed-requests log the columns after the user-agent differ by line kind - a guard
+	 * line ends {@code "<reason>" <status>}, a fallback line {@code "<reason>"}, a failed plugin-served line
+	 * {@code "plugin:<id>" <status>} - so it goes after whatever a line's trailing columns are, and a consumer reading
+	 * those by position keeps reading them. Quoted, like the user-agent.
+	 */
+	private static void appendVisitorType(StringBuilder sb, RequestContext context) {
+
+		String visitorType = context.getVisitorType();
+		sb.append(SEPARATOR).append("\"").append((null != visitorType) ? visitorType : "-").append("\"");
+	}
+
+	/**
 	 *
 	 * @param url - request URL
 	 * @param isCacheable - true if request is run through FrontCache engine (e.g. GET method, text data). false - otherwise (request forwarded to origin)
@@ -247,18 +269,72 @@ public class RequestLogger {
 		.append(SEPARATOR).append("\"").append(clientTypeRule(context)).append("\"")
 		.append(SEPARATOR).append("\"").append(userAgent).append("\"");
 
+		// the request line ends with the visitor type; the failed-requests copy below reuses the line WITHOUT it,
+		// appends its reason, and then its own visitor type - the last token of every line, whatever precedes it
+		int beforeVisitorType = sb4file.length();
+		appendVisitorType(sb4file, context);
 		logger.trace(sb4file.toString());
+
+		// the same line, as an event for a plugin that observes requests (sampled; top-level requests only)
+		CoreEvents.requestCompleted(context, isCacheable, requestTypeDynamicCachedSoft, runtimeMillis, lengthBytes);
 
 		// also write non-successful requests to the dedicated failed-requests log, with the
 		// failure category appended as the last column for easy filtering. No HTTP-status column
 		// here - see logGuardedRequest(), which writes one for guard actions only.
 		if (isFallbackError)
 		{
+			sb4file.setLength(beforeVisitorType);
 			sb4file.append(SEPARATOR).append("\"").append(context.getFallbackReason()).append("\"");
+			appendVisitorType(sb4file, context);
 			failedRequestLogger.trace(sb4file.toString());
 		}
 
 		return;
+	}
+
+	/**
+	 * Logs a request the node answered without cache or origin, under {@code /fc-x/} - a plugin's own path (E2).
+	 * The request log's line, with {@code direct} and the answerer in the is-cached column: {@code plugin:<id>}, or
+	 * {@code plugin:none} when no started plugin owns the path. Its status goes on the failed-requests log as well
+	 * when the plugin failed or was refused (5xx, 413), with the answerer as the reason.
+	 *
+	 * @param answeredBy {@code plugin:<id>} or {@code plugin:none}
+	 */
+	public static void logServedRequest(String url, String answeredBy, int status, long runtimeMillis, long lengthBytes,
+			RequestContext context) {
+
+		HttpServletRequest request = context.getRequest();
+		StringBuilder sb = new StringBuilder();
+		sb.append(formatLogTime(Instant.now()))
+			.append(SEPARATOR).append(context.getRequestId())
+			.append(SEPARATOR).append(context.getDomain())
+			.append(SEPARATOR).append(method(request))
+			.append(SEPARATOR).append((500 <= status || 413 == status) ? "error" : "success")
+			.append(SEPARATOR).append(context.getRequestType())
+			.append(SEPARATOR).append("direct")
+			.append(SEPARATOR).append(answeredBy)
+			.append(SEPARATOR).append(runtimeMillis)
+			.append(SEPARATOR).append(lengthBytes)
+			.append(SEPARATOR).append("\"").append(url).append("\"")
+			.append(SEPARATOR).append("\"").append(context.getClientIP()).append("\"")
+			.append(SEPARATOR).append(context.getFrontCacheId())
+			.append(SEPARATOR).append(context.getClientType())
+			.append(SEPARATOR).append("\"").append(clientTypeRule(context)).append("\"")
+			.append(SEPARATOR).append("\"").append(header(request, "User-Agent")).append("\"");
+
+		int beforeVisitorType = sb.length();
+		appendVisitorType(sb, context);
+		logger.trace(sb.toString());
+
+		CoreEvents.requestCompleted(context, false, answeredBy, runtimeMillis, lengthBytes);
+
+		if (500 <= status || 413 == status)
+		{
+			sb.setLength(beforeVisitorType);
+			sb.append(SEPARATOR).append("\"").append(answeredBy).append("\"").append(SEPARATOR).append(status);
+			appendVisitorType(sb, context);
+			failedRequestLogger.trace(sb.toString());
+		}
 	}
 
 	/**
@@ -292,6 +368,7 @@ public class RequestLogger {
 //    		.append(SEPARATOR).append(dummy)
     		.append(SEPARATOR).append(context.getClientType())
     		.append(SEPARATOR).append("\"").append(clientTypeRule(context)).append("\"");
+    		appendVisitorType(sb4header, context);
 
     		// Never touch HttpServletResponse from here: includes are resolved on the include-processor's
     		// worker threads and the servlet response is not thread safe (concurrent setHeader() corrupts

@@ -18,7 +18,10 @@ package org.frontcache.module;
 /**
  * How this node is deployed, as {@link FrontcacheModule#onModeKnown} reports it: behind
  * {@code FrontCacheServlet} (a reverse proxy) or {@code FrontCacheFilter} (inside the origin application).
+ *
+ * @deprecated since 2.13.0: {@link org.frontcache.plugin.NodeMode}.
  */
+@Deprecated
 public enum NodeMode {
 	STANDALONE, FILTER
 }

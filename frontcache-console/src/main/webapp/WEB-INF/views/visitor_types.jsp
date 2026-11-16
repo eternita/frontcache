@@ -14,6 +14,13 @@
       last <code>reload-bots</code>); a rule with no hits is doing nothing, and the count on
       <code>default</code> is the traffic no rule claimed.
     </p>
+    <p class="text-muted">
+      Beside the two built-in types, <code>bots.conf</code> may declare further visitor types
+      (<code>@type customer like guest</code>). A declared type <b>behaves like</b> its base everywhere
+      nothing names it &mdash; in every cached entry, every page's <code>maxage</code>, every
+      <code>client=</code> and every guard rule &mdash; and only where a page or rule names it does it
+      differ. <b>no-store</b>: its requests are served cached copies but never write one.
+    </p>
 
     <%-- one tab per edge, keyed by its URL (two edges on one host share a name); the order is the console config's --%>
     <ul class="nav nav-tabs" role="tablist">
@@ -31,6 +38,40 @@
 
         <div role="tabpanel" class="tab-pane ${status.first ? 'active' : ''}" id="edge-tab-${status.index}">
 
+          <%-- 2.13.0+ edge: the types it knows - one flat list with a behaves-like column, never a tree --%>
+          <c:if test="${not empty edge.value.types}">
+            <table class="table table-condensed fc-visitor-types">
+              <thead>
+                <tr>
+                  <th>Visitor type</th>
+                  <th>Behaves like</th>
+                  <th>Cache writes</th>
+                  <th class="text-right">Hits</th>
+                </tr>
+              </thead>
+              <tbody>
+              <c:forEach var="type" items="${edge.value.types}">
+                <tr>
+                  <td><code><c:out value="${type.name}"/></code></td>
+                  <td>
+                    <c:choose>
+                      <c:when test="${type.builtIn}"><span class="text-muted">built-in</span></c:when>
+                      <c:otherwise><code><c:out value="${type.base}"/></code></c:otherwise>
+                    </c:choose>
+                  </td>
+                  <td>
+                    <c:choose>
+                      <c:when test="${type.noStore}"><span class="label label-info">no-store</span></c:when>
+                      <c:otherwise><span class="text-muted">as its pages say</span></c:otherwise>
+                    </c:choose>
+                  </td>
+                  <td class="text-right">${type.hits}</td>
+                </tr>
+              </c:forEach>
+              </tbody>
+            </table>
+          </c:if>
+
           <c:choose>
 
             <%-- 2.9.0+ edge: the ordered rules, with hit counts --%>
@@ -41,7 +82,7 @@
                     <th>#</th>
                     <th>Rule</th>
                     <th>Condition</th>
-                    <th>Client type</th>
+                    <th>Visitor type</th>
                     <th>Mode</th>
                     <th class="text-right">Hits</th>
                   </tr>

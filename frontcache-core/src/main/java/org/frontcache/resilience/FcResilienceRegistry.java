@@ -22,6 +22,8 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiter;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 
+import org.frontcache.plugin.host.CoreEvents;
+
 /**
  * Holds the Resilience4j registries, keyed by command key.
  *
@@ -40,6 +42,25 @@ public class FcResilienceRegistry {
 	private static final CircuitBreakerRegistry CIRCUIT_BREAKERS = CircuitBreakerRegistry.ofDefaults();
 	private static final BulkheadRegistry BULKHEADS = BulkheadRegistry.ofDefaults();
 	private static final TimeLimiterRegistry TIME_LIMITERS = TimeLimiterRegistry.ofDefaults();
+
+	// Every circuit breaker reports its state changes to the plugin event bus (CircuitStateChanged) - from its
+	// own event publisher, after the transition, so an observing plugin never takes part in one.
+	static {
+		CIRCUIT_BREAKERS.getEventPublisher().onEntryAdded(e -> observe(e.getAddedEntry()));
+		CIRCUIT_BREAKERS.getEventPublisher().onEntryReplaced(e -> observe(e.getNewEntry()));
+	}
+
+	private static void observe(CircuitBreaker breaker)
+	{
+		breaker.getEventPublisher().onStateTransition(e -> {
+			try {
+				CoreEvents.circuitStateChanged(e.getCircuitBreakerName(), e.getStateTransition().getFromState().name(),
+						e.getStateTransition().getToState().name(), breaker.getMetrics().getFailureRate());
+			} catch (RuntimeException ignored) {
+				// the bus never throws; this is for a breaker whose metrics cannot answer
+			}
+		});
+	}
 
 	private FcResilienceRegistry() { }
 

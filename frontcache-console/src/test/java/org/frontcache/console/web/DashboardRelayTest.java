@@ -268,7 +268,7 @@ public class DashboardRelayTest {
 		final Relay relay;
 
 		Fixture() {
-			relay = new Relay("http://edge.example.com/hystrix.stream", async, out);
+			relay = new Relay("http://edge.example.com/fc-dashboard.stream", async, out);
 			relay.start();
 		}
 	}

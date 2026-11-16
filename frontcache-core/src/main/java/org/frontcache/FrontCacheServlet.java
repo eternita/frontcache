@@ -25,8 +25,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.frontcache.module.FrontcacheModules;
-import org.frontcache.module.NodeMode;
+import org.frontcache.plugin.host.FrontcachePlugins;
+import org.frontcache.plugin.NodeMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +47,7 @@ public class FrontCacheServlet extends HttpServlet {
 
 		// before the engine exists, so a module learns how the node is deployed before it starts (the
 		// Pro module's first usage record then says so - a node in filter mode is one application replica)
-		FrontcacheModules.modeKnown(NodeMode.STANDALONE);
+		FrontcachePlugins.modeKnown(NodeMode.STANDALONE);
 
 		fcEngine = FrontCacheEngine.getFrontCache();
 

@@ -29,8 +29,12 @@ import java.util.TreeSet;
 
 import org.frontcache.FCConfig;
 import org.frontcache.core.ClientIpResolver;
+import org.frontcache.core.EvidenceCookies;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.RequestContext;
+import org.frontcache.plugin.host.CoreEvents;
+import org.frontcache.plugin.host.PluginEndpoints;
 import org.frontcache.guard.ratelimit.GuardRateLimiterRegistry;
 import org.frontcache.guard.ratelimit.RateLimitPredicate;
 import org.slf4j.Logger;
@@ -74,6 +78,9 @@ public class GuardRuleEngine {
 	private final Set<String> warnedRedirectHosts =
 			Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<String, Boolean>());
 
+	// what the last load skipped - the ConfigReloaded event's reasons; replaced by every load
+	private List<String> loadProblems = new ArrayList<String>();
+
 	public GuardRuleEngine(int maxRequestURILength) {
 		this.maxRequestURILength = maxRequestURILength;
 		load();
@@ -101,6 +108,8 @@ public class GuardRuleEngine {
 		// it on every redirect whether or not configured rules were loaded at all.
 		this.redirectHostAllowlist = Collections.unmodifiableSet(allowedRedirectHosts());
 
+		this.loadProblems = new ArrayList<String>();
+
 		List<GuardRule> loaded = new ArrayList<GuardRule>();
 
 		loaded.addAll(buildInRules());
@@ -119,6 +128,10 @@ public class GuardRuleEngine {
 		releaseUnusedRateLimitBuckets();
 		warnOnMissingExemptions();
 		warnOnRateLimitWithoutTrustedProxies();
+		checkChallengeProviders();
+		checkPluginPredicates();
+
+		CoreEvents.configReloaded(GUARD_RULES_CONFIG_FILE, true, this.rules.size(), this.loadProblems);
 	}
 
 	/**
@@ -244,13 +257,53 @@ public class GuardRuleEngine {
 				continue;
 
 			try {
-				checkNoSelfRedirect(parser.parse(trimmed));
+				GuardRule rule = parser.parse(trimmed);
+				checkNoSelfRedirect(rule);
+				for (String refusal : pluginPredicateRefusals(rule.getPredicates()))
+					errors.add("line " + (i + 1) + ": " + refusal);
 			} catch (GuardConfigException e) {
 				errors.add("line " + (i + 1) + ": " + e.getMessage());
 			}
 		}
 
 		return errors;
+	}
+
+	/**
+	 * What the started plugins say of a rule's {@code ext:} predicates - nothing when no plugin has started (the console
+	 * and the portal parse with none, and a node checks its rules again once its plugins start).
+	 */
+	public static List<String> pluginPredicateRefusals(List<GuardPredicate> predicates)
+	{
+		List<String> refusals = new ArrayList<String>();
+		for (GuardPredicate predicate : predicates)
+		{
+			ExtPredicate ext = predicate.pluginPredicate();
+			if (null == ext)
+				continue;
+			String refusal = org.frontcache.plugin.host.PluginPredicates.validate(ext);
+			if (null != refusal)
+				refusals.add(refusal);
+		}
+		return refusals;
+	}
+
+	/**
+	 * Binds every rule's {@code ext:} predicates to the started plugins now - at load once they run, and by the engine
+	 * right after it starts them (the engine's first load runs before) - so a name no plugin offers, or an argument a
+	 * plugin refuses, is an ERROR in the log at once, not at the first request that reaches the rule.
+	 */
+	public void checkPluginPredicates()
+	{
+		if (!org.frontcache.plugin.host.PluginPredicates.isRunning())
+			return;
+		for (GuardRule rule : this.rules)
+			for (GuardPredicate predicate : rule.getPredicates())
+			{
+				ExtPredicate ext = predicate.pluginPredicate();
+				if (null != ext)
+					org.frontcache.plugin.host.PluginPredicates.check(ext, GUARD_RULES_CONFIG_FILE + ": " + rule.getName());
+			}
 	}
 
 	private List<GuardRule> loadConfiguredRules()
@@ -290,10 +343,12 @@ public class GuardRuleEngine {
 				} catch (GuardConfigException e) {
 					// one bad line must not cost the whole file
 					logger.error("Skipping guard rule (" + GUARD_RULES_CONFIG_FILE + ":" + lineNumber + "): " + e.getMessage());
+					loadProblems.add(GUARD_RULES_CONFIG_FILE + ":" + lineNumber + ": " + e.getMessage());
 				}
 			}
 		} catch (Exception e) {
 			logger.error("Can't read " + GUARD_RULES_CONFIG_FILE + " - loaded " + loaded.size() + " rule(s) before the failure", e);
+			loadProblems.add("can't read " + GUARD_RULES_CONFIG_FILE + ": " + e.getMessage());
 		} finally {
 			close(reader);
 			close(is);
@@ -367,10 +422,14 @@ public class GuardRuleEngine {
 	 */
 	private void checkNoSelfRedirect(GuardRule rule)
 	{
-		if (GuardAction.Type.REDIRECT != rule.getAction().getType())
+		GuardAction action = rule.getAction();
+		if (GuardAction.Type.CHALLENGE == action.getType() && null != action.getOtherwise())
+			action = action.getOtherwise(); // a challenge's own target is under /fc-x/, which it never challenges
+
+		if (GuardAction.Type.REDIRECT != action.getType())
 			return;
 
-		String target = rule.getAction().getTarget();
+		String target = action.getTarget();
 		if (null == target)
 			return;
 
@@ -502,6 +561,21 @@ public class GuardRuleEngine {
 			if (!matched)
 				continue;
 
+			GuardAction action = rule.getAction();
+			PluginEndpoints.Challenge challenge = null;
+			if (GuardAction.Type.CHALLENGE == action.getType())
+			{
+				// Requests a challenge never applies to - the rule does not act and counts no hit: an include or
+				// the provider's own path (a redirect there would loop), or a visitor who already holds a pass from
+				// the provider's plugin (sending them to solve it again is the loop an operator who forgot
+				// '!cookie-hmac:' would otherwise build).
+				if (!isChallengeable(context))
+					continue;
+				challenge = PluginEndpoints.challenge(action.getProvider());
+				if (null != challenge && holdsPass(context, challenge))
+					continue;
+			}
+
 			if (countHits)
 				rule.countHit();
 
@@ -513,13 +587,41 @@ public class GuardRuleEngine {
 				continue;
 			}
 
-			if (GuardAction.Type.ALLOW == rule.getAction().getType())
+			if (GuardAction.Type.ALLOW == action.getType())
 				return GuardOutcome.cont(dryRunMatches);
 
-			String resolvedTarget = null;
-			if (GuardAction.Type.REDIRECT == rule.getAction().getType())
+			if (GuardAction.Type.CHALLENGE == action.getType())
 			{
-				String expanded = rule.getAction().resolveTarget(context);
+				if (null == challenge)
+				{
+					// The provider is absent - no started plugin offers it, or the node cannot sign a pass. A
+					// redirect to a 404 would lock visitors out, so: the rule's 'else', or a dry run.
+					reportUnavailable(rule, countHits);
+					if (null == action.getOtherwise())
+					{
+						if (null == dryRunMatches)
+							dryRunMatches = new ArrayList<GuardRule>(2);
+						dryRunMatches.add(rule);
+						continue;
+					}
+					action = action.getOtherwise();
+				}
+				else if (!isRedirectable(context))
+				{
+					// A redirect would lose a POST's body: refuse it the way a rate limit does, with a time to retry.
+					if (0 == context.getGuardRetryAfterSeconds())
+						context.setGuardRetryAfterSeconds(CHALLENGE_RETRY_AFTER_SECONDS);
+					return GuardOutcome.terminal(rule, CHALLENGE_NOT_REDIRECTABLE, null, dryRunMatches);
+				}
+				else
+					return GuardOutcome.challenge(rule, challengeTarget(challenge.plugin(), action.getProvider(), context),
+							challenge.plugin(), dryRunMatches);
+			}
+
+			String resolvedTarget = null;
+			if (GuardAction.Type.REDIRECT == action.getType())
+			{
+				String expanded = action.resolveTarget(context);
 				resolvedTarget = sanitizeTarget(rule, expanded);
 
 				// sanitizeTarget() refused the target's own host - redirecting there would be an open
@@ -537,10 +639,129 @@ public class GuardRuleEngine {
 				}
 			}
 
-			return GuardOutcome.terminal(rule, resolvedTarget, dryRunMatches);
+			return GuardOutcome.terminal(rule, action, resolvedTarget, dryRunMatches);
 		}
 
 		return GuardOutcome.cont(dryRunMatches);
+	}
+
+	/** What a challenge answers a request it cannot redirect (not a GET or HEAD). */
+	static final GuardAction CHALLENGE_NOT_REDIRECTABLE = GuardAction.reject(429, "429 Too Many Requests");
+
+	/** Retry-After on that 429 when no rate: predicate set one. */
+	static final int CHALLENGE_RETRY_AFTER_SECONDS = 60;
+
+	/**
+	 * A top-level request outside {@code /fc-x/}. An include is a fragment of a page another rule already decided, and
+	 * a redirect inside one would be served as the fragment; the provider's own path is what the visitor is being sent
+	 * to.
+	 */
+	private static boolean isChallengeable(RequestContext context)
+	{
+		// no request type is a load-time probe - challengeable, so the exemption warnings see a challenge rule
+		String requestType = context.getRequestType();
+		return (null == requestType || FCHeaders.COMPONENT_TOPLEVEL.equals(requestType))
+				&& !PluginEndpoints.isReserved(context.getRequestURI());
+	}
+
+	/** A GET or HEAD - or a probe, which has no method to refuse. */
+	private static boolean isRedirectable(RequestContext context)
+	{
+		jakarta.servlet.http.HttpServletRequest request = context.getRequest();
+		if (null == request)
+			return true;
+		try {
+			String method = request.getMethod();
+			return "GET".equals(method) || "HEAD".equals(method);
+		} catch (Exception e) {
+			return true; // a recycled request is an async include, which never gets this far
+		}
+	}
+
+	private static boolean holdsPass(RequestContext context, PluginEndpoints.Challenge challenge)
+	{
+		for (String cookie : challenge.cookies())
+			if (EvidenceCookies.holds(context, cookie))
+				return true;
+		return false;
+	}
+
+	/**
+	 * {@code /fc-x/<plugin>/?p=<provider>&return=<path and query, encoded>} - relative, so it stays on whatever host
+	 * the visitor reached, and the return address is a path on this site, never a host.
+	 */
+	static String challengeTarget(String plugin, String provider, RequestContext context)
+	{
+		String uri = context.getRequestURI();
+		String query = context.getRequestQueryString();
+		String back = ((null != uri && 0 < uri.length()) ? uri : "/") + ((null != query) ? query : "");
+		return PluginEndpoints.PREFIX + plugin + "/?p=" + encode(provider) + "&return=" + encode(back);
+	}
+
+	/** ERROR once per rule object (once per reload) - the request that finds the provider absent is not the place to repeat it. */
+	private void reportUnavailable(GuardRule rule, boolean countHits)
+	{
+		if (countHits && rule.firstUnavailableReport())
+			logger.error("Guard rule '" + rule.getName() + "' challenges with '" + rule.getAction().getProvider() + "', which "
+					+ unavailableReason(rule.getAction().getProvider()) + " - the rule acts as "
+					+ ((null != rule.getAction().getOtherwise()) ? "its else action, " + rule.getAction().getOtherwise()
+							: "a dry run (logged, nothing refused)"));
+	}
+
+	private static String unavailableReason(String provider)
+	{
+		if (!EvidenceCookies.isConfigured())
+			return "cannot be passed: " + EvidenceCookies.SECRET_PROPERTY + " is not set, so no pass can be signed";
+		return "no started plugin offers (a plugin names its providers in its manifest's 'challenges')";
+	}
+
+	/**
+	 * Says, for every challenge rule, whether its provider can be used - at load, once the plugins have started (the
+	 * engine's first load runs before them, so the engine calls this again after starting them). A rule found
+	 * unavailable here is not reported again by the first request that meets it.
+	 */
+	public void checkChallengeProviders()
+	{
+		if (!PluginEndpoints.isRunning())
+			return;
+
+		for (GuardRule rule : this.rules)
+		{
+			if (GuardAction.Type.CHALLENGE != rule.getAction().getType())
+				continue;
+			String provider = rule.getAction().getProvider();
+			PluginEndpoints.Challenge challenge = PluginEndpoints.challenge(provider);
+			if (null != challenge)
+				logger.info("Guard rule '" + rule.getName() + "' challenges with '" + provider + "', served by plugin '"
+						+ challenge.plugin() + "' at " + PluginEndpoints.PREFIX + challenge.plugin() + "/");
+			else if (rule.isDryRun())
+				logger.warn("Guard rule '" + rule.getName() + "' (dry-run) challenges with '" + provider + "', which "
+						+ unavailableReason(provider));
+			else
+				reportUnavailable(rule, true);
+		}
+	}
+
+	/**
+	 * Whether a plugin may send a visitor to {@code target} - the rule a guard rule's own redirect target is held to:
+	 * a path on this site, or an absolute http(s) URL to an allowed redirect host (the site's public name, or
+	 * {@code front-cache.guard-rules.allowed-redirect-hosts}).
+	 */
+	public boolean isAllowedRedirectTarget(String target)
+	{
+		if (null == target || 0 == target.length())
+			return false;
+		for (int i = 0; i < target.length(); i++)
+		{
+			char c = target.charAt(i);
+			if (c <= ' ' || c == 0x7f || c == '\\')
+				return false; // whitespace, control characters and backslashes are how a path turns into a host
+		}
+		if (target.startsWith("/"))
+			return !target.startsWith("//");
+
+		String host = hostOf(target);
+		return null != host && this.redirectHostAllowlist.contains(host.toLowerCase());
 	}
 
 	/**
