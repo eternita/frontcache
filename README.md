@@ -61,4 +61,6 @@ artifacts, exactly as an application would.
 Frontcache is licensed under the [Apache License 2.0](LICENSE); see [NOTICE](NOTICE) for the
 third-party material in the source tree. Frontcache Pro - additional modules that plug into the same
 node and console - is available under a commercial license and is not part of this repository or of
-any distribution built from it: https://www.eternita.co/frontcache-license.html
+any distribution built from it.
+
+Commercial support and Pro features: [Eternita Edge](https://www.eternita.co/frontcache.html).
