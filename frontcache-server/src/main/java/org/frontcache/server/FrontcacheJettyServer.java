@@ -43,14 +43,8 @@ public class FrontcacheJettyServer {
 
 		System.out.println("Starting Frontcache Jetty Server (port=" + port + ", webapp=" + webDir + ") ...");
 
-		// Honor X-Forwarded-* from the nginx front door so request.getScheme()/
-		// getServerPort() reflect the client-facing values (https/443), not the
-		// plain-HTTP backend hop. Without this absolute-URL/redirect generation sees
-		// port 80 and breaks behind a TLS-terminating proxy.
 		Server server = new Server();
-		HttpConfiguration httpConfig = new HttpConfiguration();
-		httpConfig.addCustomizer(new ForwardedRequestCustomizer());
-		ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
+		ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(httpConfiguration()));
 		connector.setPort(port);
 		server.addConnector(connector);
 
@@ -77,6 +71,38 @@ public class FrontcacheJettyServer {
 		System.out.println("Frontcache Jetty Server has been started successfully ...");
 
 		server.join();
+	}
+
+	/**
+	 * The connector's HTTP configuration - public so a test can serve through exactly what a node serves through.
+	 *
+	 * It honours {@code X-Forwarded-Proto} / {@code -Port} / {@code -Host} from the nginx front door, so that
+	 * getScheme(), isSecure() and getServerPort() report the client-facing values (https/443) rather than the
+	 * plain-HTTP backend hop. Without that, absolute-URL and redirect generation sees port 80 and breaks behind a
+	 * TLS-terminating proxy.
+	 *
+	 * It must NEVER let a forwarding header set the client address. Jetty's {@link ForwardedRequestCustomizer}
+	 * does that by default, from {@code X-Forwarded-For} and from RFC 7239 {@code Forwarded: for=}. It replaces
+	 * getRemoteAddr() with the header's LEFTMOST entry - the one the client wrote - and it does so from any peer.
+	 * {@code ClientIpResolver} then took that client-chosen value for the socket peer, found it untrusted, and
+	 * returned it. Its right-to-left walk over {@code front-cache.client-ip.trusted-proxies} never ran. So on
+	 * every server-mode node behind a proxy, {@code client-ip:} rules, the {@code rate:} limiters, the evidence
+	 * cookies' address binding, a trap rule's log reason and anything banning on the resolved address were
+	 * keyed on whatever the client sent. {@code ClientIpResolver} is the one place that turns forwarding headers
+	 * into a client address, with the trust list the node actually has (it is re-read on a reload; this launcher
+	 * runs outside the war and could only hold a copy). So both headers are switched off here, and
+	 * getRemoteAddr() stays the real socket peer. A blank header name means Jetty installs no handler for it.
+	 * The headers themselves still reach the webapp untouched - the resolver reads them.
+	 */
+	public static HttpConfiguration httpConfiguration()
+	{
+		ForwardedRequestCustomizer forwarded = new ForwardedRequestCustomizer();
+		forwarded.setForwardedForHeader(null);   // X-Forwarded-For: the client address is ClientIpResolver's
+		forwarded.setForwardedHeader(null);      // RFC 7239 Forwarded: its for= sets the remote address too
+
+		HttpConfiguration httpConfig = new HttpConfiguration();
+		httpConfig.addCustomizer(forwarded);
+		return httpConfig;
 	}
 
 }
