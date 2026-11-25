@@ -284,7 +284,8 @@ googlebot-ok | ua~(?i)googlebot ; client-ip:@lists/googlebot.txt | allow
 banned       | client-ip:@lists/banned.txt                        | reject:403
 ```
 
-The crawler-feeder example plugin (`examples/plugins/crawler-feeder/`) keeps
+The crawler-feeder example plugin
+([edge-plugins](https://github.com/eternita/edge-plugins/tree/main/plugins/crawler-feeder)) keeps
 `googlebot.txt`, `bingbot.txt` and `applebot.txt` this way: the ranges the vendors publish,
 plus each address that claims to be the crawler, is reported by a rule you name, and passes
 the vendors' own check — its reverse DNS name is under the crawler's domain and resolves back

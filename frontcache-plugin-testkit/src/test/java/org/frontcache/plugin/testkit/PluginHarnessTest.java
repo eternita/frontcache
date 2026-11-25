@@ -250,11 +250,11 @@ public class PluginHarnessTest {
 
 	@Test
 	public void theManifestThatNamesTheClassIsPicked() {
-		// the examples' manifests are on this class path, one per resource root, as one per jar on a node
-		assertEquals("example", PluginHarness.manifestOf(com.example.frontcache.ExamplePlugin.class).id());
-		assertEquals("debug", PluginHarness.manifestOf(org.frontcache.examples.debug.DebugPlugin.class).id());
-		assertEquals("crawler-feeder",
-				PluginHarness.manifestOf(org.frontcache.examples.crawlerfeeder.CrawlerFeederPlugin.class).id());
+		// the fixtures' manifests are on this class path, one per resource root, as one per jar on a node
+		assertEquals("well-behaved",
+				PluginHarness.manifestOf(org.frontcache.plugin.testkit.fixtures.WellBehavedPlugin.class).id());
+		assertEquals("another",
+				PluginHarness.manifestOf(org.frontcache.plugin.testkit.fixtures.AnotherPlugin.class).id());
 		try {
 			PluginHarness.manifestOf(Recorder.class);
 			fail();

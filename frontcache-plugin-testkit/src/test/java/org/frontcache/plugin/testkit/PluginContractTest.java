@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.frontcache.plugin.testkit.fixtures.BrokenPlugins;
+import org.frontcache.plugin.testkit.fixtures.WellBehavedContract;
 import org.junit.Test;
 import org.junit.runner.JUnitCore;
 import org.junit.runner.Result;
@@ -29,8 +30,7 @@ import org.junit.runner.notification.Failure;
 
 /**
  * The contract catches what it promises to: each broken plugin of {@link BrokenPlugins} fails exactly the contract
- * tests about its fault. (The examples' contract tests, compiled into this module's test source set, are the other
- * half: a well-behaved plugin passes every one.)
+ * tests about its fault - and {@link WellBehavedContract} is the other half: a well-behaved plugin passes every one.
  */
 public class PluginContractTest {
 
@@ -40,6 +40,13 @@ public class PluginContractTest {
 		for (Failure f : result.getFailures())
 			failed.add(f.getDescription().getMethodName());
 		return failed;
+	}
+
+	@Test
+	public void aWellBehavedPluginPassesEveryContractTest() {
+		Result result = new JUnitCore().run(WellBehavedContract.class);
+		assertTrue("ran no contract test", result.getRunCount() > 10);
+		assertEquals(result.getFailures().toString(), 0, result.getFailureCount());
 	}
 
 	@Test
