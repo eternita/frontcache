@@ -4,8 +4,8 @@
 # $FRONTCACHE_HTTP_PORT (9080 by default), no TLS.
 #
 # Whatever terminates TLS for you goes in front - an ingress, an ALB, Cloudflare, nginx.
-# A worked nginx front door (two containers, or a script for a VM) is in the public repo
-# under examples/front-door; it used to be a second image built from this Dockerfile.
+# A worked nginx front door (two containers, or a script for a VM) is in the eternita/edge-examples
+# repo under front-door/; it used to be a second image built from this Dockerfile.
 #
 # Frontcache runs as PID 1 via exec, so it receives Docker's SIGTERM directly.
 set -euo pipefail

@@ -22,8 +22,8 @@
 #
 # It installs Frontcache and nothing else. Frontcache speaks plain HTTP and terminates no TLS,
 # so put your own front door on 80/443 in front of it - an ALB, Cloudflare, or nginx. A worked
-# nginx front door (a script for exactly this layout) is in the public repo under
-# examples/front-door.
+# nginx front door (a script for exactly this layout) is in the eternita/edge-examples repo
+# under front-door/.
 #
 # Usage:
 #   install-frontcache.sh [options]
@@ -537,7 +537,7 @@ fi
 # front-cache.http-port / https-port are what redirect rewriting uses, so they must be the
 # CLIENT-FACING ports - what a browser sees, not what Frontcache binds. With nothing in front,
 # that is $FC_PORT. Put a front door on 80/443 in front of it and these have to change to
-# 80/443, or redirects will send users to $FC_PORT (examples/front-door does this for you).
+# 80/443, or redirects will send users to $FC_PORT (edge-examples/front-door does this for you).
 set_prop 'front-cache.http-port' "$FC_PORT"
 
 run chown -R "$SERVICE_USER:$SERVICE_USER" "$TARGET_DIR"
@@ -643,7 +643,7 @@ $([ "$WITH_CONSOLE" = 1 ] && printf '      systemctl status %s        # console 
 
     Frontcache terminates no TLS. Put a front door on 80/443 in front of it and set
     front-cache.http-port / front-cache.https-port to the ports CLIENTS see - see
-    examples/front-door in the public repo for a worked nginx one.
+    front-door in the eternita/edge-examples repo for a worked nginx one.
 
     Before serving real traffic, review $LINK_DIR/FRONTCACHE_HOME/conf/frontcache.properties -
     at minimum front-cache.api-key and front-cache.default-domain, and give this node a

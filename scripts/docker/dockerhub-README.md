@@ -12,7 +12,8 @@ Page-fragment cache and reverse proxy. Put it in front of a web app in any langu
 page fragments, stitches together `<fc:include url="..."/>` markers (concurrently), and adds
 circuit breaking and fallbacks.
 
-- Docs and examples: https://github.com/eternita/frontcache
+- Docs: https://github.com/eternita/frontcache
+- Examples: https://github.com/eternita/edge-examples
 - Install guide: https://github.com/eternita/frontcache/blob/master/docs/install-guide.md
 
 ## Run it
@@ -28,7 +29,7 @@ docker run -d --name frontcache --restart unless-stopped \
 Frontcache serves **plain HTTP on 9080 and terminates no TLS.** Whatever fronts it owns 80/443 —
 an ingress, an ALB, Cloudflare, or nginx. A worked nginx front door (a two-container compose
 stack, or a script for a VM) is at
-https://github.com/eternita/frontcache/tree/master/examples/front-door.
+https://github.com/eternita/edge-examples/tree/main/front-door.
 
 ## Tags
 

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Frontcache is a reverse-proxy / web-filter page-fragment cache for web apps written in any language. It sits in front of an origin app and serves cached page fragments, stitches together `<fc:include url="..."/>` fragments (optionally concurrently), and provides circuit-breaking/fallbacks via Resilience4j.
 
-This repository is **the product source and its public documentation**, Apache-2.0: the Gradle build at the root (`frontcache-core`, `-server`, `-console`, `-agent`, `-tests`), the user-facing docs under `docs/`, the runnable examples under `examples/`, and the replay benchmark under `benchmark/`. **Frontcache Pro** (licensing, the cache warmer's orchestration, the console's cluster rate, and the Pro features still to come) is proprietary and lives in a **separate, private repository** that includes this build as a Gradle composite (`includeBuild('../frontcache')`) and plugs in through the two SPIs described under *Core architecture*. Nothing here depends on it, names it in code, or links to it. The design documents behind the invariants below are private too, which is why this file states each invariant in its own words rather than pointing at one.
+This repository is **the product source and its public documentation**, Apache-2.0: the Gradle build at the root (`frontcache-core`, `-server`, `-console`, `-agent`, `-tests`), the user-facing docs under `docs/`, the ELK log-analytics stack under `log-analytics/`, and the replay benchmark under `benchmark/`. The runnable examples (JSP, Spring Boot, PHP, the nginx front door) are in their own public repository, `eternita/edge-examples` (`../edge-examples`), as the plugin template and example plugins are in `eternita/edge-plugins`. **Frontcache Pro** (licensing, the cache warmer's orchestration, the console's cluster rate, and the Pro features still to come) is proprietary and lives in a **separate, private repository** that includes this build as a Gradle composite (`includeBuild('../frontcache')`) and plugs in through the two SPIs described under *Core architecture*. Nothing here depends on it, names it in code, or links to it. The design documents behind the invariants below are private too, which is why this file states each invariant in its own words rather than pointing at one.
 
 ## Build & test
 
@@ -63,7 +63,7 @@ Java 25 (via a toolchain: `languageVersion = JavaLanguageVersion.of(25)` and `op
 - **frontcache-agent** — thin standalone HTTP client (`FrontCacheAgent`, `FrontCacheAgentCluster`) for app code to invalidate cache remotely. Minimal deps (httpclient5 only). Its public API is `String` in, `String` out and never exposes an HTTP type, which is why it could move to HttpClient 5 with the rest of the project without breaking any customer source.
 - **frontcache-tests** — the end-to-end / integration suite (HtmlUnit + embedded Jetty 12), the Community one. Not published; run via the repo-root `tests.sh` — see the Build & test section.
 - **Frontcache Pro is not here.** It is a set of jars built in a separate, private repository — a node module, a console plugin, and the license-file library they share — that plug in through `org.frontcache.plugin` and `org.frontcache.console.plugin` (see *Core architecture*). That repository includes this build as a Gradle composite, so it compiles against this tree: a change to a public type in either SPI, to `FrontCacheClient`'s generic `call*` methods, to `frontcache-core`'s test fixtures (`StubNode`) or to `frontcache-tests`' fixtures and homes can break it, and it refuses to build against a `version.properties` other than the one it pins. **Package names are split across the two** — `org.frontcache.license` (only `BuildInfo` is here), `org.frontcache.warmer` (only `WarmRequest`), `org.frontcache.io` and the console's `service` / `model` / `web.controllers` — which is legal on a class path and lets a Pro class reach a package-private core member, so a package-private member in those packages is not as private as it looks.
-- `examples/` (jsp/php/spring, front-door, log-analytics), `benchmark/` and `scripts/` (dist, docker, and dev: `deploy-build-remote.sh` / `update-frontcache-code-remote.sh`, which push this working tree's server to a host over ssh - `--war-jar` adds a jar to the deployed war's `WEB-INF/lib`) are auxiliary; the docs are under `docs/` (see *Docs and examples* below).
+- `log-analytics/`, `benchmark/` and `scripts/` (dist, docker, and dev: `deploy-build-remote.sh` / `update-frontcache-code-remote.sh`, which push this working tree's server to a host over ssh - `--war-jar` adds a jar to the deployed war's `WEB-INF/lib`) are auxiliary; the docs are under `docs/` (see *Docs and examples* below).
 
 ## Core architecture (frontcache-core)
 
@@ -208,46 +208,17 @@ they drive redirect rewriting.
 
 **The origin is in charge of caching**, through the `x-frontcache-component-*` response headers (and the
 `http://frontcache.org/core` taglib for Java/JSP origins). The header contract is owned by
-`docs/concept.md` and echoed in `docs/install-guide.md` (troubleshooting) and
-`examples/frontcache-php/README.md`; when it changes, all three change.
+`docs/concept.md` and echoed in `docs/install-guide.md` (troubleshooting) and edge-examples'
+`frontcache-php/README.md`; when it changes, all three change.
 
-### Running the examples
+### The examples live in edge-examples
 
-Each example runs with one command, against the **published** artifacts — never this tree (see below). All three filter-mode examples need **JDK 25** —
-Frontcache is Java 25 bytecode and Jakarta EE 10 (`jakarta.servlet`), so it will not
-load on an older JVM or in a `javax.servlet` container.
-
-```bash
-cd examples/frontcache-jsp && ./gradlew appRun          # embedded Jetty 12 :8080 -> /example/index.jsp
-```
-```bash
-cd examples/frontcache-spring && mvn spring-boot:run    # Spring Boot 3.x :8080 -> /example
-```
-
-`frontcache-php` has nothing to build: copy the directory into a `DocumentRoot` and run a
-downloaded `frontcache-server` in front of it (use case #2 — see its README).
-
-The front-door example has an executable check of its own (it needs Docker, so CI does not run it):
-
-```bash
-cd examples/front-door && ./smoke-test.sh
-```
-
-It brings the two-container compose stack up on 8080/8443 against a stand-in origin and
-asserts the five things the nginx template exists to get right (cache hit on the second
-request, unbuffered `/hystrix.stream`, gzip on proxied responses, `x-frontcache-*` headers
-surviving the hop, `ORIGIN_PATHS` bypass). `KEEP=1` leaves the stack up; `FC_IMAGE=…` pins a
-different image. Run it after touching `render-nginx-site.sh`, `docker/`, or `vm/`.
-
-Render the nginx config without installing anything:
-
-```bash
-FRONTCACHE_HOST=fc-server ORIGIN_HOST=origin.example.com examples/front-door/render-nginx-site.sh | less
-```
-
-Jetty in the JSP example is pinned to **12.0.38** deliberately: 12.0.30+ bundles ASM ≥ 9.9,
-which is required to scan Java 25 (class file v69) bytecode. An older Jetty crashes the
-embedded launcher during annotation scanning.
+The JSP, Spring Boot and PHP examples, the nginx front door (`front-door/`, with its Docker smoke test) and the
+JSP example's screenshots moved to [eternita/edge-examples](https://github.com/eternita/edge-examples)
+(`../edge-examples`), at its top level. Its own `CLAUDE.md` says how to run each one and what is easy to break
+there (the Jetty pin, the front-door smoke test, the version strings). Docs here link to them by absolute
+`https://github.com/eternita/edge-examples/{tree,blob}/main/...` URLs, never by a relative path - a relative
+path out of this repository resolves to nothing on GitHub. Nothing in this build compiles or runs them.
 
 ### Doc map — where a topic belongs
 
@@ -263,23 +234,21 @@ file and cross-link rather than duplicating.
 | [docs/deployment-usecases.md](docs/deployment-usecases.md)           | *which topology to pick* — the three use cases and their setup steps, plus the IO API table. Concepts were extracted to `concept.md` on 2026-08-21; §0 is now only a pointer table into it |
 | [docs/guard-getting-started.md](docs/guard-getting-started.md)       | `guard-rules.conf` — condition/action grammar, recipes, dry-run rollout, settings reference |
 | [docs/rate-limit-howto.md](docs/rate-limit-howto.md)                 | `rate:` — the tutorial for the one predicate: window / `bucket=` / `scope=` semantics, eight scenarios with their per-request behaviour, sizing, and a five-minute laptop run. Shipped in 2.8.0. The grammar row for `rate:` and the `front-cache.client-ip.trusted-proxies` prerequisite stay in `guard-getting-started.md` |
-| [docs/search-cidr-howto.md](docs/search-cidr-howto.md)               | `examples/log-analytics/search-cidr.sh` — aggregating a request log into CIDR blocks, and turning a block into a `client-ip:` line. Owns the script's flags, the leftmost-XFF vs `ClientIpResolver` caveat, and the widen-the-mask method; **not** the rule grammar (that is `guard-getting-started.md`) nor the log's parsed fields (that is the log-analytics README) |
+| [docs/search-cidr-howto.md](docs/search-cidr-howto.md)               | `log-analytics/search-cidr.sh` — aggregating a request log into CIDR blocks, and turning a block into a `client-ip:` line. Owns the script's flags, the leftmost-XFF vs `ClientIpResolver` caveat, and the widen-the-mask method; **not** the rule grammar (that is `guard-getting-started.md`) nor the log's parsed fields (that is the log-analytics README) |
 | [docs/resilience-command-flow.md](docs/resilience-command-flow.md)      | the resilience command graph (`FC_Total`, `FC_ThroughCache*`, `FC_BypassCache`), keys and isolation |
 | [docs/value.md](docs/value.md)                                       | *why it is worth installing* — the measured cache-on/cache-off A/B (6.1x throughput, 98.7% origin offload), what the numbers buy, and the caveats. Numbers here must come from a saved report in `benchmark/results/`, never from memory |
 | [benchmark/README.md](benchmark/README.md)                           | the replay harness — `extract-requests.js` (request log to CSV) and `load-test.js` (replay, report), every flag, and the recipes. Owns how a measurement is produced; `docs/value.md` owns what it means |
-| [examples/front-door/README.md](examples/front-door/README.md)       | nginx on 80/443 in front of Frontcache — the load-bearing directives and why each one matters |
-| [examples/log-analytics/README.md](examples/log-analytics/README.md) | the ELK stack for Frontcache's four logs — pulling them, the dashboards, and every parsed field |
+| [log-analytics/README.md](log-analytics/README.md)                 | the ELK stack for Frontcache's four logs — pulling them, the dashboards, and every parsed field |
 | [docs/release-notes/](docs/release-notes/)                           | one note per version, written for an operator deciding whether and how to upgrade (see *Versioning and release notes*); `README.md` there is the index |
 
 ### Conventions that are easy to break
 
-**A release touches the docs in twelve places.** The current version is hard-coded in [README.md](README.md),
-[docs/install-guide.md](docs/install-guide.md) (26 occurrences), all four example READMEs,
-[examples/frontcache-jsp/build.gradle](examples/frontcache-jsp/build.gradle),
-[examples/frontcache-spring/pom.xml](examples/frontcache-spring/pom.xml),
-[docs/downloads.md](docs/downloads.md) (which lists the *two* current versions — roll the older one out), and the front-door
-`docker-compose.yml`, `.env.example`, and `smoke-test.sh`. Grep for the old version and
-change every hit; `version.properties` drives the build, not the docs. The docs deliberately tell
+**A release touches the docs in three places here, and the examples in edge-examples.** The current version is
+hard-coded in [README.md](README.md), [docs/install-guide.md](docs/install-guide.md) (26 occurrences) and
+[docs/downloads.md](docs/downloads.md) (which lists the *two* current versions — roll the older one out); the
+examples' READMEs, `frontcache-jsp/build.gradle`, `frontcache-spring/pom.xml` and the front-door
+`docker-compose.yml`, `.env.example` and `smoke-test.sh` in edge-examples carry it too (its `CLAUDE.md` lists them).
+Grep for the old version in both repositories and change every hit; `version.properties` drives the build, not the docs. The docs deliberately tell
 users to **pin an exact version**, so keeping `latest` out of examples is part of the message.
 
 **The 2.6.0 image rename is a documented breaking change.** Through 2.5.1 the plain
@@ -299,9 +268,9 @@ Both repositories are one now, so a relative link from `docs/` into a module is 
 docs still use the naming convention, and converting them is a pass of its own, not something to
 half-do in passing. **Examples are the opposite**: they must stay standalone-copyable and consume the
 published `org.frontcache:*` artifacts. `frontcache-jsp` once declared `includeBuild('../..')` to
-compile against the source; the removal is documented in
-[settings.gradle](examples/frontcache-jsp/settings.gradle). Never reintroduce a composite build or a
-relative path from an example into the build.
+compile against the source; the removal is documented in edge-examples' `frontcache-jsp/settings.gradle`.
+Now that they are a repository of their own, a composite build would have to name `../frontcache` - never
+reintroduce one.
 
 The wiki is disabled (`/wiki` 302s to the repo home), so its links were dropped and the doc footers
 cross-link each other instead — don't reintroduce a wiki reference unless someone enables it. And
@@ -312,5 +281,5 @@ read; the docs say so explicitly. API keys and TLS material are always placehold
 (`CHANGE_ME`, `YOUR_API_KEY`, self-signed certs).
 
 **Build output stays out of git.** `.gitignore` covers every `build/` and `target/`, `.gradle/`, and
-the `FRONTCACHE_HOME/{cache,logs}/` of the examples and the e2e homes — running an example or the e2e
-suite dirties none of those. `benchmark/requests/` (a replayable dump of real traffic) is ignored too.
+the `FRONTCACHE_HOME/{cache,logs}/` of the e2e homes — running the e2e suite dirties none of those, and
+`log-analytics/logs/` ignores whatever `pull-logs.sh` drops into it. `benchmark/requests/` (a replayable dump of real traffic) is ignored too.

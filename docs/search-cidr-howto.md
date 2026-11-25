@@ -1,13 +1,13 @@
 # Finding the network behind the traffic — a `search-cidr.sh` how-to
 
 A walk from "something is hammering us" to the **address blocks** it is coming from, using
-[`examples/log-analytics/search-cidr.sh`](../examples/log-analytics/search-cidr.sh) against a
+[`log-analytics/search-cidr.sh`](../log-analytics/search-cidr.sh) against a
 request log — and from those blocks to the line in `bots.conf` or `guard-rules.conf` that acts
 on them.
 
 The script is a single `awk` pass over a log file. It needs no stack, no containers and no
 Elasticsearch: it is the five-second answer for the question the
-[Kibana dashboards](../examples/log-analytics/README.md) answer with more ceremony, and it runs
+[Kibana dashboards](../log-analytics/README.md) answer with more ceremony, and it runs
 on a log you just `scp`'d. The `client-ip:` predicate it feeds arrived in **2.9.0**.
 
 ---
@@ -42,7 +42,7 @@ deployed a rule naming it, the pool has moved on.
 ## 2. The command, in thirty seconds
 
 ```bash
-cd examples/log-analytics
+cd log-analytics
 ./search-cidr.sh -n 20 -m 24 "toplevel.*no-js-proof"
 ```
 
@@ -66,7 +66,7 @@ the busiest prefixes.
 
 The regex is matched against the raw line, so **anything in the line is a filter** — there are
 no per-field flags to learn, and the columns are positional and stable
-([parsed fields](../examples/log-analytics/README.md#parsed-fields) names every one of them):
+([parsed fields](../log-analytics/README.md#parsed-fields) names every one of them):
 
 | You want | Regex |
 | --- | --- |
@@ -432,7 +432,7 @@ silently, so a log in an unexpected shape says so instead of quietly returning a
 - **It reads a log, so it is history.** It tells you what happened in the window the file
   covers, not what is happening now. For live pressure, `rate:` measures the present
   ([rate-limit-howto.md](rate-limit-howto.md)); for a trend over weeks, the
-  [Kibana dashboards](../examples/log-analytics/README.md) hold more than one file.
+  [Kibana dashboards](../log-analytics/README.md) hold more than one file.
 - **It is not a blocklist generator.** The output is evidence. Every recipe above ends in
   `dry-run` and a human, and §4.3 ends in `whois`, on purpose: the cost of a wrong `/16` is paid
   by people who never visited you.
@@ -441,6 +441,6 @@ silently, so a log in an unexpected shape says so instead of quietly returning a
 
 Guard rules: [guard-getting-started.md](guard-getting-started.md) ·
 Rate limiting: [rate-limit-howto.md](rate-limit-howto.md) ·
-The logs and every parsed field: [examples/log-analytics](../examples/log-analytics) ·
+The logs and every parsed field: [log-analytics](../log-analytics) ·
 `client-ip:` and `bots.conf` rules: [2.9.0 release notes](release-notes/2.9.0.md) ·
 Dashboards: [console-dashboards.md](console-dashboards.md)

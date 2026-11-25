@@ -126,7 +126,7 @@ literal — precisely so an external Hystrix Dashboard or Turbine can keep readi
 - Requires the node's api key; a missing or wrong one is a `401`.
 - Management-port rule applies, as above.
 - **Do not buffer it** through a reverse proxy — see the nginx recipe in
-  [examples/front-door](../examples/front-door).
+  [edge-examples/front-door](https://github.com/eternita/edge-examples/tree/main/front-door).
 
 Use this for the live per-command view. Use Prometheus (§2) for anything you want to keep,
 alert on, or graph over time — the stream is a rolling window, not a store.
@@ -139,7 +139,7 @@ Four logs under `FRONTCACHE_HOME/logs/` — `frontcache-requests.log` (one line 
 redirects, dry-run matches).
 
 This is the only channel with **per-URL** data, which is exactly why it is a log and not a
-metric. [examples/log-analytics](../examples/log-analytics) pulls them off the hosts and
+metric. [log-analytics](../log-analytics) pulls them off the hosts and
 indexes all four into a local Elastic stack with four ready-made dashboards.
 
 For a one-off, `front-cache.log-to-headers=true` puts the same per-request timings into

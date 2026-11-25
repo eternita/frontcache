@@ -150,8 +150,8 @@ Not in the application's own config. The directory is located via `-Dfrontcache.
 Alongside `conf/`, the same home holds `cache/` (the L2 Lucene index) and `logs/`.
 
 Two ready-made filter-mode skeletons live in this repository:
-[the JSP example's](../examples/frontcache-jsp/FRONTCACHE_HOME) and
-[the Spring example's](../examples/frontcache-spring/FRONTCACHE_HOME).
+[the JSP example's](https://github.com/eternita/edge-examples/tree/main/frontcache-jsp/FRONTCACHE_HOME) and
+[the Spring example's](https://github.com/eternita/edge-examples/tree/main/frontcache-spring/FRONTCACHE_HOME).
 
 ## 8. Standard ports
 
@@ -165,7 +165,7 @@ The embedded-Jetty launcher defaults:
 > **The recurring trap:** `front-cache.http-port` / `front-cache.https-port` are the
 > **client-facing** ports — 80/443 when something terminates TLS in front of Frontcache — not the
 > port Frontcache listens on. They drive redirect rewriting, so getting them wrong sends users to
-> `:9080`. See [examples/front-door](../examples/front-door) for the nginx case.
+> `:9080`. See [edge-examples/front-door](https://github.com/eternita/edge-examples/tree/main/front-door) for the nginx case.
 
 ## 9. Invalidation and management
 
@@ -191,7 +191,7 @@ the response, and `x-frontcache-fallback-is-used` marks a fallback.
 
 `FRONTCACHE_HOME/logs/` holds four logs — `frontcache-requests.log` (one line per
 request/fragment), `error.log`, `fallback.log`, and `frontcache-failed-requests.log` (guard-rule
-rejections and circuit-breaker fallbacks). The [log-analytics example](../examples/log-analytics) indexes
+rejections and circuit-breaker fallbacks). The [log-analytics example](../log-analytics) indexes
 all four into Elasticsearch + Kibana with ready-made dashboards.
 
 ---
@@ -205,7 +205,7 @@ all four into Elasticsearch + Kibana with ready-made dashboards.
   [guard-getting-started.md](guard-getting-started.md)
 - Stop fragmenting from multiplying origin work: [include-combining.md](include-combining.md)
 - Circuit breakers in detail: [resilience-command-flow.md](resilience-command-flow.md)
-- Run something: [JSP](../examples/frontcache-jsp) · [Spring Boot](../examples/frontcache-spring) · [PHP](../examples/frontcache-php)
+- Run something: [JSP](https://github.com/eternita/edge-examples/tree/main/frontcache-jsp) · [Spring Boot](https://github.com/eternita/edge-examples/tree/main/frontcache-spring) · [PHP](https://github.com/eternita/edge-examples/tree/main/frontcache-php)
 
 ---
 

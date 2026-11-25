@@ -580,11 +580,11 @@ belongs in the log, where retention bounds it. The one sizing signal to watch is
 Counters reset when `reload-guard-rules` rebuilds the rules, which Prometheus reads as the
 counter reset it is.
 
-**Kibana** — pull the logs into the [log-analytics example](../examples/log-analytics)
+**Kibana** — pull the logs into the [log-analytics example](../log-analytics)
 and open the **Frontcache Rejected Requests** dashboard:
 
 ```bash
-cd examples/log-analytics
+cd log-analytics
 ./start-fc-elk.sh
 ./pull-logs.sh "fc-us fc-eu"
 # http://localhost:5601/app/dashboards#/view/fc-rejected
@@ -593,7 +593,7 @@ cd examples/log-analytics
 It breaks everything down by rule, HTTP status, node, domain, country, client IP, URL
 and user agent, and separates *rejected* / *redirected* / *dry-run* / circuit-breaker
 fallbacks; that example's
-[README](../examples/log-analytics/README.md) covers the setup and every parsed field.
+[README](../log-analytics/README.md) covers the setup and every parsed field.
 
 Hit counts are in memory: they reset when the node restarts or when you reload the
 rules. The logs and dashboard are the durable record.

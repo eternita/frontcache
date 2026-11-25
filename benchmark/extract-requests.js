@@ -35,7 +35,7 @@ const path = require('path');
 const readline = require('readline');
 const zlib = require('zlib');
 
-const DEFAULT_LOG = path.join(__dirname, '..', 'examples', 'log-analytics', 'logs', 'fc-us.hobbyray.com-frontcache-requests.log');
+const DEFAULT_LOG = path.join(__dirname, '..', 'log-analytics', 'logs', 'fc-us.hobbyray.com-frontcache-requests.log');
 const DEFAULT_OUT = path.join(__dirname, 'requests', 'requests.csv');
 
 function parseArgs(argv) {

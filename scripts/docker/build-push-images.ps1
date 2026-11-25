@@ -150,7 +150,7 @@ if ($Push) {
     Write-Host "      ${ImageServer}:${Tag}"
     Write-Host ""
     Write-Host "    Frontcache serves plain HTTP and no TLS. For an nginx front door on 80/443"
-    Write-Host "    see examples/front-door in the public repo."
+    Write-Host "    see front-door in the eternita/edge-examples repo."
 } else {
     Write-Host ">>> Loaded locally. Start the stack with:"
     Write-Host "    `$env:FC_VERSION='$Tag'; .\start-fc-server.ps1"

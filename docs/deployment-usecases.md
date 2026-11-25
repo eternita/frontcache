@@ -24,7 +24,7 @@ passing the request down the filter chain.
    snippets, including the repository to add.
 
 2. **Register the filter** in `WEB-INF/web.xml` (see
-   [the JSP example's `web.xml`](../examples/frontcache-jsp/src/main/webapp/WEB-INF/web.xml)):
+   [the JSP example's `web.xml`](https://github.com/eternita/edge-examples/blob/main/frontcache-jsp/src/main/webapp/WEB-INF/web.xml)):
 
    ```xml
    <filter>
@@ -43,7 +43,7 @@ passing the request down the filter chain.
 
 3. **Provision `FRONTCACHE_HOME`.** Copy a `FRONTCACHE_HOME/conf` skeleton — unpack the
    published `frontcache-core-<version>-home.zip`, or start from the one in
-   [the JSP example](../examples/frontcache-jsp/FRONTCACHE_HOME). In **filter mode you do NOT
+   [the JSP example](https://github.com/eternita/edge-examples/tree/main/frontcache-jsp/FRONTCACHE_HOME). In **filter mode you do NOT
    set an origin host** — the app itself is the origin. Minimal `frontcache.properties`:
 
    ```properties

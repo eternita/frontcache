@@ -9,8 +9,8 @@ Everything here uses **published images** — there is nothing to build in this 
 | --- | --- | --- |
 | Frontcache alone, plain HTTP on 9080 | `pavlikovskiy/frontcache-server` | [install-guide §D](install-guide.md#d-container-image) |
 | The console UI on 7080 | `pavlikovskiy/frontcache-console` | [install-guide §E](install-guide.md#e-console--realtime-stats-and-cache-management) |
-| A real front door on 80/443 (TLS, gzip, asset bypass) | nginx + Frontcache, two containers | [examples/front-door/docker](../examples/front-door/docker) |
-| Logs in Kibana | three stock Elastic containers | [examples/log-analytics](../examples/log-analytics) |
+| A real front door on 80/443 (TLS, gzip, asset bypass) | nginx + Frontcache, two containers | [edge-examples/front-door/docker](https://github.com/eternita/edge-examples/tree/main/front-door/docker) |
+| Logs in Kibana | three stock Elastic containers | [log-analytics](../log-analytics) |
 
 ---
 
@@ -84,7 +84,8 @@ See [console-dashboards.md](console-dashboards.md) for what is on it.
 Frontcache does not terminate TLS. This is the two-container stack that does:
 
 ```sh
-cd examples/front-door/docker
+git clone https://github.com/eternita/edge-examples.git
+cd edge-examples/front-door/docker
 cp .env.example .env
 $EDITOR .env            # ORIGIN_HOST, ORIGIN_PATHS, ports, FC_IMAGE
 docker compose up -d
@@ -107,7 +108,7 @@ client ──▶ nginx :80  │                     (cached)
   `docker compose exec nginx curl -si http://fc-server:9080/ | head -20`
 - One process per container, so no supervisor and no signal handling anywhere in the example.
   nginx renders its site config from `/docker-entrypoint.d/` and is then PID 1.
-- `./smoke-test.sh` — from `examples/front-door`, one level up from `docker/` — brings the stack
+- `./smoke-test.sh` — from `edge-examples/front-door`, one level up from `docker/` — brings the stack
   up against the stand-in origin and asserts the five things the nginx template exists to get
   right. `KEEP=1` leaves it up; `FC_IMAGE=…` pins a different image.
 
@@ -120,7 +121,7 @@ somewhere.
 ## 4. Log analytics — Elasticsearch + Kibana + Logstash
 
 ```sh
-cd examples/log-analytics
+cd log-analytics
 cp .env.example .env         # optional: pin STACK_VERSION, heap, ports
 ./start-fc-elk.sh
 ./pull-logs.sh "fc-us fc-eu"  # ssh aliases

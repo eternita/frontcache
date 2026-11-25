@@ -11,7 +11,7 @@
 #
 # The launcher listens on HTTP only (default 9080). TLS is terminated by whatever fronts it -
 # an ingress, an ALB, or nginx proxying 443 -> http://127.0.0.1:9080. A worked nginx front door
-# is at https://github.com/eternita/frontcache/tree/master/examples/front-door.
+# is at https://github.com/eternita/edge-examples/tree/main/front-door.
 #
 set -euo pipefail
 

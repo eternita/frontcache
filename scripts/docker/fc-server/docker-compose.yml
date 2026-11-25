@@ -1,7 +1,7 @@
 # Frontcache stack: the standalone server, plus the console under an opt-in profile.
 #
 # Frontcache alone, plain HTTP on 9080. It does not terminate TLS and has no front door of
-# its own - see examples/front-door in the public repo for a worked nginx one.
+# its own - see front-door in the eternita/edge-examples repo for a worked nginx one.
 #
 # Both services run PUBLISHED images - the images are built by
 # scripts/docker/build-push-images.sh from the release archives, not by compose. That is
