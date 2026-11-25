@@ -46,7 +46,7 @@ service, `--archive PATH` installs from a file you staged yourself (air-gapped h
 full in [install-guide §C](install-guide.md#c-installer--a-systemd-service-on-a-vm).
 
 The server serves **plain HTTP on 9080** and terminates no TLS — a front door on 80/443 is a
-separate, deliberate step: [examples/front-door](../examples/front-door).
+separate, deliberate step: [edge-examples/front-door](https://github.com/eternita/edge-examples/tree/main/front-door).
 
 ## Console
 

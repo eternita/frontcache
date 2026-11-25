@@ -338,11 +338,11 @@ without it every fragment counts against the sibling's own address instead of th
 
 ## 5. Try it on your laptop in five minutes
 
-The [JSP example](../examples/frontcache-jsp) is a complete node with its own
+The [JSP example](https://github.com/eternita/edge-examples/tree/main/frontcache-jsp) is a complete node with its own
 `FRONTCACHE_HOME`, so nothing here touches a server. It needs **JDK 25**.
 
 **1.** Add one rule to
-[examples/frontcache-jsp/FRONTCACHE_HOME/conf/guard-rules.conf](../examples/frontcache-jsp/FRONTCACHE_HOME/conf/guard-rules.conf):
+[edge-examples/frontcache-jsp/FRONTCACHE_HOME/conf/guard-rules.conf](https://github.com/eternita/edge-examples/blob/main/frontcache-jsp/FRONTCACHE_HOME/conf/guard-rules.conf):
 
 ```
 demo-flood | uri~^/example/index\.jsp$ ; rate:3/10s | reject:429 Too Many Requests
@@ -358,7 +358,8 @@ peer *is* the client. That is the one deployment where leaving it empty is right
 **2.** Start it:
 
 ```bash
-cd examples/frontcache-jsp && ./gradlew appRun
+git clone https://github.com/eternita/edge-examples.git
+cd edge-examples/frontcache-jsp && ./gradlew appRun
 ```
 
 **3.** Spend the budget:
@@ -415,7 +416,7 @@ the visitor was charged one each time. That is `scope=toplevel` doing its job.
   status codes above are the evidence. The standalone server's shipped config has that logger,
   which is the log §6 describes.
 
-The [Spring Boot example](../examples/frontcache-spring) behaves the same way, with its own
+The [Spring Boot example](https://github.com/eternita/edge-examples/tree/main/frontcache-spring) behaves the same way, with its own
 `FRONTCACHE_HOME/conf/guard-rules.conf`.
 
 ---
@@ -464,7 +465,7 @@ lives in the log, where retention bounds it.
 
 **Kibana** — a rate rejection is a `rejected` disposition like any other, so it lands in the
 **Frontcache Rejected Requests** dashboard of the
-[log-analytics example](../examples/log-analytics) with no pipeline change. One thing to adjust
+[log-analytics example](../log-analytics) with no pipeline change. One thing to adjust
 there: a panel aggregating on `reason` will split one rate rule into one term per client
 address, so split `reason` on `#` and keep the address as its own field.
 
@@ -548,4 +549,4 @@ Guard rules in general: [guard-getting-started.md](guard-getting-started.md) ·
 How a request flows: [concept.md](concept.md) ·
 Topologies: [deployment-usecases.md](deployment-usecases.md) ·
 Metrics and dashboards: [console-dashboards.md](console-dashboards.md) ·
-Logs into Kibana: [examples/log-analytics](../examples/log-analytics)
+Logs into Kibana: [log-analytics](../log-analytics)

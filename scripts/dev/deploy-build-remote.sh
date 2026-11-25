@@ -20,7 +20,8 @@
 #
 # It does NOT configure a front door. nginx on 80/443 is configured once per host, not once
 # per deploy, and it lives with the rest of the front-door material:
-# examples/front-door/vm/configure-nginx-remote.sh. The command is printed at the end.
+# front-door/vm/configure-nginx-remote.sh in the eternita/edge-examples repo (expected checked out
+# beside this one, as ../edge-examples). The command is printed at the end.
 #
 # Flags:
 #   --war-jar <file>  ALSO add <file> to the deployed war's WEB-INF/lib (repeatable) - e.g. a
@@ -214,6 +215,6 @@ echo "      sudo systemctl status $SERVICE_NAME"
 echo "      sudo journalctl -u $SERVICE_NAME -f"
 echo
 echo "    No front door was configured - that is a once-per-host step, not a per-deploy one."
-echo "    From this checkout:"
-echo "      cd $REPO_ROOT/examples/front-door/vm"
+echo "    From an edge-examples checkout (https://github.com/eternita/edge-examples):"
+echo "      cd $REPO_ROOT/../edge-examples/front-door/vm"
 echo "      REMOTE_HOST=$REMOTE_HOST ./configure-nginx-remote.sh --origin-host $ORIGIN_HOST"

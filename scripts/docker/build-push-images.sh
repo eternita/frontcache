@@ -19,8 +19,8 @@
 #   $NS/frontcache-console:<tag>        console, 7080
 #
 # The server image used to come in two variants - `<tag>` was nginx + Frontcache on 80/443 and
-# `<tag>-slim` was Frontcache alone. The nginx front door moved to the public repo under
-# examples/front-door, so there is ONE server image and it is what -slim used to be. 2.6.0 was
+# `<tag>-slim` was Frontcache alone. The nginx front door moved to the eternita/edge-examples repo
+# under front-door/, so there is ONE server image and it is what -slim used to be. 2.6.0 was
 # published under both names as a compatibility alias; from 2.7.0 only the plain tag is pushed.
 # The -slim tags up to 2.6.0 still exist and still resolve - nothing was deleted.
 #
@@ -171,7 +171,7 @@ if [ "$PUSH" = 1 ]; then
   echo "      $IMAGE_SERVER:$TAG"
   echo
   echo "    Frontcache serves plain HTTP and no TLS. For an nginx front door on 80/443 see"
-  echo "    examples/front-door in the public repo."
+  echo "    front-door in the eternita/edge-examples repo."
 else
   echo ">>> Loaded locally. Start the stack with:"
   echo "    FC_VERSION=$TAG ./start-fc-server.sh              # server only"

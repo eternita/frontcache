@@ -8,8 +8,8 @@ Container images for Frontcache.
 
   > Through 2.5.1 this image came in two variants — the default was nginx + Frontcache on
   > 80/443, and `-slim` was Frontcache alone. **There is now one image, and it is what `-slim`
-  > was.** The nginx front door lives in the public repo's
-  > [`examples/front-door`](https://github.com/eternita/frontcache/tree/master/examples/front-door),
+  > was.** The nginx front door lives in
+  > [`edge-examples/front-door`](https://github.com/eternita/edge-examples/tree/main/front-door),
   > which has both a two-container compose stack and a script for a VM. 2.6.0 was published under
   > the `-slim` names as
   > well, as a compatibility alias; from 2.7.0 only the plain tag is pushed. Nothing was deleted,
@@ -20,8 +20,8 @@ Container images for Frontcache.
 
 > **Log analytics moved out.** The ELK stack (Elasticsearch + Kibana + Logstash) that indexed
 > the request, error, fallback and rejected-request logs, and the `pull-logs` /
-> `start-fc-elk` / `stop-fc-elk` scripts that drove it, now live in the public repo's
-> [`examples/log-analytics`](https://github.com/eternita/frontcache/tree/master/examples/log-analytics).
+> `start-fc-elk` / `stop-fc-elk` scripts that drove it, now live in this repository's top-level
+> [`log-analytics`](../../log-analytics).
 > Same stack, same dashboards, same script names — the `fc-elk/` subdirectory is flattened into
 > the example root, so run them from there. The compose project name is pinned to `fc-elk`, so
 > an existing local stack keeps its `fc-elk_es-data` / `fc-elk_ls-data` volumes.

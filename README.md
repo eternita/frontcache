@@ -10,7 +10,7 @@
 | **Install it**        | [Install guide](docs/install-guide.md) — library, archive, installer script, or container                                                               |
 | **Download it**       | [Downloads](docs/downloads.md) — direct links to every artifact, 2.13.0 and 2.12.0                                                                       |
 | **Choose a topology** | [Deployment use cases](docs/deployment-usecases.md) — filter, standalone proxy, or multi-region                                                         |
-| **See it work**       | [Java / Spring Boot](examples/frontcache-spring) · [PHP](examples/frontcache-php) — each runs with one command                                          |
+| **See it work**       | [Java / Spring Boot](https://github.com/eternita/edge-examples/tree/main/frontcache-spring) · [PHP](https://github.com/eternita/edge-examples/tree/main/frontcache-php) — each runs with one command                                          |
 | **See what changed**  | [Release notes](docs/release-notes/) — 2.7.0, 2.8.0, 2.9.0, 2.10.0, 2.11.0, 2.12.0, 2.13.0                                                                                    |
 | **Read more**         | [Documentation index](docs/doc-index.md)                                                                                                                |
 
@@ -52,8 +52,9 @@ console's JavaScript tests).
 ./tests.sh           # the end-to-end suite (starts two embedded Jetty nodes and a console)
 ```
 
-The examples under `examples/` do not build against this source: they consume the published
-artifacts, exactly as an application would.
+The runnable examples (JSP, Spring Boot, PHP, the nginx front door) live in a repository of their own,
+[eternita/edge-examples](https://github.com/eternita/edge-examples), and do not build against this source:
+they consume the published artifacts, exactly as an application would.
 
 
 #### License

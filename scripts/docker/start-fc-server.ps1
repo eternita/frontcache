@@ -53,7 +53,7 @@ finally {
 Write-Host ""
 Write-Host ">>> Frontcache is up."
 Write-Host "    http://$http  (plain HTTP - no TLS here; put a front door in front of it,"
-Write-Host "     e.g. examples/front-door in the public repo)"
+Write-Host "     e.g. front-door in the eternita/edge-examples repo)"
 if ($console) { Write-Host "    console: http://$console/" }
 Write-Host "    health:  docker inspect --format '{{.State.Health.Status}}' fc-server"
 Write-Host "    logs:    docker logs -f fc-server"

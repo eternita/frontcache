@@ -68,7 +68,7 @@ directory and indexes into `frontcache-YYYY.MM.dd`, `frontcache-errors-YYYY.MM.d
 
 It finds the remote log directory itself, probing (in order)
 `/opt/frontcache/FRONTCACHE_HOME/logs` — where the installer script of
-[the install guide](../../docs/install-guide.md) puts it —
+[the install guide](../docs/install-guide.md) puts it —
 `~/opt/frontcache-server/FRONTCACHE_HOME/logs`, and
 `/opt/frontcache-server/FRONTCACHE_HOME/logs`. Set `REMOTE_LOG_DIR` to pin it instead; a host
 that then does not have that directory is an error rather than a fallback.
@@ -156,7 +156,7 @@ behind — import only ever adds and overwrites. They are harmless; delete them 
 ### Frontcache Rejected Requests
 
 Fed by `frontcache-failed-requests*.log`: everything a
-[guard rule](../../docs/guard-getting-started.md) did before cache or origin —
+[guard rule](../docs/guard-getting-started.md) did before cache or origin —
 rejected (400 / 414), redirected (301 / 302), or matched in dry-run — plus requests that
 completed through a circuit-breaker fallback. **`reject_reason` is the headline dimension: it holds the
 rule name**, so a new rule appears in every panel without touching the dashboard.
@@ -332,6 +332,6 @@ because it does.
 
 ---
 
-Install and run Frontcache: [docs/HOWTO-install.md](../../docs/install-guide.md) ·
+Install and run Frontcache: [docs/HOWTO-install.md](../docs/install-guide.md) ·
 Guard rules, which feed the Rejected Requests dashboard:
-[docs/guard-getting-started.md](../../docs/guard-getting-started.md)
+[docs/guard-getting-started.md](../docs/guard-getting-started.md)

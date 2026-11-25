@@ -50,7 +50,7 @@ published() { ( cd "$COMPOSE_DIR" && docker compose port "$1" "$2" 2>/dev/null )
 echo
 echo ">>> Frontcache is up."
 echo "    http://$(published fc-server "${FRONTCACHE_HTTP_PORT:-9080}")  (plain HTTP - no TLS here;"
-echo "     put a front door in front of it, e.g. examples/front-door in the public repo)"
+echo "     put a front door in front of it, e.g. front-door in the eternita/edge-examples repo)"
 if [ "$WITH_CONSOLE" = 1 ]; then
   echo "    console: http://$(published fc-console 7080)/"
 fi

@@ -63,8 +63,8 @@ https://www.hobbyray.com/it/coin-x-y-z-XV4KbzbiAhYAAAFL_Azk0Ldq.htm,"Mozilla/5.0
 | `--stats` | per-column counters to stderr |
 
 The log file is a positional argument; `.gz` is handled. Default:
-`../examples/log-analytics/logs/fc-us.hobbyray.com-frontcache-requests.log` — i.e. whatever
-[log analytics](../examples/log-analytics) has pulled down via its `pull-logs.sh`.
+`../log-analytics/logs/fc-us.hobbyray.com-frontcache-requests.log` — i.e. whatever
+[log analytics](../log-analytics) has pulled down via its `pull-logs.sh`.
 
 The whole file is streamed, so log size does not matter — 1.1 GB / 2.5M lines takes ~3s:
 

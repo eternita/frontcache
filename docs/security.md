@@ -114,7 +114,7 @@ your origin, which makes it the cheapest place to shed abuse. Two security-relev
 ## 6. Transport and headers
 
 - **The container serves plain HTTP on 9080 and terminates no TLS.** That is by design — put an
-  ingress, ALB, Cloudflare, or the [front-door nginx example](../examples/front-door) in front.
+  ingress, ALB, Cloudflare, or the [front-door nginx example](https://github.com/eternita/edge-examples/tree/main/front-door) in front.
 - **Client-IP headers are client-controllable.** `FCUtils.getClientIP` takes the first present of
   `x-frontcache-client-ip`, `x-forwarded-for`, `Proxy-Client-IP`, … before falling back to
   `getRemoteAddr()`. So guard rules keyed on IP or country, and the `clientip` field in the logs,
@@ -129,7 +129,7 @@ your origin, which makes it the cheapest place to shed abuse. Two security-relev
 
 - The four logs under `logs/` carry **full URLs, client IPs, and user agents** — treat them as
   personal data with whatever retention that implies for you.
-- The [log-analytics example](../examples/log-analytics) runs Elasticsearch, Kibana and
+- The [log-analytics example](../log-analytics) runs Elasticsearch, Kibana and
   Logstash **with security disabled**. It is explicitly a workstation tool, not a deployment.
   Do not put it on a shared host as-is.
 

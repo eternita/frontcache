@@ -12,7 +12,7 @@
 | **See what changed** | [Release notes](release-notes/) — 2.7.0, 2.8.0, 2.9.0, 2.10.0, 2.11.0, 2.12.0 and 2.13.0: what breaks, what to do, what kept its old name |
 | **Run it in containers** | [Docker options](docker.md) — server, console, nginx front door, or the ELK stack                            |
 | **Choose a topology** | [Deployment use cases](deployment-usecases.md) — filter, standalone proxy, or multi-region                              |
-| **See it work** | [Java / Spring Boot](../examples/frontcache-spring) · [PHP](../examples/frontcache-php) — each runs with one command    |
+| **See it work** | [Java / Spring Boot](https://github.com/eternita/edge-examples/tree/main/frontcache-spring) · [PHP](https://github.com/eternita/edge-examples/tree/main/frontcache-php) — each runs with one command    |
 | **Tell it what to cache** | [HTTP headers](http-headers.md) — the header contract an origin drives caching with, in any language                 |
 | **...from a Java app** | [JSP tags](jsp-tags.md) — `fc:component` and `fc:include`, the tag form of those headers                            |
 | **...for a grid or a list** | [Include combining](include-combining.md) — batch the fragments one page is missing into a single origin call |
@@ -20,7 +20,7 @@
 | **Stop one loud client** | [Rate limiting how-to](rate-limit-howto.md) — per-IP `rate:` rules step by step, with the behaviour of each scenario spelled out |
 | **Survive a bad origin** | [Resilience command flow](resilience-command-flow.md) — how every origin call is circuit-broken, and what serves a fallback |
 | **Lock it down** | [Security](security.md) — the api key, what replaced the management port, and the blast radius                  |
-| **Put it behind nginx** | [Front door](../examples/front-door) — nginx on 80/443 in front of Frontcache, as containers or on a VM                 |
+| **Put it behind nginx** | [Front door](https://github.com/eternita/edge-examples/tree/main/front-door) — nginx on 80/443 in front of Frontcache, as containers or on a VM                 |
 | **Watch it** | [Console and dashboards](console-dashboards.md) — the console UI, and getting metrics into Prometheus / Grafana / OTLP  |
 | **Find the network behind it** | [search-cidr how-to](search-cidr-howto.md) — aggregate a request log into CIDR blocks, then feed them to `bots.conf` / `guard-rules.conf` |
-| **See what it is doing** | [Log analytics](../examples/log-analytics) — pull the logs into Elasticsearch + Kibana, with four ready-made dashboards |
+| **See what it is doing** | [Log analytics](../log-analytics) — pull the logs into Elasticsearch + Kibana, with four ready-made dashboards |

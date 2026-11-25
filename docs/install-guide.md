@@ -69,7 +69,7 @@ the steps. Edit at least `front-cache.default-domain` and `front-cache.api-key` 
 ```
 
 Spring Boot, with no `web.xml` — see
-[the Spring example](../examples/frontcache-spring/src/main/java/org/frontcache/example/WebConfig.java):
+[the Spring example](https://github.com/eternita/edge-examples/blob/main/frontcache-spring/src/main/java/org/frontcache/example/WebConfig.java):
 
 ```java
 @Bean
@@ -89,8 +89,8 @@ FilterRegistrationBean<FrontCacheFilter> frontcacheFilter() {
 -Dlogback.configurationFile=/path/to/FRONTCACHE_HOME/conf/fc-logback.xml
 ```
 
-**Working examples:** [`frontcache-jsp`](../examples/frontcache-jsp) (Gradle + JSP) and
-[`frontcache-spring`](../examples/frontcache-spring) (Maven + Spring Boot). Both run with one
+**Working examples:** [`frontcache-jsp`](https://github.com/eternita/edge-examples/tree/main/frontcache-jsp) (Gradle + JSP) and
+[`frontcache-spring`](https://github.com/eternita/edge-examples/tree/main/frontcache-spring) (Maven + Spring Boot). Both run with one
 command and show cached vs. dynamic fragments in the response headers.
 
 ---
@@ -181,7 +181,7 @@ api key — that is expected, and is exactly why this works as a health check wi
    `front-cache.http-port` / `front-cache.https-port` to the ports **clients** see (80/443), not
    9080, or redirects will send users to `:9080`.
    A worked nginx front door — a two-container compose stack, or a script for a VM — is in
-   [examples/front-door](../examples/front-door).
+   [edge-examples/front-door](https://github.com/eternita/edge-examples/tree/main/front-door).
 2. Move DNS to the Frontcache host, and restrict the origin so only Frontcache can reach it.
 3. Run it under a supervisor — `README-INSTALL.md` inside the bundle carries a systemd unit, or
    use channel C, which writes it for you.
@@ -205,7 +205,7 @@ the exact edit.
 
 Everything in channel B, scripted, including the JDK and the service user. It installs
 Frontcache and nothing else — a front door on 80/443 is a separate, optional step, see
-[examples/front-door](../examples/front-door).
+[edge-examples/front-door](https://github.com/eternita/edge-examples/tree/main/front-door).
 
 ```sh
 V=2.13.0
@@ -267,7 +267,7 @@ docker run -d --name frontcache --restart unless-stopped \
 
 The image is **Frontcache alone** — plain HTTP on 9080, no TLS. That is what a Kubernetes
 ingress, an ALB, or Cloudflare wants in front of it. For a front door of your own on 80/443, see
-[examples/front-door](../examples/front-door): nginx and Frontcache as two containers, or a
+[edge-examples/front-door](https://github.com/eternita/edge-examples/tree/main/front-door): nginx and Frontcache as two containers, or a
 script for a VM.
 
 It is multi-arch (amd64 + arm64) and carries a `HEALTHCHECK`.
@@ -425,7 +425,7 @@ archive, a container, or point `FRONTCACHE_JAVA_HOME` at a JDK 25.
 
 **Logs.** `FRONTCACHE_HOME/logs/`: `frontcache-requests.log` (one line per request/fragment),
 `error.log`, `fallback.log`, `frontcache-failed-requests.log` (guard-rule rejections and
-circuit-breaker fallbacks). The [log-analytics example](../examples/log-analytics) indexes all four into
+circuit-breaker fallbacks). The [log-analytics example](../log-analytics) indexes all four into
 Elasticsearch + Kibana with ready-made dashboards.
 
 ---

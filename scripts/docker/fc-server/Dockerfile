@@ -4,7 +4,7 @@
 #
 # Frontcache alone: plain HTTP on 9080, no TLS and no front door. Put it behind whatever
 # terminates TLS for you - an ingress, an ALB, Cloudflare, or nginx. A worked nginx example
-# (two containers, or a VM script) lives in the public repo under examples/front-door.
+# (two containers, or a VM script) lives in the eternita/edge-examples repo under front-door/.
 #
 # The build context is a small STAGING DIRECTORY assembled by
 # scripts/docker/build-push-images.sh: this Dockerfile, the entrypoint, and the distribution

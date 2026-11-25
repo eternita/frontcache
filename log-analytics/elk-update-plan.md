@@ -6,7 +6,7 @@
 > run is the clean-slate `./stop-fc-elk.sh -v` — it drops the ES volume and would discard the
 > ~4.5M ingested documents.
 
-Scope: `examples/log-analytics/kibana/fc-dashboard.ndjson` (saved-object export) plus the
+Scope: `log-analytics/kibana/fc-dashboard.ndjson` (saved-object export) plus the
 "Frontcache Overview" bullet in [README.md](README.md). No changes to Logstash, the index
 templates, or the other three dashboards.
 
@@ -266,7 +266,7 @@ Then prove the file works from scratch: `./stop-fc-elk.sh -v && ./start-fc-elk.s
   bullet to the seven new tiles and the **Breakdowns** bullet to drop bot-vs-browser latency,
   by-domain and the cacheable / client-type pies, adding the type split and the two cache splits.
   Errors, Fallbacks and Rejected sections unchanged.
-- The root [README.md](../../README.md) row for log-analytics is topic-level and needs no change.
+- The root [README.md](../README.md) row for log-analytics is topic-level and needs no change.
   No version strings are involved, so the twelve-file version-bump rule does not apply.
 
 ## 10. Decisions (answered)
