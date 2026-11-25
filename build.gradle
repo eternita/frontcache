@@ -297,8 +297,6 @@ project(':frontcache-plugin-testkit') {
 		api project(':frontcache-plugin-api')
 		// a plugin's tests extend PluginContract, a JUnit 4 test - test-scoped for the plugin, api here
 		api 'junit:junit:4.13.2'
-		// the examples log through slf4j - which a dropped-in plugin's class loader shows from the node
-		testImplementation 'org.slf4j:slf4j-api:2.0.17'
 	}
 
 	// coreVersion() of a TestPluginContext: this build's version, as a node's BuildInfo reports its own
@@ -311,20 +309,15 @@ project(':frontcache-plugin-testkit') {
 	}
 
 	// ---- the self-test --------------------------------------------------------
-	// The plugin template and the two example plugins are standalone Gradle builds (examples/), never part of
-	// this one - so their sources and tests are compiled and run HERE, in this module's test source set, and
-	// `:frontcache-plugin-testkit:test` runs every example's PluginContract test against this checkout's API.
-	// Each one's src/main/resources is its own class-path root rather than a resource dir: every example carries
-	// META-INF/frontcache-plugin.properties, and copying three into one directory would keep one of them -
-	// PluginHarness picks the manifest that names the plugin's class, as a node sees one per jar.
-	def examples = ['examples/plugin-template', 'examples/plugins/debug', 'examples/plugins/crawler-feeder']
-			.collect { rootProject.file(it) }
-	sourceSets.test.java.srcDirs(examples.collect { new File(it, 'src/main/java') })
-	sourceSets.test.java.srcDirs(examples.collect { new File(it, 'src/test/java') })
-	def exampleResources = files(examples.collect { new File(it, 'src/main/resources') })
-	sourceSets.test.runtimeClasspath += exampleResources
+	// The fixture plugins' manifests (src/test/manifests/<plugin>/META-INF/frontcache-plugin.properties) are each a
+	// class-path root of their own rather than a resource dir: copying two into one directory would keep one of
+	// them - PluginHarness picks the manifest that names the plugin's class, as a node sees one per jar. The plugin
+	// template and the example plugins are in a repository of their own (edge-plugins), built against the published
+	// API and testkit.
+	def fixtureManifests = files(file('src/test/manifests').listFiles()?.findAll { it.isDirectory() }?.sort() ?: [])
+	sourceSets.test.runtimeClasspath += fixtureManifests
 	tasks.named('test', Test) {
-		classpath += exampleResources
+		classpath += fixtureManifests
 		// deliberately broken plugins and the contracts over them, run by PluginContractTest through JUnitCore -
 		// on their own they fail, which is the point
 		exclude 'org/frontcache/plugin/testkit/fixtures/**'
