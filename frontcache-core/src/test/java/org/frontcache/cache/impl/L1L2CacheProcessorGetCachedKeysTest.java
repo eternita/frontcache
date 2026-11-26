@@ -18,8 +18,11 @@ package org.frontcache.cache.impl;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
@@ -137,5 +140,80 @@ public class L1L2CacheProcessorGetCachedKeysTest {
 		// L2 key was stored as path, so the path form must be gone
 		assertFalse(keys.contains("/l2/page.html"));
 		assertTrue(keys.contains(l1Url));
+	}
+
+	// --- forEachCachedKey: the streamed listing dump-keys and get-cached-keys use ---
+
+	private List<String> streamed() throws Exception {
+		List<String> keys = new ArrayList<String>();
+		long count = cacheProcessor.forEachCachedKey(keys::add);
+		assertEquals("the count returned must match the keys handed over", keys.size(), count);
+		return keys;
+	}
+
+	@Test
+	public void forEachCachedKeyStreamsBothTiers() throws Exception {
+		String l1Url = "http://test.example.com/l1/page.html";
+		putL1(l1Url);
+		putL2("http://test.example.com/l2/page.html");
+
+		List<String> keys = streamed();
+		assertEquals(2, keys.size());
+		assertTrue(keys.contains(l1Url));
+		assertTrue(keys.contains("/l2/page.html"));
+	}
+
+	/**
+	 * An invalidated key is not listed. Through the processor the merge policy reclaims a small
+	 * segment's deletes almost at once, so this does NOT prove the live-docs check -
+	 * {@link LuceneKeyWalkTest} does, on an index that keeps its deleted terms.
+	 */
+	@Test
+	public void forEachCachedKeySkipsInvalidatedL2Keys() throws Exception {
+		putL2("http://test.example.com/l2/a.html");
+		putL2("http://test.example.com/l2/b.html");
+		putL2("http://test.example.com/l2/c.html");
+		assertEquals(3, streamed().size());
+
+		cacheProcessor.removeFromCache("http://test.example.com/l2/b.html");
+
+		assertEquals(Arrays.asList("/l2/a.html", "/l2/c.html"), streamed());
+	}
+
+	@Test
+	public void aReplacedL2EntryIsListedOnce() throws Exception {
+		putL2("http://test.example.com/l2/page.html");
+		assertEquals(1, streamed().size());
+		putL2("http://test.example.com/l2/page.html"); // updateDocument: old doc deleted, term shared
+
+		assertEquals(Arrays.asList("/l2/page.html"), streamed());
+	}
+
+	@Test
+	public void l2KeysAreListedInKeyOrder() throws Exception {
+		putL2("http://test.example.com/l2/c.html");
+		putL2("http://test.example.com/l2/a.html");
+		putL2("http://test.example.com/l2/b.html");
+
+		assertEquals(Arrays.asList("/l2/a.html", "/l2/b.html", "/l2/c.html"), streamed());
+	}
+
+	/** A sink's failure is the caller's (a dump file's disk filled up), passed on as is - and stops the listing. */
+	@Test
+	public void aSinkFailureIsPassedOnAndStopsTheListing() throws Exception {
+		putL2("http://test.example.com/l2/a.html");
+		putL2("http://test.example.com/l2/b.html");
+
+		List<String> seen = new ArrayList<String>();
+		IllegalStateException thrown = assertThrows(IllegalStateException.class, () ->
+				cacheProcessor.forEachCachedKey(key -> {
+					seen.add(key);
+					throw new IllegalStateException("disk full");
+				}));
+		assertEquals("disk full", thrown.getMessage());
+		assertEquals("no key may be handed over after the sink failed", 1, seen.size());
+
+		// the searcher was released: the index still lists
+		assertEquals(2, streamed().size());
 	}
 }

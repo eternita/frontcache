@@ -15,12 +15,18 @@
  */
 package org.frontcache.io;
 
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -30,6 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.servlet.ServletConfig;
@@ -84,6 +91,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	// guards against concurrent key dumps - only one dump-keys may run at a time
 	private final AtomicBoolean dumpKeysInProgress = new AtomicBoolean(false);
+
+	// get-cached-keys response buffer: one write per 64 KiB of keys, not one per key
+	private static final int KEYS_BUFFER_SIZE = 64 * 1024;
 
 
 	public FrontCacheIOServlet() {
@@ -345,26 +355,18 @@ public class FrontCacheIOServlet extends HttpServlet {
 	private void getCachedKeys(HttpServletRequest req, HttpServletResponse resp)
 	{
 		resp.setContentType("text");
-		OutputStream os = null;
-		try {
-			os = resp.getOutputStream();
-			for (String url : CacheManager.getInstance().getCachedKeys())
-			{
-				os.write((url + "\n").getBytes());
-			}
-			os.flush();
+		// streamed: the keys are written as the cache lists them and never collected, so a large L2
+		// index does not have to fit in the heap. A failure part way is a truncated body - the
+		// status is already committed - so it is logged with how far it got.
+		long[] written = {0};
+		try (Writer out = new BufferedWriter(new OutputStreamWriter(resp.getOutputStream(), StandardCharsets.UTF_8), KEYS_BUFFER_SIZE)) {
+			CacheManager.getInstance().forEachCachedKey(key -> {
+				writeKeyLine(out, key);
+				written[0]++;
+			});
 		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				if (null != os)
-					os.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			logger.error("get-cached-keys failed after {} keys: {}", written[0], e.toString());
 		}
-
-		return;
 	}
 
 	/**
@@ -430,6 +432,9 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 * <p>
 	 * Only one dump may run at a time - if a dump is already in progress the request is
 	 * rejected and no new dump is started.
+	 * <p>
+	 * The response names the file before it exists: it appears, complete, when the dump ends -
+	 * see {@link #writeKeysFile(CacheProcessor, File)}.
 	 *
 	 * @param req
 	 * @return
@@ -446,43 +451,98 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 		final DateFormat logTimeDateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
 		final String frontcacheHome = System.getProperty(FCConfig.FRONT_CACHE_HOME_SYSTEM_KEY);
+		if (null == frontcacheHome)
+		{
+			// checked here, not in the thread: a failure before the thread starts would leave the
+			// flag set and refuse every later dump until a restart
+			dumpKeysInProgress.set(false);
+			DumpKeysActionResponse aResponse = new DumpKeysActionResponse();
+			aResponse.setResponseStatus(ActionResponse.RESPONSE_STATUS_ERROR);
+			aResponse.setErrorDescription("FRONTCACHE_HOME is not set - nowhere to write the dump");
+			return aResponse;
+		}
 		final String filePath = "warmer/keys_" + logTimeDateFormat.format(new Date()) + ".txt";
-		Runnable r = new Runnable() {
+		final File keysDumpFile = new File(new File(frontcacheHome), filePath);
 
-			public void run() {
-
-				File outputDir = new File(frontcacheHome);
-				File keysDumpFile = new  File(outputDir, filePath);
-				FileOutputStream fos = null;
-				try {
-					fos = new FileOutputStream(keysDumpFile);
-					for (String url : CacheManager.getInstance().getCachedKeys())
-					{
-						fos.write((url + "\n").getBytes());
-						fos.flush();
-					}
-				} catch (Exception e) {
-					e.printStackTrace();
-				} finally {
-					try {
-						if (null != fos)
-							fos.close();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-					dumpKeysInProgress.set(false);
-				}
-
+		Thread t = new Thread(() -> {
+			try {
+				writeKeysFile(CacheManager.getInstance(), keysDumpFile);
+			} catch (Throwable e) {
+				// writeKeysFile has logged an IOException already; anything else (an Error included,
+				// which is how an OutOfMemoryError used to end a dump) is logged here
+				if (!(e instanceof IOException))
+					logger.error("dump-keys to " + keysDumpFile + " failed", e);
+			} finally {
+				dumpKeysInProgress.set(false);
 			}
-		};
-
-		Thread t = new Thread(r);
+		}, "fc-dump-keys");
+		t.setDaemon(true); // must not hold a shutting-down node open
 		t.start();
 
 		DumpKeysActionResponse aResponse = new DumpKeysActionResponse();
 		aResponse.setOutputFile(filePath);
 
 		return aResponse;
+	}
+
+	/**
+	 * Writes every key {@code processor} lists to {@code target}, one per line, UTF-8, and returns how
+	 * many. The keys are streamed ({@link CacheProcessor#forEachCachedKey}), so memory does not grow
+	 * with the number of keys.
+	 * <p>
+	 * Written to {@code <target>.tmp} and moved onto {@code target} only once the listing completed,
+	 * so a file under the name the response gave is always a whole dump: a dump that fails part way
+	 * leaves nothing behind (the temp file is deleted) rather than a truncated list nothing marks as
+	 * truncated. The move stays in one directory, which is what makes {@code ATOMIC_MOVE} legal.
+	 */
+	static long writeKeysFile(CacheProcessor processor, File target) throws IOException
+	{
+		Path targetPath = target.toPath();
+		Path tmp = targetPath.resolveSibling(targetPath.getFileName() + ".tmp");
+		long started = System.nanoTime();
+		long[] written = {0};
+		boolean complete = false;
+		try {
+			Files.createDirectories(targetPath.toAbsolutePath().getParent());
+			try (Writer out = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
+				processor.forEachCachedKey(key -> {
+					writeKeyLine(out, key);
+					written[0]++;
+				});
+			}
+			Files.move(tmp, targetPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+			complete = true;
+		} catch (IOException | RuntimeException e) {
+			IOException failure = (e instanceof UncheckedIOException) ? ((UncheckedIOException) e).getCause()
+					: (e instanceof IOException) ? (IOException) e : new IOException(e.toString(), e);
+			LoggerFactory.getLogger(FrontCacheIOServlet.class).error(
+					"dump-keys to {} failed after {} keys, nothing written: {}", target, written[0], failure.toString());
+			throw failure;
+		} finally {
+			// in a finally, not the catch: an Error (an OutOfMemoryError in a custom processor) must
+			// not leave a partial temp file either
+			if (!complete)
+				try {
+					Files.deleteIfExists(tmp);
+				} catch (IOException ignored) {
+					// the failure being reported is the one that matters
+				}
+		}
+
+		LoggerFactory.getLogger(FrontCacheIOServlet.class).info("dump-keys: {} keys written to {} in {} ms",
+				written[0], target, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+		return written[0];
+	}
+
+	/** One key and its line break - a {@code Consumer} cannot throw {@code IOException}, so it travels unchecked. */
+	private static void writeKeyLine(Writer out, String key)
+	{
+		try {
+			out.write(key);
+			out.write('\n');
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 
 	/**

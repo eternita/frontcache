@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.function.Consumer;
 
 import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
@@ -444,6 +445,23 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 		keys.addAll(luceneIndexManager.getKeys(limit - keys.size()));
 
 		return keys;
+	}
+
+	/**
+	 * L1 first, then L2 - the tiers are disjoint ({@code putToCache} writes one or the other), so no
+	 * key is listed twice. L1 is bounded by its Ehcache config and copied as {@code getKeys()} always
+	 * did; L2 is streamed from the index, which is what keeps a dump of a large index out of the heap.
+	 */
+	@Override
+	public long forEachCachedKey(Consumer<String> sink) throws IOException {
+		long count = 0;
+		for (Object key : ehCache.getKeys())
+		{
+			sink.accept(key.toString());
+			count++;
+		}
+
+		return count + luceneIndexManager.forEachKey(Integer.MAX_VALUE, sink);
 	}
 
 	@Override

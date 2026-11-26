@@ -15,9 +15,11 @@
  */
 package org.frontcache.cache;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Consumer;
 
 import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.FrontCacheException;
@@ -85,6 +87,24 @@ public interface CacheProcessor {
 	public default List<String> getCachedKeys(int limit) {
 		List<String> keys = getCachedKeys();
 		return (keys.size() <= limit) ? keys : keys.subList(0, Math.max(0, limit));
+	}
+
+	/**
+	 * Hands every cached key to {@code sink}, one at a time, and returns how many it handed over -
+	 * for a caller that writes the keys somewhere ({@code dump-keys}, {@code get-cached-keys})
+	 * rather than keeping them. {@link #getCachedKeys()} holds every key in memory at once, which
+	 * on a large L2 index is an {@code OutOfMemoryError}; this holds none of them.
+	 *
+	 * Throws when the listing could not be completed, so a caller can tell a complete listing from
+	 * a partial one; whatever {@code sink} throws is passed on unchanged, and stops the listing.
+	 *
+	 * A {@code default} because it is additive: a processor that does not override it answers from
+	 * {@link #getCachedKeys()}, which is correct and exactly as expensive as it always was.
+	 */
+	public default long forEachCachedKey(Consumer<String> sink) throws IOException {
+		List<String> keys = getCachedKeys();
+		keys.forEach(sink);
+		return keys.size();
 	}
 
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context);
