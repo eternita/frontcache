@@ -177,6 +177,42 @@ public abstract class ClientTests extends TestsBase {
 		return;
 	}
 
+	/**
+	 * The paged get-cached-keys over the real servlet: a prefix narrows the listing, a page of one
+	 * says whether more follow, and the cursor resumes after the key it names.
+	 */
+	@Test
+	public void getCachedKeysPageClient() throws Exception {
+
+		frontcacheClient = new FrontCacheClient(getFrontCacheBaseURLLocalhost(), ApiKeys.TEST_API_KEY_LOCALHOST);
+		frontcacheClient.removeFromCacheAll(); // clean up
+
+		assertEquals("a", webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/fc-client/a.jsp").getWebResponse().getContentAsString().trim());
+		assertEquals("b", webClient.getPage(getFrontCacheBaseURLLocalhost() + "common/fc-client/b.jsp").getWebResponse().getContentAsString().trim());
+
+		// the key form (path or URL) is the node's business - find a.jsp's, and page by its directory
+		java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+		Assert.assertTrue(frontcacheClient.getCachedKeys(baos));
+		String aKey = null;
+		for (String key : baos.toString("UTF-8").split("\n"))
+			if (key.endsWith("common/fc-client/a.jsp"))
+				aKey = key;
+		Assert.assertNotNull("a.jsp not cached: " + baos, aKey);
+		String prefix = aKey.substring(0, aKey.length() - "a.jsp".length());
+
+		org.frontcache.client.CachedKeysPage first = frontcacheClient.getCachedKeysPage(prefix, null, 1);
+		assertEquals(Arrays.asList(aKey), first.getKeys());
+		Assert.assertTrue("b.jsp follows", first.isMore());
+
+		org.frontcache.client.CachedKeysPage second = frontcacheClient.getCachedKeysPage(prefix, first.nextAfter(), 1);
+		assertEquals(Arrays.asList(prefix + "b.jsp"), second.getKeys());
+		Assert.assertFalse("nothing follows b.jsp under the prefix", second.isMore());
+
+		List<String> all = new java.util.ArrayList<String>();
+		assertEquals(2, frontcacheClient.forEachCachedKey(prefix, 1, all::add));
+		assertEquals(Arrays.asList(aKey, prefix + "b.jsp"), all);
+	}
+
 //	@Test
 //	public void getCacheStatusCluster() throws Exception {
 //

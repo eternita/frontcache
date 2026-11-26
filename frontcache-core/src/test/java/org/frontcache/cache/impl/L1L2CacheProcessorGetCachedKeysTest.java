@@ -216,4 +216,31 @@ public class L1L2CacheProcessorGetCachedKeysTest {
 		// the searcher was released: the index still lists
 		assertEquals(2, streamed().size());
 	}
+
+	/**
+	 * One order across both tiers, so a cursor works across them: L1 keys are slotted between the
+	 * streamed L2 keys. An L1 key given as a bare path sorts among the L2 paths.
+	 */
+	@Test
+	public void l1AndL2AreMergedIntoOneOrderAndPagedAcrossTheTiers() throws Exception {
+		putL2("http://test.example.com/a.html");
+		putL1("/b.html");
+		putL2("http://test.example.com/c.html");
+		putL1("/d.html");
+		putL2("http://test.example.com/e.html");
+
+		assertEquals(Arrays.asList("/a.html", "/b.html", "/c.html", "/d.html", "/e.html"), streamed());
+
+		List<String> page = new ArrayList<String>();
+		assertEquals(2, cacheProcessor.forEachCachedKey(null, "/a.html", 2, page::add));
+		assertEquals("a page may end on an L1 key", Arrays.asList("/b.html", "/c.html"), page);
+
+		page.clear();
+		assertEquals(2, cacheProcessor.forEachCachedKey(null, "/c.html", 2, page::add));
+		assertEquals(Arrays.asList("/d.html", "/e.html"), page);
+
+		page.clear();
+		assertEquals(1, cacheProcessor.forEachCachedKey("/d", null, 10, page::add));
+		assertEquals("the prefix applies to L1 too", Arrays.asList("/d.html"), page);
+	}
 }

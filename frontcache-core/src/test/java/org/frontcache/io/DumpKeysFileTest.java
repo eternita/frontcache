@@ -19,6 +19,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -48,8 +51,8 @@ public class DumpKeysFileTest {
 	@SuppressWarnings("unchecked")
 	private static CacheProcessor listing(List<String> keys, IOException failure) throws IOException {
 		CacheProcessor processor = mock(CacheProcessor.class);
-		when(processor.forEachCachedKey(any(Consumer.class))).thenAnswer(invocation -> {
-			Consumer<String> sink = invocation.getArgument(0);
+		when(processor.forEachCachedKey(any(), any(), anyInt(), any(Consumer.class))).thenAnswer(invocation -> {
+			Consumer<String> sink = invocation.getArgument(3);
 			keys.forEach(sink);
 			if (null != failure)
 				throw failure;
@@ -63,7 +66,7 @@ public class DumpKeysFileTest {
 		List<String> keys = Arrays.asList("/a.html", "/ünï/çødé.html", "http://l1.example.com/b.html");
 		File target = new File(home.getRoot(), "warmer/keys_1.txt"); // warmer/ does not exist yet
 
-		long written = FrontCacheIOServlet.writeKeysFile(listing(keys, null), target);
+		long written = FrontCacheIOServlet.writeKeysFile(listing(keys, null), null, target);
 
 		assertEquals(3, written);
 		assertEquals("/a.html\n/ünï/çødé.html\nhttp://l1.example.com/b.html\n",
@@ -76,7 +79,7 @@ public class DumpKeysFileTest {
 		File target = new File(home.getRoot(), "warmer/keys_2.txt");
 		CacheProcessor processor = listing(Arrays.asList("/a.html", "/b.html"), new IOException("L2 index unavailable"));
 
-		IOException thrown = assertThrows(IOException.class, () -> FrontCacheIOServlet.writeKeysFile(processor, target));
+		IOException thrown = assertThrows(IOException.class, () -> FrontCacheIOServlet.writeKeysFile(processor, null, target));
 
 		assertEquals("L2 index unavailable", thrown.getMessage());
 		assertFalse("a partial dump must not appear under the dump's name", target.exists());
@@ -87,7 +90,16 @@ public class DumpKeysFileTest {
 	public void anEmptyCacheIsAnEmptyFile() throws Exception {
 		File target = new File(home.getRoot(), "warmer/keys_3.txt");
 
-		assertEquals(0, FrontCacheIOServlet.writeKeysFile(listing(Arrays.<String>asList(), null), target));
+		assertEquals(0, FrontCacheIOServlet.writeKeysFile(listing(Arrays.<String>asList(), null), null, target));
 		assertEquals(0, target.length());
+	}
+
+	@Test
+	public void aPrefixIsPassedToTheListing() throws Exception {
+		CacheProcessor processor = listing(Arrays.asList("/p/a.html"), null);
+
+		FrontCacheIOServlet.writeKeysFile(processor, "/p/", new File(home.getRoot(), "warmer/keys_4.txt"));
+
+		verify(processor).forEachCachedKey(eq("/p/"), eq(null), eq(Integer.MAX_VALUE), any());
 	}
 }

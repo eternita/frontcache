@@ -16,6 +16,7 @@
 package org.frontcache.cache;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -105,6 +106,41 @@ public interface CacheProcessor {
 		List<String> keys = getCachedKeys();
 		keys.forEach(sink);
 		return keys.size();
+	}
+
+	/**
+	 * Hands {@code sink} at most {@code limit} cached keys that start with {@code prefix} and sort
+	 * after {@code after}, <b>in {@link CachedKeys#ORDER}</b>, and returns how many - one page of a
+	 * listing that a caller walks by passing the last key it received as the next {@code after}.
+	 * {@code prefix} and {@code after} may be null (or empty), meaning no restriction.
+	 * <p>
+	 * The order is what makes the cursor work: {@code after} is a key, not a position, so a page
+	 * stays correct while entries are added and removed between requests - a key added behind the
+	 * cursor is simply not listed by this walk. Failures and the sink's exceptions behave as in
+	 * {@link #forEachCachedKey(Consumer)}.
+	 * <p>
+	 * A {@code default}, additive, for the same reason as that one: it filters and sorts
+	 * {@link #getCachedKeys()}, which a processor holding its keys in memory can afford.
+	 */
+	public default long forEachCachedKey(String prefix, String after, int limit, Consumer<String> sink) throws IOException {
+		if (0 >= limit)
+			return 0;
+
+		List<String> keys = new ArrayList<String>();
+		for (String key : getCachedKeys())
+			if (CachedKeys.inRange(key, prefix, after))
+				keys.add(key);
+		keys.sort(CachedKeys.ORDER);
+
+		long count = 0;
+		for (String key : keys)
+		{
+			if (count >= limit)
+				break;
+			sink.accept(key);
+			count++;
+		}
+		return count;
 	}
 
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context);

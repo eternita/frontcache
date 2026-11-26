@@ -54,6 +54,15 @@ public class FCHeaders {
 
     public static final String X_FRONTCACHE_DYNAMIC_REQUEST = "x-frontcache-dynamic-request";
     public static final String X_FRONTCACHE_SOFT_REFRESH = "x-frontcache-soft-refresh";
+
+    /**
+     * On a paged {@code get-cached-keys} answer (the request named {@code limit}): how many keys the
+     * page holds, and whether more follow ({@code true} / {@code false}). The count header's PRESENCE
+     * is how a client tells a paged answer from a node that predates paging, which ignores the
+     * parameters and lists every key - see {@code FrontCacheClient.getCachedKeysPage}.
+     */
+    public static final String X_FRONTCACHE_KEYS_COUNT = "x-frontcache-keys-count";
+    public static final String X_FRONTCACHE_KEYS_MORE = "x-frontcache-keys-more";
     public static final String X_FRONTCACHE_ASYNC_INCLUDE = "x-frontcache-async-include";
 
     public static final String X_FRONTCACHE_TRACE = "x-frontcache-trace"; // request

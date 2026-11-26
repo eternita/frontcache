@@ -53,6 +53,7 @@ import org.frontcache.bots.BotRuleEntry;
 import org.frontcache.cache.CacheManager;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheStats;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FcNodeStats;
 import org.frontcache.core.ApiKey;
 import org.frontcache.core.WebResponse;
@@ -94,6 +95,10 @@ public class FrontCacheIOServlet extends HttpServlet {
 
 	// get-cached-keys response buffer: one write per 64 KiB of keys, not one per key
 	private static final int KEYS_BUFFER_SIZE = 64 * 1024;
+
+	// the largest page get-cached-keys answers with limit: a page is buffered, so this bounds its
+	// memory (100,000 URLs is ~10-20 MB) - a larger limit is served as this many, with more=true
+	static final int MAX_KEYS_PAGE = 100_000;
 
 
 	public FrontCacheIOServlet() {
@@ -354,19 +359,97 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 */
 	private void getCachedKeys(HttpServletRequest req, HttpServletResponse resp)
 	{
+		writeKeysResponse(CacheManager.getInstance(), req.getParameter("prefix"), req.getParameter("after"),
+				req.getParameter("limit"), resp);
+	}
+
+	/**
+	 * {@code get-cached-keys}: the cached keys, one per line, UTF-8, in
+	 * {@link org.frontcache.cache.CachedKeys#ORDER} - optionally only those starting with
+	 * {@code prefix} and sorting after {@code after}. Two modes, chosen by {@code limit}:
+	 * <ul>
+	 * <li><b>no {@code limit}</b> - the whole listing, streamed: written as the cache lists it and
+	 * never collected, so a large L2 index need not fit in the heap. A failure part way is a
+	 * truncated body - the status is already committed - so it is logged with how far it got. This
+	 * is the pre-paging answer, unchanged for every existing caller.</li>
+	 * <li><b>{@code limit}</b> - one page of at most {@code limit} keys (capped at
+	 * {@link #MAX_KEYS_PAGE}), buffered - bounded by the cap - so the answer can carry
+	 * {@code x-frontcache-keys-count} and {@code x-frontcache-keys-more} and a failure is a
+	 * {@code 500}, never a short page that reads as the last one. The next page is
+	 * {@code after=<the last key received>}. {@code more} is exact: the walk asks for one key more
+	 * than the page holds.</li>
+	 * </ul>
+	 */
+	static void writeKeysResponse(CacheProcessor processor, String prefix, String after, String limitParam,
+			HttpServletResponse resp)
+	{
+		prefix = emptyToNull(prefix);
+		after = emptyToNull(after);
+
+		if (null == limitParam)
+		{
+			streamKeys(processor, prefix, after, resp);
+			return;
+		}
+
+		int limit;
+		try {
+			limit = Integer.parseInt(limitParam.trim());
+		} catch (NumberFormatException e) {
+			limit = 0;
+		}
+
+		try {
+			if (0 >= limit)
+			{
+				resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "limit must be a positive number, was: " + limitParam);
+				return;
+			}
+			limit = Math.min(limit, MAX_KEYS_PAGE);
+
+			List<String> page = new ArrayList<String>(Math.min(limit + 1, 1024));
+			try {
+				processor.forEachCachedKey(prefix, after, limit + 1, page::add);
+			} catch (IOException | RuntimeException e) {
+				LoggerFactory.getLogger(FrontCacheIOServlet.class).error("get-cached-keys page failed: {}", e.toString());
+				resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "listing cached keys failed: " + e);
+				return;
+			}
+
+			boolean more = page.size() > limit;
+			if (more)
+				page.remove(page.size() - 1);
+
+			resp.setContentType("text/plain; charset=UTF-8");
+			resp.setHeader(FCHeaders.X_FRONTCACHE_KEYS_COUNT, String.valueOf(page.size()));
+			resp.setHeader(FCHeaders.X_FRONTCACHE_KEYS_MORE, String.valueOf(more));
+			try (Writer out = new BufferedWriter(new OutputStreamWriter(resp.getOutputStream(), StandardCharsets.UTF_8), KEYS_BUFFER_SIZE)) {
+				for (String key : page)
+					writeKeyLine(out, key);
+			}
+		} catch (IOException | UncheckedIOException e) {
+			// the client went away mid-page: nothing to answer
+			LoggerFactory.getLogger(FrontCacheIOServlet.class).debug("get-cached-keys page not delivered: {}", e.toString());
+		}
+	}
+
+	private static void streamKeys(CacheProcessor processor, String prefix, String after, HttpServletResponse resp)
+	{
 		resp.setContentType("text");
-		// streamed: the keys are written as the cache lists them and never collected, so a large L2
-		// index does not have to fit in the heap. A failure part way is a truncated body - the
-		// status is already committed - so it is logged with how far it got.
 		long[] written = {0};
 		try (Writer out = new BufferedWriter(new OutputStreamWriter(resp.getOutputStream(), StandardCharsets.UTF_8), KEYS_BUFFER_SIZE)) {
-			CacheManager.getInstance().forEachCachedKey(key -> {
+			processor.forEachCachedKey(prefix, after, Integer.MAX_VALUE, key -> {
 				writeKeyLine(out, key);
 				written[0]++;
 			});
 		} catch (Exception e) {
-			logger.error("get-cached-keys failed after {} keys: {}", written[0], e.toString());
+			LoggerFactory.getLogger(FrontCacheIOServlet.class).error("get-cached-keys failed after {} keys: {}", written[0], e.toString());
 		}
+	}
+
+	private static String emptyToNull(String s)
+	{
+		return (null == s || s.isEmpty()) ? null : s;
 	}
 
 	/**
@@ -434,7 +517,8 @@ public class FrontCacheIOServlet extends HttpServlet {
 	 * rejected and no new dump is started.
 	 * <p>
 	 * The response names the file before it exists: it appears, complete, when the dump ends -
-	 * see {@link #writeKeysFile(CacheProcessor, File)}.
+	 * see {@link #writeKeysFile(CacheProcessor, String, File)}. An optional {@code prefix} dumps only
+	 * the keys starting with it.
 	 *
 	 * @param req
 	 * @return
@@ -463,10 +547,11 @@ public class FrontCacheIOServlet extends HttpServlet {
 		}
 		final String filePath = "warmer/keys_" + logTimeDateFormat.format(new Date()) + ".txt";
 		final File keysDumpFile = new File(new File(frontcacheHome), filePath);
+		final String prefix = emptyToNull(req.getParameter("prefix"));
 
 		Thread t = new Thread(() -> {
 			try {
-				writeKeysFile(CacheManager.getInstance(), keysDumpFile);
+				writeKeysFile(CacheManager.getInstance(), prefix, keysDumpFile);
 			} catch (Throwable e) {
 				// writeKeysFile has logged an IOException already; anything else (an Error included,
 				// which is how an OutOfMemoryError used to end a dump) is logged here
@@ -486,16 +571,17 @@ public class FrontCacheIOServlet extends HttpServlet {
 	}
 
 	/**
-	 * Writes every key {@code processor} lists to {@code target}, one per line, UTF-8, and returns how
-	 * many. The keys are streamed ({@link CacheProcessor#forEachCachedKey}), so memory does not grow
-	 * with the number of keys.
+	 * Writes every key {@code processor} lists (only those starting with {@code prefix}, when one is
+	 * given) to {@code target}, one per line, UTF-8, in key order, and returns how many. The keys are
+	 * streamed ({@link CacheProcessor#forEachCachedKey}), so memory does not grow with the number of
+	 * keys.
 	 * <p>
 	 * Written to {@code <target>.tmp} and moved onto {@code target} only once the listing completed,
 	 * so a file under the name the response gave is always a whole dump: a dump that fails part way
 	 * leaves nothing behind (the temp file is deleted) rather than a truncated list nothing marks as
 	 * truncated. The move stays in one directory, which is what makes {@code ATOMIC_MOVE} legal.
 	 */
-	static long writeKeysFile(CacheProcessor processor, File target) throws IOException
+	static long writeKeysFile(CacheProcessor processor, String prefix, File target) throws IOException
 	{
 		Path targetPath = target.toPath();
 		Path tmp = targetPath.resolveSibling(targetPath.getFileName() + ".tmp");
@@ -505,7 +591,7 @@ public class FrontCacheIOServlet extends HttpServlet {
 		try {
 			Files.createDirectories(targetPath.toAbsolutePath().getParent());
 			try (Writer out = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
-				processor.forEachCachedKey(key -> {
+				processor.forEachCachedKey(prefix, null, Integer.MAX_VALUE, key -> {
 					writeKeyLine(out, key);
 					written[0]++;
 				});

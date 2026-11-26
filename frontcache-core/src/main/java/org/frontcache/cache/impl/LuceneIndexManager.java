@@ -36,7 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -62,6 +62,7 @@ import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.store.SimpleFSLockFactory;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.StringHelper;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.slf4j.Logger;
@@ -1270,7 +1271,7 @@ public class LuceneIndexManager {
 	}
 
 	/**
-	 * Returns all URL keys stored in the index - see {@link #forEachKey(int, Consumer)}, which this
+	 * Returns all URL keys stored in the index - see {@link #forEachKey(String, String, int, Predicate)}, which this
 	 * collects into a list. Prefer that for a caller that writes the keys somewhere: on a large index
 	 * the list alone does not fit in the heap.
 	 *
@@ -1289,7 +1290,7 @@ public class LuceneIndexManager {
 	{
 		List<String> keys = new ArrayList<String>();
 		try {
-			forEachKey(limit, keys::add);
+			forEachKey(null, null, limit, keys::add);
 		} catch (IOException e) {
 			logger.error("Error during loading urls/keys from index: {}", e.toString());
 		}
@@ -1297,13 +1298,19 @@ public class LuceneIndexManager {
 	}
 
 	/**
-	 * Hands at most {@code limit} live URL keys to {@code sink}, in key order, and returns how many.
+	 * Offers {@code sink} the live URL keys that start with {@code prefix} and sort after
+	 * {@code after} (either null or empty = no restriction), in key order, until it has offered
+	 * {@code limit} or {@code sink} answers {@code false}; returns how many it offered.
 	 * <p>
 	 * The keys come from the {@link #URL_FIELD} terms dictionary, not from stored fields. A key is
 	 * both indexed and stored as the same string ({@link #indexDoc}), so the two answer alike - but
 	 * reading a stored field decompresses the block the document sits in, page body and JSON
 	 * included, which on a 50 GB index is reading most of 50 GB to list a few hundred MB of URLs.
-	 * The terms dictionary holds the keys alone.
+	 * The terms dictionary holds the keys alone, sorted - so a prefix or a cursor is one seek, not a
+	 * scan from the first key.
+	 * <p>
+	 * Key order is UTF-8 byte order, which is Unicode code-point order -
+	 * {@link org.frontcache.cache.CachedKeys#ORDER}, which the L1 keys are merged in.
 	 * <p>
 	 * <b>The live-docs check is not optional.</b> A deleted (invalidated, expired, replaced) document
 	 * keeps its term in its segment until that segment is merged away; only the reader's live docs
@@ -1316,7 +1323,7 @@ public class LuceneIndexManager {
 	 *         writing a dump must not mistake a partial listing for a complete one. Whatever
 	 *         {@code sink} throws is passed on unchanged.
 	 */
-	public long forEachKey(int limit, Consumer<String> sink) throws IOException
+	public long forEachKey(String prefix, String after, int limit, Predicate<String> sink) throws IOException
 	{
 		if (0 >= limit)
 			return 0;
@@ -1332,7 +1339,7 @@ public class LuceneIndexManager {
 			throw new IOException("L2 index unavailable");
 
 		try {
-			return forEachLiveKey(acquired.searcher.getIndexReader(), limit, sink);
+			return forEachLiveKey(acquired.searcher.getIndexReader(), prefix, after, limit, sink);
 		} catch (SinkFailure f) {
 			throw f.getCause(); // the caller's failure, not the index's - passed on as is
 		} catch (IOException | RuntimeException e) {
@@ -1349,29 +1356,52 @@ public class LuceneIndexManager {
 	 * segment's deletes almost at once, so a test through the manager never sees a deleted term and
 	 * passes with the live-docs check removed.
 	 */
-	static long forEachLiveKey(IndexReader reader, int limit, Consumer<String> sink) throws IOException
+	static long forEachLiveKey(IndexReader reader, String prefix, String after, int limit, Predicate<String> sink) throws IOException
 	{
 		Terms terms = MultiTerms.getTerms(reader, URL_FIELD);
 		if (null == terms)
 			return 0; // no document has ever been indexed
 
-		Bits liveDocs = MultiBits.getLiveDocs(reader); // null = no deletions
+		BytesRef prefixBytes = (null == prefix || prefix.isEmpty()) ? null : new BytesRef(prefix);
+		BytesRef afterBytes = (null == after || after.isEmpty()) ? null : new BytesRef(after);
+
+		// start at whichever bound is further on: a cursor before the prefix starts at the prefix,
+		// a cursor inside (or past) it starts at the cursor
+		BytesRef start = prefixBytes;
+		if (null != afterBytes && (null == start || afterBytes.compareTo(start) > 0))
+			start = afterBytes;
+
 		TermsEnum termsEnum = terms.iterator();
+		BytesRef term;
+		if (null == start)
+			term = termsEnum.next();
+		else
+			term = (TermsEnum.SeekStatus.END == termsEnum.seekCeil(start)) ? null : termsEnum.term();
+
+		Bits liveDocs = MultiBits.getLiveDocs(reader); // null = no deletions
 		PostingsEnum postings = null;
 		long count = 0;
-		BytesRef term;
-		while (count < limit && null != (term = termsEnum.next()))
+		for (; null != term && count < limit; term = termsEnum.next())
 		{
+			if (null != prefixBytes && !StringHelper.startsWith(term, prefixBytes))
+				break; // sorted: no later term has the prefix either
+
+			if (null != afterBytes && term.compareTo(afterBytes) <= 0)
+				continue; // the cursor itself - seekCeil lands ON it when it is still a key
+
 			postings = termsEnum.postings(postings, PostingsEnum.NONE);
 			if (!hasLiveDoc(postings, liveDocs))
 				continue;
 
+			boolean more;
 			try {
-				sink.accept(term.utf8ToString());
+				more = sink.test(term.utf8ToString());
 			} catch (RuntimeException e) {
 				throw new SinkFailure(e);
 			}
 			count++;
+			if (!more)
+				break;
 		}
 		return count;
 	}

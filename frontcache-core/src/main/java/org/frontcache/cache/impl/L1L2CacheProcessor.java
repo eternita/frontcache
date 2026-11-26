@@ -28,6 +28,7 @@ import java.util.function.Consumer;
 import org.frontcache.FCConfig;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.cache.CacheStats;
+import org.frontcache.cache.CachedKeys;
 import org.frontcache.cache.FcCacheMetrics;
 import org.frontcache.cache.CacheProcessorBase;
 import org.frontcache.core.FCHeaders;
@@ -448,20 +449,56 @@ public class L1L2CacheProcessor extends CacheProcessorBase implements CacheProce
 	}
 
 	/**
-	 * L1 first, then L2 - the tiers are disjoint ({@code putToCache} writes one or the other), so no
-	 * key is listed twice. L1 is bounded by its Ehcache config and copied as {@code getKeys()} always
-	 * did; L2 is streamed from the index, which is what keeps a dump of a large index out of the heap.
+	 * Every key, in {@link CachedKeys#ORDER} - the unbounded case of the ranged listing below.
 	 */
 	@Override
 	public long forEachCachedKey(Consumer<String> sink) throws IOException {
-		long count = 0;
+		return forEachCachedKey(null, null, Integer.MAX_VALUE, sink);
+	}
+
+	/**
+	 * L1 and L2 merged into one ordered listing, so a cursor works across both tiers. The tiers are
+	 * disjoint ({@code putToCache} writes one or the other), so no key is listed twice. L1 is bounded
+	 * by its Ehcache config: its keys in range are copied and sorted, as {@code getKeys()} always
+	 * copied them. L2 is streamed from the index in the same order and the L1 keys are slotted in
+	 * between - which is what keeps a dump of a large index out of the heap.
+	 */
+	@Override
+	public long forEachCachedKey(String prefix, String after, int limit, Consumer<String> sink) throws IOException {
+		if (0 >= limit)
+			return 0;
+
+		List<String> l1 = new ArrayList<String>();
 		for (Object key : ehCache.getKeys())
 		{
-			sink.accept(key.toString());
-			count++;
+			String k = key.toString();
+			if (CachedKeys.inRange(k, prefix, after))
+				l1.add(k);
 		}
+		l1.sort(CachedKeys.ORDER);
 
-		return count + luceneIndexManager.forEachKey(Integer.MAX_VALUE, sink);
+		int[] nextL1 = {0};
+		long[] count = {0};
+		luceneIndexManager.forEachKey(prefix, after, limit, l2Key -> {
+			while (nextL1[0] < l1.size() && count[0] < limit && CachedKeys.ORDER.compare(l1.get(nextL1[0]), l2Key) < 0)
+			{
+				sink.accept(l1.get(nextL1[0]++));
+				count[0]++;
+			}
+			if (count[0] >= limit)
+				return false; // the page filled with L1 keys - this L2 key belongs to the next one
+
+			sink.accept(l2Key);
+			count[0]++;
+			return count[0] < limit;
+		});
+
+		while (nextL1[0] < l1.size() && count[0] < limit)
+		{
+			sink.accept(l1.get(nextL1[0]++));
+			count[0]++;
+		}
+		return count[0];
 	}
 
 	@Override
