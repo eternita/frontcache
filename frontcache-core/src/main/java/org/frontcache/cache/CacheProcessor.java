@@ -15,9 +15,12 @@
  */
 package org.frontcache.cache;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Consumer;
 
 import org.frontcache.core.FcHttpClient;
 import org.frontcache.core.FrontCacheException;
@@ -85,6 +88,59 @@ public interface CacheProcessor {
 	public default List<String> getCachedKeys(int limit) {
 		List<String> keys = getCachedKeys();
 		return (keys.size() <= limit) ? keys : keys.subList(0, Math.max(0, limit));
+	}
+
+	/**
+	 * Hands every cached key to {@code sink}, one at a time, and returns how many it handed over -
+	 * for a caller that writes the keys somewhere ({@code dump-keys}, {@code get-cached-keys})
+	 * rather than keeping them. {@link #getCachedKeys()} holds every key in memory at once, which
+	 * on a large L2 index is an {@code OutOfMemoryError}; this holds none of them.
+	 *
+	 * Throws when the listing could not be completed, so a caller can tell a complete listing from
+	 * a partial one; whatever {@code sink} throws is passed on unchanged, and stops the listing.
+	 *
+	 * A {@code default} because it is additive: a processor that does not override it answers from
+	 * {@link #getCachedKeys()}, which is correct and exactly as expensive as it always was.
+	 */
+	public default long forEachCachedKey(Consumer<String> sink) throws IOException {
+		List<String> keys = getCachedKeys();
+		keys.forEach(sink);
+		return keys.size();
+	}
+
+	/**
+	 * Hands {@code sink} at most {@code limit} cached keys that start with {@code prefix} and sort
+	 * after {@code after}, <b>in {@link CachedKeys#ORDER}</b>, and returns how many - one page of a
+	 * listing that a caller walks by passing the last key it received as the next {@code after}.
+	 * {@code prefix} and {@code after} may be null (or empty), meaning no restriction.
+	 * <p>
+	 * The order is what makes the cursor work: {@code after} is a key, not a position, so a page
+	 * stays correct while entries are added and removed between requests - a key added behind the
+	 * cursor is simply not listed by this walk. Failures and the sink's exceptions behave as in
+	 * {@link #forEachCachedKey(Consumer)}.
+	 * <p>
+	 * A {@code default}, additive, for the same reason as that one: it filters and sorts
+	 * {@link #getCachedKeys()}, which a processor holding its keys in memory can afford.
+	 */
+	public default long forEachCachedKey(String prefix, String after, int limit, Consumer<String> sink) throws IOException {
+		if (0 >= limit)
+			return 0;
+
+		List<String> keys = new ArrayList<String>();
+		for (String key : getCachedKeys())
+			if (CachedKeys.inRange(key, prefix, after))
+				keys.add(key);
+		keys.sort(CachedKeys.ORDER);
+
+		long count = 0;
+		for (String key : keys)
+		{
+			if (count >= limit)
+				break;
+			sink.accept(key);
+			count++;
+		}
+		return count;
 	}
 
 	public void doSoftInvalidation(String currentRequestURL, String originUrlStr, Map<String, List<String>> requestHeaders, FcHttpClient client, RequestContext context);

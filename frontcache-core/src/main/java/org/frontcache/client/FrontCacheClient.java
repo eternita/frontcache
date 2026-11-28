@@ -22,12 +22,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
+import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HeaderElement;
 import org.apache.hc.core5.http.message.MessageSupport;
 import org.apache.hc.core5.http.HttpRequest;
@@ -53,6 +56,7 @@ import org.apache.hc.core5.http.message.MessageSupport;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.protocol.HttpContext;
+import org.frontcache.core.FCHeaders;
 import org.frontcache.core.FCUtils;
 import org.frontcache.core.WebResponse;
 import org.frontcache.guard.GuardRuleEntry;
@@ -412,6 +416,111 @@ public class FrontCacheClient {
 		}
 
 		return success;
+	}
+
+	/**
+	 * One page of the node's cached keys: at most {@code limit} keys starting with {@code prefix}
+	 * (null = all) and sorting after {@code after} (null = from the first), in the node's key order.
+	 * Walk a listing by passing {@link CachedKeysPage#nextAfter()} back while
+	 * {@link CachedKeysPage#isMore()} - or let {@link #forEachCachedKey} do it. A node caps a page at
+	 * 100,000 keys and answers a larger {@code limit} with that many.
+	 * <p>
+	 * Unlike {@link #getCachedKeys(OutputStream)}, which streams the whole listing, a page is bounded,
+	 * and a failure is an exception rather than a short listing that reads as complete: the node
+	 * says how many keys the page holds, and a page that arrives with fewer is refused.
+	 *
+	 * @throws CachedKeysPage.PagingNotSupportedException when the node predates paging - it ignores
+	 *         {@code limit} and lists every key, which this method does not read
+	 * @throws IOException on any other failure: refused, an HTTP error, a truncated page
+	 */
+	public CachedKeysPage getCachedKeysPage(String prefix, String after, int limit) throws IOException
+	{
+		if (0 >= limit)
+			throw new IllegalArgumentException("limit must be positive: " + limit);
+
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		urlParameters.add(new BasicNameValuePair("action", FrontcacheAction.GET_CACHED_KEYS));
+		urlParameters.add(new BasicNameValuePair("limit", String.valueOf(limit)));
+		if (null != prefix && !prefix.isEmpty())
+			urlParameters.add(new BasicNameValuePair("prefix", prefix));
+		if (null != after && !after.isEmpty())
+			urlParameters.add(new BasicNameValuePair("after", after));
+
+		HttpPost post = new HttpPost(frontCacheURI);
+		if (null != apiKey)
+			post.addHeader("Authorization", "Bearer " + apiKey);
+		post.setEntity(new UrlEncodedFormEntity(urlParameters, StandardCharsets.UTF_8));
+
+		ClassicHttpResponse response = client.executeOpen(null, post, null);
+		try {
+			if (200 != response.getCode())
+				throw new IOException("get-cached-keys page from " + frontCacheURI + ": HTTP " + response.getCode());
+
+			Header countHeader = response.getFirstHeader(FCHeaders.X_FRONTCACHE_KEYS_COUNT);
+			BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent(), StandardCharsets.UTF_8));
+			if (null == countHeader)
+			{
+				// no paging headers: an un-keyed refusal (one JSON line) or a node that predates paging and
+				// is now streaming every key. Read one line to tell them apart, then drop the connection -
+				// closing the stream instead would read the rest of the listing to keep it reusable.
+				String firstLine = reader.readLine();
+				post.cancel();
+				if (null != firstLine && firstLine.startsWith("{"))
+					throw new IOException("get-cached-keys page refused by " + frontCacheURI + ": "
+							+ (firstLine.length() > 200 ? firstLine.substring(0, 200) + "..." : firstLine));
+				throw new CachedKeysPage.PagingNotSupportedException(frontCacheURI
+						+ " answered without paging - it predates paged get-cached-keys");
+			}
+
+			int expected;
+			try {
+				expected = Integer.parseInt(countHeader.getValue().trim());
+			} catch (NumberFormatException e) {
+				throw new IOException("get-cached-keys page from " + frontCacheURI + ": bad key count " + countHeader.getValue());
+			}
+
+			List<String> keys = new ArrayList<String>(Math.min(expected, 100_000));
+			String line;
+			while (null != (line = reader.readLine()))
+				if (!line.isEmpty())
+					keys.add(line);
+
+			if (keys.size() != expected)
+				throw new IOException("get-cached-keys page from " + frontCacheURI + " truncated: "
+						+ keys.size() + " of " + expected + " keys arrived");
+
+			Header moreHeader = response.getFirstHeader(FCHeaders.X_FRONTCACHE_KEYS_MORE);
+			return new CachedKeysPage(keys, null != moreHeader && "true".equalsIgnoreCase(moreHeader.getValue().trim()));
+		} finally {
+			try {
+				response.close();
+			} catch (IOException e) {
+				// a cancelled exchange fails to close; the answer (or the exception in flight) is what counts
+			}
+		}
+	}
+
+	/**
+	 * Every cached key starting with {@code prefix} (null = all), page by page, to {@code sink} - so
+	 * the caller holds one page of {@code pageSize} keys at a time, never the listing. Returns how many.
+	 * Throws as {@link #getCachedKeysPage} does, part way included: what the sink received by then is
+	 * an incomplete listing.
+	 */
+	public long forEachCachedKey(String prefix, int pageSize, Consumer<String> sink) throws IOException
+	{
+		long count = 0;
+		String after = null;
+		while (true)
+		{
+			CachedKeysPage page = getCachedKeysPage(prefix, after, pageSize);
+			for (String key : page.getKeys())
+				sink.accept(key);
+			count += page.getKeys().size();
+
+			if (!page.isMore() || null == page.nextAfter())
+				return count;
+			after = page.nextAfter();
+		}
 	}
 
 	/**

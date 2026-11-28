@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -49,9 +50,8 @@ import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
@@ -60,7 +60,9 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.store.SimpleFSLockFactory;
+import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.StringHelper;
 import org.frontcache.cache.CacheProcessor;
 import org.frontcache.core.WebResponse;
 import org.slf4j.Logger;
@@ -1269,13 +1271,11 @@ public class LuceneIndexManager {
 	}
 
 	/**
-	 * Returns all URL keys stored in the index.
-	 * <p>
-	 * Uses a paginated {@link MatchAllDocsQuery} with {@link IndexSearcher#searchAfter}
-	 * and loads only the {@link #URL_FIELD} stored field per document, avoiding the
-	 * cost of materialising large binary / JSON fields for every hit.
+	 * Returns all URL keys stored in the index - see {@link #forEachKey(String, String, int, Predicate)}, which this
+	 * collects into a list. Prefer that for a caller that writes the keys somewhere: on a large index
+	 * the list alone does not fit in the heap.
 	 *
-	 * @return list of normalised URL keys (never {@code null})
+	 * @return list of normalised URL keys (never {@code null}); empty when L2 is unavailable
 	 */
 	public List<String> getKeys()
 	{
@@ -1283,73 +1283,150 @@ public class LuceneIndexManager {
 	}
 
 	/**
-	 * At most {@code limit} keys - the same scan as {@link #getKeys()}, stopped early.
+	 * At most {@code limit} keys - the same scan as {@link #getKeys()}, stopped early. Logs and returns
+	 * what it has, possibly nothing, when the index cannot be read, as it always did.
 	 */
 	public List<String> getKeys(int limit)
 	{
+		List<String> keys = new ArrayList<String>();
+		try {
+			forEachKey(null, null, limit, keys::add);
+		} catch (IOException e) {
+			logger.error("Error during loading urls/keys from index: {}", e.toString());
+		}
+		return keys;
+	}
+
+	/**
+	 * Offers {@code sink} the live URL keys that start with {@code prefix} and sort after
+	 * {@code after} (either null or empty = no restriction), in key order, until it has offered
+	 * {@code limit} or {@code sink} answers {@code false}; returns how many it offered.
+	 * <p>
+	 * The keys come from the {@link #URL_FIELD} terms dictionary, not from stored fields. A key is
+	 * both indexed and stored as the same string ({@link #indexDoc}), so the two answer alike - but
+	 * reading a stored field decompresses the block the document sits in, page body and JSON
+	 * included, which on a 50 GB index is reading most of 50 GB to list a few hundred MB of URLs.
+	 * The terms dictionary holds the keys alone, sorted - so a prefix or a cursor is one seek, not a
+	 * scan from the first key.
+	 * <p>
+	 * Key order is UTF-8 byte order, which is Unicode code-point order -
+	 * {@link org.frontcache.cache.CachedKeys#ORDER}, which the L1 keys are merged in.
+	 * <p>
+	 * <b>The live-docs check is not optional.</b> A deleted (invalidated, expired, replaced) document
+	 * keeps its term in its segment until that segment is merged away; only the reader's live docs
+	 * say it is gone. Without the check an invalidated URL is listed again. A URL is in at most one
+	 * live document ({@code updateDocument} replaces by this term), so it is listed at most once.
+	 * <p>
+	 * Nothing is collected here: memory does not grow with the number of keys.
+	 *
+	 * @throws IOException when L2 is unavailable or the listing could not be completed - a caller
+	 *         writing a dump must not mistake a partial listing for a complete one. Whatever
+	 *         {@code sink} throws is passed on unchanged.
+	 */
+	public long forEachKey(String prefix, String after, int limit, Predicate<String> sink) throws IOException
+	{
 		if (0 >= limit)
-			return Collections.emptyList();
+			return 0;
 
 		Acquired acquired = null;
 		try {
 			acquired = acquireSearcher();
-		} catch (Exception e1) {
-			logger.debug("Error during acquiring L2 searcher. " + e1.getMessage());
-			return Collections.emptyList();
+		} catch (Exception e) {
+			throw new IOException("L2 searcher unavailable: " + e, e);
 		}
 
 		if (null == acquired)
-			return Collections.emptyList();
-
-		List<String> keys = new ArrayList<String>();
+			throw new IOException("L2 index unavailable");
 
 		try {
-			IndexSearcher searcher = acquired.searcher;
-			StoredFields storedFields = searcher.getIndexReader().storedFields();
-
-			// only load the URL stored field — skip JSON, BIN, etc.
-			Set<String> urlFieldOnly = Collections.singleton(URL_FIELD);
-
-			int pageSize = Math.min(1024, limit);
-			Query query = new MatchAllDocsQuery();
-			ScoreDoc lastHit = null;
-
-			while (true) {
-				TopDocs topDocs = (lastHit == null)
-						? searcher.search(query, pageSize)
-						: searcher.searchAfter(lastHit, query, pageSize);
-
-				if (topDocs.scoreDocs.length == 0)
-					break;
-
-				for (ScoreDoc hit : topDocs.scoreDocs) {
-					Document doc = storedFields.document(hit.doc, urlFieldOnly);
-					String url = doc.get(URL_FIELD);
-					if (url != null)
-						keys.add(url);
-					else
-						logger.error("URL is null for doc id {} (probably corrupted during index time)", hit.doc);
-
-					if (keys.size() >= limit)
-						break;
-				}
-
-				if (keys.size() >= limit)
-					break; // enough
-
-				if (topDocs.scoreDocs.length < pageSize)
-					break; // last page
-
-				lastHit = topDocs.scoreDocs[topDocs.scoreDocs.length - 1];
-			}
-		} catch (Exception e) {
-			if (!discardWriterIfLockLost(e, "getKeys"))
-				logger.error("Error during loading urls/keys from index", e);
+			return forEachLiveKey(acquired.searcher.getIndexReader(), prefix, after, limit, sink);
+		} catch (SinkFailure f) {
+			throw f.getCause(); // the caller's failure, not the index's - passed on as is
+		} catch (IOException | RuntimeException e) {
+			discardWriterIfLockLost(e, "forEachKey");
+			throw (e instanceof IOException) ? (IOException) e : new IOException(e.toString(), e);
 		} finally {
 			releaseSearcher(acquired);
 		}
+	}
 
-		return keys;
+	/**
+	 * The walk {@link #forEachKey} does, over any reader - static so a test can hand it a reader whose
+	 * deleted documents are still in their segment. This index's merge policy reclaims a small
+	 * segment's deletes almost at once, so a test through the manager never sees a deleted term and
+	 * passes with the live-docs check removed.
+	 */
+	static long forEachLiveKey(IndexReader reader, String prefix, String after, int limit, Predicate<String> sink) throws IOException
+	{
+		Terms terms = MultiTerms.getTerms(reader, URL_FIELD);
+		if (null == terms)
+			return 0; // no document has ever been indexed
+
+		BytesRef prefixBytes = (null == prefix || prefix.isEmpty()) ? null : new BytesRef(prefix);
+		BytesRef afterBytes = (null == after || after.isEmpty()) ? null : new BytesRef(after);
+
+		// start at whichever bound is further on: a cursor before the prefix starts at the prefix,
+		// a cursor inside (or past) it starts at the cursor
+		BytesRef start = prefixBytes;
+		if (null != afterBytes && (null == start || afterBytes.compareTo(start) > 0))
+			start = afterBytes;
+
+		TermsEnum termsEnum = terms.iterator();
+		BytesRef term;
+		if (null == start)
+			term = termsEnum.next();
+		else
+			term = (TermsEnum.SeekStatus.END == termsEnum.seekCeil(start)) ? null : termsEnum.term();
+
+		Bits liveDocs = MultiBits.getLiveDocs(reader); // null = no deletions
+		PostingsEnum postings = null;
+		long count = 0;
+		for (; null != term && count < limit; term = termsEnum.next())
+		{
+			if (null != prefixBytes && !StringHelper.startsWith(term, prefixBytes))
+				break; // sorted: no later term has the prefix either
+
+			if (null != afterBytes && term.compareTo(afterBytes) <= 0)
+				continue; // the cursor itself - seekCeil lands ON it when it is still a key
+
+			postings = termsEnum.postings(postings, PostingsEnum.NONE);
+			if (!hasLiveDoc(postings, liveDocs))
+				continue;
+
+			boolean more;
+			try {
+				more = sink.test(term.utf8ToString());
+			} catch (RuntimeException e) {
+				throw new SinkFailure(e);
+			}
+			count++;
+			if (!more)
+				break;
+		}
+		return count;
+	}
+
+	/** Carries a sink's exception past {@link #forEachKey}'s index-failure handling, which must not see it. */
+	static final class SinkFailure extends RuntimeException {
+		private static final long serialVersionUID = 1L;
+
+		SinkFailure(RuntimeException cause) {
+			super(cause);
+		}
+
+		@Override
+		public synchronized RuntimeException getCause() {
+			return (RuntimeException) super.getCause();
+		}
+	}
+
+	private static boolean hasLiveDoc(PostingsEnum postings, Bits liveDocs) throws IOException
+	{
+		for (int doc = postings.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = postings.nextDoc())
+			if (null == liveDocs || liveDocs.get(doc))
+				return true;
+
+		return false;
 	}
 
 	/**
